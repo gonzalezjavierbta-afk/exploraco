@@ -224,6 +224,26 @@ function mapMapa(rows) {
   });
 }
 
+// Stats reales para homepage (independientes del filtro). Compartido entre
+// el modo recomendar y el modo normal.
+async function statsDestinos(sql) {
+  var statsRows = await sql(
+    'SELECT '
+    + '  COUNT(*) AS total_destinos, '
+    + '  COUNT(DISTINCT ciudad) AS total_ciudades, '
+    + '  COALESCE(SUM(total_resenas), 0) AS total_resenas, '
+    + '  ROUND(AVG(rating)::numeric, 1) AS rating_promedio '
+    + 'FROM destinos WHERE status = \'published\' AND categoria_slug != \'blog\''
+  );
+  var st = statsRows[0] || {};
+  return {
+    destinos: parseInt(st.total_destinos  || 0),
+    ciudades: parseInt(st.total_ciudades  || 0),
+    resenas:  parseInt(st.total_resenas   || 0),
+    rating:   st.rating_promedio ? parseFloat(st.rating_promedio) : 0,
+  };
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -247,19 +267,17 @@ module.exports = async function handler(req, res) {
     var cercaRaw = req.query.cerca_de || null;
     var radioKm  = BUSQ.clampRadio(req.query.radio_km);
     var ordenRaw = req.query.orden || null;
-    var sugerir  = String(req.query.sugerir || '') === '1';
-
-    // Wave 2 (D7/D10): el endpoint IGNORA recomendar/semilla y degrada a normal.
-    // (Los hooks viven en busqueda.js: BUSQ.buildRecomendar / WAVE.)
+    var sugerir    = String(req.query.sugerir || '')    === '1';
+    var recomendar = String(req.query.recomendar || '') === '1';
+    var semilla    = BUSQ.parseSemilla(req.query.semilla);
 
     var cerca  = BUSQ.parseParLatLng(cercaRaw);
-    var tokens = BUSQ.normTokens(q);
-    var usaMotor = sugerir || tokens.length > 0 || !!cerca
-                   || (ordenRaw && ordenRaw !== 'relevancia');
 
-    // ---- Modo sugerir=1 (autocompletado ligero, ignora filtros salvo q) ----
+    // ---- Modo sugerir=1 (motor completo: normalizacion + typos + sinonimos) ----
     if (sugerir) {
-      var sg = BUSQ.buildSugerir({ q: q });
+      var sTokens = BUSQ.normTokens(q);
+      var sExp = await BUSQ.cargarExpansiones(sql, sTokens);
+      var sg = BUSQ.buildSugerir({ q: q, expansiones: sExp });
       var sLimit = Math.min(limit, 10);
       var sConds = ["d.status = 'published'", "d.categoria_slug != 'blog'"];
       if (sg.conds.length) sConds = sConds.concat(sg.conds);
@@ -267,7 +285,8 @@ module.exports = async function handler(req, res) {
       var sP = sg.params.concat([sLimit]);
       try {
         var sRows = await sql(
-          'SELECT id, slug, nombre, categoria_slug, ciudad, region '
+          'SELECT id, slug, nombre, categoria_slug, ciudad, region, ('
+          + sg.viaSql + ') AS via '
           + 'FROM destinos d WHERE ' + sWhere + ' ORDER BY ' + sg.orderSql
           + ' LIMIT $' + sP.length,
           sP
@@ -277,7 +296,8 @@ module.exports = async function handler(req, res) {
           sugerencias: sRows.map(function(r) {
             return { id: r.id, slug: r.slug, name: r.nombre,
               nombre: r.nombre, cat: r.categoria_slug || 'sitio',
-              city: r.ciudad || '', ciudad: r.ciudad || '', region: r.region || '' };
+              city: r.ciudad || '', ciudad: r.ciudad || '', region: r.region || '',
+              via: r.via || 'normal' };
           }),
         });
       } catch (eSug) {
@@ -295,10 +315,80 @@ module.exports = async function handler(req, res) {
           sugerencias: lRows.map(function(r) {
             return { id: r.id, slug: r.slug, name: r.nombre,
               nombre: r.nombre, cat: r.categoria_slug || 'sitio',
-              city: r.ciudad || '', ciudad: r.ciudad || '', region: r.region || '' };
+              city: r.ciudad || '', ciudad: r.ciudad || '', region: r.region || '',
+              via: 'normal' };
           }),
         });
       }
+    }
+
+    // ---- Wave 2: parseNL data-driven + sinonimos (D5) + filtros (A3) ----
+    // parseNL consume categoria/zona/precio de q a filtros estructurados; el
+    // resto (libres) va al texto y se expande por sinonimos (aditivo).
+    var lexico = null, parse = null, expansiones = {};
+    if (q) {
+      lexico = await BUSQ.cargarLexico(sql);
+      parse = BUSQ.parseNL(q, lexico);
+      if (parse.libres.length) {
+        expansiones = await BUSQ.cargarExpansiones(sql, parse.libres);
+      }
+    }
+    var libres = parse ? parse.libres : [];
+    var filtros = parse ? parse.filtros : null;
+    if (filtros) {
+      // El parametro explicito SIEMPRE gana sobre el parsing del texto.
+      if (cat) filtros = Object.assign({}, filtros, { categoria_slug: null });
+      if (ciudad) filtros = Object.assign({}, filtros, { ciudad: null, region: null, barrio: null });
+    }
+    var tieneFiltros = !!(filtros && (filtros.categoria_slug || filtros.ciudad
+      || filtros.region || filtros.barrio || filtros.precio_min != null || filtros.precio_max != null));
+    var usaMotor = libres.length > 0 || tieneFiltros || !!cerca
+                   || (ordenRaw && ordenRaw !== 'relevancia');
+    var qMotor = libres.join(' ');
+
+    // ---- Modo recomendar=1 (D10 / Wave 2): degradacion 1 -> 2 -> 3 ----
+    // Si viene categoria en la query (los directorios la envian), la
+    // recomendacion se filtra a esa categoria; sin categoria -> cross-categoria.
+    if (recomendar && modo !== 'mapa') {
+      var sesion = BUSQ.parseSesion(req);
+      var rec = await BUSQ.recomendarCascada(sql, {
+        semilla: semilla, usuario_id: sesion.ok ? sesion.usuario_id : null,
+        categoria: cat });
+      if (rec.candidatos.length) {
+        var socMap = {};
+        var recIds = rec.candidatos.map(function (c) {
+          socMap[c.destino_id] = c.social_score; return c.destino_id;
+        });
+        var rParams = [recIds];
+        var rCat = '';
+        if (cat) { rParams.push(String(cat)); rCat = ' AND d.categoria_slug = $' + rParams.length; }
+        var rRows = await sql(
+          'SELECT d.*, dd.checkin, dd.checkout, dd.habitaciones, dd.amenidades, '
+          + 'dd.faqs, dd.booking_url, dd.hostelworld_url, dd.airbnb_url '
+          + 'FROM destinos d LEFT JOIN destinos_detalles dd ON dd.destino_id = d.id '
+          + "WHERE d.id = ANY($1::uuid[]) AND d.status = 'published' "
+          + "AND d.categoria_slug <> 'blog'" + rCat,
+          rParams
+        );
+        var rData = rRows.map(toPlace);
+        rData.forEach(function (p) { p.social_score = socMap[String(p.id)] || 0; });
+        var rCtx = { tokens: libres, cerca: cerca, radio_km: radioKm };
+        rData.sort(function (a, b) {
+          var sa = BUSQ.rankScore(a, rCtx), sb = BUSQ.rankScore(b, rCtx);
+          if (sb !== sa) return sb - sa;
+          var ra = Number(a.rating) || 0, rb = Number(b.rating) || 0;
+          if (rb !== ra) return rb - ra;
+          var va = Number(a.reviews) || 0, vb = Number(b.reviews) || 0;
+          if (vb !== va) return vb - va;
+          return String(a.id) < String(b.id) ? -1 : (String(a.id) > String(b.id) ? 1 : 0);
+        });
+        return res.status(200).json({
+          ok: true, modo: 'recomendar', nivel: rec.nivel,
+          total: rData.length, stats: await statsDestinos(sql),
+          data: rData.slice(offset, offset + limit),
+        });
+      }
+      // Nivel 3 sin candidatos: degrada a busqueda normal (mas abajo).
     }
 
     // ---- Modo mapa ----
@@ -310,7 +400,8 @@ module.exports = async function handler(req, res) {
         });
       }
       var mb = buildBase(cat, ciudad, dest);
-      var mBusq = BUSQ.buildBusqueda({ q: q, cerca_de: cercaRaw, radio_km: radioKm, orden: ordenRaw });
+      var mBusq = BUSQ.buildBusqueda({ q: qMotor, cerca_de: cercaRaw, radio_km: radioKm,
+        orden: ordenRaw, filtros: filtros, expansiones: expansiones });
       var mConds = mb.conds.concat(mBusq.conds);
       var mWhere = mConds.join(' AND ');
       var mParams = mb.params.concat(mBusq.params);
@@ -345,7 +436,8 @@ module.exports = async function handler(req, res) {
       rows = lg.rows; countRows = lg.countRows;
     } else {
       var nb = buildBase(cat, ciudad, dest);
-      var nBusq = BUSQ.buildBusqueda({ q: q, cerca_de: cercaRaw, radio_km: radioKm, orden: ordenRaw });
+      var nBusq = BUSQ.buildBusqueda({ q: qMotor, cerca_de: cercaRaw, radio_km: radioKm,
+        orden: ordenRaw, filtros: filtros, expansiones: expansiones });
       var nConds = nb.conds.concat(nBusq.conds);
       var nWhere = nConds.join(' AND ');
       var nParams = nb.params.concat(nBusq.params);
@@ -373,15 +465,7 @@ module.exports = async function handler(req, res) {
     }
 
     // Stats reales para homepage (independientes del filtro)
-    var statsRows = await sql(
-      'SELECT '
-      + '  COUNT(*) AS total_destinos, '
-      + '  COUNT(DISTINCT ciudad) AS total_ciudades, '
-      + '  COALESCE(SUM(total_resenas), 0) AS total_resenas, '
-      + '  ROUND(AVG(rating)::numeric, 1) AS rating_promedio '
-      + 'FROM destinos WHERE status = \'published\' AND categoria_slug != \'blog\''
-    );
-    var st = statsRows[0] || {};
+    var stats = await statsDestinos(sql);
 
     var data = rows.map(toPlace);
     if (usaMotor) {
@@ -394,12 +478,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       ok:    true,
       total: parseInt((countRows[0] || {}).n || 0),
-      stats: {
-        destinos: parseInt(st.total_destinos  || 0),
-        ciudades: parseInt(st.total_ciudades  || 0),
-        resenas:  parseInt(st.total_resenas   || 0),
-        rating:   st.rating_promedio ? parseFloat(st.rating_promedio) : 0,
-      },
+      stats: stats,
       data: data,
     });
 

@@ -4709,8 +4709,8 @@ Unificar los cuatro buscadores divergentes en **una** implementacion con **norma
 
 ### Diferido a Wave 2 (NO hecho en esta tanda)
 
-- Migracion **054** (diccionario de sinonimos), tolerancia a typos (trigramas), parsing de lenguaje natural y recomendaciones sociales (co-ocurrencia + guardados + referidos).
-- **Follow-up (condicion 1 de ADR-090):** extraer `normGeo` de `api/interacciones.js` a `busqueda.js`.
+- Migracion **054** (diccionario de sinonimos), tolerancia a typos (trigramas), parsing de lenguaje natural y recomendaciones sociales (co-ocurrencia + guardados + referidos). **EJECUTADO en Wave 2: ver `TSK-199`; la migracion 054 quedo APLICADA en Neon.**
+- **Follow-up (condicion 1 de ADR-090):** extraer `normGeo` de `api/interacciones.js` a `busqueda.js`. **PENDIENTE** (deuda viva, no bloquea; registrada en `TSK-199`).
 
 ### Gate / decision de producto
 
@@ -4738,6 +4738,49 @@ Unificar los cuatro buscadores divergentes en **una** implementacion con **norma
 ### Entrega formal - Rollback versionado de la 053
 
 `db/cleanups/006_rollback_053_busqueda_normalizada.sql` (2462 bytes) queda registrado como **ENTREGA FORMAL de Wave 1** (evidencia del incidente del ledger y del rollback aplicado durante T3b). Es el **procedimiento de rollback versionado de la migracion 053**, **IDEMPOTENTE**; **NO debe borrarse** (Cero Borrado Logico, ADR-003): es la via de reversion oficial de la 053.
+
+## TSK-199 - Buscador unificado Wave 2 (ADR-090 `### Enmienda Wave 2`): migracion 054 (diccionario de sinonimos) + typos por trigramas (D1) + parseNL data-driven (D6) + recomendacion personalizada con degradacion (D10) - 2026-10-07 - CERRADO EN WORKING TREE (sin commit)
+
+**Estado: CERRADO EN WORKING TREE (sin commit).** Decision de arquitectura: `DECISIONS.md` **ADR-090, `### Enmienda Wave 2`** (Estado **ACEPTADO**; veredicto `APRUEBA -- 2026-10-07 -- @architect-review`; rango ADR-090 `L7339-7618`). La Wave 1 (**TSK-198**) NO se reabre. **Cero funciones serverless nuevas: presupuesto Vercel 8/8 INTACTO** (ADR-010); el motor `busqueda.js` sigue siendo el asset dual UMD-lite de la raiz. **Cero Borrado Logico** (ADR-003): no se elimino ningun item historico de TSK-198.
+
+### Que se estaba haciendo
+
+Activar los cuatro puntos que la Wave 1 dejo diferidos (D1 typos, D5 sinonimos, D6 parseNL, D10 recomendar) sobre el motor `busqueda.js`, con una migracion aditiva (054) y sin tocar el shape `{ok,total,stats,data}` ni el `modo=mapa`.
+
+### Alcance ejecutado (real, no el plan original)
+
+1. **Migracion 054 APLICADA en Neon** (`db/migrations/054_busqueda_sinonimos.sql`, 9955 bytes, ASCII-safe, aditiva/idempotente): `schema_migrations` **max=54**, `resultado='aplicada'`. Crea la tabla `busqueda_sinonimos` (`termino_norm`/`canonico_norm` via `exploraco_norm()`, `tipo` CHECK, `peso numeric(4,2)`, `activo`, `creado_en`) con **3 indices** (PK + unico parcial `WHERE activo` + indice de canonico) y **15 filas seed** geograficas (`ON CONFLICT` idempotente: 2a corrida sin duplicar). Anade los **2 indices sociales parciales** `(destino_id,usuario_id)` y `(usuario_id,destino_id)` en `interacciones`, ambos `WHERE activo=true`. **054 UNICA: NO se crea una 055.**
+2. **`busqueda.js`:** constantes v1 fijas `MIN_COOC_USER=3`/`MAX_COOC`/`REF_DECAY`/`REF_MAX_NIVEL`; `parseNL` data-driven; `sqlSimExpr` (typos por trigramas + cap); expansion de sinonimos (anade `canonico_norm` como token alternativo, nunca reemplaza el original); `buildRecomendar`/`recomendarCascada` con degradacion **1 -> 2 -> 3**; `buildSugerir` expone el campo `via`.
+3. **`api/destinos.js`:** typos + sinonimos + `parseNL`; `sugerir=1` devuelve `via` = `normal|sinonimo|typo`; `recomendar=1` respeta `categoria`. **`api/utilidades.js`:** `/buscar` SSR con la misma paridad. Shape `{ok,total,stats,data}` y `modo=mapa` **intactos**; **8/8 endpoints**.
+4. **Frontend:** `index.html` + `directorio-{hostal,comida,sitio,evento}.html` con dropdown etiquetado por `via` y bloque "Recomendado para ti" (oculto si vacio; los directorios envian `categoria`).
+5. **Paridad de trigramas cerrada:** `scripts/smoke_busqueda_parity.js` paso de **51/51 a 64/64 PASS** (13 casos nuevos) al alinear `exploraco_trgm` con `trigramas()`.
+
+### Verificacion (medida en el turno de cierre)
+
+| Prueba | Resultado |
+|---|---|
+| Migracion 054 en `schema_migrations` | **max=54**, `aplicada` |
+| `busqueda_sinonimos` | **3 indices** + **15 filas seed**; idempotente (2a corrida limpia) |
+| Indices sociales `interacciones` | **2** parciales `WHERE activo=true` |
+| `scripts/smoke_busqueda_parity.js` | **64/64 PASS** (era 51/51) |
+| Escudo GOLD (@qa-auditor) | **CERTIFICA OK**: sintaxis **9/9**, ASCII **3/3**, balance divs **5/5**, smoke **64/64**, invariantes **4/4** |
+| Presupuesto Vercel | **8/8 INTACTO** (sin endpoint nuevo) |
+
+### Deudas / follow-ups (NO bloquean)
+
+1. **Condicion 1 de ADR-090 (pendiente):** extraer `normGeo`/`sqlNormGeo` de `api/interacciones.js` a `busqueda.js`.
+2. Calibracion `EXPLAIN ANALYZE` de `BUSQ_UMBRALES` con volumetria real.
+3. **Opcional:** `sugerir=1` con scoping por categoria en directorios (hoy cross-categoria).
+4. **Opcional:** unificar el JS duplicado de los 4 directorios en `directorio-busqueda.js`.
+5. `npm run test` sigue roto por **BUG-118** preexistente (no de esta tanda; NO se duplica en `BUGS_HISTORICOS.md`).
+
+### Bug aparte (NO de esta tanda) - BUG-118
+
+`misAlbumRatingTxt is not defined` en el inline de `mi-perfil.html`; **PRE-EXISTENTE**, ya registrado como **BUG-118** (`BUGS_HISTORICOS.md` L2060). Se arregla en tanda separada; **no se crea duplicado**.
+
+### Archivos tocados
+
+`busqueda.js` · `api/destinos.js` · `api/utilidades.js` · `index.html` · `directorio-comida.html` · `directorio-evento.html` · `directorio-hostal.html` · `directorio-sitio.html` · `db/migrations/054_busqueda_sinonimos.sql` (nuevo) · `scripts/smoke_busqueda_parity.js`. `DECISIONS.md` ADR-090 `### Enmienda Wave 2` (documentacion). En **working tree, SIN commitear** al cierre de este pase documental.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

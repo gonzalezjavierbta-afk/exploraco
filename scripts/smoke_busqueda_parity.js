@@ -14,12 +14,16 @@
 //   public.exploraco_norm). Si no esta, el smoke falla con SQLSTATE 42883 y lo
 //   dice: es el aviso legitimo de "aplicar la 053", no un falso negativo.
 //
-// FUERA DE ALCANCE (declarado)
-//   NO compara exploraco_trgm contra un trigramas() JS completo (ese espejo vive
-//   en busqueda.js, Wave 1). SI cubre, desde T3c, dos guardas de exploraco_trgm
-//   (ADR-090 D1): (a) un caso conocido con trigramas esperados y (b) una guarda
-//   de rendimiento con entrada larga (9000+ chars) y umbral de tiempo, para no
-//   repetir el incidente de cuelgue detectado en T3c.
+// COBERTURA DE TRIGRAMAS (dos capas)
+//   1) Desde T3c, dos guardas de exploraco_trgm (ADR-090 D1): (a) un caso
+//      conocido con trigramas esperados y (b) una guarda de rendimiento con
+//      entrada larga (9000+ chars) y umbral de tiempo, para no repetir el
+//      incidente de cuelgue detectado en T3c.
+//   2) Wave 2 (cierre de deuda): paridad public.exploraco_trgm (SQL) contra
+//      trigramas() (JS, busqueda.js), JSON.stringify(db) === JSON.stringify(js),
+//      sobre un corpus de bordes (largas >5, cortas 1-4, tildes/enie/mayusculas,
+//      espacios multiples + signos y caso vacio). Antes estaba declarada FUERA
+//      DE ALCANCE; ya NO lo esta.
 //
 // USO
 //   node scripts/smoke_busqueda_parity.js
@@ -185,6 +189,46 @@ function repr(s) { return JSON.stringify(s); }
     var ep = (e && e.code) ? String(e.code) : 'n/a';
     console.log('FAIL - guarda de rendimiento exploraco_trgm abortada: SQLSTATE ' + ep);
     total++; fail++;
+  }
+
+  // --- (Wave 2) Cierre de deuda: paridad public.exploraco_trgm (SQL) vs
+  //     trigramas() (JS, busqueda.js). Antes declarada FUERA DE ALCANCE; ahora
+  //     se cubre con un corpus de bordes (largas >5, cortas 1-4, tildes/enie/
+  //     mayusculas, espacios multiples + signos y caso vacio). Mismo criterio
+  //     que el corpus del normalizador: diacriticos como escapes \uXXXX.
+  var TRGM_PARIDAD = [
+    'bucaramanga',
+    'Cartagena de Indias',
+    'a',
+    'ab',
+    'abc',
+    'cali',
+    'Bogot\u00e1',
+    'NI\u00d1O',
+    'Medell\u00edn',
+    '  multiples   espacios  ',
+    'signos!@#$%^&*()',
+    'A1B2C3 con Se\u00f1ales',
+    ''
+  ];
+  var T = require(path.join(__dirname, '..', 'busqueda.js')).trigramas;
+  for (var tp = 0; tp < TRGM_PARIDAD.length; tp++) {
+    var tx = TRGM_PARIDAD[tp];
+    var jsArr = T(tx);
+    try {
+      var pRows = await sql('SELECT public.exploraco_trgm($1::text) AS t', [tx]);
+      var dbArr = (pRows && pRows[0] && pRows[0].t) ? pRows[0].t : [];
+      var pOk = (JSON.stringify(dbArr) === JSON.stringify(jsArr));
+      total++;
+      if (pOk) { pass++; } else { fail++; }
+      console.log((pOk ? 'PASS' : 'FAIL') + ' [trgm.paridad ' + (tp + 1) + '] ' + repr(tx)
+        + ' n_js=' + jsArr.length + ' n_db=' + dbArr.length
+        + (pOk ? '' : ' js=' + JSON.stringify(jsArr) + ' db=' + JSON.stringify(dbArr)));
+    } catch (e) {
+      var pc = (e && e.code) ? String(e.code) : 'n/a';
+      console.log('FAIL - paridad exploraco_trgm ' + repr(tx) + ' abortado: SQLSTATE ' + pc);
+      total++; fail++;
+    }
   }
 
   console.log('');

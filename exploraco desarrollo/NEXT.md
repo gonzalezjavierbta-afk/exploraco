@@ -241,6 +241,31 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-07 (pase documental único R2, 10ª tanda) - Buscador unificado Wave 2 (ADR-090 Enmienda Wave 2)
+
+**Qué se estaba haciendo:** activar los cuatro puntos que la Wave 1 (TSK-198) dejó diferidos sobre el motor `busqueda.js`: **D1** typos por trigramas, **D5** tabla `busqueda_sinonimos`, **D6** `parseNL` data-driven y **D10** modo `recomendar` personalizado con degradación; más una migración aditiva (054) y el cierre de la deuda de paridad de trigramas. El detalle de ejecución vive **una sola vez** en `TASKS.md` **TSK-199** y en `DECISIONS.md` **ADR-090 `### Enmienda Wave 2`**; aquí solo hay estado y siguientes pasos. La Wave 1 **no se reabre**.
+
+**Lo que quedó entregado (en working tree, sin commit):**
+- **Migración 054 APLICADA** en Neon (`db/migrations/054_busqueda_sinonimos.sql`): `schema_migrations` **max=54**, `aplicada`; tabla `busqueda_sinonimos` (**3 índices**, **15 filas seed** geográficas, idempotente) + **2 índices sociales parciales** en `interacciones` `WHERE activo=true`. **054 única: no hay 055.**
+- **`busqueda.js`:** constantes v1 (`MIN_COOC_USER=3`, `MAX_COOC`, `REF_DECAY`, `REF_MAX_NIVEL`), `parseNL` data-driven, `sqlSimExpr` (typos+cap), expansión de sinónimos, `buildRecomendar`/`recomendarCascada` (1→2→3), `buildSugerir` con campo `via`.
+- **`api/destinos.js`** (typos/sinónimos/`parseNL`; `sugerir=1` expone `via`=`normal|sinonimo|typo`; `recomendar=1` respeta `categoria`) y **`api/utilidades.js`** (`/buscar` SSR con la misma paridad). Shape `{ok,total,stats,data}` y `modo=mapa` **intactos**; **`api/*`: 8/8 INTACTO**.
+- **Frontend:** `index.html` + los 4 `directorio-*.html` con dropdown etiquetado por `via` y bloque "Recomendado para ti" (oculto si vacío; los directorios envían `categoria`).
+- **Paridad de trigramas cerrada:** `scripts/smoke_busqueda_parity.js` pasó de **51/51** a **64/64 PASS** (13 casos nuevos). **Escudo GOLD (@qa-auditor): CERTIFICA OK** (sintaxis 9/9, ASCII 3/3, balance divs 5/5, smoke 64/64, invariantes 4/4).
+
+**Qué sigue:**
+1. **(a) Commit + push** de la Wave 2 y de los docs de este pase. Único pendiente obligatorio.
+2. **(b) Deuda 1 (condición 1 de ADR-090):** extraer `normGeo`/`sqlNormGeo` de `api/interacciones.js` a `busqueda.js`.
+3. **(c) Deuda 2:** calibración `EXPLAIN ANALYZE` de `BUSQ_UMBRALES` con volumetría real.
+4. **(d) Opcional Deuda 3:** `sugerir=1` con scoping por categoría en directorios (hoy cross-categoría).
+5. **(e) Opcional Deuda 4:** unificar el JS duplicado de los 4 directorios en `directorio-busqueda.js`.
+6. **(f) Deuda 5:** `npm run test` sigue roto por **BUG-118** preexistente; se arregla en tanda separada.
+
+**Riesgos activos:**
+- **`BUSQ_UMBRALES` son constantes v1** sin calibrar contra volumetría real: el ranking y los umbrales de similitud pueden desviarse en producción (deuda 2).
+- **`normGeo` sigue duplicado** en `api/interacciones.js` (deuda 1): la divergencia está acotada por el smoke 64/64, no eliminada.
+- **`sugerir=1` es cross-categoría** en los directorios (deuda 3): puede ofrecer una sugerencia fuera de la categoría solicitada.
+- **BUG-118 preexistente** mantiene `npm run test` en rojo: no es regresión de esta Wave, pero enmascara fallos nuevos mientras no se cierre.
+
 ### WORKING TREE 2026-10-07 (pase documental único R2, 9ª tanda) - Buscador unificado Wave 1 (ADR-090)
 
 **Qué se estaba haciendo:** entregar la **Wave 1 del buscador unificado** (`DECISIONS.md` **ADR-090**, Estado **ACEPTADO** tras el veredicto `APRUEBA -- 2026-10-07 -- @architect-review`): normalizar la busqueda por columnas en `destinos` (migracion 053), un motor compartido `busqueda.js` y un contrato de query params sobre `api/destinos.js`/`api/utilidades.js`, **sin endpoints nuevos**. El detalle de ejecución vive **una sola vez** en `TASKS.md` **TSK-198** y en `DECISIONS.md` **ADR-090**; aquí solo hay estado y siguientes pasos.

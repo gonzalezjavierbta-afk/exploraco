@@ -158,8 +158,8 @@ module.exports = async function handler(req, res) {
   if (tipo === 'sitemap' || !tipo) {
     try {
       var rows = await sql(
-        `SELECT slug, categoria_slug, actualizado_en, total_resenas
-         FROM destinos WHERE status='published' ORDER BY actualizado_en DESC NULLS LAST`
+        'SELECT slug, categoria_slug, actualizado_en, total_resenas '
+        + "FROM destinos WHERE status='published' ORDER BY actualizado_en DESC NULLS LAST"
       );
       var urls = STATIC_PAGES.map(function(p){
         return '\n  <url><loc>'+xe(BASE+p.loc)+'</loc>'
@@ -204,8 +204,8 @@ module.exports = async function handler(req, res) {
       if (/bot|crawler|spider|google|bing|baidu|yandex/i.test(ua))
         return res.status(200).json({ ok:true, counted:false });
       await sql(
-        `INSERT INTO interacciones (destino_id, tipo, texto, xp_ganado, creado_en)
-         VALUES ($1,'visita',$2,0,NOW())`,
+        'INSERT INTO interacciones (destino_id, tipo, texto, xp_ganado, creado_en) '
+        + "VALUES ($1,'visita',$2,0,NOW())",
         [destId, body.referrer||null]
       ).catch(function(){});
       return res.status(200).json({ ok:true, counted:true });
@@ -226,26 +226,26 @@ module.exports = async function handler(req, res) {
       var h30   = new Date(ahora-30*86400000).toISOString();
       var h7    = new Date(ahora-7*86400000).toISOString();
       var v  = await sql(
-        `SELECT COUNT(*) AS total,
-                COUNT(CASE WHEN creado_en>=$2 THEN 1 END) AS v30,
-                COUNT(CASE WHEN creado_en>=$3 THEN 1 END) AS v7
-         FROM interacciones WHERE destino_id=$1 AND tipo='visita' AND activo=true`,
+        'SELECT COUNT(*) AS total, '
+        + 'COUNT(CASE WHEN creado_en>=$2 THEN 1 END) AS v30, '
+        + 'COUNT(CASE WHEN creado_en>=$3 THEN 1 END) AS v7 '
+        + "FROM interacciones WHERE destino_id=$1 AND tipo='visita' AND activo=true",
         [d.id, h30, h7]
       );
       var g  = await sql(
-        `SELECT COUNT(*) AS n FROM interacciones WHERE destino_id=$1 AND tipo='guardado'`,
+        "SELECT COUNT(*) AS n FROM interacciones WHERE destino_id=$1 AND tipo='guardado'",
         [d.id]
       );
       var rv = await sql(
-        `SELECT COUNT(*) AS n, ROUND(AVG(rating)::numeric,1) AS avg
-         FROM interacciones WHERE destino_id=$1 AND tipo='resena'`,
+        'SELECT COUNT(*) AS n, ROUND(AVG(rating)::numeric,1) AS avg '
+        + "FROM interacciones WHERE destino_id=$1 AND tipo='resena'",
         [d.id]
       );
       var hist = await sql(
-        `SELECT DATE(creado_en AT TIME ZONE 'America/Bogota') AS dia, COUNT(*) AS n
-         FROM interacciones
-         WHERE destino_id=$1 AND tipo='visita' AND activo=true AND creado_en>=$2
-         GROUP BY dia ORDER BY dia ASC`,
+        "SELECT DATE(creado_en AT TIME ZONE 'America/Bogota') AS dia, COUNT(*) AS n "
+        + 'FROM interacciones '
+        + "WHERE destino_id=$1 AND tipo='visita' AND activo=true AND creado_en>=$2 "
+        + 'GROUP BY dia ORDER BY dia ASC',
         [d.id, h30]
       );
       var vv = v[0]||{};
@@ -306,10 +306,10 @@ module.exports = async function handler(req, res) {
       }
       if (!destId2) return res.status(400).json({ ok:false, error:'destino_id o slug requerido' });
       var fotos = await sql(
-        `SELECT id, url, caption, orden, es_hero, creado_en
-         FROM destinos_fotos
-         WHERE destino_id=$1
-         ORDER BY es_hero DESC NULLS LAST, orden ASC NULLS LAST, creado_en ASC`,
+        'SELECT id, url, caption, orden, es_hero, creado_en '
+        + 'FROM destinos_fotos '
+        + 'WHERE destino_id=$1 '
+        + 'ORDER BY es_hero DESC NULLS LAST, orden ASC NULLS LAST, creado_en ASC',
         [destId2]
       );
       return res.status(200).json({ ok:true, total:fotos.length, data:fotos });
@@ -345,9 +345,9 @@ module.exports = async function handler(req, res) {
       for (var i2 = 0; i2 < limpia.length; i2++) {
         var f2 = limpia[i2];
         var r2 = await sql(
-          `INSERT INTO destinos_fotos (destino_id,url,caption,orden,es_hero,creado_en)
-           VALUES ($1,$2,$3,$4,$5,NOW()) ON CONFLICT DO NOTHING
-           RETURNING id,url,caption,orden,es_hero`,
+          'INSERT INTO destinos_fotos (destino_id,url,caption,orden,es_hero,creado_en) '
+          + 'VALUES ($1,$2,$3,$4,$5,NOW()) ON CONFLICT DO NOTHING '
+          + 'RETURNING id,url,caption,orden,es_hero',
           [destId3, f2.url, f2.caption, f2.orden, f2.es_hero]
         );
         if (r2.length) insertadas.push(r2[0]);
@@ -375,9 +375,9 @@ module.exports = async function handler(req, res) {
       var b3   = req.body || {};
       if (!fid) return res.status(400).json({ ok:false, error:'id requerido' });
       var upd = await sql(
-        `UPDATE destinos_fotos
-         SET caption=COALESCE($2,caption), orden=COALESCE($3,orden), es_hero=COALESCE($4,es_hero)
-         WHERE id=$1 RETURNING id,url,caption,orden,es_hero`,
+        'UPDATE destinos_fotos '
+        + 'SET caption=COALESCE($2,caption), orden=COALESCE($3,orden), es_hero=COALESCE($4,es_hero) '
+        + 'WHERE id=$1 RETURNING id,url,caption,orden,es_hero',
         [fid,
          b3.caption!==undefined?b3.caption:null,
          b3.orden!==undefined?b3.orden:null,
@@ -407,8 +407,8 @@ module.exports = async function handler(req, res) {
       await sql('DELETE FROM destinos_fotos WHERE id=$1',[fid2]);
       if (fr[0].es_hero) {
         var sig = await sql(
-          `SELECT url FROM destinos_fotos WHERE destino_id=$1
-           ORDER BY orden ASC NULLS LAST LIMIT 1`,
+          'SELECT url FROM destinos_fotos WHERE destino_id=$1 '
+          + 'ORDER BY orden ASC NULLS LAST LIMIT 1',
           [fr[0].destino_id]
         );
         await sql(
@@ -427,14 +427,26 @@ module.exports = async function handler(req, res) {
       var qRaw = String(req.query.q || req.query.query || '').trim().slice(0, 80);
       var cercaRaw = req.query.cerca_de || null;
       var radioKm = BUSQ.clampRadio(req.query.radio_km);
-      var buscaTokens = BUSQ.normTokens(qRaw);
       var buscaCerca = BUSQ.parseParLatLng(cercaRaw);
       // Orden (D8/D12): si llega cerca_de y no llega orden, distancia por
       // defecto; orden=distancia sin coords validas degrada a relevancia (D11).
       var ordenRaw = req.query.orden || null;
       var ordenEfectivo = BUSQ.normalizarOrden(ordenRaw);
       if (!ordenRaw && buscaCerca) ordenEfectivo = 'distancia';
-      var usaMotor = buscaTokens.length > 0 || !!buscaCerca;
+      // Wave 2 (A3/A4): parseNL data-driven + sinonimos + recomendar.
+      var recomendar = String(req.query.recomendar || '') === '1';
+      var semilla = BUSQ.parseSemilla(req.query.semilla);
+      var bLexico = null, bParse = null, bExp = {};
+      if (qRaw) {
+        bLexico = await BUSQ.cargarLexico(sql);
+        bParse = BUSQ.parseNL(qRaw, bLexico);
+        if (bParse.libres.length) bExp = await BUSQ.cargarExpansiones(sql, bParse.libres);
+      }
+      var bLibres = bParse ? bParse.libres : BUSQ.normTokens(qRaw);
+      var bFiltros = bParse ? bParse.filtros : null;
+      var bTieneFiltros = !!(bFiltros && (bFiltros.categoria_slug || bFiltros.ciudad
+        || bFiltros.region || bFiltros.barrio || bFiltros.precio_min != null || bFiltros.precio_max != null));
+      var usaMotor = bLibres.length > 0 || bTieneFiltros || !!buscaCerca;
       // Legacy ILIKE (D11): comportamiento previo, tambien usado si el motor
       // no esta disponible (053 ausente -> SQLSTATE 42703/42P01).
       function buscaLegacy() {
@@ -447,25 +459,65 @@ module.exports = async function handler(req, res) {
           ['%' + qLike + '%']
         );
       }
-      var bRows = [];
-      if (usaMotor) {
-        // Mismo motor y MISMO orden que /api/destinos?q= (ADR-090 D8/D12).
-        var bSel = 'SELECT id, slug, nombre, ciudad, region, barrio, foto_hero, hero_bg, emoji, rating, total_resenas, precio_desde, categoria_slug';
-        var bBusq = BUSQ.buildBusqueda({ q: qRaw, cerca_de: cercaRaw, radio_km: radioKm, orden: ordenEfectivo });
+      var bSel = 'SELECT id, slug, nombre, ciudad, region, barrio, foto_hero, hero_bg, emoji, rating, total_resenas, precio_desde, categoria_slug';
+      // Mismo motor y MISMO orden que /api/destinos?q= (ADR-090 D8/D12).
+      function buscaMotor() {
+        var bBusq = BUSQ.buildBusqueda({ q: bLibres.join(' '), cerca_de: cercaRaw, radio_km: radioKm,
+          orden: ordenEfectivo, filtros: bFiltros, expansiones: bExp });
         var bConds = ["d.status = 'published'", "d.categoria_slug != 'blog'"].concat(bBusq.conds);
         var bWhere = bConds.join(' AND ');
         var bParams = bBusq.params;
         var bDistSel = bBusq.distSql ? (', ' + bBusq.distSql + ' AS dist_m') : '';
         var bSql = bSel + bDistSel + ' FROM destinos d WHERE ' + bWhere
           + ' ORDER BY ' + bBusq.orderSql + ' LIMIT $' + (bParams.length + 1);
-        try {
-          bRows = await sql(bSql, bParams.concat([30]));
-        } catch (eBusq) {
-          if (!esFalloEsquema(eBusq)) throw eBusq;
+        return sql(bSql, bParams.concat([30]));
+      }
+      var bRows = [];
+      if (recomendar) {
+        var bCat = req.query.categoria || null;
+        var bSes = BUSQ.parseSesion(req);
+        var bRec = await BUSQ.recomendarCascada(sql, {
+          semilla: semilla, usuario_id: bSes.ok ? bSes.usuario_id : null,
+          categoria: bCat });
+        if (bRec.candidatos.length) {
+          var bSoc = {};
+          var bIds = bRec.candidatos.map(function (c) {
+            bSoc[c.destino_id] = c.social_score; return c.destino_id;
+          });
+          try {
+            var bParams = [bIds];
+            var bCatSql = '';
+            if (bCat) { bParams.push(String(bCat)); bCatSql = ' AND d.categoria_slug = $' + bParams.length; }
+            var bRr = await sql(bSel + ' FROM destinos d WHERE d.id = ANY($1::uuid[]) '
+              + "AND d.status = 'published' AND d.categoria_slug <> 'blog'" + bCatSql, bParams);
+            bRr.forEach(function (r) { r.social_score = bSoc[String(r.id)] || 0; });
+            var bRctx = { tokens: bLibres, cerca: buscaCerca, radio_km: radioKm };
+            bRr.sort(function (a, b) {
+              var sa = BUSQ.rankScore(a, bRctx), sb = BUSQ.rankScore(b, bRctx);
+              if (sb !== sa) return sb - sa;
+              var ra = Number(a.rating) || 0, rb = Number(b.rating) || 0;
+              if (rb !== ra) return rb - ra;
+              var va = Number(a.total_resenas) || 0, vb = Number(b.total_resenas) || 0;
+              if (vb !== va) return vb - va;
+              return String(a.id) < String(b.id) ? -1 : (String(a.id) > String(b.id) ? 1 : 0);
+            });
+            bRows = bRr;
+          } catch (eRec) {
+            if (!esFalloEsquema(eRec)) throw eRec;
+          }
+        }
+      }
+      if (!bRows.length) {
+        if (usaMotor) {
+          try {
+            bRows = await buscaMotor();
+          } catch (eBusq) {
+            if (!esFalloEsquema(eBusq)) throw eBusq;
+            bRows = await buscaLegacy();
+          }
+        } else if (qRaw) {
           bRows = await buscaLegacy();
         }
-      } else if (qRaw) {
-        bRows = await buscaLegacy();
       }
       var catsB = {
         hostal:{ label:'Hospedaje', tbg:'#DBEAFE', tc:'#1e3a8a', emoji:'\ud83c\udfe8' },
@@ -510,19 +562,25 @@ module.exports = async function handler(req, res) {
       var qEsc = bxe(qRaw);
       var ogTitle = qRaw ? 'Buscar: ' + qEsc + ' | LATAWEL' : 'Buscar | LATAWEL';
       var hayResultados = bRows.length > 0;
-      var hTitulo = buscaCerca
-        ? (qRaw ? 'Resultados para "' + qEsc + '" cerca de ti' : 'Lugares cerca de ti')
-        : (qRaw ? 'Resultados para "' + qEsc + '"' : 'Buscar en LATAWEL');
-      var hSub = buscaCerca
-        ? (hayResultados ? bRows.length + ' resultado(s) cerca de ti' : 'Sin resultados cerca de ti')
-        : (qRaw
-            ? (hayResultados ? bRows.length + ' resultado(s)' : 'Sin resultados')
-            : 'Escribe una ciudad, un nombre, una region o una actividad.');
+      var hTitulo = recomendar
+        ? (hayResultados ? 'Recomendados para ti' : 'Recomendados')
+        : (buscaCerca
+            ? (qRaw ? 'Resultados para "' + qEsc + '" cerca de ti' : 'Lugares cerca de ti')
+            : (qRaw ? 'Resultados para "' + qEsc + '"' : 'Buscar en LATAWEL'));
+      var hSub = recomendar
+        ? (hayResultados ? bRows.length + ' recomendacion(es)' : 'Aun sin recomendaciones; explora el directorio.')
+        : (buscaCerca
+            ? (hayResultados ? bRows.length + ' resultado(s) cerca de ti' : 'Sin resultados cerca de ti')
+            : (qRaw
+                ? (hayResultados ? bRows.length + ' resultado(s)' : 'Sin resultados')
+                : 'Escribe una ciudad, un nombre, una region o una actividad.'));
       var hBody = hayResultados
         ? '<div class="bgrid">' + cards + '</div>'
-        : (qRaw
-            ? '<div class="bempty">No encontramos nada para "' + qEsc + '". Prueba con otra palabra o revisa el <a href="/directorio-sitio.html">directorio</a>.</div>'
-            : '<div class="bempty">Busca por nombre, ciudad, region, barrio o actividad.</div>');
+        : (recomendar
+            ? '<div class="bempty">No hay recomendaciones por ahora. Explora el <a href="/directorio-sitio.html">directorio</a>.</div>'
+            : (qRaw
+                ? '<div class="bempty">No encontramos nada para "' + qEsc + '". Prueba con otra palabra o revisa el <a href="/directorio-sitio.html">directorio</a>.</div>'
+                : '<div class="bempty">Busca por nombre, ciudad, region, barrio o actividad.</div>'));
       var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
         + '<meta charset="UTF-8">\n'
         + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -808,14 +866,14 @@ if (tipo === 'blog-lista') {
   if (tipo === 'diagnostico') {
     if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
     var tbls = await sql(
-      `SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename`
+      "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"
     );
     var cols = {};
     for (var j = 0; j < tbls.length; j++) {
       var t = tbls[j].tablename;
       var c = await sql(
-        `SELECT column_name,data_type FROM information_schema.columns
-         WHERE table_name=$1 AND table_schema='public' ORDER BY ordinal_position`,[t]
+        "SELECT column_name,data_type FROM information_schema.columns "
+        + "WHERE table_name=$1 AND table_schema='public' ORDER BY ordinal_position",[t]
       );
       cols[t] = c.map(function(x){ return x.column_name+':'+x.data_type; });
     }

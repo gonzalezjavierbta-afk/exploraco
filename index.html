@@ -975,6 +975,19 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .if-btn{padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:700;cursor:pointer;color:var(--muted);background:var(--white);transition:all .12s}
 .if-btn:hover{border-color:var(--black);color:var(--black)}
 .if-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+/* -- RECOMENDADO PARA TI (Wave 2, ADR-090 D10) -- */
+/* Silo propio: TODO bajo .reco-sec con reset (ADR-004). Nada suelto en :root. */
+.reco-sec{background:var(--bg);border-top:1px solid var(--border)}
+.reco-sec,.reco-sec *{box-sizing:border-box}
+.reco-sec .reco-inner{max-width:1280px;margin:0 auto;padding:36px 4%}
+.reco-sec .reco-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.reco-sec .reco-eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
+.reco-sec .reco-title{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--text);margin:0;line-height:1.05}
+.reco-sec .reco-sub{font-size:12px;color:var(--muted);margin:4px 0 0;max-width:520px}
+.reco-sec .reco-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.reco-sec .reco-why{position:absolute;top:9px;right:9px;z-index:2;background:rgba(0,0,0,.62);color:#fff;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:2px 7px;border-radius:3px}
+@media(max-width:900px){.reco-sec .reco-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.reco-sec .reco-grid{grid-template-columns:1fr}}
 
 </style><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1116,6 +1129,20 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <button class="hdot" onclick="goSlide(5)"></button>
 </div>
   <div class="hcap" id="hcap"></div>
+</section>
+
+<!-- RECOMENDADO PARA TI (Wave 2, ADR-090 D10) -->
+<section class="reco-sec" id="reco-section" style="display:none" aria-labelledby="reco-title">
+  <div class="reco-inner">
+    <div class="reco-head">
+      <div>
+        <div class="reco-eyebrow">&#10022; Personalizado</div>
+        <h2 class="reco-title bc" id="reco-title">Recomendado para ti</h2>
+        <p class="reco-sub" id="reco-sub">Lugares que viajeros como t&uacute; exploraron despu&eacute;s de una b&uacute;squeda parecida.</p>
+      </div>
+    </div>
+    <div class="reco-grid" id="reco-grid"></div>
+  </div>
 </section>
 
 
@@ -1595,41 +1622,57 @@ function ddHover(i) { if(ddIdx === i) return; ddIdx = i; ddHighlight(); }
 function normalizarItem(p) {
   var ct = CATS[p.cat] || {label:'Lugar'};
   return {
+    id: (p.id != null) ? p.id : null,
     name: p.name || p.nombre || '', city: p.city || p.ciudad || '',
     cat: p.cat || 'sitio',
     rating: (typeof p.rating === 'number') ? p.rating : 0,
     hero_bg: p.hero_bg || ct.bg || '#333', emoji: p.emoji || ct.emoji || ''
   };
 }
-/* Pinta la lista reusando el marcado .ddi ya existente. */
-function pintarDropdown(items, lbl, q) {
+/* Pinta uno o varios grupos reusando el marcado .ddi ya existente.
+   grupos = [{lbl:'...', items:[]}]; max 8 opciones en total. */
+function pintarDropdown(grupos, q) {
   if(!hddi) return;
-  ddItems = items.slice(0, 8); ddIdx = -1;
+  var gruposUse = [], total = 0;
+  (grupos || []).forEach(function(g) {
+    if(!g || !g.items || !g.items.length || total >= 8) return;
+    var take = g.items.slice(0, Math.min(6, 8 - total));
+    if(!take.length) return;
+    gruposUse.push({lbl:g.lbl, items:take});
+    total += take.length;
+  });
+  ddItems = []; ddIdx = -1;
+  gruposUse.forEach(function(g){ ddItems = ddItems.concat(g.items); });
   if(!ddItems.length) {
     hddi.innerHTML = '<div class="hdd-empty">Sin resultados para "' + esc(q) + '"</div>';
     if(hdd) hdd.classList.add('open');
     setAria();
     return;
   }
-  var html = '<div style="padding:7px 0"><div class="ddlbl">' + lbl + '</div>';
-  for(var i = 0; i < ddItems.length; i++) {
-    var p = ddItems[i];
-    var ct = CATS[p.cat] || {label:'Lugar'};
-    html += '<button type="button" class="ddi" role="option" id="dd-opt-' + i + '" aria-selected="false"'
-      + ' onmouseenter="ddHover(' + i + ')"'
-      + ' onclick="pickPlace(\'' + p.name.replace(/'/g, "\\'") + '\')">'
-      + '<div class="ddt" style="background:' + p.hero_bg + '">' + p.emoji + '</div>'
-      + '<div><div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.85)">' + p.name + '</div>'
-      + '<div style="font-size:10px;color:rgba(255,255,255,.35)">' + ct.label
-      + (p.city ? ' \u00b7 ' + p.city : '') + (p.rating ? ' \u00b7 \u2605' + p.rating : '') + '</div></div>'
-      + '</button>';
+  var html = '<div style="padding:7px 0">', n = 0;
+  for(var gi = 0; gi < gruposUse.length; gi++) {
+    html += '<div class="ddlbl">' + gruposUse[gi].lbl + '</div>';
+    for(var i = 0; i < gruposUse[gi].items.length; i++, n++) {
+      var p = gruposUse[gi].items[i];
+      var ct = CATS[p.cat] || {label:'Lugar'};
+      html += '<button type="button" class="ddi" role="option" id="dd-opt-' + n + '" aria-selected="false"'
+        + ' onmouseenter="ddHover(' + n + ')"'
+        + ' onclick="pickPlace(\'' + p.name.replace(/'/g, "\\'") + '\',\'' + (p.id == null ? '' : p.id) + '\')">'
+        + '<div class="ddt" style="background:' + p.hero_bg + '">' + p.emoji + '</div>'
+        + '<div><div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.85)">' + p.name + '</div>'
+        + '<div style="font-size:10px;color:rgba(255,255,255,.35)">' + ct.label
+        + (p.city ? ' \u00b7 ' + p.city : '') + (p.rating ? ' \u00b7 \u2605' + p.rating : '') + '</div></div>'
+        + '</button>';
+    }
   }
   html += '</div>';
   hddi.innerHTML = html;
   if(hdd) hdd.classList.add('open');
   setAria();
 }
-/* Sugerencias servidor con debounce (~180 ms) y token anti-obsoletas. */
+/* Sugerencias servidor con debounce (~180 ms) y token anti-obsoletas.
+   sugerir=1 aplica el motor completo (normalizacion + typos + sinonimos)
+   y devuelve `via` por fila: 'normal' | 'sinonimo' | 'typo' (ADR-090). */
 function pedirSugerencias(q) {
   var seq = ++ddSeq;
   var url = '/api/destinos?sugerir=1&q=' + encodeURIComponent(q)
@@ -1639,8 +1682,23 @@ function pedirSugerencias(q) {
     .then(function(data) {
       if(seq !== ddSeq) return;                     /* respuesta obsoleta */
       if(!sinp || sinp.value !== q) return;         /* el texto cambio */
-      if(!data || !data.sugerencias || !data.sugerencias.length) return; /* fallback local */
-      pintarDropdown(data.sugerencias.map(normalizarItem), 'Resultados', q);
+      var sug = (data && data.sugerencias) ? data.sugerencias : [];
+      if(!sug.length) return;                       /* fallback local */
+      var vistos = {}, porVia = {normal:[], sinonimo:[], typo:[]};
+      sug.forEach(function(p) {
+        var it = normalizarItem(p);
+        var k = normTxt(it.name) + '|' + normTxt(it.city);
+        if(vistos[k]) return;
+        vistos[k] = 1;
+        var v = (p.via === 'sinonimo' || p.via === 'typo') ? p.via : 'normal';
+        porVia[v].push(it);
+      });
+      var grupos = [];
+      if(porVia.normal.length)   grupos.push({lbl:'Resultados', items:porVia.normal});
+      if(porVia.sinonimo.length) grupos.push({lbl:'\u2248 Sin\u00f3nimos', items:porVia.sinonimo});
+      if(porVia.typo.length)     grupos.push({lbl:'\u2248 Corregido', items:porVia.typo});
+      if(!grupos.length) return;                    /* fallback local */
+      pintarDropdown(grupos, q);
     })
     .catch(function() { /* fallback: se mantiene el filtrado local */ });
 }
@@ -1682,7 +1740,7 @@ if(sinp) {
       ddHighlight();
     } else if(e.key === 'Enter') {
       e.preventDefault();
-      if(ddIdx >= 0 && ddItems[ddIdx]) pickPlace(ddItems[ddIdx].name);
+      if(ddIdx >= 0 && ddItems[ddIdx]) pickPlace(ddItems[ddIdx].name, ddItems[ddIdx].id);
       else goBuscar();
     } else if(e.key === 'Escape') {
       if(hdd) hdd.classList.remove('open');
@@ -1716,16 +1774,20 @@ function renderDropdown(q) {
       })
     : PL.slice(0,5);
   var lbl = q ? 'Resultados' : '\uD83D\uDD25 Tendencias';
-  pintarDropdown(res.map(normalizarItem), lbl, q);
+  pintarDropdown([{lbl:lbl, items:res.map(normalizarItem)}], q);
   agendarSugerencias(q);
 }
 
-function pickPlace(name){
+function pickPlace(name, id){
   searchQ=name; destSearch=name;
   if(sinp) sinp.value=name;
   if(scl) scl.classList.add('vis');
   if(hdd) hdd.classList.remove('open');
   ddItems=[]; ddIdx=-1; setAria();
+  /* Semilla de recomendacion: UN unico uuid de la busqueda actual (ADR-090 A4). */
+  var sid = (id == null) ? '' : String(id);
+  recoSemilla = RE_UUID_CLI.test(sid) ? sid : null;
+  if(recoSemilla) cargarRecomendados();
   renderDest();
   var recs=document.getElementById('recs');
   if(recs) recs.scrollIntoView({behavior:'smooth'});
@@ -1736,6 +1798,7 @@ searchQ=''; destSearch='';
 if(sinp) sinp.value='';
 if(scl) scl.classList.remove('vis');
 if(hdd) hdd.classList.remove('open');
+recoSemilla = null; cargarRecomendados();
 renderDest();
 if(typeof window.ExploraReloadDestinos === 'function') window.ExploraReloadDestinos();
 }
@@ -1745,6 +1808,70 @@ if(q){ location.href='/buscar?q='+encodeURIComponent(q)+geoQuerySuffix(); return
 var recs=document.getElementById('recs');
 if(recs) recs.scrollIntoView({behavior:'smooth'});
 }
+
+/* -- RECOMENDADO PARA TI (Wave 2, ADR-090 D10) --
+   Pide api/destinos?recomendar=1 con semilla opcional (UN uuid, A4).
+   Degradacion 1 -> 2 -> 3: si la API responde global (nivel 2/3) se
+   muestra igual. Imagenes con onerror y placeholder (ADR-008). */
+var recoSeq = 0, recoSemilla = null;
+var RE_UUID_CLI = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function pintarRecomendados(items, personalizado) {
+  var sec  = document.getElementById('reco-section');
+  var grid = document.getElementById('reco-grid');
+  if(!sec || !grid) return;
+  if(!items || !items.length) { sec.style.display = 'none'; return; }
+  var why = personalizado ? 'Af\u00edn a tu b\u00fasqueda' : 'Popular';
+  var html = '';
+  for(var i = 0; i < items.length; i++) {
+    var p  = items[i];
+    var ct = CATS[p.cat] || {label:'Lugar', tbg:'#E5E7EB', tc:'#333'};
+    var bg = esc(p.hero_bg || '#222');
+    var img = p.foto
+      ? '<img src="' + esc(p.foto) + '" alt="' + esc(p.name) + '" loading="lazy" '
+        + 'style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" '
+        + 'onerror="this.style.display=\'none\'">'
+      : photoPlaceholderHTML(p.emoji || ct.emoji, 'card');
+    html += '<a class="dcard reco-card" href="' + esc(p.slug) + '.html">'
+      + '<div class="dcard-img" style="background:' + bg + '">' + img
+      + '<div class="dcard-badge" style="background:' + ct.tbg + ';color:' + ct.tc + '">' + ct.label + '</div>'
+      + '<div class="reco-why">' + why + '</div>'
+      + '</div>'
+      + '<div class="dcard-body">'
+      + '<div class="dcard-name">' + esc(p.name) + '</div>'
+      + '<div class="dcard-loc">\uD83D\uDCCD ' + esc(p.city) + (p.region ? ', ' + esc(p.region) : '') + '</div>'
+      + '<div class="dcard-stars-row">' + starHtml(p.rating, 'dst')
+      + '<span class="dcard-rv">(' + (p.reviews || 0) + ')</span></div>'
+      + '</div>'
+      + '</a>';
+  }
+  grid.innerHTML = html;
+  sec.style.display = 'block';
+}
+
+function cargarRecomendados() {
+  var sec = document.getElementById('reco-section');
+  if(!sec) return;
+  var seq = ++recoSeq;
+  var url = '/api/destinos?recomendar=1&limit=8';
+  if(recoSemilla) url += '&semilla=' + encodeURIComponent(recoSemilla);
+  fetch(url, {headers:{'Accept':'application/json'}})
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if(seq !== recoSeq) return;
+      /* Sin candidatos la API NO responde modo 'recomendar' (cae a global):
+         se oculta el bloque para no mostrar ruido (categoria-agnostico). */
+      if(!data || !data.ok || data.modo !== 'recomendar'
+         || !data.data || !data.data.length) {
+        sec.style.display = 'none'; return;
+      }
+      var nivel = Number(data.nivel) || 3;
+      pintarRecomendados(data.data, !!recoSemilla && nivel <= 2);
+    })
+    .catch(function() { if(sec) sec.style.display = 'none'; });
+}
+
+cargarRecomendados();
 
 /* -- GEOLOCALIZACION (T15) --
    Jamas bloquea la escritura ni el envio: si falla, ofrece ciudad manual.
@@ -1848,6 +1975,7 @@ function clearDestSearch(){
   if(destInput) destInput.value='';
   if(destClear) destClear.style.display='none';
   if(sinp) sinp.value='';
+  recoSemilla = null; cargarRecomendados();
   renderDest();
   if(typeof window.ExploraReloadDestinos === 'function') window.ExploraReloadDestinos();
 }
