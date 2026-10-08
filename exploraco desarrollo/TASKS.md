@@ -4710,7 +4710,7 @@ Unificar los cuatro buscadores divergentes en **una** implementacion con **norma
 ### Diferido a Wave 2 (NO hecho en esta tanda)
 
 - Migracion **054** (diccionario de sinonimos), tolerancia a typos (trigramas), parsing de lenguaje natural y recomendaciones sociales (co-ocurrencia + guardados + referidos). **EJECUTADO en Wave 2: ver `TSK-199`; la migracion 054 quedo APLICADA en Neon.**
-- **Follow-up (condicion 1 de ADR-090):** extraer `normGeo` de `api/interacciones.js` a `busqueda.js`. **PENDIENTE** (deuda viva, no bloquea; registrada en `TSK-199`).
+- **Follow-up (condicion 1 de ADR-090):** extraer `normGeo` de `api/interacciones.js` a `busqueda.js`. **CUMPLIDA** en `TSK-199` (follow-ups, working tree SIN commit): `normGeo`/`sqlNormGeo` extraidos a `busqueda.js` y consumidos via `require`.
 
 ### Gate / decision de producto
 
@@ -4739,9 +4739,9 @@ Unificar los cuatro buscadores divergentes en **una** implementacion con **norma
 
 `db/cleanups/006_rollback_053_busqueda_normalizada.sql` (2462 bytes) queda registrado como **ENTREGA FORMAL de Wave 1** (evidencia del incidente del ledger y del rollback aplicado durante T3b). Es el **procedimiento de rollback versionado de la migracion 053**, **IDEMPOTENTE**; **NO debe borrarse** (Cero Borrado Logico, ADR-003): es la via de reversion oficial de la 053.
 
-## TSK-199 - Buscador unificado Wave 2 (ADR-090 `### Enmienda Wave 2`): migracion 054 (diccionario de sinonimos) + typos por trigramas (D1) + parseNL data-driven (D6) + recomendacion personalizada con degradacion (D10) - 2026-10-07 - CERRADO EN WORKING TREE (sin commit)
+## TSK-199 - Buscador unificado Wave 2 (ADR-090 `### Enmienda Wave 2`): migracion 054 (diccionario de sinonimos) + typos por trigramas (D1) + parseNL data-driven (D6) + recomendacion personalizada con degradacion (D10) - 2026-10-07 - CERRADO / COMMITEADO Y PUSHEADO (`29e2e5b`)
 
-**Estado: CERRADO EN WORKING TREE (sin commit).** Decision de arquitectura: `DECISIONS.md` **ADR-090, `### Enmienda Wave 2`** (Estado **ACEPTADO**; veredicto `APRUEBA -- 2026-10-07 -- @architect-review`; rango ADR-090 `L7339-7618`). La Wave 1 (**TSK-198**) NO se reabre. **Cero funciones serverless nuevas: presupuesto Vercel 8/8 INTACTO** (ADR-010); el motor `busqueda.js` sigue siendo el asset dual UMD-lite de la raiz. **Cero Borrado Logico** (ADR-003): no se elimino ningun item historico de TSK-198.
+**Estado: CERRADO / COMMITEADO Y PUSHEADO (`29e2e5b`).** Decision de arquitectura: `DECISIONS.md` **ADR-090, `### Enmienda Wave 2`** (Estado **ACEPTADO**; veredicto `APRUEBA -- 2026-10-07 -- @architect-review`; rango ADR-090 `L7339-7618`). La Wave 1 (**TSK-198**) NO se reabre. **Cero funciones serverless nuevas: presupuesto Vercel 8/8 INTACTO** (ADR-010); el motor `busqueda.js` sigue siendo el asset dual UMD-lite de la raiz. **Cero Borrado Logico** (ADR-003): no se elimino ningun item historico de TSK-198.
 
 ### Que se estaba haciendo
 
@@ -4768,19 +4768,27 @@ Activar los cuatro puntos que la Wave 1 dejo diferidos (D1 typos, D5 sinonimos, 
 
 ### Deudas / follow-ups (NO bloquean)
 
-1. **Condicion 1 de ADR-090 (pendiente):** extraer `normGeo`/`sqlNormGeo` de `api/interacciones.js` a `busqueda.js`.
-2. Calibracion `EXPLAIN ANALYZE` de `BUSQ_UMBRALES` con volumetria real.
-3. **Opcional:** `sugerir=1` con scoping por categoria en directorios (hoy cross-categoria).
-4. **Opcional:** unificar el JS duplicado de los 4 directorios en `directorio-busqueda.js`.
-5. `npm run test` sigue roto por **BUG-118** preexistente (no de esta tanda; NO se duplica en `BUGS_HISTORICOS.md`).
+**Follow-ups ejecutados DESPUES del commit `29e2e5b`: cambios NUEVOS aun en working tree, SIN commit (pase documental R2).** El commit `29e2e5b` NO se reabre ni se toca; esto se registra como continuacion de TSK-199.
+
+1. **Condicion 1 de ADR-090: CUMPLIDA (working tree, SIN commit).** `normGeo`/`sqlNormGeo` quedaron **extraidos de `api/interacciones.js` a `busqueda.js`** (ahora la **unica definicion canonica**); `api/interacciones.js:213-214` los **consume via `require`** (`var normGeo = BUSQ.normGeo; var sqlNormGeo = BUSQ.sqlNormGeo;`). Eliminada la copia divergente de esas dos funciones. Verificado en Neon real (2026-10-07): `scripts/smoke_busqueda_parity.js` **64/64**, `scripts/smoke_058_origen_clasificador.js` **97/97**, `scripts/smoke_origen_factor_parity.js` **111/111**.
+2. **`sugerir=1` de `api/destinos.js` acepta `categoria` OPCIONAL (HECHO, working tree).** Antes cross-categoria; ahora, con `categoria` presente, las sugerencias se acotan con `AND d.categoria_slug = $n`; sin `categoria` se mantiene cross-categoria (**regresion cero**). Cubre la mitad de la deuda 3 original.
+3. **JS de los 4 directorios unificado en `directorio-busqueda.js` (HECHO, working tree; asset estatico NUEVO en la raiz).** `directorio-{hostal,comida,sitio,evento}.html` cargan ese unico asset; resuelve `CAT` por `data-cat` o por el prefijo `tpl-*` del contenedor y **envia `categoria` a `sugerir`** (`directorio-busqueda.js:80`) **y a `recomendar`** (`:144`). Cubre la deuda 4 original.
+4. **DEUDA NUEVA -- baja PRECISION de typos (documentada; DECISION del operador = aceptar v1 + documentar).** Causa: `search_trgm` **materializa la ficha COMPLETA via `tags_norm`** (ej. **Monserrate 7.908 chars / 1.612 trigramas**), asi que `sim` **no discrimina** (para `'medelin'` pasan `sim >= 0.34` **111/219 = 50,7%**, con falsos positivos). El GIN `idx_destinos_search_trgm` **existe y es valido**, pero el planner **prefiere Seq Scan** con **219 filas** (`idx_scan = 0`). **Se ACEPTA v1 con sesgo a recall**; la **calibracion de `BUSQ_UMBRALES`** y una eventual **acotacion de `search_trgm`** quedan para un **ADR futuro con datos**.
+5. **DEUDA -- instrumentar logs de CONSULTA de busqueda** (no de interacciones) para poder calibrar `BUSQ_UMBRALES` con uso real. **Diferido** (decision del operador); sin esos logs no hay datos para el ADR futuro del punto 4.
+6. **Calibracion `EXPLAIN ANALYZE` de `BUSQ_UMBRALES` con volumetria real** (sigue abierta): ahora acotada por las deudas 4/5; los defaults `0.34`/`0.5` siguen **sin validar**.
+7. **OBSERVACION menor (no bloqueante):** `normGeoAlias`/`ALIAS_CIUDAD` **siguen duplicados** en `api/interacciones.js` (`:338-346`) respecto a `busqueda.js` (mismo cuerpo). Consolidar como **follow-up DRY** (la condicion 1 elimino `normGeo`/`sqlNormGeo`, no los alias).
+8. **NOTA menor:** `scripts/express_check.js` aplica el barrido ASCII **solo a `api/` y `scripts/`** (filtro `^(api|scripts)/`, `express_check.js:238`); los JS de raiz (**`busqueda.js`**, **`directorio-busqueda.js`**) requieren **invocacion explicita** para entrar al barrido.
+9. `npm run test` sigue roto por **BUG-118** preexistente (no de esta tanda; NO se duplica en `BUGS_HISTORICOS.md`).
 
 ### Bug aparte (NO de esta tanda) - BUG-118
 
-`misAlbumRatingTxt is not defined` en el inline de `mi-perfil.html`; **PRE-EXISTENTE**, ya registrado como **BUG-118** (`BUGS_HISTORICOS.md` L2060). Se arregla en tanda separada; **no se crea duplicado**.
+`misAlbumRatingTxt is not defined` en el inline de `mi-perfil.html`; **PRE-EXISTENTE**, ya registrado como **BUG-118** (`BUGS_HISTORICOS.md` L2060). Se arregla en tanda separada; **no se crea duplicado**. Sigue **preexistente** tras los follow-ups de esta tanda.
 
 ### Archivos tocados
 
-`busqueda.js` · `api/destinos.js` · `api/utilidades.js` · `index.html` · `directorio-comida.html` · `directorio-evento.html` · `directorio-hostal.html` · `directorio-sitio.html` · `db/migrations/054_busqueda_sinonimos.sql` (nuevo) · `scripts/smoke_busqueda_parity.js`. `DECISIONS.md` ADR-090 `### Enmienda Wave 2` (documentacion). En **working tree, SIN commitear** al cierre de este pase documental.
+`busqueda.js` · `api/destinos.js` · `api/utilidades.js` · `index.html` · `directorio-comida.html` · `directorio-evento.html` · `directorio-hostal.html` · `directorio-sitio.html` · `db/migrations/054_busqueda_sinonimos.sql` (nuevo) · `scripts/smoke_busqueda_parity.js`. `DECISIONS.md` ADR-090 `### Enmienda Wave 2` (documentacion). **COMMITEADA Y PUSHEADA** (`29e2e5b`) al cierre de este pase documental.
+
+**Follow-ups posteriores (working tree, SIN commit; NO reabren `29e2e5b`):** `busqueda.js` · `api/interacciones.js` · `api/destinos.js` · `directorio-busqueda.js` (**NUEVO**) · `directorio-{comida,evento,hostal,sitio}.html`.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

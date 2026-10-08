@@ -281,8 +281,13 @@ module.exports = async function handler(req, res) {
       var sLimit = Math.min(limit, 10);
       var sConds = ["d.status = 'published'", "d.categoria_slug != 'blog'"];
       if (sg.conds.length) sConds = sConds.concat(sg.conds);
+      // Categoria OPCIONAL (los directorios la envian): filtra las
+      // sugerencias a esa categoria; sin categoria -> cross-categoria
+      // (comportamiento actual). El parametro explicito SIEMPRE gana.
+      var sP = sg.params.slice();
+      if (cat) { sP.push(String(cat)); sConds.push('d.categoria_slug = $' + sP.length); }
+      sP.push(sLimit);
       var sWhere = sConds.join(' AND ');
-      var sP = sg.params.concat([sLimit]);
       try {
         var sRows = await sql(
           'SELECT id, slug, nombre, categoria_slug, ciudad, region, ('
@@ -303,12 +308,14 @@ module.exports = async function handler(req, res) {
       } catch (eSug) {
         if (!esFalloEsquema(eSug)) throw eSug;
         var like = '%' + q + '%';
+        var lCat = cat ? ' AND d.categoria_slug = $3' : '';
+        var lParams = cat ? [like, sLimit, String(cat)] : [like, sLimit];
         var lRows = await sql(
           'SELECT id, slug, nombre, categoria_slug, ciudad, region FROM destinos d '
           + "WHERE d.status = 'published' AND d.categoria_slug != 'blog' "
-          + 'AND (d.nombre ILIKE $1 OR d.ciudad ILIKE $1) '
+          + 'AND (d.nombre ILIKE $1 OR d.ciudad ILIKE $1)' + lCat + ' '
           + 'ORDER BY d.rating DESC NULLS LAST LIMIT $2',
-          [like, sLimit]
+          lParams
         );
         return res.status(200).json({
           ok: true, modo: 'sugerir', total: lRows.length,

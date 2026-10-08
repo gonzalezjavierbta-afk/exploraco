@@ -205,6 +205,14 @@ var SCORE_ORDEN = MOTOR_SCORE.SCORE_ORDEN;
 var sqlConDegradacion = MOTOR_SCORE.sqlConDegradacion;
 var esFalloEsquemaScore = MOTOR_SCORE.esFalloEsquema;
 
+// ADR-090 (condicion 1): normalizacion canonica UNICA en el motor compartido
+// busqueda.js (UMD-lite, fuera de api/ por el techo 8/8). normGeo (espejo JS)
+// y sqlNormGeo (espejo SQL, wrapper de public.exploraco_norm, migracion 053)
+// se CONSUMEN desde ahi; NO se redefinen localmente (Regla de No-Duplicidad).
+var BUSQ = require('../busqueda.js');
+var normGeo = BUSQ.normGeo;
+var sqlNormGeo = BUSQ.sqlNormGeo;
+
 // v9 Gamificacion v4.0: probabilidades de cromos por rareza (ADR-018)
 var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 };
 
@@ -315,38 +323,13 @@ function haversineMetros(lat1, lng1, lat2, lng2) {
   return TIERRA_RADIO_M * c;
 }
 
-// ADR-058 (B-1): UNICA normalizacion canonica de texto geografico
-// (Regla de No-Duplicidad). Debe producir EXACTAMENTE lo mismo que el seed
-// geo (geo_ciudades.nombre_normalizado / geo_paises.nombre_normalizado):
-// NFD + strip de diacriticos + lowercase + [^a-z0-9 ]->espacio + colapsar
-// espacios + trim. Ej: 'Bogota D.C.' -> 'bogota d c'; 'Medellin' ->
-// 'medellin'; 'Narino' -> 'narino'. ASCII-safe (los diacriticos se
-// referencian por rango Unicode, nunca como bytes > 127).
-function normGeo(s) {
-  var v = String(s == null ? '' : s);
-  v = v.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  v = v.toLowerCase();
-  v = v.replace(/[^a-z0-9 ]/g, ' ');
-  v = v.replace(/ +/g, ' ').trim();
-  return v;
-}
-
-// ADR-058 (B-1): espejo SQL OBLIGATORIO de normGeo SIN depender de
-// unaccent (extension no garantizada). Su fidelidad con el JS se valida en
-// un smoke de paridad (scripts/smoke_origen_factor_parity.js). El lower()
-// va ANTES del translate/regexp para que las mayusculas SIN tilde
-// ('Bogota') tambien sobrevivan al filtro [^a-z0-9 ] (mismo resultado que
-// normGeo). Cubre a/e/i/o/u con tilde, u con dieresis y enie (ambas
-// cajas); las tildes van como escapes \u00xx (ASCII-safe, ADR-002).
-function sqlNormGeo(expr) {
-  var e = String(expr);
-  var tildes = '\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc\u00f1'
-    + '\u00c1\u00c9\u00cd\u00d3\u00da\u00dc\u00d1';
-  var planas = 'aeiouunaeiouun';
-  return "btrim(regexp_replace(regexp_replace(translate(lower(COALESCE(" + e
-    + ",'')), '" + tildes + "', '" + planas + "'), '[^a-z0-9 ]', ' ', 'g'),"
-    + " ' +', ' ', 'g'))";
-}
+// ADR-090 (condicion 1): normGeo/sqlNormGeo se consumen del motor compartido
+// busqueda.js (require mas arriba); NO se redefinen aqui (Regla de
+// No-Duplicidad). normGeo es el mismo NFD + strip de diacriticos; sqlNormGeo
+// emite public.exploraco_norm(expr) (migracion 053, IMMUTABLE), espejo SQL
+// validado por scripts/smoke_busqueda_parity.js. Comportamiento preservado:
+// exploraco_norm coincide con normGeo (y con el translate ADR-058 previo) en
+// el corpus de bordes; se cubre ademas en scripts/smoke_origen_factor_parity.js.
 
 // ADR-058 (N-4): alias minimo del matcher de ciudades. Claves y valores en
 // formato normGeo ([a-z0-9 ]). Se aplica ANTES del lookup y se replica en
