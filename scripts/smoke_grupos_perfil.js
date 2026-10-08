@@ -805,7 +805,8 @@ function correr() {
     var nombres = ['pfGruposToggle', 'pfGruposRender', 'museoGrupoClave',
       'guardadosGrupoClave', 'nivelesGrupoClave', 'pfNivelesAutoAbrirGrupo',
       'misionEstado', 'misionGrupoClave', 'misionCardHTML', 'pfMisionesAutoAbrirGrupo',
-      'misAlbumesBoton', 'misAlbumesToggleVerMas', 'misAlbumesPintar'];
+      'misAlbumesBoton', 'misAlbumesToggleVerMas', 'misAlbumesPintar',
+      'misAlbumRatingTxt'];
     var faltan = [];
     var chunks = [];
     for (var nf = 0; nf < nombres.length; nf++) {

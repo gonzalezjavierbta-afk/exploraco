@@ -2059,7 +2059,7 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 ## BUG-118: `smoke_grupos_perfil.js` reporta `misAlbumRatingTxt is not defined` en la zona "Mis Álbumes" de `mi-perfil.html` -- FAIL **PRE-EXISTENTE**, no regresion de TSK-197
 
-**Severidad:** **BAJA / de instrumentacion** (el render real en navegador funciona; el fallo es del arnes o de su ejecucion). **Estado: ABIERTO / PENDIENTE.** **NO corregido.**
+**Severidad:** **BAJA / de instrumentacion** (el render real en navegador funciona; el fallo es del arnes o de su ejecucion). **Estado: CERRADO / RESUELTO (2026-10-07).** **Corregido en el ARNES, no en el producto.**
 
 **Contexto:** detectado el 2026-10-07 durante la verificacion de **TSK-197** (campo `desc` en las misiones). Round-trip `git stash`: contra **HEAD** el smoke marca **64/65**, **identico** con y sin los cambios de TSK-197. Por tanto **no es regresion**: es una **deuda previa**.
 
@@ -2068,3 +2068,9 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **Lo que NO se hizo:** **no se corrigio** y **no se aislo la causa raiz** (se desconoce si es el orden de los scripts inline extraidos, un error previo que aborta la ejecucion dentro del `vm`, o el alcance del `function` al ejecutar los bloques por separado). Lo que queda **afirmado y medido** es solo: (a) el FAIL existe; (b) es pre-existente; (c) el simbolo esta definido en el archivo real. **No se fabrica una causa que no se midio.**
 
 **Deuda:** quien lo aborde debe **primero reproducir el FAIL contra HEAD** y **aislar si es defecto del arnes o del archivo**. Si es del arnes, la leccion es hermana de **BUG-098** (*producto correcto, instrumentacion incorrecta*).
+
+**RESOLUCION (2026-10-07; BUG-118 CERRADO).** Confirmado el pronostico: la causa raiz era un **defecto del ARNES**, no del producto. `scripts/smoke_grupos_perfil.js` extrae funciones inline de `mi-perfil.html` **por NOMBRE** dentro de un `vm`; su array `nombres` extraia `misAlbumesPintar` pero **OMITIA su dependencia `misAlbumRatingTxt`** (`mi-perfil.html:3393`, invocada desde `misAlbumesPintar` en `mi-perfil.html:3422`). Bajo el `vm`, esa llamada lanzaba `ReferenceError` e interrumpia `correr()` en la seccion 6; el resultado se reportaba como la asercion #65 en 64/65. En el navegador ambas funciones **comparten scope global** y el render funciona -- de ahi que el sintoma solo existiera bajo el arnes.
+
+**FIX (solo arnes):** `scripts/smoke_grupos_perfil.js:806-809` anade `'misAlbumRatingTxt'` al array `nombres`. **No se toco `mi-perfil.html`: el producto quedo INTACTO.** Es el mismo patron de la familia **BUG-098** (*producto correcto, instrumentacion incorrecta*).
+
+**RESULTADO medido (ADR-006):** `node scripts/smoke_grupos_perfil.js` = **109/109 PASS, FAIL 0** (el contaje previo **64/65 estaba TRUNCADO**: al desbloquear las secciones 6-8 corren ~44 aserciones que antes no se ejecutaban, todas PASS). `npm run test` = **VERDE**; `node --check` **OK**; **ASCII-safe (0 bytes > 127)**. El producto (`mi-perfil.html`) no se modifico. Detalle de ejecucion en `TASKS.md` **TSK-200**.

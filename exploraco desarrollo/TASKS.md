@@ -4655,9 +4655,9 @@ Con ese dato, la salida deja de ser `NO_CONFIRMADO` y pasa a `OK` o a `FALLIDO_4
 
 En `index-api-connector.js` quedan los shims `window.setMapaMediaSoloMio` (`:502`) y `window.setMapaMediaVista` (`:529`) sin ningún `onclick` que los invoque: **código muerto inofensivo**, se conservan a propósito.
 
-## TSK-197 - Campo `desc` en las 41 misiones del catalogo + render condicional de la descripcion en Mi Perfil - 2026-10-07 - CERRADO EN WORKING TREE (sin commit)
+## TSK-197 - Campo `desc` en las 41 misiones del catalogo + render condicional de la descripcion en Mi Perfil - 2026-10-07 - CERRADO / COMMITEADA Y PUSHEADA (`3df9603`)
 
-**Estado: CERRADO EN WORKING TREE (sin commit).** Cambio **aditivo de datos + render**. **Sin ADR nuevo** y **`DECISIONS.md` sin tocar** (no es arquitectura nueva). **Sin endpoint nuevo y sin migracion: presupuesto Vercel 8/8 INTACTO** (ADR-010).
+**Estado: CERRADO / COMMITEADA Y PUSHEADA (`3df9603`; `main` == `origin/main`).** Cambio **aditivo de datos + render**. **Sin ADR nuevo** y **`DECISIONS.md` sin tocar** (no es arquitectura nueva). **Sin endpoint nuevo y sin migracion: presupuesto Vercel 8/8 INTACTO** (ADR-010).
 
 ### Que se estaba haciendo
 
@@ -4678,19 +4678,19 @@ Las tarjetas de mision de "Mi perfil" **no mostraban descripcion**, asi que el u
 | Catalogo `MISIONES` | **ids = 41**, **desc = 41** |
 | `scripts/smoke_niveles_data.js` | **31/31 PASS** |
 | `scripts/smoke_test_perfil_progreso.js` | **OK** (catalogo n=41, sin ids duplicados) |
-| `scripts/smoke_grupos_perfil.js` | **64/65** - unico FAIL `misAlbumRatingTxt is not defined` (**PRE-EXISTENTE**, ver BUG-118) |
+| `scripts/smoke_grupos_perfil.js` | **64/65** al cierre -> **109/109 HOY** (ya resuelto: **BUG-118 CERRADO**; ver TSK-200) |
 
-**FAIL pre-existente (ADR-006).** El unico fallo de `smoke_grupos_perfil.js` (`misAlbumRatingTxt is not defined`) se confirmo **PRE-EXISTENTE en HEAD** por round-trip `git stash`: contra HEAD marca **64/65 identico**. **No es regresion de esta tanda** y **NO se corrige aqui**; queda como **BUG-118** (independiente, PENDIENTE, zona "Mis Albumes" de `mi-perfil.html`).
+**FAIL pre-existente (ADR-006).** El unico fallo de `smoke_grupos_perfil.js` (`misAlbumRatingTxt is not defined`) se confirmo **PRE-EXISTENTE en HEAD** por round-trip `git stash`: contra HEAD marca **64/65 identico**. **No es regresion de esta tanda** y **NO se corrige aqui**; queda como **BUG-118** (independiente, PENDIENTE, zona "Mis Albumes" de `mi-perfil.html`). **ACTUALIZACION (2026-10-07): ya resuelto (BUG-118 CERRADO) -> 109/109; el FAIL era del ARNES, no del producto (ver TSK-200).**
 
 **Presupuesto Vercel:** **8/8 funciones serverless INTACTAS** (sin endpoint nuevo); **sin migraciones**.
 
 ### Archivos tocados
 
-`api/interacciones.js` · `mi-perfil.html`. Ambos en **working tree, SIN commitear** al cierre de este pase documental.
+`api/interacciones.js` · `mi-perfil.html`. **COMMITEADA Y PUSHEADA** en `3df9603` (`main` == `origin/main`) al cierre de este pase documental.
 
-## TSK-198 - Buscador unificado Wave 1 (ADR-090): migracion 053 + motor `busqueda.js` + busqueda normalizada en `api/destinos.js`/`api/utilidades.js` + dropdown en `index.html` + "cerca de ti" en los 4 directorios - 2026-10-07 - CERRADO EN WORKING TREE (sin commit)
+## TSK-198 - Buscador unificado Wave 1 (ADR-090): migracion 053 + motor `busqueda.js` + busqueda normalizada en `api/destinos.js`/`api/utilidades.js` + dropdown en `index.html` + "cerca de ti" en los 4 directorios - 2026-10-07 - CERRADO / COMMITEADA Y PUSHEADA (`b302e66`)
 
-**Estado: CERRADO EN WORKING TREE (sin commit).** Decision de arquitectura: `DECISIONS.md` **ADR-090** (Estado **ACEPTADO**; veredicto `APRUEBA -- 2026-10-07 -- @architect-review`). **Cero funciones serverless nuevas: presupuesto Vercel 8/8 INTACTO** (ADR-010); el motor `busqueda.js` vive en la **raiz** (asset dual UMD-lite), como `lib/score.js` en ADR-086.
+**Estado: CERRADO / COMMITEADA Y PUSHEADA (`b302e66`; `main` == `origin/main`).** Decision de arquitectura: `DECISIONS.md` **ADR-090** (Estado **ACEPTADO**; veredicto `APRUEBA -- 2026-10-07 -- @architect-review`). **Cero funciones serverless nuevas: presupuesto Vercel 8/8 INTACTO** (ADR-010); el motor `busqueda.js` vive en la **raiz** (asset dual UMD-lite), como `lib/score.js` en ADR-086.
 
 ### Que se estaba haciendo
 
@@ -4729,11 +4729,11 @@ Unificar los cuatro buscadores divergentes en **una** implementacion con **norma
 
 ### Bug aparte (NO de esta tanda) - BUG-118
 
-`npm run test` falla en `scripts/smoke_grupos_perfil.js` -> `ReferenceError: misAlbumRatingTxt is not defined` en el inline de `mi-perfil.html` (linea 180). **PRE-EXISTENTE** (ultimo commit del inline 2026-10-04); ya registrado como **BUG-118** y se arregla en **tanda separada**.
+`npm run test` falla en `scripts/smoke_grupos_perfil.js` -> `ReferenceError: misAlbumRatingTxt is not defined` en el inline de `mi-perfil.html` (linea 180). **PRE-EXISTENTE** (ultimo commit del inline 2026-10-04); ya registrado como **BUG-118** y se arregla en **tanda separada**. **ACTUALIZADO (2026-10-07): ya resuelto (BUG-118 CERRADO) -> 109/109 (fix en `scripts/smoke_grupos_perfil.js:806-809`; ver TSK-200).**
 
 ### Archivos tocados
 
-`busqueda.js` (nuevo) · `api/destinos.js` · `api/utilidades.js` · `index.html` · `directorio-comida.html` · `directorio-evento.html` · `directorio-hostal.html` · `directorio-sitio.html` · `scripts/apply_sql_file.js` · `db/migrations/053_busqueda_normalizada.sql` (nuevo) · `db/migrations/documental/052_...sql` (reubicado) · `db/cleanups/006_rollback_053_busqueda_normalizada.sql` (nuevo) · `scripts/smoke_busqueda_parity.js` (nuevo). En **working tree, SIN commitear** al cierre de este pase documental.
+`busqueda.js` (nuevo) · `api/destinos.js` · `api/utilidades.js` · `index.html` · `directorio-comida.html` · `directorio-evento.html` · `directorio-hostal.html` · `directorio-sitio.html` · `scripts/apply_sql_file.js` · `db/migrations/053_busqueda_normalizada.sql` (nuevo) · `db/migrations/documental/052_...sql` (reubicado) · `db/cleanups/006_rollback_053_busqueda_normalizada.sql` (nuevo) · `scripts/smoke_busqueda_parity.js` (nuevo). **COMMITEADA Y PUSHEADA** en `b302e66` (`main` == `origin/main`) al cierre de este pase documental.
 
 ### Entrega formal - Rollback versionado de la 053
 
@@ -4778,17 +4778,48 @@ Activar los cuatro puntos que la Wave 1 dejo diferidos (D1 typos, D5 sinonimos, 
 6. **Calibracion `EXPLAIN ANALYZE` de `BUSQ_UMBRALES` con volumetria real** (sigue abierta): ahora acotada por las deudas 4/5; los defaults `0.34`/`0.5` siguen **sin validar**.
 7. **OBSERVACION menor (no bloqueante):** `normGeoAlias`/`ALIAS_CIUDAD` **siguen duplicados** en `api/interacciones.js` (`:338-346`) respecto a `busqueda.js` (mismo cuerpo). Consolidar como **follow-up DRY** (la condicion 1 elimino `normGeo`/`sqlNormGeo`, no los alias).
 8. **NOTA menor:** `scripts/express_check.js` aplica el barrido ASCII **solo a `api/` y `scripts/`** (filtro `^(api|scripts)/`, `express_check.js:238`); los JS de raiz (**`busqueda.js`**, **`directorio-busqueda.js`**) requieren **invocacion explicita** para entrar al barrido.
-9. `npm run test` sigue roto por **BUG-118** preexistente (no de esta tanda; NO se duplica en `BUGS_HISTORICOS.md`).
+9. `npm run test` sigue roto por **BUG-118** preexistente (no de esta tanda; NO se duplica en `BUGS_HISTORICOS.md`). **ACTUALIZADO (2026-10-07): ya resuelto (BUG-118 CERRADO) -> 109/109 (ver TSK-200).**
 
 ### Bug aparte (NO de esta tanda) - BUG-118
 
-`misAlbumRatingTxt is not defined` en el inline de `mi-perfil.html`; **PRE-EXISTENTE**, ya registrado como **BUG-118** (`BUGS_HISTORICOS.md` L2060). Se arregla en tanda separada; **no se crea duplicado**. Sigue **preexistente** tras los follow-ups de esta tanda.
+`misAlbumRatingTxt is not defined` en el inline de `mi-perfil.html`; **PRE-EXISTENTE**, ya registrado como **BUG-118** (`BUGS_HISTORICOS.md` L2060). Se arregla en tanda separada; **no se crea duplicado**. Sigue **preexistente** tras los follow-ups de esta tanda. **ACTUALIZADO (2026-10-07): ya resuelto (BUG-118 CERRADO) -> 109/109; el fix fue del ARNES (`scripts/smoke_grupos_perfil.js:806-809`), producto INTACTO (ver TSK-200).**
 
 ### Archivos tocados
 
 `busqueda.js` · `api/destinos.js` · `api/utilidades.js` · `index.html` · `directorio-comida.html` · `directorio-evento.html` · `directorio-hostal.html` · `directorio-sitio.html` · `db/migrations/054_busqueda_sinonimos.sql` (nuevo) · `scripts/smoke_busqueda_parity.js`. `DECISIONS.md` ADR-090 `### Enmienda Wave 2` (documentacion). **COMMITEADA Y PUSHEADA** (`29e2e5b`) al cierre de este pase documental.
 
 **Follow-ups posteriores (working tree, SIN commit; NO reabren `29e2e5b`):** `busqueda.js` · `api/interacciones.js` · `api/destinos.js` · `directorio-busqueda.js` (**NUEVO**) · `directorio-{comida,evento,hostal,sitio}.html`.
+
+## TSK-200 - BUG-118: fix del ARNES de `smoke_grupos_perfil.js` (extraccion de `misAlbumRatingTxt`) - 2026-10-07 - CERRADO EN WORKING TREE (sin commit)
+
+**Estado: CERRADO EN WORKING TREE (sin commit).** Cambio **solo de instrumentacion**: se corrige el arnes, NO el producto. **Sin ADR nuevo** y **`DECISIONS.md` sin tocar** (no es decision de arquitectura). **Sin endpoint nuevo, sin migracion y `mi-perfil.html` INTACTO: presupuesto Vercel 8/8 INTACTO** (ADR-010).
+
+### Que se estaba haciendo
+
+Cerrar el **unico FAIL** que mantenia `npm run test` en rojo (BUG-118), un fallo **PRE-EXISTENTE** reportado como `misAlbumRatingTxt is not defined` en la zona "Mis Albumes" de `mi-perfil.html`.
+
+### Causa raiz (medida, no supuesta)
+
+**Defecto del ARNES, no del producto.** `scripts/smoke_grupos_perfil.js` extrae funciones inline de `mi-perfil.html` **por NOMBRE** dentro de un `vm`; su array `nombres` extraia `misAlbumesPintar` (`scripts/smoke_grupos_perfil.js:808`) pero **OMITIA su dependencia `misAlbumRatingTxt`** (`mi-perfil.html:3393`, invocada desde `misAlbumesPintar` en `mi-perfil.html:3422`). Bajo el `vm`, la llamada lanzaba `ReferenceError` e interrumpia `correr()` en la seccion 6; el resultado se contaba como la asercion #65 en **64/65**. En el navegador ambas funciones **comparten scope global** y el render funciona: el sintoma solo existia bajo el arnes. Mismo patron que **BUG-098** (*producto correcto, instrumentacion incorrecta*).
+
+### Alcance ejecutado (real, no el plan original)
+
+1. **`scripts/smoke_grupos_perfil.js:806-809`:** se anade `'misAlbumRatingTxt'` al array `nombres`. **Unico archivo tocado.**
+2. **`mi-perfil.html` NO se toco:** el producto quedo **INTACTO** (la funcion `misAlbumRatingTxt` ya estaba definida en `:3393`).
+
+### Verificacion (medida en el turno de cierre)
+
+| Prueba | Resultado |
+|---|---|
+| `node scripts/smoke_grupos_perfil.js` | **109/109 PASS, FAIL 0** (el 64/65 previo estaba **TRUNCADO**: al desbloquear las secciones 6-8 corren ~44 aserciones antes no ejecutadas) |
+| `npm run test` | **VERDE** (todos los smokes `RESULTADO: OK`) |
+| `node --check scripts/smoke_grupos_perfil.js` | **OK** |
+| ASCII-safety | **0 bytes > 127** |
+| Presupuesto Vercel | **8/8 INTACTO** (sin endpoint nuevo); **sin migraciones** |
+
+### Archivos tocados
+
+`scripts/smoke_grupos_perfil.js`. En **working tree, SIN commitear** al cierre de este pase documental. **`mi-perfil.html` y `api/*` sin tocar.**
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
