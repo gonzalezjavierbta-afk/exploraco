@@ -4893,5 +4893,64 @@ Registrados en `BUGS_HISTORICOS.md` en este mismo pase. **Ninguno es regresion d
 
 Codigo (working tree, SIN commit; **NO desplegado**): `db/migrations/055_reclamacion_propiedad_destinos.sql` (nuevo) · `api/interacciones.js` · `api/admin.js` · `api/pagina-destino.js` · `admin.html` · `scripts/verificar_migraciones_prod.js` · `scripts/smoke_055_indice_unico_reclamacion.js` (nuevo). Documentacion (este pase): `exploraco desarrollo/TASKS.md` · `NEXT.md` · `DECISIONS.md` · `BUGS_HISTORICOS.md`.
 
+## TSK-202 - Reubicacion del boton "Reclamar" del hero a la franja `.gstrip` - 2026-10-08 - IMPLEMENTADO / VERIFICADO LOCAL / **PENDIENTE DE QA RUNTIME**
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL, SIN COMMIT Y SIN DESPLEGAR.** **NO abre un ADR nuevo** (ADR-084): es una **reubicacion de UI que no toca el modelo de datos**, asi que se registra como **nota de producto N-091.1 bajo ADR-091** (`DECISIONS.md`, seccion propia; el argumento vive **una sola vez**, alli). Peticion del operador: **mover el boton del hero a la barra, mas sutil, y que dijera solo "Reclamar"** en vez del copy largo. Tarea hermana de **TSK-201** (misma feature, mismo ciclo). **8/8 endpoints Vercel INTACTOS**, cero endpoints nuevos, **cero migraciones**, `api/interacciones.js` **sin tocar**.
+
+### Que se estaba haciendo
+
+1. **Quitar** el boton de reclamar de la **fila 2 del hero** de la ficha y **colocarlo en la franja naranja `.gstrip`**, justo debajo del hero.
+2. **Acortar el copy** a `Reclamar`.
+3. Que la decision de tinta quede **escrita con su numero**, no como preferencia.
+
+### Alcance ejecutado (real, no el plan original)
+
+1. **`api/pagina-destino.js`** (3.173 lineas), CSS del silo: `.gscta` (`:266`) **perdio `margin-left:auto`**; nueva `.gsrecl` (`:278`): `margin-left:auto`, fondo transparente, sin borde, tinta `#fff`, Barlow Condensed 800, mayusculas, `border-bottom:3px solid transparent`, `flex-shrink:0`; `.gsrecl:hover` (`:279`) = `color:#fff` + `border-bottom-color:var(--gold-dark)`.
+2. **Una sola constante de markup** `var btnReclamarHTML` (`:991`) alimenta las **dos ramas** de la franja, de modo que el boton se emite **exactamente una vez por render**: rama real (`:992-1006`, boton **antes** del CTA "Ver galeria") y rama de reserva `<div class="gstrip" data-gslite style="display:none">` (`:1017`, mismo boton).
+3. **`initReclamo()`** (`:2952`): revela el boton y, **si vive en la franja de reserva**, revela tambien la franja completa (`data-gslite` -> `style.display=""`).
+4. **Nada mas cambio**: el modal y su silo CSS `.pdrecl` (`:542-554`, colgado del selector padre unico, ADR-004) siguen iguales; el modal se monta por `getElementById` desde `rcAbrir`, **independiente de la posicion del boton**.
+
+### Las 3 decisiones de diseno (el detalle vive en DECISIONS.md N-091.1)
+
+1. **Aislamiento del markup (ADR-003).** El boton se emite **exactamente una vez por render**, garantizado por la **unica constante de markup** que alimenta las dos ramas: nunca dos veces (franja real + reserva) ni cero. En `cat === 'blog'` **no se emite**, igual que antes.
+2. **La franja es condicional, y eso habria creado un agujero.** La condicion de emision real es `cat !== 'blog' && (nRes > 0 || d.precio_desde || galAll.length > 1)` (`:993`): un destino **sin resenas, sin `precio_desde` y sin galeria multiple NO emitia franja**, luego un boton movido ahi **habria desaparecido por completo** de esos destinos. **Solucion: rama de reserva que nace oculta**, revelada por `initReclamo()` junto al boton **solo si** el GET `reclamacion_estado` responde `es_reclamable:true`. Se conserva la **degradacion silenciosa** de ADR-091: si el GET falla no se ve nada, y en un destino no reclamable **no queda una franja naranja vacia a la vista**. **Trampa del motor al verificar:** `galAll` **incluye la foto del hero** (`:825` `if (!galAll.length && hero) galAll = [hero];`), asi que **una sola foto NO basta** para forzar la rama de reserva.
+3. **Contraste: excepcion asumida, con numero.** Fondo real de la franja **`#FF4A00`**. Con tinta **`#fff`** el contraste es **3.370:1** (verificado: L del fondo = 0,2616; 1,05 / 0,3116 = 3,369), **por debajo del AA de texto normal (4.5:1)** pero **por encima del AA de texto grande (3.0:1)**. El 4.5:1 con tinta blanca es **matematicamente inalcanzable** sobre ese naranja porque el fondo es demasiado claro: solo un texto oscuro lo alcanzaria, y eso rompia el lenguaje visual de la franja. **Decision del operador: mantener 3.370:1 y arreglar el hover.** En el hover **ya no se atenua**: el `rgba(255,255,255,.82)` (2.675:1, es decir **el raton BAJABA el contraste**) paso a `#fff`, y la unica senal de hover es el **subrayado**. Contexto justo: `.gscta` tiene el mismo **3.370:1** y `.gspl` (8 px) esta peor, asi que **no es regresion respecto a los hermanos**, pero **queda como deuda asumida y documentada, no como conformidad AA**.
+
+### Anclas verificadas por grep en el fichero real (ADR-006)
+
+| Ancla | Contenido medido |
+|---|---|
+| `api/pagina-destino.js:266` | `.gscta` sin `margin-left:auto` |
+| `api/pagina-destino.js:278` / `:279` | `.gsrecl` / `.gsrecl:hover` |
+| `api/pagina-destino.js:991` | `var btnReclamarHTML = '<button class="gsrecl" id="btn-reclamar" style="display:none" onclick="abrirModalReclamo()">Reclamar</button>';` |
+| `api/pagina-destino.js:993` | condicion de emision de la franja real |
+| `api/pagina-destino.js:1004` / `:1005` | boton de reclamo **antes** del CTA "Ver galeria" |
+| `api/pagina-destino.js:1017` | rama de reserva `data-gslite`, oculta de nacimiento |
+| `api/pagina-destino.js:2952` | `initReclamo()` |
+| `api/pagina-destino.js:825` | `galAll` incluye la foto del hero |
+
+### Verificacion (medida en este turno)
+
+| Prueba | Resultado |
+|---|---|
+| `node scripts/smoke_auditoria_pagina_destino.js` | **71/76** (5 FAIL, los 5 de **AUDIT 3** = lightbox `#lb`, ver deuda 1). Bloque nuevo **`AUDIT 8` va 15/15** |
+| Balance de divs del render | **OK en las 3 ramas**: real **86/86**, reserva **76/76**, blog **51/51** |
+| ASCII-safety (ADR-002) | **0 bytes > 127**, **0 backticks** |
+| CSS | **cero variables CSS nuevas**, **nada en `:root`** (el subrayado usa `var(--gold-dark)`, que ya existia) |
+| Silo del modal | `.pdrecl` sigue colgado del **selector padre unico** (ADR-004); el modal abre igual |
+| Presupuesto Vercel (ADR-010) | **8/8 INTACTO**, cero endpoint nuevo, cero migracion, `api/interacciones.js` sin tocar |
+
+### Deudas (registradas **para que no se confundan con regresiones vivas**)
+
+1. **`scripts/smoke_auditoria_pagina_destino.js` AUDIT 3: 5 checks en rojo.** Auditan el lightbox `#lb`, que **TSK-112 / ADR-079 retiro del motor**: no pueden pasar **por construccion**. **Preexistente** y verificado que **no crece** con este cambio (los mismos 5 FAIL antes y despues). Total del smoke **71/76**; el bloque nuevo **AUDIT 8 va 15/15**.
+2. **AUDIT 7: se corrigio una deuda real del propio smoke.** Su helper `heroAll()` buscaba **`HERO_ALL`**, variable que el motor **ya no emite** (hoy emite **`HERO_FOTOS`**, `api/pagina-destino.js:2747`), asi que **4 aserciones no podian pasar**. Verificado contra el motor **antes** de tocarlo.
+3. **Este smoke NO esta en la cadena de `npm test`**, asi que **un rojo aqui no sale en el `npm test`**. Conviene **decidir su enganche**; **no se resuelve en este pase**.
+4. **`:focus-visible` no cubierto** en `.gsrecl`. **NO es un defecto**: la regla **no quita `outline`**, luego el anillo de foco por defecto del navegador sigue presente para teclado. Se deja como **observacion, no como deuda**.
+5. **QA runtime en produccion PENDIENTE**: el boton **nace oculto** y solo aparece si el GET responde `es_reclamable:true`. Hay que validarlo en (a) un destino **con resenas** (franja real) y (b) uno **sin resenas, sin precio y sin galeria multiple** (franja de reserva).
+
+### Archivos tocados
+
+Codigo (working tree, **SIN commit; NO desplegado**): `api/pagina-destino.js` · `scripts/smoke_auditoria_pagina_destino.js`. **Nada en `scripts/` ni en `api/` se modifico en este pase documental.** Documentacion (este pase, unico): `exploraco desarrollo/TASKS.md` · `NEXT.md` · `DECISIONS.md` (nota de producto **N-091.1**). **No se registro ningun BUG nuevo** (las deudas 1-3 son preexistentes o de instrumentacion y ya estan cubiertas por **BUG-119**).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

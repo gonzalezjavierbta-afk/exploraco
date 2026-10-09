@@ -263,7 +263,20 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}"
 +".gsdiv{width:1px;height:30px;background:rgba(255,255,255,.25);flex-shrink:0}"
 +".gsprice{color:#fff}.gspl{font-size:8px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:1.2px}.gspv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}"
-+".gscta{margin-left:auto;background:#fff;color:var(--gold-ink);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}"
+    +".gscta{background:#fff;color:var(--gold-ink);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}"
+    // .gsrecl (ADR-091): boton "Reclamar" de la franja naranja. Se pega al
+    // extremo derecho con SU PROPIO margin-left:auto (el de .gscta se le
+    // quito, asi el CTA "Ver galeria" queda a su izquierda). Tinta BLANCA a
+    // proposito: el fondo de la franja ya es #FF4A00 y texto naranja sobre
+    // naranja seria invisible; se sigue el tono de .gstars/.gsrv/.gspv.
+    // El hover NO atenua la tinta: se queda en #fff (3.37:1 sobre #FF4A00).
+    // Atenuarlo a rgba(255,255,255,.82) lo bajaba a 2.67:1, o sea pasar el
+    // raton DEGRADABA la legibilidad, que es justo lo contrario de lo que
+    // debe hacer un hover. La unica senal de hover es el subrayado, que usa
+    // la variable var(--gold-dark) que ya existe en :root: cero variables
+    // nuevas y nada en :root (ADR-004): cuelga del bloque .gstrip.
+    +".gsrecl{margin-left:auto;background:transparent;border:none;border-bottom:3px solid transparent;padding:8px 0 5px;color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}"
+    +".gsrecl:hover{color:#fff;border-bottom-color:var(--gold-dark)}"
 
 +".ssec{padding:40px 4%}.ssec.bwarm{background:var(--warm)}.ssec.bwhite{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}"
 +".sin{max-width:860px;margin:0 auto}"
@@ -966,6 +979,16 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   }
 
   // -- GSTRIP (rating sticky bar) ---------------------------------
+  // El boton de reclamo (ADR-091) se emite desde la franja y NO desde la fila
+  // 2 del hero: sobre el fondo oscuro del hero era ilegible y desbalanceaba
+  // la botonera, que queda solo con acciones de uso (Como llegar, Guardar,
+  // Estuve aqui). El marcado vive en UNA constante para garantizar el
+  // invariante ADR-003: el boton se emite EXACTAMENTE UNA VEZ por render,
+  // nunca dos (franja real + franja de reserva) y nunca cero.
+  // NACE OCULTO (display:none): solo initReclamo() lo revela si GET
+  // reclamation_estado responde es_reclamable:true; si el GET falla el boton
+  // sigue oculto (degradacion silenciosa, patron initSpotDuenos).
+  var btnReclamarHTML = '<button class="gsrecl" id="btn-reclamar" style="display:none" onclick="abrirModalReclamo()">Reclamar</button>';
   var gstrip = '';
   if (cat !== 'blog' && (nRes > 0 || d.precio_desde || galAll.length > 1)) {
     var starsHtml = [1,2,3,4,5].map(function(i){
@@ -976,8 +999,22 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + (d.precio_desde ? '<div class="gsprice"><div class="gspl">Desde</div><div class="gspv">'+esc(money(d.precio_desde))+'</div></div>' : '')
       // TSK-076: el boton "Reservar" salio de la franja; la reserva vive
       // en secReservar y en la botonera. En su lugar, CTA a la galeria.
+      // El reclamo va ANTES del CTA para que el orden visual sea
+      // [rating] [div] [precio] -> [Reclamar] [Ver galeria].
+      + btnReclamarHTML
       + (galAll.length > 1 ? '<button class="gscta" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">Ver galeria</button>' : '')
       + '</div>';
+  } else if (cat !== 'blog') {
+    // FRANJA DE RESERVA: si la condicion anterior es falsa (sin resenas, sin
+    // precio y sin galeria multiple) la franja real no se emite, y sin ella
+    // el reclamo se perderia. Se emite entonces una franja minima marcada con
+    // data-gslite que contiene el MISMO boton, y NACE OCULTA: en el caso mas
+    // frecuente (punto sin datos de ranking) casi siempre no hay nada que
+    // reclamar, y una franja vacia a la vista seria ruido visual.
+    // initReclamo() la revela junto al boton si el punto es reclamable.
+    // Nada mas cambia en esta rama: no se anaden resenas, precio ni galeria,
+    // la reserva es solo el contenedor del boton.
+    gstrip = '<div class="gstrip" data-gslite style="display:none">' + btnReclamarHTML + '</div>';
   }
 
   var secNum = 1;
@@ -2422,13 +2459,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   if (d.lat && d.lng) hctarRow2.push('<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>');
   hctarRow2.push('<button class="hobtn" id="btn-guardar" onclick="abrirPopoverGuardar()">\u2661 Guardar</button>');
   hctarRow2.push('<button class="hobtn" id="btn-visitado" onclick="marcarVisitadoBtn(this)">\u2713 Estuve aqui</button>');
-  // ADR-091 (reclamacion de propiedad): se emite SIEMPRE para que la fila 2
-  // no quede desbalanceada, pero NACE OCULTO (display:none en el atributo).
-  // Solo initReclamo() lo revela si GET reclamation_estado responde
-  // es_reclamable:true; si el GET falla el boton sigue oculto (degradacion
-  // silenciosa, patron initSpotDuenos). La clase propia pd-recl permite
-  // ocultarlo sin tocar .hobtn.
-  hctarRow2.push('<button class="hobtn pd-recl" id="btn-reclamar" style="display:none" onclick="abrirModalReclamo()">\u00bfEres creador o due\u00f1o oficial del punto?</button>');
+  // ADR-091: el boton de reclamo se emitio en la fila 2 del hero (clase
+  // .hobtn pd-recl) y ahora vive en la franja naranja .gstrip, como
+  // .gsrecl (ver bloque GSTRIP). Se MUEVE, no se elimina: id, onclick y
+  // initReclamo() se conservan, y la clase pd-recl desaparece con el boton
+  // porque solo existia para poder ocultarlo sin tocar .hobtn.
   // Rebranding LATAWEL: og:image absoluta. Si el destino tiene hero propio se
   // respeta (absolutizandolo contra BASE); si no, se usa la imagen OG oficial.
   // Se mira la foto REAL (d.foto_hero/d.foto), no el fallback Unsplash.
@@ -2919,7 +2954,16 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '  if(!btn)return;\n'
     + '  fetch("/api/interacciones?tipo=reclamacion_estado&destino_id="+encodeURIComponent(DID)).then(function(r){return r.json().catch(function(){return null;});}).then(function(res){\n'
     + '    if(!res||!res.ok||!res.data)return;\n'
-    + '    if(res.data.es_reclamable===true)btn.style.display="";\n'
+    + '    if(res.data.es_reclamable!==true)return;\n'
+    + '    btn.style.display="";\n'
+    // El boton puede vivir en la franja real (visible) o en la franja de
+    // reserva (data-gslite, oculta de nacimiento). Se localiza desde el
+    // propio boton y solo se revela si es la de reserva: asi la franja
+    // vacia sigue oculta cuando no hay nada que reclamar. Degradacion
+    // silenciosa conservada: GET que falla, res no ok o es_reclamable
+    // distinto de true no muestran nada.
+    + '    var wrap=btn.closest?btn.closest(".gstrip"):null;\n'
+    + '    if(wrap&&wrap.hasAttribute("data-gslite"))wrap.style.display="";\n'
     + '  }).catch(function(e){console.warn("[reclamacion_estado]",e&&e.message);});\n'
     + '}\n'
     + 'initReclamo();\n'

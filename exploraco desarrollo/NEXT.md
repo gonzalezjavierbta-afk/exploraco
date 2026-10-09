@@ -242,6 +242,26 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-08 (pase documental único R2, 15ª tanda) - Reubicación del botón "Reclamar" del hero a la franja `.gstrip` (nota de producto N-091.1): implementado y verificado local, SIN COMMIT y SIN DESPLEGAR
+
+**Qué se estaba haciendo:** por petición del operador, **mover el botón de "reclamar propiedad de un destino" de la fila 2 del hero a la franja naranja `.gstrip`** (más sutil) y **acortar el copy a "Reclamar"**. **Reubicación de UI pura: no toca el modelo de datos, ni backend, ni endpoints, ni migraciones**, así que **NO abre un ADR nuevo**: queda como **nota de producto N-091.1 bajo ADR-091**. El argumento vive **una sola vez** en `DECISIONS.md` N-091.1; aquí solo hay estado y siguientes pasos. Detalle de ejecución en `TASKS.md` **TSK-202**.
+
+**Lo que quedó entregado (working tree, SIN commit; NO desplegado):**
+- **`api/pagina-destino.js`** (3.173 líneas): nueva `.gsrecl` (`:278`) + `.gsrecl:hover` (`:279`); `.gscta` (`:266`) perdió `margin-left:auto`; **una sola constante de markup** `btnReclamarHTML` (`:991`) que alimenta **las dos ramas** de la franja, de modo que el botón se emite **exactamente una vez por render** (ADR-003); rama de reserva `<div class="gstrip" data-gslite style="display:none">` (`:1017`) que `initReclamo()` (`:2952`) revela **solo si** el GET `reclamacion_estado` responde `es_reclamable:true`.
+- **Decisiones de diseño:** (a) **el botón no podía ir ciego a la franja**, porque su emisión es condicional (`cat !== 'blog' && (nRes > 0 || d.precio_desde || galAll.length > 1)`) y sin resenas + sin precio + sin galería múltiple **no emitía franja** → de ahí la rama de reserva oculta, que conserva la **degradación silenciosa** de ADR-091; (b) **tinta blanca por decisión, con el número:** `#fff` sobre `#FF4A00` da **3,370:1** (bajo el AA de texto normal 4,5:1, sobre el AA de texto grande 3,0:1) y el 4,5:1 **es matemáticamente inalcanzable** con tinta blanca sobre ese fondo; (c) **el hover ya no atenúa** (el `rgba(255,255,255,.82)` = 2,675:1 hacía que el ratón **bajara** el contraste) → ahora `#fff` con el subrayado como única señal.
+- **Verificación (ADR-006):** `smoke_auditoria_pagina_destino.js` **71/76** (los 5 FAIL son de **AUDIT 3**, lightbox `#lb` retirado por TSK-112/ADR-079, preexistentes y verificados de que **no crecen**); bloque nuevo **`AUDIT 8` 15/15**; balance de divs OK en las **3 ramas** (86/86, 76/76, 51/51); ASCII **0 bytes >127** y 0 backticks; **cero variables CSS nuevas** y nada en `:root`; silo `.pdrecl` del modal **intacto** (ADR-004) y el modal abre igual (se monta por `getElementById` desde `rcAbrir`); **8/8 endpoints INTACTO**, cero migraciones, `api/interacciones.js` sin tocar.
+
+**Qué sigue (acción concreta, en orden):**
+1. **QA runtime** (lo único obligatorio de esta tanda): como el botón **nace oculto** y solo aparece si el GET responde `es_reclamable:true`, validarlo en **(a)** un destino **con reseñas** (franja real, botón junto al CTA "Ver galería") y en **(b)** uno **sin reseñas, sin precio y sin galería múltiple** (franja de reserva). Ojo al elegir el caso (b): **`galAll` incluye la foto del hero**, así que **una sola foto no basta** para forzar la franja de reserva.
+2. **Decidir el enganche de `scripts/smoke_auditoria_pagina_destino.js`** a la cadena de `npm test`: hoy **no está encadenado**, así que sus 5 FAIL de AUDIT 3 **no salen en el `npm test`** y pueden volver a pasar inadvertidos. **No se resuelve en este pase.**
+3. Después, el despliegue de la feature completa (**TSK-201**), que es lo que cierra de verdad la 055 en producción.
+
+**Riesgos activos:**
+- **Contraste asumido, no conforme AA:** `.gsrecl` queda en **3,370:1** (`.gscta` tiene el mismo valor y `.gspl` está peor, luego **no es regresión**), y el hover ya **no** lo empeora. **Deuda documentada, no defecto vivo.**
+- **Franja de reserva = superficie nueva para ruido visual:** si `initReclamo()` no revelara solo con `es_reclamable:true`, un destino no reclamable dejaría una **franja naranja vacía a la vista**. Hoy está cubierta por aserción del smoke.
+- **Deudas preexistentes, no regresiones de esta tanda:** los **5 FAIL** de AUDIT 3 (**BUG-119**, lightbox retirado del motor por TSK-112/ADR-079) y la deuda instrumentación de **AUDIT 7** (`heroAll()` buscaba `HERO_ALL`, que el motor ya no emite; hoy emite `HERO_FOTOS`) — esta última **sí se corrigió** en el propio smoke, verificado contra el motor antes de tocarlo.
+- **`:focus-visible` sin regla propia en `.gsrecl`:** **no es un defecto** (la regla no quita `outline`, luego el anillo de foco del navegador sigue presente para teclado). Queda como **observación**.
+
 ### WORKING TREE 2026-10-08 (pase documental único R2, 14ª tanda) - Reclamo de propiedad de destinos (ADR-091): implementado y verificado local, PENDIENTE DE DESPLIEGUE
 
 **Qué se estaba haciendo:** cerrar el ciclo documental de la feature **ADR-091** (reclamo de propiedad de destinos con **pozo de XP** y **bono 1.5x**). El ADR ya estaba redactado; **NO se re-litiga ni se rediseña**: este pase solo **registra estado y deudas** (R2, ADR-084). El detalle de ejecución vive **una sola vez** en `TASKS.md` **TSK-201**; aquí solo hay estado y siguientes pasos.

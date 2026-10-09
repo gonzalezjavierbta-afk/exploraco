@@ -7950,8 +7950,42 @@ El paso **4** es un **techo duro**: aunque un parametro futuro, un error de oper
 - **Fuente unica (ADR-084):** el argumento de D1-D12 y de los controles (a)-(e) vive **una sola vez, aqui**.
 - **Estado:** **PROPUESTO (2026-10-08)** -- pendiente de veredicto de `@architect-review`. **D1-D5 son decisiones ya tomadas por el operador**: una revision puede pedir que se redacten mas claro, **no que se re-litiguen**.
 
+### Nota de producto N-091.1 - Reubicacion del boton "Reclamar" a la franja `.gstrip` (2026-10-08)
+
+**NO es un ADR nuevo, y no porcedure abrirlo.** Es una **reubicacion de UI que no toca el modelo de datos, ni el backend, ni los endpoints, ni las migraciones**: no hay decision de arquitectura que este ADR tuviera que derogar ni que otro tuviera que abrir. Se registra aqui, **bajo el ADR-091** (que es el que fijo la reclamacion de propiedad), como **nota de producto**. **Estado de la nota: ACEPTADA E IMPLEMENTADA EN WORKING TREE (2026-10-08), sin commit y sin desplegar.** Numero **N-091.1**: el primer ADR es **091** y esta es su primera nota; el **092** sigue libre. **No contradice ninguna premisa de ADR-091**: la condicion de emision, la degradacion silenciosa, el silo `.pdrecl`, el `id` unico `btn-reclamar` y el contrato del GET `reclamacion_estado` **se conservan intactos**; lo unico que cambia es **donde se pinta el boton** y **su copy**.
+
+**Fuente unica (ADR-084 D1):** el argumento de esta nota vive **una sola vez, aqui**. `TASKS.md` **TSK-202** y `NEXT.md` **15a tanda** apuntan y no lo repiten.
+
+#### Peticion y problema
+
+Peticion del operador: el boton de reclamar propiedad, que estaba en la **fila 2 del hero** de la ficha, **molesta alli** (ruido visual) y su copy era largo. Se pide moverlo a la **franja naranja `.gstrip`**, justo debajo del hero, mas sutil, y que dijera solo **"Reclamar"**.
+
+#### Decisiones (no re-litigan el ADR-091)
+
+- **N1 -- Un solo punto de emision (ADR-003).** El boton se emite **exactamente una vez por render**, garantizado estructuralmente por **una unica constante de markup** (`var btnReclamarHTML`, `api/pagina-destino.js:991`) que alimenta **las dos ramas** de la franja. Consecuencia buscada: **nunca dos veces** (franja real + reserva a la vez) ni **cero**. En `cat === 'blog'` **no se emite**, igual que antes.
+- **N2 -- La franja es condicional, y por eso el boton NO podia ir ciego ahi.** La condicion real de emision es `cat !== 'blog' && (nRes > 0 || d.precio_desde || galAll.length > 1)` (`:993`). Un destino **sin resenas, sin `precio_desde` y sin galeria multiple NO emitia franja**: un boton movido ahi **habria desaparecido por completo** de esos destinos, que es exactamente la clase de fallo que ADR-003 prohibe. **Solucion: rama de reserva** `<div class="gstrip" data-gslite style="display:none">` (`:1017`) con el **mismo** boton, que **nace oculta** y que `initReclamo()` (`:2952`) revela **junto al boton** solo si el GET `reclamacion_estado` responde `es_reclamable:true`. Esto **conserva la degradacion silenciosa de ADR-091**: si el GET falla no se ve nada, y en un destino **no reclamable no queda una franja naranja vacia a la vista**. **Trampa del motor al verificar esto:** `galAll` **incluye la foto del hero** (`:825`), asi que **una sola foto NO basta** para forzar la rama de reserva.
+- **N3 -- Tinta blanca, con el numero por delante.** El fondo real de la franja es **`#FF4A00`**. La eleccion no era estetica: en el hero el boton llevaba `.hobtn`, **disenada para fondo oscuro**, y seria ilegible sobre el naranja; ademas el texto naranja `#FF4A00` de "Compartir" habria sido **invisible** sobre un fondo del mismo color. La tinta se eligio **`#fff`**, que es **el lenguaje que ya usa la franja** (`.gsavg`, `.gstars`, `.gspv`). Contraste medido: **3,370:1** (luminancia del fondo 0,2616; 1,05 / 0,3116). **Por debajo del AA de texto normal (4,5:1) y por encima del AA de texto grande (3,0:1).**
+- **N4 -- El hover ya no atenua.** Atenuar la tinta a `rgba(255,255,255,.82)` daba **2,675:1**, es decir **pasar el raton BAJABA el contraste**, que es lo contrario de lo que debe hacer un hover. El hover paso a **`#fff`** y su unica senal es el **subrayado** (`border-bottom-color:var(--gold-dark)`, variable que **ya existia**: cero variables nuevas y nada en `:root`, ADR-004).
+
+#### Contraste: excepcion asumida, no conformidad
+
+Con tinta blanca, el **4,5:1 es matematicamente inalcanzable** sobre `#FF4A00`: el fondo es demasiado claro, y solo un texto oscuro lo alcanzaria, lo que **romperia el lenguaje visual de la franja**. **Decision del operador: mantener 3,370:1 y arreglar el hover.** Contexto justo: **`.gscta` tiene el mismo 3,370:1** y **`.gspl` (8 px) esta peor**, luego **no es una regresion respecto a los hermanos**. **Queda como deuda asumida y documentada, no como conformidad AA.**
+
+#### Deuda / observaciones (NO son regresiones vivas)
+
+- **`scripts/smoke_auditoria_pagina_destino.js` AUDIT 3: 5 checks en rojo** (lightbox `#lb`), porque **TSK-112 / ADR-079 retiraron el lightbox del motor**: no pueden pasar **por construccion**. **Preexistente**, verificado que **no crece** con este cambio. Total del smoke **71/76**; el bloque nuevo **AUDIT 8 va 15/15**.
+- **AUDIT 7: deuda de instrumentacion del propio smoke, CORREGIDA aqui.** Su helper `heroAll()` buscaba **`HERO_ALL`**, variable que el motor **ya no emite** (hoy emite **`HERO_FOTOS`**, `api/pagina-destino.js:2747`), asi que **4 aserciones no podian pasar**. Verificado contra el motor **antes** de tocarlo.
+- **El smoke NO esta encadenado a `npm test`**, asi que **un rojo ahi no sale en el `npm test`**. **Decidir su enganche; no se resuelve en esta nota.**
+- **`:focus-visible` sin regla propia en `.gsrecl`: NO es un defecto.** La regla **no quita `outline`**, luego el anillo de foco por defecto del navegador sigue presente para teclado. Es una **observacion**, no una deuda.
+- **QA runtime PENDIENTE** (unico paso obligatorio que queda): validar el boton en un destino **con resenas** (franja real) y en uno **sin resenas, sin precio y sin galeria multiple** (franja de reserva). El boton **nace oculto**: no se puede validar por inspeccion estatica.
+
+#### Invariantes verificados
+
+**8/8 endpoints Vercel intactos**, **cero endpoints nuevos**, **cero migraciones**, `api/interacciones.js` **sin tocar**. Balance de divs del render **OK en las 3 ramas** (real **86/86**, reserva **76/76**, blog **51/51**). **ASCII-safety: 0 bytes > 127, 0 backticks** (ADR-002). **Cero variables CSS nuevas**, nada en `:root`. El silo `.pdrecl` del modal **sigue colgado del selector padre unico** (ADR-004) y el modal **abre igual**: se monta por `getElementById` desde `rcAbrir`, **independiente de la posicion del boton**. Detalle de ejecucion en `TASKS.md` **TSK-202**.
+
 **ADRs relacionados:**
 
+- **ADR-091** (padre de esta nota): fija la reclamacion de propiedad, el pozo de XP, el bono 1.5x, el GET `reclamacion_estado` y la **degradacion silenciosa** que N2 conserva.
 - **ADR-018** (el nivel es **DERIVADO** con `calcularNivelLocal(xpTotal)`, nunca una columna; `xp_total - xp_gastado_sinks`): es el motivo de que D3 acredite **plano** y de que el revertimiento (D11) pueda dejar `xp_total` por debajo de lo gastado.
 - **ADR-010 / ADR-001** (presupuesto 8/8: este ADR **no crea endpoint** ni fichero en `api/`; las acciones son query params de `interacciones.js` y recursos de `admin.js`).
 - **ADR-003** (Cero Borrado Logico): el reset del pozo es `UPDATE ... SET xp_bruto=0`, **no** un borrado de filas de `xp_pozo_aportes`; la unica excepcion es el `ON DELETE CASCADE` por recurso que deja de existir fisicamente.

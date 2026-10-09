@@ -192,7 +192,9 @@ function heroUrl(html) {
   return m ? m[1] : '';
 }
 function heroAll(html) {
-  var m = /var HERO_ALL=(\[[^\]]*\])/.exec(html);
+  // El motor emite var HERO_FOTOS= (api/pagina-destino.js:2747): [hero] + miniaturas.
+  // El helper buscaba HERO_ALL, que el render ya no produce.
+  var m = /var HERO_FOTOS=(\[[^\]]*\])/.exec(html);
   if (!m) return [];
   try { return JSON.parse(m[1]); } catch (e) { return []; }
 }
@@ -241,6 +243,79 @@ var heroConVideo = buildHTML(
   [{ url: "https://e.com/vid.mp4", votos: 99, foto_type: "video" }]
 );
 check("hero: video con mas votos NO entra al hero", heroUrl(heroConVideo) === "https://e.com/hero.jpg" && heroAll(heroConVideo).indexOf("https://e.com/vid.mp4") === -1, JSON.stringify(heroAll(heroConVideo)));
+
+console.log("\n=== AUDIT 8: boton Reclamar en la franja .gstrip (ADR-091 / ADR-003) ===");
+// El boton de reclamo se emite DESDE la franja naranja .gstrip, nunca desde
+// la botonera del hero (.hctar-row). El marcado vive en una sola constante
+// (btnReclamarHTML) para que cada render lo emita EXACTAMENTE UNA VEZ (ADR-003).
+// Ojo empirico: galAll incluye la foto del hero, asi que para forzar la rama
+// de reserva (:1003) hay que dejar resenas en 0, sin precio_desde y sin NINGUNA
+// foto (ni hero ni curada): con una sola foto galAll.length === 1 y la rama
+// real seguiria ganandonos.
+function bloqueHtml(html, apertura) {
+  var i = html.indexOf(apertura);
+  if (i < 0) return "";
+  var j = html.indexOf("</section>", i);
+  return j < 0 ? html.slice(i) : html.slice(i, j);
+}
+function zonaGstrip(html) {
+  var i = html.indexOf('<div class="gstrip"');
+  if (i < 0) return "";
+  var j = html.indexOf("\n\n", i);
+  return j < 0 ? html.slice(i) : html.slice(i, j);
+}
+function zonaHero(html) {
+  var i = html.indexOf('<div class="hctar">');
+  if (i < 0) return "";
+  var j = html.indexOf('<div class="hr">', i);
+  return j < 0 ? html.slice(i, i + 1500) : html.slice(i, j);
+}
+var TAG_BTN = 'id="btn-reclamar"';
+
+// 1 + 2 + 4: render con FRANJA REAL (resenas > 0 y galeria multiple).
+var htmlReal = buildHTML(
+  base({ foto_hero: "https://e.com/h.jpg", total_resenas: 3, rating: 4 }),
+  {},
+  [{ url: "https://e.com/h.jpg" }, { url: "https://e.com/g.jpg" }],
+  [], null, []
+);
+var gsReal = zonaGstrip(htmlReal);
+var heroReal = zonaHero(htmlReal);
+check("franja real: .gstrip emitido", gsReal.indexOf('<div class="gstrip">') >= 0, "len=" + gsReal.length);
+check("franja real: #btn-reclamar DENTRO de .gstrip", gsReal.indexOf(TAG_BTN) >= 0);
+check("franja real: #btn-reclamar FUERA de la botonera del hero", heroReal.indexOf(TAG_BTN) < 0, "hctar=" + heroReal.length);
+check("franja real: hero NO emite boton .gsrecl", heroReal.indexOf('class="gsrecl"') < 0);
+var iBotonReal = gsReal.indexOf(TAG_BTN);
+var iCtaReal = gsReal.indexOf("Ver galeria");
+check("franja real: CTA 'Ver galeria' presente", iCtaReal >= 0, "idx=" + iCtaReal);
+check("franja real: orden Reclamar -> Ver galeria", iBotonReal >= 0 && iCtaReal > iBotonReal, "boton=" + iBotonReal + " cta=" + iCtaReal);
+var nReal = cuenta(htmlReal, /id="btn-reclamar"/g);
+check("ADR-003 franja real: btn-reclamar emitido exactamente 1 vez", nReal === 1, "ocurrencias=" + nReal);
+
+// 3 + 4: render con RAMA DE RESERVA (condicion de :989 empiricamente falsa).
+var htmlLite = buildHTML(base({}), {}, [], [], null, []);
+var gsLite = zonaGstrip(htmlLite);
+// La rama real (:989) solo imprime .gsavg/.gsprice/CTA: si ninguno aparece y
+// el wrapper data-gslite si, TOMAMOS DE VERDAD la rama de reserva.
+var tomoReserva = gsLite.indexOf("data-gslite") >= 0 && gsLite.indexOf("gsavg") < 0;
+check("reserva: condicion de :989 es FALSA (0 resenas, sin precio, sin galeria)", tomoReserva, "gstrip=" + gsLite.slice(0, 70));
+check("reserva: wrapper data-gslite presente", gsLite.indexOf("data-gslite") >= 0);
+check("reserva: wrapper data-gslite NACE OCULTO (display:none)", /data-gslite style="display:none"/.test(gsLite));
+check("reserva: sin resenas ni precio en la franja", gsLite.indexOf("resenas") < 0 && gsLite.indexOf("gsprice") < 0);
+var nLite = cuenta(htmlLite, /id="btn-reclamar"/g);
+check("ADR-003 reserva: btn-reclamar emitido exactamente 1 vez", nLite === 1, "ocurrencias=" + nLite);
+
+// 5: en blog el boton no se emite en absoluto (ni franja real ni reserva).
+var htmlBlog = buildHTML(base({ categoria_slug: "blog", descripcion: "hola", total_resenas: 7, rating: 5, precio_desde: 30000 }), {}, [], [], null, []);
+var nBlog = cuenta(htmlBlog, /id="btn-reclamar"/g);
+check("blog: btn-reclamar con CERO ocurrencias", nBlog === 0, "ocurrencias=" + nBlog);
+// Ojo: el CSS inline del motor contiene ".gstrip{...}", asi que la asercion
+// negativa mira el atributo class del ELEMENTO, no la regla de estilo.
+check("blog: ningun <div class=\"gstrip\"> emitido", cuenta(htmlBlog, /<div class="gstrip"/g) === 0, "divs=" + cuenta(htmlBlog, /<div class="gstrip"/g));
+// El script inline de initReclamo() SI menciona data-gslite (compartido por
+// ambas ramas), asi que se busca el atributo en un ELEMENTO, no el string.
+var nLiteBlog = cuenta(htmlBlog, /<div class="gstrip" data-gslite/g);
+check("blog: sin <div data-gslite> emitido", nLiteBlog === 0, "ocurrencias=" + nLiteBlog);
 
 console.log("\n=== RESUMEN ===");
 console.log(fails === 0 ? "TODOS LOS SMOKE TESTS PASARON (" + total + " checks)" : fails + " smoke test(s) FALLARON de " + total);
