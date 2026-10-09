@@ -4952,5 +4952,63 @@ Codigo (working tree, SIN commit; **NO desplegado**): `db/migrations/055_reclama
 
 Codigo (working tree, **SIN commit; NO desplegado**): `api/pagina-destino.js` · `scripts/smoke_auditoria_pagina_destino.js`. **Nada en `scripts/` ni en `api/` se modifico en este pase documental.** Documentacion (este pase, unico): `exploraco desarrollo/TASKS.md` · `NEXT.md` · `DECISIONS.md` (nota de producto **N-091.1**). **No se registro ningun BUG nuevo** (las deudas 1-3 son preexistentes o de instrumentacion y ya estan cubiertas por **BUG-119**).
 
+## TSK-203 - BUG-123: el widget de calificacion 1-5 era INVISIBLE en los 3 modales (doble piso de opacidad en CSS) - 2026-10-09 - CERRADO EN WORKING TREE (sin commit, sin desplegar)
+
+**Estado: CORREGIDO Y VERIFICADO LOCAL, SIN COMMIT Y SIN DESPLEGAR.** **NO abre un ADR nuevo** (ADR-084): es una correccion de CSS de silo, **no toca arquitectura, esquema, backend ni contratos** (`api/` sin tocar, **8/8 endpoints INTACTO**, cero migraciones). La causa raiz vive **una sola vez aqui**; `DECISIONS.md` **no se toca**. El detalle del por que vive en **BUG-123** (`BUGS_HISTORICOS.md`); aqui esta el alcance, las medidas y las deudas.
+
+Reporte del operador: "el widget de calificacion de medios 1-5 no aparece en ninguno de los 3 modales y no hay donde clicar". **Era real, y era exclusivamente visual**: el widget **si existia en el DOM**, el listener **si estaba enlazado** (`MediaActions.bind()`) y el POST **si funcionaba**. Lo que fallaba era el alfa efectivo del glifo.
+
+### Causa raiz, con numeros medidos (contra `HEAD`, no de memoria)
+
+El silo CSS del widget **multiplicaba opacidades** en el estado "sin nota":
+
+| Piso | Selector en `HEAD` | Valor |
+|---|---|---|
+| Grupo | `[data-ma-voto] .ma-estrellas.is-empty` | `opacity:.62` |
+| Glifo | `[data-ma-voto] .ma-estrellas.is-empty .ma-estrella` | `opacity:.2` + `transform:scale(.9)` |
+
+Multiplicadas: **0,62 x 0,2 = 0,124**. Como el **color lo heredaba el contenedor** (`.g-act rgba(255,255,255,.82)`, `.av-act rgba(255,255,255,.62)`, `.pf-museo-btn.ghost rgba(255,255,255,.7)`), el **alfa efectivo final** caia a **0,102 / 0,077 / 0,087** segun la superficie. Sobre el fondo `--black #0F1419` eso daba **1,1:1 a 1,3:1**, muy por debajo del umbral perceptible. Se sumaban **`font-size:12px`**, **`transform:scale(.9)`** y un **`cursor:default`** en `.ma-estrella` que **anulaba** el `cursor:pointer` que el silo ponia en el contenedor: el raton no daba ninguna senal de que ahi se clica.
+
+**Por que toda la red de seguridad lo dejo pasar:** el punto **(e) de `NEXT.md`** ya lo advertia -- **el Escudo GOLD es estatico** (comprueba sintaxis, ASCII y balance de divs) y **nunca renderiza**. Un defecto de cascada puramente visual es ciego para el.
+
+### El arreglo (3 silos, solo bajo el selector padre `[data-ma-voto]`, `:root` intacto por ADR-004)
+
+1. **Eliminada la regla de grupo `.ma-estrellas.is-empty{opacity:.62}`**: queda **un solo piso de opacidad**, sobre el glifo.
+2. **Alfa efectivo del glifo sin nota: ~0,10 -> 0,84.** Contraste medido por el smoke: **9,09:1** galeria / **5,65:1** comunidad / **6,90:1** mi-perfil **en reposo**; **12,56:1 / 7,55:1 / 9,36:1** **en hover**. **Piso AA 4,5:1.**
+3. **`cursor:default` -> `cursor:inherit`** en `.ma-estrella`, para que herede el `pointer` del contenedor.
+4. **`font-size:12px` -> `14px`** (**13px** en `mi-perfil.html`, el boton mas estrecho). El area de clic se agrando con `padding` vertical + `margin` vertical negativo, para **no hacer crecer el boton**.
+5. **Intactos:** estado ya puntuado (`.is-on` con `--gold`), preview (`.is-preview`), anillo de foco (`:focus-visible`), sombra de preview (`.is-hover`), `is-busy`, `aria-disabled` y anillo `ma-valorado`. **Sin variables CSS nuevas y nada en `:root`.**
+
+**El piso es `.84` y no `.73` a proposito:** `.73` pasaba el gate de 4,5:1 por **0,06** en la superficie mas apagada (comunidad, `.av-act rgba(255,255,255,.62)`), asi que cualquier retoque de esa clase compartida reventaba el smoke por falso positivo. `.84` deja margen real; el glifo se ve holgado y el margen lo absorbe el widget, no la pagina (`.av-act` da color a **todos** los botones de accion y **no se toca**). El hover va a **`1` y no a `.88`** porque con el piso en `.84` un delta de 0,04 apagaba la respuesta al hover, que es la unica senal de "aqui se clica".
+
+### Hallazgo que se arrastro: el piso tapaba el preview y la nota real
+
+Al eliminar la regla de grupo se destapo un defecto **oculto por la propia regla que seodia**. La regla `.is-empty .ma-estrella` (**0,4,0**) **ganaba** a `.is-preview` y a `.is-on` (**0,3,0**), asi que en estado vacio **el preview era invisible** y la nota real se reliese. El arreglo usa `:not(.is-on):not(.is-preview)` para que el piso **solo** aplique al glifo realmente vacio. **Este defecto existia en `HEAD` y nadie lo habia visto.**
+
+### Red de seguridad nueva (el gap que motivo el bug)
+
+**`scripts/smoke_090_contraste_calificacion.js` -- 7 checks, 100% local, sin red, sin escrituras.**
+**Comando: `node scripts/smoke_090_contraste_calificacion.js`** (exit 0). Lee `galeria.html`, `comunidad.html` y `mi-perfil.html`.
+
+Cubre: (1) ausencia de doble piso grupo x glifo; (2) alfa minimo del glifo; (3) `.ma-estrella` no declara ni resuelve `cursor:default`; (4) **contraste en reposo >= 4,5:1** en las 3 superficies; (5) aislamiento bajo `[data-ma-voto]` y `:root` sin ganar `--gold`/`--star`; (6) **consistencia de los 3 silos** (22 reglas, 0 faltan, 0 sobran; normaliza 13px a 14px); (7) **contraste en hover >= 4,5:1** en las 3 superficies.
+
+**Verificacion (ADR-006, medida en este turno):** **7/7 PASS, exit 0**. Reparto: reposof 9,09 / 5,65 / 6,90; hover 12,56 / 7,55 / 9,36.
+
+**Dos defectos del propio smoke, detectados y corregidos durante su construccion** (familia **BUG-098**: *el arnes tenia un bug propio*):
+- La especificidad **no contaba pseudo-clases** y **no desempataba por linea**: el gate era **ciego al valor de hover**, o sea el check 7 no podia fallar.
+- Corregido: `:hover` cuenta como clase, y el desempate usa el **numero de linea real** (mapa `lineaMap` + `lbase`, linea inicial absoluta del silo en el fichero).
+- **Se demostro que el defecto existia reinyectando el bug original**: el smoke reportaba **contraste 1,31:1** y **4 checks FAIL**. Un gate que nunca se ha visto en rojo no es un gate.
+
+### Deudas: lo que NO se toco y sigue PENDIENTE
+
+1. **`api/pagina-destino.js` no carga `media-actions.js` ni emite `data-ma-voto`**, luego la **ficha de destino no tiene widget**. El namespace `data-media-*` (`mediaRatingAttrs()`, `:1771-1776`, usada en `:947`, `:1790`, `:1793`) es **namespace muerto**. Es **superficie nueva**: requiere **`@renderer-dev`, que tiene gate**, y las **8/8 funciones serverless estan agotadas** (se extiende la existente, cero endpoint nuevo). **No se abre en este pase.**
+2. **`mapa-cultural.js` es un emisor muerto:** emite los `data-ma-*` (`:436-442`, `:2061-2063`, `:2198-2200`, `:2347-2349`) pero **nunca llama a `bind()` ni a `sync()`**. Ningun `.bind(`/`.sync(` suyo aparece en el fichero (solo la mencion en el comentario `:431`).
+3. **`media-actions.js` no refresca el JWT tras un `401`** (`:455`): llama a `pedirLogin()` y detiene. Afecta a **sesiones con token caducado** aunque `ExploraCO.usuario.id` exista. **No se ha tocado porque no se ha reproducido.**
+4. **El widget nunca pinta el promedio de la comunidad, solo la nota propia** (`media-actions.js:333-345`, `pintarEstrellas()`: `nota = ctx.miPuntuacion`). **Es una decision de producto, no un defecto** (ADR-089: la UI no expone la reputacion de autor ni el promedio agregado; ver el riesgo ya registrado en `NEXT.md`).
+
+### Archivos tocados
+
+Codigo (working tree, **SIN commit; NO desplegado**): `galeria.html` (+30/-11) · `comunidad.html` (+30/-11) · `mi-perfil.html` (+31/-11) · `scripts/smoke_090_contraste_calificacion.js` (nuevo, 30.669 bytes). **`api/` sin tocar**: **8/8 INTACTO**, cero migracion, cero endpoint nuevo. Documentacion (este pase, unico): `TASKS.md` (esta seccion) · `NEXT.md` (nueva seccion + cierre del punto (e)) · `BUGS_HISTORICOS.md` (**BUG-123**). **`DECISIONS.md` y `PROJECT.md` SIN TOCAR**: no hay decision de arquitectura que registrar y el alcance del proyecto no cambia.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

@@ -242,6 +242,28 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-09 (pase documental único R2, 16ª tanda) - BUG-123: el widget de calificación 1-5 era invisible en los 3 modales: corregido y verificado local, SIN COMMIT y SIN DESPLEGAR
+
+**Qué se estaba haciendo:** cerrar documentalmente la corrección del **widget de calificación de medios 1-5**, que el operador reportó como **"no aparece en ningún modal y no hay dónde clicar"**. **El defecto era exclusivamente visual**: el widget **sí existía en el DOM**, el listener **sí estaba enlazado** (`MediaActions.bind()`) y el **POST sí funcionaba**. **NO abre un ADR nuevo** (ADR-084): es una corrección de CSS de silo, sin arquitectura, sin esquema y sin backend (`api/` sin tocar, **8/8 INTACTO**, cero migraciones). El argumento vive **una sola vez** en `TASKS.md` **TSK-203** y en `BUGS_HISTORICOS.md` **BUG-123**.
+
+**Causa raíz, medida contra `HEAD`:** el silo CSS **multiplicaba opacidades** en el estado "sin nota" — grupo `.ma-estrellas.is-empty` (`opacity:.62`) x glifo `.is-empty .ma-estrella` (`opacity:.2`) = **0,124**, y como el color lo heredaba el contenedor (`.g-act rgba(255,255,255,.82)`, `.av-act rgba(255,255,255,.62)`, `.pf-museo-btn.ghost rgba(255,255,255,.7)`) el **alfa efectivo bajaba a 0,102 / 0,077 / 0,087**: **1,1:1 a 1,3:1** sobre `--black #0F1419`. Se sumaban `font-size:12px`, `transform:scale(.9)` y un **`cursor:default`** que anulaba el `pointer` del contenedor.
+
+**Lo corregido:** regla de grupo **eliminada** (un solo piso de opacidad, sobre el glifo); alfa efectivo del glifo **~0,10 -> 0,84**; **`cursor:default` -> `cursor:inherit`**; **`12px` -> `14px`** (**13px** en `mi-perfil.html`), con el área de clic agrandada vía `padding` + `margin` negativo para **no crecer el botón**. **Todo bajo el selector padre `[data-ma-voto]`**, **nada en `:root`** (ADR-004), **cero variables CSS nuevas**. Intactos: `.is-on`, `.is-preview`, `:focus-visible`, `.is-hover`, `is-busy`, `aria-disabled`.
+
+**El hallazgo que se arrastró:** al eliminar la regla de grupo se destapó un defecto **oculto por la regla que se odiaba** — `.is-empty .ma-estrella` (**0,4,0**) ganaba a `.is-preview` y a `.is-on` (**0,3,0**), así que en estado vacío **el preview era invisible**. El arreglo usa `:not(.is-on):not(.is-preview)`.
+
+**Verificación (ADR-006, medida):** `node scripts/smoke_090_contraste_calificacion.js` -> **7/7 PASS, exit 0**. Reposo **9,09 / 5,65 / 6,90**; hover **12,56 / 7,55 / 9,36**; piso AA **4,5:1**. `git diff --numstat`: `galeria.html` +30/-11, `comunidad.html` +30/-11, `mi-perfil.html` +31/-11.
+
+**Qué sigue:**
+1. **QA visual en navegador del widget en los 3 modales** (galería, comunidad, mi perfil): ver el glifo "sin nota", el **preview en hover** y el **anillo de foco de teclado** (`radiogroup` con `tabindex` roving). **Ojo: el smoke es un resolvedor de cascada, no un render** — da el contraste y la prioridad de reglas, pero **no prueba que el botón se vea** en pantalla.
+2. **Commit + push** de los 3 HTML + el smoke nuevo + los docs de este pase. Único pendiente obligatorio del ciclo; nada llega a producción sin push.
+3. Decidir si `scripts/smoke_090_contraste_calificacion.js` **se engancha a la cadena de `npm test`** (hoy **no lo está**, igual que `smoke_auditoria_pagina_destino.js`). **No se resuelve en este pase.**
+
+**Riesgos activos:**
+- **El gap estructural que causó este bug sigue abierto:** **el Escudo GOLD es estático y nunca renderiza**, así que un defecto puramente visual es invisible para toda la red existente. El `smoke_090` **cierra el contraste y la opacidad**, pero **no** el render real.
+- **El smoke tiene margen medido, no holgura infinita:** el piso es **.84** y no .73 porque .73 pasaba el gate por **0,06** en la superficie más apagada (`.av-act`, `rgba(255,255,255,.62)`). **Cualquier retoque de `.av-act` reventará el smoke** — y ese rojo sería **verdad**, no falso positivo.
+- **La ficha de destino sigue sin widget** (deuda 1 de TSK-203): `api/pagina-destino.js` no carga `media-actions.js` ni emite `data-ma-voto`, y su namespace `data-media-*` (`mediaRatingAttrs()`) está **muerto**. Superficie nueva que requiere `@renderer-dev` (**con gate**) y las **8/8 serverless agotadas**.
+
 ### WORKING TREE 2026-10-08 (pase documental único R2, 15ª tanda) - Reubicación del botón "Reclamar" del hero a la franja `.gstrip` (nota de producto N-091.1): implementado y verificado local, SIN COMMIT y SIN DESPLEGAR
 
 **Qué se estaba haciendo:** por petición del operador, **mover el botón de "reclamar propiedad de un destino" de la fila 2 del hero a la franja naranja `.gstrip`** (más sutil) y **acortar el copy a "Reclamar"**. **Reubicación de UI pura: no toca el modelo de datos, ni backend, ni endpoints, ni migraciones**, así que **NO abre un ADR nuevo**: queda como **nota de producto N-091.1 bajo ADR-091**. El argumento vive **una sola vez** en `DECISIONS.md` N-091.1; aquí solo hay estado y siguientes pasos. Detalle de ejecución en `TASKS.md` **TSK-202**.
@@ -440,7 +462,7 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
    - `.av-act-solo-texto` y `.av-act-rate` en `comunidad.html`.
    - `white-space: nowrap` para **"sin valorar"** en tarjetas estrechas (el texto parte y descuadra).
    - Popup del mapa: necesita su `max-width` **dentro de `.md-album-cell`** (contenedor que hoy lo limita).
-5. **(e) El render de las 5 estrellas NO se ha visto en un navegador real.** **El Escudo GOLD es estatico**: comprueba sintaxis, ASCII y balance de divs, **no renderiza**. Sin QA visual quedan **sin verificar** la accesibilidad de teclado del `radiogroup`, el preview en hover y el repintado optimista **con reversion** si el POST falla. **Este es el pendiente con mas riesgo de los cinco**, porque un `radiogroup` mal construido es un fallo de accesibilidad, no unPixel.
+5. **(e) [PARCIALMENTE RESUELTO 2026-10-09 -> BUG-123 / TSK-203] El render de las 5 estrellas NO se ha visto en un navegador real.** **El Escudo GOLD es estatico**: comprueba sintaxis, ASCII y balance de divs, **no renderiza**. Este aviso **se cumple**: el widget **era invisible en los 3 modales** (doble piso de opacidad CSS, alfa efectivo ~0,10, contraste 1,1:1 a 1,3:1) aunque el DOM, el listener y el POST **funcionaban**. **Corregido y verificado** por `scripts/smoke_090_contraste_calificacion.js` (**7/7, exit 0**; alfa 0,84; contraste 9,09 / 5,65 / 6,90 en reposo y 12,56 / 7,55 / 9,36 en hover). **Lo que este punto sigue SIN cubrir, y no por descuido:** (i) el `smoke_090` **tambien es estatico** -- resuelve cascada y contraste, **no renderiza**, luego **el render real sigue sin verse en un navegador**; (ii) siguen **sin verificar en navegador** el teclado del `radiogroup`, el preview en hover y el repintado optimista **con reversion** si el POST falla. **Este punto NO se cierra entero: se cierra la mitad medible (causa raiz + contraste + gate automatico) y queda abierta la QA visual real**, que es la unica que puede encontrar fallos que un resolvedor de cascada no ve. Detalle en `TASKS.md` TSK-203.
 6. **(f) Housekeeping:** commit + push de los docs de este pase (unico pendiente obligatorio del ciclo).
 
 **Riesgos activos:**

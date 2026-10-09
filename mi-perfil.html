@@ -825,8 +825,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
    Fondo NO supuesto: el glifo apagado hereda currentColor y el encendido usa el
    --gold que la pagina ya declara, asi se lee igual sobre claro y sobre oscuro.
    Estados distinguibles SIN depender solo del color: is-on crece (scale 1.14) y
-   lleva halo; is-preview se ve mas chico (scale .86) y mas tenue; is-empty baja
-   el alfa de todo el grupo. */
+   lleva halo; is-preview se ve algo mas chico (scale .94) y mas brillante;
+   is-empty fija el alfa del glifo en un unico piso legible (el grupo no atenua). */
 [data-ma-voto]{
   /* RESET DE SILO */
   box-sizing:border-box;position:static;display:inline-flex;align-items:center;
@@ -835,32 +835,52 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   transition:opacity .15s ease,box-shadow .15s ease;
 }
 [data-ma-voto] span{box-sizing:border-box;margin:0;padding:0}
-/* el contenedor es el alvo (role=group / radiogroup): puntero, no las estrellas */
+/* el contenedor es el alvo (role=group / radiogroup): el puntero vive ahi y las
+   estrellas lo HEREDAN (nunca declaran default, asi el cursor no miente) */
 [data-ma-voto].ma-calificable{cursor:pointer}
 [data-ma-voto] .ma-estrellas,[data-ma-voto] [data-ma-estrellas]{
   display:inline-flex;align-items:center;gap:1px;flex:0 0 auto;max-width:100%;
   letter-spacing:0;
 }
+/* glifo 13px (boton pf-museo-btn.ghost, el mas estrecho de los tres silos):
+   caja de 27px de alto para el clic; el margen negativo deja la huella de
+   layout en 13px, asi el boton no crece */
 [data-ma-voto] .ma-estrella,[data-ma-voto] [data-ma-estrella]{
-  display:inline-block;flex:0 0 auto;font-size:12px;line-height:1;
-  color:inherit;opacity:.34;cursor:default;user-select:none;
+  display:inline-flex;align-items:center;justify-content:center;
+  box-sizing:content-box;padding:7px 0;margin:-7px 0;
+  flex:0 0 auto;font-size:13px;line-height:1;
+  color:inherit;opacity:.34;cursor:inherit;user-select:none;
   -webkit-user-select:none;transform-origin:50% 62%;
   transition:transform .12s ease,opacity .12s ease,color .12s ease;
 }
-/* preview (hover o flechas): mas chico y mas tenue que la nota real */
-[data-ma-voto] .ma-estrella.is-preview{opacity:.6;transform:scale(.86)}
+/* preview (hover o flechas): algo mas chico que la nota real y por encima del
+   piso de vacio, para que la estrella bajo el puntero se lea siempre */
+[data-ma-voto] .ma-estrella.is-preview{opacity:.88;transform:scale(.94)}
 /* nota real del usuario: gana siempre al preview (mismo peso, va despues) */
 [data-ma-voto] .ma-estrella.is-on{
   color:var(--gold,#FF4A00);opacity:1;transform:scale(1.14);
   text-shadow:0 0 6px rgba(255,74,0,.4);
 }
-/* vacio / sin nota puesta: nada encendido y el grupo entero mas apagado */
-[data-ma-voto] .ma-estrellas.is-empty{opacity:.62}
-[data-ma-voto] .ma-estrellas.is-empty .ma-estrella{opacity:.2;transform:scale(.9)}
+/* vacio / sin nota: UNA sola dimension de alfa sobre el glifo. Antes el grupo
+   (0.62) y la estrella (0.2) se multiplicaban a 0.12 y el glifo era invisible;
+   la regla de opacidad del grupo se elimino por redundante.
+   PISO .84 Y NO .73: .73 pasaba el gate de 4.5:1 por solo 0.06 en la superficie
+   mas apagada (comunidad, .av-act rgba(255,255,255,.62)), asi que cualquier
+   retoque de esa clase compartida reventaba el smoke por falso positivo.
+   .84 deja el glifo holgado (9.09:1 galeria / 5.65:1 comunidad / 6.90:1
+   mi-perfil contra --black) y el margen lo absorbe el widget, no la pagina:
+   .av-act da color a todos los botones de accion y no se toca.
+   El :not deja ganar a la nota real (is-on) y al preview, que antes quedaban
+   tapados por el vacio. */
+[data-ma-voto] .ma-estrellas.is-empty .ma-estrella:not(.is-on):not(.is-preview){opacity:.84}
 /* foco de contenedor: solo con puntero fino (en tactil :hover se queda pegado) */
 @media (hover:hover){
   [data-ma-voto] .ma-estrellas.is-hover{box-shadow:inset 0 -2px 0 -1px rgba(255,74,0,.55)}
-  [data-ma-voto]:hover .ma-estrellas.is-empty .ma-estrella{opacity:.34}
+  /* hover del vacio a opacidad 1 (no .88): con el piso en .84 un delta de 0.04
+     apagaba la respuesta al hover, que es la unica senal de "aqui se clica".
+     Asi el delta es 0.16 y el contraste del hover queda > 7:1 en las 3
+     superficies (12.56 / 7.55 / 9.36). */
+  [data-ma-voto]:hover .ma-estrellas.is-empty .ma-estrella:not(.is-preview){opacity:1}
 }
 @media (hover:none){[data-ma-voto] .ma-estrellas.is-hover{box-shadow:none}}
 /* foco visible de teclado: anillo de acento + halo, legible en claro y oscuro */
