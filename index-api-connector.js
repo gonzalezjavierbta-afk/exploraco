@@ -294,10 +294,11 @@
     }
     if (typeof DEST_FEATURED_IDS !== 'undefined') replArr(DEST_FEATURED_IDS, featIds);
 
-    // 5. AGENDA_EVENTS[] \u2014 eventos de la DB + los hardcodeados originales
+    // 5. AGENDA_EVENTS[] -- SOLO eventos reales de la API (DB).
     //    Orden: mas recientes primero (creado_en DESC) para que los eventos
-    //    recien cargados aparezcan arriba de la agenda del home, sin quedar
-    //    enterrados bajo eventos legacy con rating alto.
+    //    recien cargados aparezcan arriba de la agenda del home.
+    //    Sin merge con eventos hardcodeados: si la API no devuelve eventos,
+    //    la agenda queda [] y el home muestra el estado vacio neutro.
     var eventosDB = apiData
       .filter(function (item) { return item.cat === 'evento'; })
       .sort(function (a, b) {
@@ -306,14 +307,7 @@
       })
       .map(toAgendaEvent);
 
-    if (eventosDB.length > 0 && typeof AGENDA_EVENTS !== 'undefined') {
-      // Mantener eventos hardcodeados, a\u00f1adir los de DB al principio si no son duplicados
-      var slugsDB = eventosDB.map(function (e) { return e.url; });
-      var eventosOriginalesFiltrados = AGENDA_EVENTS.filter(function (e) {
-        return !slugsDB.includes(e.url);
-      });
-      replArr(AGENDA_EVENTS, eventosDB.concat(eventosOriginalesFiltrados));
-    }
+    if (typeof AGENDA_EVENTS !== 'undefined') replArr(AGENDA_EVENTS, eventosDB);
 
     // 6. Stats reales (solo en carga inicial, no en b\u00fasquedas)
     if (!q && d.stats) updateStats(d.stats);

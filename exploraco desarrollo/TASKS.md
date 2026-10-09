@@ -12,6 +12,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ### Tareas no completadas / estado actual
 
+- **CERRADA / EN WORKING TREE (2026-10-09; pase documental unico R2; commit PENDIENTE; NO desplegada).** **TSK-204 - Limpieza de contenido hardcodeado: retiro de 95 paginas estaticas legacy + vaciado de arrays hardcodeados en `index.html` + retiro de `MOCK_LB` en `comunidad.html` (render 100% dependiente de la API con estados vacios estrictos).** Codigo (working tree, **SIN commit**): **95 `.html` ELIMINADOS** (`git status` = **95 D**; paginas de destino con `L.marker([<numeros>])` fijo y popups erroneos duplicados; las sigue sirviendo el rewrite `vercel.json:8` `/:slug.html` -> `api/pagina-destino?slug=:slug`), `index.html` (**+10/-115**; `const AGENDA_EVENTS=[]` `:1413` y `var DEST_FEATURED_IDS=[]` `:1885`; retirados `MM_PINS` (codigo muerto), `SLIDES`, `V360_DATA`, el bloque SLIDESHOW `buildSlides`/`goSlide` y los fondos Unsplash del hero; `renderAgenda` con estado vacio neutro si `AGENDA_EVENTS.length===0` `:3097`), `index-api-connector.js` (**+5/-11**; retirado el merge que REINTRODUCIA eventos hardcodeados: `AGENDA_EVENTS` refleja SOLO la API), `comunidad.html` (**+17/-15**; `MOCK_LB` y sus 2 usos retirados; estados vacios en mensajes de sala, parches abiertos y ranking, tambien en error). **FALSO POSITIVO corregido:** `perfil.html` (marcador DINAMICO, lo lee `scripts/smoke_021_xp_decimal_rankings.js:41`) **se restauro con git**; NO era contenido hardcodeado. **`api/*.js` y `admin.html` SIN tocar: 8/8 INTACTO; cero migraciones; cero endpoint nuevo; SIN ADR** (no es arquitectura). Verificacion medida: `node scripts/docs-evidencia.js --test` -> **exit code 0** (incluye `smoke_021` 45/45 y `smoke_niveles_espejos` OK); `verificar-capa-gratis.js` OK; Escudo GOLD OK (divs `index` 375/375, `comunidad` 461/461). Deuda: bytes >127 preexistentes (`index.html` 1.139 / `comunidad.html` 238); hero con fondo neutro; docs historicos con `MOCK_LB`. Detalle en la seccion TSK-204 al final de este fichero.
+
 - **CERRADA / COMMITEADA Y PUSHEADA (2026-10-04; commit `8315fb0` en `main`; anterior `d9f2878`).** **TSK-177 / ADR-077 ENMIENDA 1** -- Misiones desplegables por ESTADO + galeria de perfil dentro del modal de subida + boton "+ Subir material" en "Gestion del Museo".
 - **Alcance:** 3 cambios de UI en `mi-perfil.html` + 2 smokes afectados. `api/*` sin tocar (**8/8 INTACTO**, ADR-010); sin migracion ni endpoint nuevo.
 - **Verificacion (medida):** `npm test` EXIT 0 (22 pasos, 0 FAIL); `smoke_grupos_perfil.js` 73 -> 109 (109/109 PASS); `smoke_042` 30 -> 45; divs 526/526; residuos del modulo retirado = 0; ASCII 0 bytes > 127.
@@ -5009,6 +5011,41 @@ Cubre: (1) ausencia de doble piso grupo x glifo; (2) alfa minimo del glifo; (3) 
 ### Archivos tocados
 
 Codigo (working tree, **SIN commit; NO desplegado**): `galeria.html` (+30/-11) · `comunidad.html` (+30/-11) · `mi-perfil.html` (+31/-11) · `scripts/smoke_090_contraste_calificacion.js` (nuevo, 30.669 bytes). **`api/` sin tocar**: **8/8 INTACTO**, cero migracion, cero endpoint nuevo. Documentacion (este pase, unico): `TASKS.md` (esta seccion) · `NEXT.md` (nueva seccion + cierre del punto (e)) · `BUGS_HISTORICOS.md` (**BUG-123**). **`DECISIONS.md` y `PROJECT.md` SIN TOCAR**: no hay decision de arquitectura que registrar y el alcance del proyecto no cambia.
+
+## TSK-204 - Limpieza de contenido hardcodeado: 95 paginas estaticas legacy retiradas + arrays hardcodeados vaciados en `index.html` + `MOCK_LB` retirado de `comunidad.html` (render 100% dependiente de la API) - 2026-10-09 - CERRADO EN WORKING TREE (sin commit, sin desplegar)
+
+**Estado: CORREGIDO Y VERIFICADO LOCAL, SIN COMMIT Y SIN DESPLEGAR.** **NO abre un ADR nuevo** (ADR-084): es limpieza de contenido y deuda, **no toca arquitectura, esquema, backend ni contratos** (`api/` sin tocar, **8/8 endpoints INTACTO**, cero migraciones). Objetivo del encargo: **eliminar contenido hardcodeado y dejar el render 100% dependiente de la API, con estados vacios estrictos**.
+
+### Alcance REAL ejecutado (medido contra el archivo real, ADR-006)
+
+1. **95 `.html` legacy ELIMINADOS** (`git status` = **95 D**): paginas de destino con `L.marker([<numeros>])` fijo y popups erroneos duplicados (p.ej. "El Cielo Restaurante" dentro de `sancocho-santandereano.html`). Las sigue sirviendo el **rewrite dinamico** `vercel.json:8` (`/:slug.html` -> `api/pagina-destino?slug=:slug`). No se perdio ninguna pagina: el render depende de Neon + `api/pagina-destino`.
+2. **`index.html`** (numstat **+10/-115**): arrays hardcodeados vaciados (`const AGENDA_EVENTS=[]` `:1413`; `var DEST_FEATURED_IDS=[]` `:1885`); **retirados** `MM_PINS` (codigo muerto), `SLIDES`, `V360_DATA`, el bloque **SLIDESHOW** (`buildSlides`/`goSlide`/etc.) y los **fondos Unsplash** del hero (queda fondo neutro). `renderAgenda` muestra **estado vacio neutro** si `AGENDA_EVENTS.length===0` (`:3097`).
+3. **`index-api-connector.js`** (numstat **+5/-11**): retirado el merge que **reintroducia** eventos hardcodeados; `AGENDA_EVENTS` refleja **SOLO la API**.
+4. **`comunidad.html`** (numstat **+17/-15**): `MOCK_LB` (fallback mock del leaderboard) y sus **2 usos** retirados; **estados vacios** en mensajes de sala y parches abiertos; ranking con estado **neutro en vacio y en error**.
+5. **FALSO POSITIVO corregido:** `perfil.html` (pagina real "Museo de viajero", **marcador DINAMICO**, requerida por `scripts/smoke_021_xp_decimal_rankings.js:41`) **se restauro con git** tras detectar que el smoke la lee. **NO** era contenido hardcodeado.
+
+### Premisas del brief original que la realidad desmintio
+
+Los IDs `#grid-destinos` / `#contenedor-planes` / `#feed-audiovisual` / `#lista-parches` / `#galeria-grid` y la carpeta `public/js/` **NO existen**; los reales son `#dest-grid`, `#planes-grid`, `#g-feed` y los `.js` **en la raiz**. **`comunidad-session.js` NO existe** (es `usuario-session.js`).
+
+### Verificacion (ADR-006, medida en este pase)
+
+- `node scripts/docs-evidencia.js --test` -> **exit code 0** (incluye `smoke_021_xp_decimal_rankings` 45/45 y `smoke_niveles_espejos` OK).
+- `node scripts/ejecucion/verificar-capa-gratis.js` -> **RESULTADO: OK**.
+- Escudo GOLD OK: divs `index.html` **375/375**, `comunidad.html` **461/461**; codigo nuevo ASCII-safe; **0 refs colgantes**.
+- `git diff --numstat`: `index.html` **+10/-115**, `index-api-connector.js` **+5/-11**, `comunidad.html` **+17/-15**; mas **95 `.html` D**.
+
+### Deudas y pendientes (no bloquean)
+
+1. **Deuda ASCII preexistente:** `index.html` tiene **1.139** chars >127 y `comunidad.html` **238** (emojis/decorativos **preexistentes**); solo el codigo **nuevo** es ASCII-safe. No se limpia en este pase.
+2. **Hero con fondo neutro:** el hero de la home queda **sin fondos Unsplash** hasta que exista una **fuente de datos real** de fondo; hoy es un placeholder neutro.
+3. **Docs historicos desactualizados:** `exploraco desarrollo/ampliacion desarrollo/GUIA_DE_DESARROLLO.md:920` y `ExploraCO_Sistema_Social_v5.md:510,683` siguen mencionando `MOCK_LB` como fallback **vigente**. Son documentos **historicos**, no gobernanza activa; se anotan como desactualizados (Cero Borrado Logico: no se borra su texto).
+4. **RECOMENDACION (texto, SIN ADR):** formalizar como **politica permanente** que **toda pagina de destino estatica legacy se retira en favor del rewrite dinamico `/:slug.html`** -> `api/pagina-destino`, evitando re-introducir HTML con marcadores/popups hardcodeados. Reglas sugeridas: (i) el destino vive **solo** en Neon + `api/pagina-destino`; (ii) ningun `.html` de destino nuevo con `L.marker([..])` literal; (iii) un grep/smoke de guardia que falle si reaparece un marker hardcodeado. **Requiere gate + decision explicita del usuario para convertirse en ADR.**
+5. **Riesgos activos:** (i) un `.html` de destino que se reintroduzca con contenido fijo volveria a **ensombrecer** el rewrite (`vercel.json` sirve el fichero fisico si existe); (ii) el hero neutro **degrada el primer impacto visual** de la home mientras no haya fuente de fondo; (iii) los **estados vacios estrictos** hacen que, ante un fallo de API, la UI muestre vacio en vez de un mock: es lo correcto, pero **se vera como "seccion rota"** si no se sabe por que.
+
+### Archivos tocados
+
+Codigo (working tree, **SIN commit; NO desplegado**): **95 `.html` ELIMINADOS** + `index.html` (**+10/-115**) + `index-api-connector.js` (**+5/-11**) + `comunidad.html` (**+17/-15**). **`api/` sin tocar: 8/8 INTACTO**, cero migracion, cero endpoint nuevo. Documentacion (este pase, unico): `TASKS.md` (esta seccion + el indice superior) y `NEXT.md` (entrada en "Completado reciente" + seccion en "Que se estaba haciendo"). **`DECISIONS.md` y `PROJECT.md` SIN TOCAR**: no hay decision de arquitectura que registrar (la recomendacion de la politica de rewrite queda como texto en `NEXT.md`, no como ADR).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

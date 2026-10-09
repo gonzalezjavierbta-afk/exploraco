@@ -1079,13 +1079,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 
 
 <section class="hero-home">
-  <div id="slides"><div class="slide  active" style="background-image:url('https://images.unsplash.com/photo-1599946347371-68eb71b16afc?w=1600&q=80')"></div>
-<div class="slide" style="background-image:url('https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=1600&q=80')"></div>
-<div class="slide" style="background-image:url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1600&q=80')"></div>
-<div class="slide" style="background-image:url('https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1600&q=80')"></div>
-<div class="slide" style="background-image:url('https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1600&q=80')"></div>
-<div class="slide" style="background-image:url('https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1600&q=80')"></div>
-</div>
+  <div id="slides"><div class="slide active" style="background:linear-gradient(160deg,#101820,#1a1a2e)"></div></div>
   <div class="hvig"></div>
   <div class="scat" id="scat"><span class="scatdot" id="scatdot"></span><span id="scatlbl"></span></div>
   <div class="hstrip">
@@ -1121,13 +1115,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <div><div class="hstn" id="stat-rating">4.8★</div><div class="hstl">Promedio</div></div>
     </div>
   </div>
-  <div class="hdots" id="hdots"><button class="hdot  on" onclick="goSlide(0)"></button>
-<button class="hdot" onclick="goSlide(1)"></button>
-<button class="hdot" onclick="goSlide(2)"></button>
-<button class="hdot" onclick="goSlide(3)"></button>
-<button class="hdot" onclick="goSlide(4)"></button>
-<button class="hdot" onclick="goSlide(5)"></button>
-</div>
+  <div class="hdots" id="hdots"></div>
   <div class="hcap" id="hcap"></div>
 </section>
 
@@ -1421,60 +1409,18 @@ textarea.wrinp{resize:vertical;min-height:88px}
 /* ── DATA ── */
 const PL=[];
 const CATS={hostal:{color:"#3B82F6",bg:"#EFF6FF",tbg:"#DBEAFE",tc:"#1e3a8a",label:"Hospedaje",emoji:"🏨"},comida:{color:"#EF4444",bg:"#FEF2F2",tbg:"#FEE2E2",tc:"#7f1d1d",label:"Comida",emoji:"🍽️"},sitio:{color:"#22C55E",bg:"#F0FDF4",tbg:"#DCFCE7",tc:"#14532d",label:"Lugar",emoji:"🏔️"},evento:{color:"#A855F7",bg:"#FAF5FF",tbg:"#F3E8FF",tc:"#581c87",label:"Evento",emoji:"🎉"}};
-const SLIDES=[{"cat":"sitio","cap":"Valle del Cocora · Quindío"},{"cat":"hostal","cap":"Centro histórico · Cartagena"},{"cat":"comida","cap":"Comida colombiana · Medellín"},{"cat":"evento","cap":"Carnaval · Barranquilla"},{"cat":"sitio","cap":"Sierra Nevada · Santa Marta"},{"cat":"comida","cap":"Café de origen · Eje Cafetero"}];
-const MM_PINS=[
-  {id:3,slug:'ciudad-perdida',name:'Ciudad Perdida',cat:'sitio',emoji:'🏔️',x:55,y:18,visited:false},
-  {id:7,slug:'valle-del-cocora',name:'Valle del Cocora',cat:'sitio',emoji:'🌴',x:22,y:38,visited:false},
-  {id:9,slug:'cano-cristales',name:'Caño Cristales',cat:'sitio',emoji:'🌈',x:65,y:48,visited:false},
-  {id:5,slug:'hostal-walled-city',name:'Hostal Walled City',cat:'hostal',emoji:'🏰',x:78,y:26,visited:false},
-  {id:2,slug:'el-cielo-restaurante',name:'El Cielo',cat:'comida',emoji:'🍽️',x:36,y:55,visited:false},
-  {id:8,slug:'carnaval-barranquilla',name:'Carnaval',cat:'evento',emoji:'💃',x:48,y:70,visited:false},
-  {id:1,slug:'hostal-casa-medina',name:'Casa Medina',cat:'hostal',emoji:'🏨',x:85,y:42,visited:false},
-  {id:10,slug:'cafe-quindio-boutique',name:'Café Quindío',cat:'hostal',emoji:'☕',x:28,y:62,visited:false},
-];
-const V360_DATA=[
-  {name:'Cascada Sierpe',loc:'📍 Buenaventura, Pacífico',emoji:'🌊',bg:'linear-gradient(160deg,#0a2a3a,#1a0a2a)'},
-  {name:'Valle del Cocora',loc:'📍 Salento, Quindío',emoji:'🌴',bg:'linear-gradient(160deg,#0a2a0a,#1a3a1a)'},
-  {name:'Caño Cristales',loc:'📍 La Macarena, Meta',emoji:'🌈',bg:'linear-gradient(160deg,#0a1a3a,#0a2a3a)'},
-  {name:'Carnaval Barranquilla',loc:'📍 Barranquilla, Atlántico',emoji:'💃',bg:'linear-gradient(160deg,#1a051a,#2a0a2a)'},
-  {name:'Cafetal del Quindío',loc:'📍 Montenegro, Quindío',emoji:'☕',bg:'linear-gradient(160deg,#1a0a00,#3a2a0a)'},
-];
 const MAPA_PLACES=[];
-const AGENDA_EVENTS=[
-  /* ── FESTIVALES ── */
-  {id:1, name:'Carnaval de Barranquilla',         cat:'festival',  city:'Barranquilla', day:14, month:'Feb', dayEnd:17, monthEnd:'Feb', time:'Todo el día',   price:'Palcos $200.000', loc:'Vía 40, Barranquilla',             emoji:'💃', color:'#A855F7', url:'carnaval-barranquilla.html', featured:true},
-  {id:2, name:'Feria de las Flores',               cat:'festival',  city:'Medellín',     day:1,  month:'Ago', dayEnd:10, monthEnd:'Ago', time:'10am–10pm',    price:'Gratis',          loc:'Centro, Medellín',                 emoji:'🌸', color:'#A855F7', url:'feria-de-las-flores.html',    featured:true},
-  {id:3, name:'Festival Iberoamericano de Teatro', cat:'festival',  city:'Bogotá',       day:3,  month:'Mar', time:'Varios horarios',price:'Desde $30.000',  loc:'Teatros de Bogotá',                emoji:'🎭', color:'#A855F7', url:'festival-iberoamericano-teatro.html',                  featured:true},
-  {id:4, name:'Festival de Jazz de Bogotá',        cat:'musica',    city:'Bogotá',       day:10, month:'Oct', time:'6pm–11pm',     price:'Desde $0',        loc:'Teatro Nacional, Bogotá',          emoji:'🎷', color:'#3B82F6', url:'festival-jazz-bogota.html',                  featured:false},
-  {id:5, name:'Feria de Cali · Salsa y cultura',   cat:'festival',  city:'Cali',         day:25, month:'Dic', dayEnd:30, monthEnd:'Dic', time:'Todo el día',  price:'Gratis',          loc:'Centro histórico, Cali',           emoji:'🕺', color:'#A855F7', url:'feria-cali.html',                  featured:true},
-  {id:6, name:'Festival Vallenato · Valledupar',   cat:'musica',    city:'Valledupar',   day:27, month:'Abr', dayEnd:30, monthEnd:'Abr', time:'Todo el día',  price:'Gratis + palcos', loc:'Parque de la Leyenda, Valledupar', emoji:'🎸', color:'#3B82F6', url:'festival-vallenato.html',                  featured:true},
-  /* ── MÚSICA ── */
-  {id:7, name:'Noche de Gaitas · Ciudad Amurallada',cat:'musica',   city:'Cartagena',    day:20, month:'Mar', time:'7pm–11pm',    price:'$25.000',         loc:'Plaza Trinidad, Cartagena',        emoji:'🎵', color:'#3B82F6', url:'hostal-walled-city.html',     featured:false},
-  {id:8, name:'Concierto Sinfónico al Aire Libre',  cat:'musica',   city:'Medellín',     day:12, month:'Sep', time:'5pm–8pm',     price:'Gratis',          loc:'Parque de los Deseos, Medellín',   emoji:'🎼', color:'#3B82F6', url:'concierto-sinfonico.html',                  featured:false},
-  {id:9, name:'Rock al Parque',                     cat:'musica',   city:'Bogotá',       day:7,  month:'Jun', time:'12pm–10pm',   price:'Gratis',          loc:'Parque Simón Bolívar, Bogotá',     emoji:'🎸', color:'#3B82F6', url:'rock-al-parque.html',                  featured:false},
-  /* ── GASTRO ── */
-  {id:10,name:'Mercado Gastronómico La Candelaria', cat:'gastro',   city:'Bogotá',       day:22, month:'Mar', time:'9am–5pm',     price:'Gratis',          loc:'Chorro de Quevedo, Bogotá',        emoji:'🍽️',color:'#EF4444', url:'hostal-casa-medina.html',     featured:false},
-  {id:11,name:'Feria del Café · Armenia',           cat:'gastro',   city:'Armenia',      day:15, month:'Jul', time:'Todo el día', price:'Gratis',          loc:'Parque Centenario, Armenia',       emoji:'☕', color:'#EF4444', url:'cafe-quindio-boutique.html',  featured:false},
-  {id:12,name:'Festival Gastronómico del Pacífico', cat:'gastro',   city:'Buenaventura', day:5,  month:'Nov', time:'10am–8pm',    price:'Gratis',          loc:'Malecón, Buenaventura',            emoji:'🦞', color:'#EF4444', url:'festival-gastronomico-pacifico.html',                  featured:false},
-  {id:13,name:'Ruta Gastronómica · Eje Cafetero',   cat:'gastro',   city:'Salento',      day:8,  month:'Abr', time:'9am–6pm',     price:'Desde $50.000',   loc:'Salento, Quindío',                 emoji:'🌿', color:'#EF4444', url:'valle-del-cocora.html',        featured:false},
-  /* ── NATURALEZA / AVENTURA ── */
-  {id:14,name:'Trek Ciudad Perdida · Salida grupal',cat:'naturaleza',city:'Santa Marta', day:25, month:'Mar', time:'Salida 6am',  price:'$1.400.000',      loc:'Terminal, Santa Marta',            emoji:'🏔️',color:'#22C55E', url:'ciudad-perdida.html',          featured:false},
-  {id:15,name:'Avistamiento Ballenas · Bahía Solano',cat:'naturaleza',city:'Bahía Solano',day:10,month:'Jul',time:'6am–12pm',    price:'Desde $180.000',  loc:'Bahía Solano, Chocó',              emoji:'🐋', color:'#22C55E', url:'avistamiento-ballenas.html',                  featured:true},
-  {id:16,name:'Caño Cristales · Temporada de colores',cat:'naturaleza',city:'La Macarena',day:15,month:'Jun',time:'Todo el día', price:'Desde $1.800.000',loc:'La Macarena, Meta',                emoji:'🌈', color:'#22C55E', url:'cano-cristales.html',          featured:true},
-];
+const AGENDA_EVENTS=[];
 
-/* ── STATE (all var — no TDZ) ── */
+/* -- STATE (all var -- no TDZ) -- */
 var activeCat = 'hostal';
 var searchQ   = '';
-var slideIdx  = 0;
-var slideTimer = null;
 var mmSaved   = [];
 var mmVisited = [];
 var destCat   = 'all';
 var destSearch = '';
 var mapaMap   = null;
 var MAPA_MEDIA = [];
-var v360Cur   = 0;
 var agendaCat = 'all';
 var agendaCityFilter = '';
 var agendaExpanded = false;
@@ -1493,58 +1439,6 @@ window.addEventListener('scroll', function() {
   if(nav) nav.classList.toggle('scrolled', window.scrollY > 60);
 }, {passive:true});
 
-/* ── SLIDESHOW (Ken Burns) ── */
-function buildSlides() {
-  var cont = document.getElementById('slides');
-  var dots = document.getElementById('hdots');
-  if(!cont) return;
-  var slideEls = cont.querySelectorAll('.slide');
-  var dotEls   = dots ? dots.querySelectorAll('.hdot') : [];
-  if(slideEls.length) {
-    slideEls[0].classList.add('active');
-    if(dotEls.length) dotEls[0].classList.add('on');
-    updateSlideUI(0);
-  }
-  for(var i=0;i<dotEls.length;i++) {
-    (function(idx){ dotEls[idx].onclick = function(){ goSlide(idx); }; })(i);
-  }
-}
-function goSlide(idx) {
-  var slides = document.querySelectorAll('.slide');
-  var dots   = document.querySelectorAll('.hdot');
-  if(!slides.length) return;
-  if(slides[slideIdx]) slides[slideIdx].classList.remove('active');
-  if(dots[slideIdx])   dots[slideIdx].classList.remove('on');
-  slideIdx = idx;
-  var el = slides[slideIdx];
-  if(el) {
-    el.style.animation = 'none';
-    void el.offsetHeight;
-    el.style.animation = '';
-    el.classList.add('active');
-  }
-  if(dots[slideIdx]) dots[slideIdx].classList.add('on');
-  updateSlideUI(slideIdx);
-  resetTimer();
-}
-function updateSlideUI(idx) {
-  var s = SLIDES[idx];
-  if(!s) return;
-  var ct = CATS[s.cat] || {};
-  var cap = document.getElementById('hcap');
-  if(cap) cap.textContent = s.cap;
-  var dot = document.getElementById('scatdot');
-  if(dot) dot.style.background = ct.color || '#FF4A00';
-  var lbl = document.getElementById('scatlbl');
-  if(lbl) lbl.textContent = (ct.label || s.cat) + 's';
-  var catEl = document.getElementById('scat');
-  if(catEl) { catEl.classList.remove('vis'); setTimeout(function(){ catEl.classList.add('vis'); }, 80); }
-}
-function nextSlide() { goSlide((slideIdx + 1) % SLIDES.length); }
-function resetTimer() {
-  clearInterval(slideTimer);
-  slideTimer = setInterval(nextSlide, 7500);
-}
 /* ── SEARCH (hero) ── */
 var sinp  = document.getElementById('sinp');
 var scl   = document.getElementById('scl');
@@ -1988,7 +1882,7 @@ function clearDestSearch(){
 // no tiene foto real, se muestra el placeholder neutro (emoji + gradiente)
 // generado por photoPlaceholderHTML(); NUNCA una URL externa.
 var DEST_PHOTOS = {};
-var DEST_FEATURED_IDS = [3,7,9,8,2,4,11,15,16,18];
+var DEST_FEATURED_IDS = [];
 var DEST_LIMIT = 8;  /* 2 rows × 4 cols on homepage */
 
 function destFiltered() {
@@ -2115,7 +2009,6 @@ function toggleDestSave(id, el) {
 }
 
 /* ── MI MAPA PERSONAL ── */
-/* MM_PINS_DATA replaced — using MAPA_PLACES */
 function renderMyMap() {
   var sv = mmSaved.length, vi = mmVisited.length, pe = Math.max(0, sv - vi);
   var sc = document.getElementById('mm-saved-count');   if(sc) sc.textContent = sv;
@@ -3201,7 +3094,11 @@ function renderAgenda(cat, fDate) {
   if(moreBtn) moreBtn.textContent = 'Ver los ' + totalCount + ' eventos en agenda completa →';
   evs = evs.slice(0, AGENDA_PREVIEW_COUNT);
   if(!evs.length){
-    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:13px">Sin eventos para este día o filtro. Prueba con otro día del calendario o cambia de categoría.</div>';
+    var sinDatos = (AGENDA_EVENTS.length === 0);
+    var msg = sinDatos
+      ? 'A\u00fan no hay eventos publicados. Vuelve pronto para descubrir la agenda cultural.'
+      : 'Sin eventos para este d\u00eda o filtro. Prueba con otro d\u00eda del calendario o cambia de categor\u00eda.';
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:13px">'+msg+'</div>';
     return;
   }
   var today = new Date();
@@ -3360,8 +3257,6 @@ document.querySelectorAll('.mchip').forEach(function(c){
 });
 
 /* ── INIT (all safe, no TDZ) ── */
-buildSlides();
-resetTimer();
 renderDest();
 /* Agenda del inicio: por defecto muestra SELECCIONADO el dia de hoy
    (fix: antes arrancaba sin filtro, mostrando todos los eventos). */

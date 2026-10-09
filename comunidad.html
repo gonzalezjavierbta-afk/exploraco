@@ -950,7 +950,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
    COMUNIDAD LATAWEL — hub de interaccion social
    1. Chat (demo local)
    2. Planes (demo local)
-   3. Ranking de viajeros (api/usuarios?tipo=leaderboard, con fallback demo)
+   3. Ranking de viajeros (api/usuarios?tipo=leaderboard, sin datos de ejemplo)
    El perfil privado vive en mi-perfil.html (badges, trofeos, avance).
    La sesion real la maneja usuario-session.js (window.ExploraCO).
    ============================================================= */
@@ -1433,6 +1433,10 @@ function chatMsgsHTML(msgs, withMod) {
 function renderChatMessages(roomId, msgs) {
   var win = document.getElementById('chat-window');
   if(!win) return;
+  if(!msgs || !msgs.length) {
+    win.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:20px 0;text-align:center">A\u00fan no hay mensajes en esta sala</div>';
+    return;
+  }
   win.innerHTML = chatMsgsHTML(msgs, true);
   win.scrollTop = win.scrollHeight;
 }
@@ -1914,7 +1918,10 @@ function renderPandillaCTA() {
 function renderPandillasUnirse(list) {
   var el = document.getElementById('pandillas-unirse');
   if(!el) return;
-  if(!list || !list.length) { el.innerHTML = ''; return; }
+  if(!list || !list.length) {
+    el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:10px 0;text-align:center">No hay parches abiertos por ahora.</div>';
+    return;
+  }
   var html = '<div class="pand-card">'
     + '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px">Parches abiertos a membresia</div>';
   list.forEach(function(p){
@@ -2081,17 +2088,7 @@ function pandillaSalir() {
     .catch(function(){ showXPToastComm('⚠️ Error de conexion'); });
 }
 
-/* ---- RANKING (leaderboard real con podio + fallback demo) ---- */
-var MOCK_LB = [
-{xp_total:1250,nombre:'Carlos M.',badge_actual:'Viajero Patrocinado'},
-  {xp_total:980,nombre:'Sarah K.',badge_actual:'Local Consagrado'},
-  {xp_total:640,nombre:'Andrea V.',badge_actual:'Cazador de Senderos'},
-  {xp_total:360,nombre:'Jorge T.',badge_actual:'Mochilero Autónomo'},
-  {xp_total:220,nombre:'Luisa R.',badge_actual:'Explorador de Barrio'},
-  {xp_total:90,nombre:'Luis P.',badge_actual:'Viajero Novato'},
-  {xp_total:45,nombre:'Camila T.',badge_actual:'Viajero Novato'},
-  {xp_total:20,nombre:'Diego R.',badge_actual:'Viajero Novato'},
-];
+/* ---- RANKING (leaderboard real, sin datos de ejemplo) ---- */
 function paintLeaderboard(rows) {
   var list = document.getElementById('lb-list');
   if(!list) return;
@@ -2131,6 +2128,11 @@ function paintLeaderboard(rows) {
     list.appendChild(card);
   });
 }
+function lbListMsg(text) {
+  var list = document.getElementById('lb-list');
+  if(!list) return;
+  list.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:30px">' + text + '</div>';
+}
 function cargarLeaderboard() {
   var list = document.getElementById('lb-list');
   if(!list) return;
@@ -2139,10 +2141,10 @@ function cargarLeaderboard() {
     .then(function(r){ return r.json(); })
     .then(function(res){
       var rows = (res && res.data) || [];
-      if(!rows.length) { paintLeaderboard(MOCK_LB); return; }
+      if(!rows.length) { lbListMsg('A\u00fan no hay ranking de la comunidad'); return; }
       paintLeaderboard(rows);
     })
-    .catch(function(){ paintLeaderboard(MOCK_LB); });
+    .catch(function(){ lbListMsg('No se pudo cargar el ranking'); });
 }
 
 /* ---- SUB-VISTAS DEL RANKING (Casas, Facciones, Parches) ----
