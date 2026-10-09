@@ -238,7 +238,11 @@
     if (!cont || typeof document === 'undefined') { return null; }
     var grp = cont.querySelector('[data-ma-estrellas]');
     if (grp) { return grp; }
-    var i, kids = cont.childNodes ? cont.childNodes.slice(0) : [];
+    var i, kids = [];
+    // childNodes es un NodeList (no tiene .slice): se copia a array por indice.
+    if (cont.childNodes) {
+      for (i = 0; i < cont.childNodes.length; i++) { kids.push(cont.childNodes[i]); }
+    }
     grp = document.createElement('span');
     grp.className = 'ma-estrellas';
     poner(grp, 'data-ma-estrellas', '1');
@@ -550,7 +554,9 @@
       if (!b || !el.contains(b)) { return; }
       if (attr(b, 'data-ma-voto') !== null) {
         var s = target.closest('[data-ma-estrella], [data-ma-nota]');
-        calificar(b, null, (s && b.contains(s)) ? nota5(attr(s, 'data-ma-nota')) : null);
+        // Sin estrella el click cae en el contenedor: no-op, nunca se adivina.
+        if (!s || !b.contains(s)) { return; }
+        calificar(b, null, nota5(attr(s, 'data-ma-nota')));
         return;
       }
       if (attr(b, 'data-ma-save') !== null) { guardar(b, null); }
