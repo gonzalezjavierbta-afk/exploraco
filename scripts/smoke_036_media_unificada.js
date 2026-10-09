@@ -334,7 +334,7 @@ async function run() {
   var mCom = crearMock([
     { test: 'FROM destinos_fotos df', reply: [{ id: 'f1', destino_id: 'd1' }] },
     { test: 'FROM usuarios WHERE id=$1 LIMIT 1', reply: [{ id: U, nombre: 'Yo', avatar: '' }] },
-    { test: /SELECT COUNT\(\*\)::int AS n FROM media_comentarios WHERE usuario_id/, reply: [{ n: 0 }] },
+    { test: /AS carga FROM media_comentarios WHERE usuario_id/, reply: [{ n: 0, carga: 0 }] },
     { test: 'INSERT INTO media_comentarios', reply: [{ id: 'm1', usuario_id: U, fuente: 'curada', item_id: 'f1', parent_id: null, texto: 'hola', activo: true, creado_en: 't1' }] },
     { test: 'SELECT progreso_album FROM usuarios', reply: [{ progreso_album: {} }] },
     { test: 'UPDATE usuarios SET xp_total', reply: [] }
@@ -355,7 +355,7 @@ async function run() {
   check('G1: media_comentar -> 201', resCom.statusCode === 201);
   check('G2: media_comentar shape comentario', !!(bCom.comentario && bCom.comentario.foto_id === 'f1'
     && bCom.comentario.texto === 'hola' && bCom.comentario.eliminado === false));
-  check('G3: media_comentar xp 6 (chat_comentario v27)', bCom.xp === 6);
+  check('G3: media_comentar xp 6 (chat_comentario base, carga 0 ADR-092)', bCom.xp === 6);
 
   // ============ H. media_interacciones (GET) ============
   var mGet = crearMock([

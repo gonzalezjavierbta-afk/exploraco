@@ -7996,3 +7996,163 @@ Con tinta blanca, el **4,5:1 es matematicamente inalcanzable** sobre `#FF4A00`: 
 - **ADR-052** (`esEsquemaFaltante`, `interacciones.js:5325`): es el mecanismo de degradacion que D7 y D10 reusan para las 3 claves nuevas y para `admin_usuarios`.
 - **ADR-034** (las senales de `interacciones` y `guardados_*`): el pozo se alimenta de las interacciones ya contabilizadas por XP, sin crear una senal nueva ni mezclarla con los guardados de media.
 - **ADR-084** (fuente unica del relato: el argumento de D1-D12 y de los controles vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` apuntan).
+
+## ADR-092: Decay estilo "Rising Star Decay" para el chat y los comentarios de media -- la `carga` se deriva del historial propio en 24h (`chat_mensajes.creado_en` / `media_comentarios.creado_en`), espejo del decay del voto con base `chat_comentario`=6, divisor 20 y tope duro 20/24h, sin UI, sin endpoint y sin migracion [NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-092
+**Fecha:** 2026-10-09
+**Autor:** Chief Architect (`@architect`). Las decisiones **D1-D8** y la calibracion (base 6, divisor 20, tope 20/24h) **son decisiones del operador ya tomadas y NO se reabren aqui**: este ADR las **redacta como tales**, no las re-litiga.
+**Estado:** **ACEPTADO E IMPLEMENTADO (2026-10-09).** *Cierre de implementacion (pase unico R2, `@docs-keeper`):* codigo **IMPLEMENTADO Y VERIFICADO LOCAL** en working tree (`api/interacciones.js`; **cero migraciones, cero endpoints nuevos, 8/8 INTACTO**): constantes `TEXTO_DIA_MAX=20`/`TEXTO_DECAY_DIV=20` (`:307-308`), helper compartido `TEXTO_TABLAS`/`xpTextoDesdeFila`/`calcularXpTextoDecay` (`:5492-5523`) y los 3 handlers realineados (`chat_msg` `:10566-10607`, `plan_chat_msg` `:10958-10994`, `crearComentarioMedia` `:6044-6101`). **Ratificado** con veredicto **APRUEBA con 4 condiciones vinculantes** de `@architect-review` (orden carga->INSERT en los 3 handlers; **fail-open = base completa**; `xp_base` decayado en motor/detalle/ledger con `cap_aplicado='accion'`; no eliminar `getProgresoAlbum`/`updProgresoAlbum` ni las claves JSONB) y **certificacion 4/4 + Escudo GOLD limpio** de `@qa-auditor`. Verificacion: `node --check` OK (api + 3 smokes), ASCII-safety **0 bytes > 127**, `npm test` **VERDE (exit 0, 0 FAIL)**; `smoke_test_comunidad.js` **32 PASS** y `smoke_036_media_unificada.js` **93/93**. Deudas aceptadas (abajo) y detalle de cierre en `TASKS.md` **TSK-205** y relevo en `NEXT.md`. **D1-D8 y la calibracion (base 6, divisor 20, tope 20/24h) son decisiones del operador ya tomadas y NO se reabren.**
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-091`** (linea **7622**, "Reclamacion de propiedad de destinos con pozo de XP"); **no existia ningun `ADR-092`**. Este ADR se escribe como **092**, el siguiente consecutivo libre. `DECISIONS.md` medido hoy: **1.209,6 KB / 7.998 lineas** antes de esta entrega (el dato de `AGENTS.md` -- 741,5 KB / 4.731 lineas -- esta **desactualizado**; se declara aqui, no se oculta).
+**Alcance:** este ADR **no ejecuta** nada y **no toca `TASKS.md` ni `NEXT.md`**. **8/8 funciones serverless INTACTAS (ADR-010):** **cero ficheros nuevos en `api/`**, **cero endpoints nuevos** y **cero migraciones nuevas**. Todo el cambio vive en **`api/interacciones.js`** (ya existente). No se reescribe ningun `tags` (ADR-003). No se recalibra el motor de multiplicadores (ADR-053/ADR-058): el decay actua **antes**, como en el voto.
+
+### Por que es un ADR nuevo y no una enmienda
+
+Ningun ADR previo decidio **que mecanismo de contencion rige el XP del chat y de los comentarios de media**. ADR-079 fijo el del **voto** ("el decay queda como unica contencion y el voto es siempre libre") y ADR-053 fijo la postura general de los caps, pero el texto (chat y comentarios) quedo con un mecanismo **distinto y heredado**: un contador con clave y fecha por dia en JSONB, con **XP plano** mientras `n < 10` y tope de **10 acciones/dia**, sin decay. Ese mecanismo nunca se justifico por escrito frente al decay del voto; es un **efecto colateral no decidido**, no una decision. No hay premisa que corregir, luego no hay nada que enmendar (mismo criterio que ADR-089, ADR-090 y ADR-091 declararon). Lo que este ADR hace es **extender el decay del voto al texto** y **unificar el contador en la fuente real** (el historial de la propia accion), exactamente el idioma que ADR-079 ratifico para el voto.
+
+### Problema / Contexto
+
+Hoy conviven **dos mecanismos de contencion** para dos familias de acciones que comparten base (`chat_comentario = 6`) y etiqueta de ledger (`chat_comentario`):
+
+- **Voto de media (ADR-079, "Rising Star Decay"):** la `carga` se deriva del **historial real** (`media_votos.creado_en` en 24h): `carga = SUM(GREATEST(0, 1 - edad/86400))`, `factor = 1 - carga/20` con clamp `>= 0`, `xp = round(XP_BASES.voto_media * factor * 100)/100`, y **tope duro** si las filas de las ultimas 24h alcanzan `VOTOS_DIA_MAX` (20). La recarga es **automatica**: al salir los votos de la ventana de 24h la carga baja sola.
+- **Chat y comentarios de media (mecanismo heredado):** un **contador en JSONB** (`usuarios.progreso_social {chat_dia, chat_n}` para el chat; `progreso_album {comentarios_dia, comentarios_dia_fecha}` para comentarios de media), con **XP PLANO** mientras `n < 10` y tope de **10 acciones/dia**. La base es `XP_BASES.chat_comentario = 6` (`:462`) y **la misma etiqueta de ledger `chat_comentario`** se usa en chat (`:10549`, `:10934`) y en comentarios de media (`:6048`).
+
+Esto produce tres problemas:
+
+1. **Inconsistencia economica.** Dos acciones de "texto" valen **siempre 6 XP** (multiplicadas por el motor) dentro del cupo, sin importar la rafaga; el voto, en cambio, decae. No hay desincentivo a la rafaga dentro del cupo.
+2. **Doble contabilidad fragil.** El contador vive en un JSONB de usuario y **no en el historial de la accion**. Si el `UPDATE` best-effort del contador falla, el estado diverge del hecho real. En medios, la fuente de verdad **ya es** el historial (`media_votos`).
+3. **Dos numeros de tope para el mismo eje.** 10/dia (texto) frente a 20/24h (voto), sin razon documentada.
+
+**Nota de convivencia (no se toca).** `media_comentar` ya tiene un **429 anti-spam de 30 comentarios/24h** (`:6000-6004`) sobre `media_comentarios.creado_en`. Es un **freno de seguridad fisico** (bloquea el envio), distinto del **tope de XP** de este ADR (que **no** bloquea el envio, D6). Los dos coexisten y no se pisan.
+
+### Baseline verificado en este turno (ADR-006: archivo real, no memoria)
+
+| Hecho | Fuente | Estado |
+|---|---|---|
+| `VOTOS_DIA_MAX = 20` | `api/interacciones.js:301` | **CONFIRMADO** (leido) |
+| `VOTO_DECAY_DIV = 20` | `api/interacciones.js:302` | **CONFIRMADO** (leido) |
+| Decay del voto: `carga` con `GREATEST(0, 1 - EXTRACT(EPOCH FROM (NOW()-creado_en))/86400.0)`, clamp `carga <= VOTOS_DIA_MAX`, `factor = 1 - carga/VOTO_DECAY_DIV`, `xp = round(...*100)/100` | `api/interacciones.js:5758-5774` | **CONFIRMADO** (leido) |
+| **Orden de medios:** la `carga` se calcula **ANTES** de `escribir()` (el INSERT/upsert del voto); el voto en curso **NO se auto-cuenta** | `api/interacciones.js:5758-5762` (calc) vs `:5775` (escribir) | **CONFIRMADO** (leido) |
+| `XP_BASES.chat_comentario = 6` | `api/interacciones.js:462` | **CONFIRMADO** (leido) |
+| `XP_BASES.voto_media = 3` | `api/interacciones.js:470` | **CONFIRMADO** (leido) |
+| `chatXpDisponible` lee `usuarios.progreso_social {chat_dia, chat_n}`; XP plano si `n < 10` | `api/interacciones.js:4960-4973` | **CONFIRMADO** (leido) |
+| `registrarChatXp` hace `+1` a `chat_n` (best-effort) | `api/interacciones.js:4975-4981` | **CONFIRMADO** (leido) |
+| `media_comentar` usa `progreso_album.comentarios_dia`; XP plano si `dia < 10`; base `chat_comentario` | `api/interacciones.js:6024-6046` | **CONFIRMADO** (leido) |
+| `media_comentar` inserta el comentario **ANTES** del bloque de XP (el comentario en curso **se auto-contaria** si el query se hiciera despues) | `api/interacciones.js:6005-6009` (INSERT) vs `:6023+` (XP) | **CONFIRMADO** (leido) |
+| 429 anti-spam 30/24h sobre `media_comentarios.creado_en` | `api/interacciones.js:6000-6004` | **CONFIRMADO** (leido) |
+| `media_comentarios` tiene `creado_en`; indice `(usuario_id, creado_en DESC)` | `db/migrations/023_interacciones_media_unificadas.sql:84`, `:101-102` | **CONFIRMADO** (leido) |
+| `chat_mensajes` tiene `usuario_id`, `activo`, `creado_en`; su unico indice es por `sala` (`idx_chat_mensajes_sala`); **NO hay indice por `usuario_id`** | `db/migrations/008_comunidad_social.sql:43`, `:54` | **CONFIRMADO** (leido) |
+| Handler `chat_msg`: inserta en `chat_mensajes` y luego consulta `chatXpDisponible`/`registrarChatXp`; ledger `chat_comentario`, `cap_aplicado='accion'` | `api/interacciones.js:10516-10554` | **CONFIRMADO** (leido) |
+| Handler `plan_chat_msg`: inserta en `chat_mensajes` y **comparte** el mismo contador (`chatXpDisponible`/`registrarChatXp`) | `api/interacciones.js:10905-10939` | **CONFIRMADO** (leido) |
+| El ledger del voto lleva `xp_base` **decayado** (`xpBaseVoto`), no la base del catalogo | `api/interacciones.js:5787` | **CONFIRMADO** (leido) |
+| `api/interacciones.js` mide **875.903 bytes / 16.528 lineas** | `Get-Item` / `Read` | **CONFIRMADO** |
+
+### Opciones evaluadas
+
+| # | Opcion | Veredicto |
+|---|---|---|
+| O1 | Dejar el contador JSONB con XP plano 10/dia | **Descartada.** Mantiene los 3 problemas (inconsistencia, doble contabilidad, dos topes) y el mecanismo duplicado frente al voto. |
+| O2 | Extender el decay del voto al texto, derivando la `carga` del historial propio | **ELEGIDA.** Un solo idioma de contencion (decay + tope duro), contador con **fuente unica** en el historial, y coherencia con ADR-079. |
+| O3 | Reusar exactamente `VOTOS_DIA_MAX`/`VOTO_DECAY_DIV` para el texto | **Descartada como acoplamiento.** Reusar la constante **voto-nombrada** hace que un futuro recaulibrado del voto cambie el texto en silencio. Se usan **constantes propias de texto** con **los mismos numeros** (D4). |
+| O4 | Migrar el contador a una columna dedicada o a una tabla de cupos | **Descartada.** Toca esquema/migracion (D8: cero migraciones) y es innecesaria: el historial **ya** es la fuente. |
+| O5 | Solo decay, sin tope duro | **Descartada por decision del operador:** decay **mas** tope duro (D2). |
+| O6 | Recalibrar la base (bajarla de 6) | **Descartada por decision del operador:** la base se mantiene en 6 (D4). |
+
+### Decisiones tomadas (D1-D8)
+
+- **D1 -- Alcance:** el mecanismo aplica al **chat** (handlers `chat_msg` de comunidad y `plan_chat_msg`) y a los **comentarios de media** (`media_comentar`).
+- **D2 -- Mecanismo:** **decay + tope duro diario**, espejo exacto del voto (ADR-079). No es solo decay.
+- **D3 -- Contador:** la `carga` se deriva del **historial de la propia tabla en 24h** (chat: `chat_mensajes.creado_en`; comentarios: `media_comentarios.creado_en`), igual que medios deriva de `media_votos.creado_en`. Se **deja de usar** `progreso_social.chat_n` y `progreso_album.comentarios_dia` para el XP; esas **claves se CONSERVAN intactas** (Cero Borrado Logico, ADR-003). El conteo **no filtra por `activo`**: espejo exacto de medios (`:5761`), solo `usuario_id` + ventana de 24h.
+- **D4 -- Calibracion:** base `chat_comentario = 6`, **divisor de decay 20**, **tope duro 20 acciones/24h**. Se declaran **constantes propias de texto** (`TEXTO_DIA_MAX = 20`, `TEXTO_DECAY_DIV = 20`) con **mismos numeros** que el voto, para no acoplar el significado de la constante voto-nombrada (O3).
+- **D5 -- Pools independientes:** el **chat** (compartido entre `chat_msg` y `plan_chat_msg`, porque ambos insertan en `chat_mensajes`) y los **comentarios de media** tienen **cada uno su propia carga**; no comparten. El pool del chat **no filtra por `sala`**: todo mensaje del usuario (en cualquier sala) cuenta para el mismo pool.
+- **D6 -- El tope NO bloquea el envio:** solo corta el XP a 0 pasado el tope (20/24h); seguir escribiendo **esta permitido**. (El unico bloqueo fisico sigue siendo el 429 anti-spam de 30/24h de comentarios, que **no** se toca.)
+- **D7 -- Sin UI nueva:** ni contador, ni tooltip, ni exposicion de la `carga` en la respuesta JSON (coherente con ADR-079, punto 3).
+- **D8 -- Sin endpoint ni migracion nuevos:** 8/8 intacto (ADR-010). Cero ficheros nuevos en `api/`, cero SQL.
+
+### Orden de calculo y formula (contrato para el Lead Developer)
+
+**El punto critico es el orden.** En medios la `carga` se calcula **antes** de escribir el voto (el voto en curso no se auto-cuenta, `:5758-5762` vs `:5775`). Hoy, en cambio, `chat_msg`/`plan_chat_msg` insertan el mensaje **antes** de consultar el contador (`:10516` vs `:10523`) y `media_comentar` inserta el comentario **antes** del bloque de XP (`:6005-6009` vs `:6023+`). **La implementacion debe calcular la `carga` y `n` ANTES de insertar la accion en curso** (espejo de medios), o, en su defecto, excluir la fila en curso (`id <> $nuevo`). Se prefiere el reordenamiento: espejo exacto.
+
+```
+-- Se ejecuta ANTES de insertar la accion en curso (espejo de :5758-5762)
+SELECT COUNT(*)::int AS n,
+       COALESCE(SUM(GREATEST(0, 1 - EXTRACT(EPOCH FROM (NOW() - creado_en)) / 86400.0)), 0) AS carga
+FROM <tabla>
+WHERE usuario_id = $1 AND creado_en > NOW() - INTERVAL '1 day'
+-- <tabla> = 'chat_mensajes' (pool chat, D5) | 'media_comentarios' (pool comentarios)
+-- sin filtro de activo: espejo exacto de :5761
+
+if (n >= TEXTO_DIA_MAX) -> xp = 0        (tope; la accion SE INSERTA igual, D6)
+else { factor = 1 - carga / TEXTO_DECAY_DIV;
+       if (factor < 0) factor = 0;
+       xp = Math.round(XP_BASES.chat_comentario * factor * 100) / 100; }
+```
+
+- **`xp_base` del ledger:** pasa a ser **el XP decayado** (como el voto en `:5787`), **no** la base plana `6`. El `xp_final` sigue siendo el resultado del motor de multiplicadores (ADR-053/ADR-058) aplicado sobre ese `xp_base` decayado.
+- **`cap_aplicado = 'accion'`:** se **conserva** (el cap sigue denominado en acciones/filas).
+- **Minimo real:** con el tope de 20 filas y divisor 20, la `carga` nunca alcanza 20 (`n >= 20` corta antes), luego `factor > 0` y el clamp `factor = 0` es **inalcanzable en la practica**, igual que en ADR-079. El minimo observado es ~5% de 6 = **~0.3 XP**.
+- **Degradacion (FAIL-OPEN = base completa, ratificado):** el helper compartido degrada igual que `conDegradacionMedia` (un fallo del agregado **no rompe el envio**). El contrato es **fail-open**: si la lectura de la `carga` falla, se asume **carga 0 -> factor 1 -> XP = base completa (6)**, espejo exacto de medios. **NO** se degrada a `xp = 0` ni a un valor plano ambiguo: esa era la contradiccion de la version PROPUESTO, **corregida por `@architect-review` y certificada por `@qa-auditor`**.
+
+### Impacto / superficies
+
+| Superficie | Cambio | Riesgo |
+|---|---|---|
+| `api/interacciones.js` -- helper de contencion | **+1 helper compartido** de `carga`/`n` por tabla (o 2 wrappers) + **+2 constantes** de texto (`TEXTO_DIA_MAX`, `TEXTO_DECAY_DIV`) | **BAJO** |
+| `chatXpDisponible` (`:4960-4973`) | Pasa a derivar `carga`/`n` de `chat_mensajes` en 24h (reuso de firma o sustitucion) | **MEDIO**: cambia la fuente de verdad de XP del chat |
+| `registrarChatXp` (`:4975-4981`) | Deja de ser la fuente del cupo; se conserva por compatibilidad de claves (ADR-003) o se retira su llamada | **BAJO** |
+| Handler `chat_msg` (`:10516-10554`) | Reordena el calculo **antes** del INSERT o excluye la fila en curso; `xp_base` del ledger = decayado | **MEDIO**: es orden critico (auto-conteo) |
+| Handler `plan_chat_msg` (`:10905-10939`) | Idem `chat_msg`; comparte el pool `chat_mensajes` (D5) | **MEDIO** |
+| `media_comentar` (`:6024-6046`) | Sustituye `progreso_album.comentarios_dia` por la `carga` de `media_comentarios`; reordena antes del INSERT o excluye la fila; `xp_base` del ledger = decayado | **MEDIO** |
+| `progreso_social.chat_n` / `progreso_album.comentarios_dia` | **CONSERVADAS** (ADR-003), dejan de ser fuente de XP | **NULO** (vestigiales) |
+| 429 anti-spam 30/24h de comentarios (`:6000-6004`) | **SIN CAMBIOS** | **NULO** |
+| Motor de multiplicadores / nivel | **SIN CAMBIOS** (el decay entra por `xp_base`) | **NULO** |
+| `xp_ledger` | **SIN CAMBIOS de esquema**; cambia el **valor** de `xp_base` para `chat_comentario` | **BAJO** (ver R6) |
+| **Endpoints nuevos** | **0** | 8/8 intactas (ADR-010) |
+| Ficheros nuevos en `api/` | **0** | ADR-010 / ADR-001 |
+
+### Consecuencias
+
+- **Positivas:** un **solo idioma** de contencion (decay + tope duro) para texto y voto; el contador pasa a tener **fuente unica** en el historial real (consistente, no depende de un JSONB best-effort); la rafaga deja de valer siempre 6 XP; coherencia con la postura de ADR-079/ADR-053 ("informar en vez de castigar": seguir escribiendo nunca se bloquea); el codigo gana claridad al eliminar dos rutas de contabilidad por dia.
+- **Negativas / aceptadas:** el chat pasa de **10 acciones/dia sin decay** a **20/24h con decay**: se permiten **mas** acciones fisicas, pero cada una vale menos conforme a la rafaga (decision consciente del operador, D1/D2/D4); el comportamiento queda **sin comunicar** al usuario (D7); el `xp_base` del ledger `chat_comentario` deja de ser uniformemente 6 (R6); las claves JSONB quedan **vestigiales** (D3).
+- **Umbral de honestidad:** esto **no impide el volumen fisico** de mensajes de chat; solo ajusta su recompensa. El unico bloqueo fisico del sistema sigue siendo el 429 anti-spam de comentarios (30/24h) y el 403 del canal oficial. Es exactamente la misma asimetria que ADR-079 declaro para el voto.
+
+### Deuda / riesgos
+
+- **R1 -- Auto-conteo de la accion en curso (CRITICO).** Si la `carga` se calcula **despues** del INSERT (como hoy en el chat y en comentarios), la accion se cuenta a si misma y el primer mensaje del dia ya arrancaria con `n = 1`. Se cierra reordenando el calculo antes del INSERT (espejo de medios) o excluyendo la fila en curso. **Es el punto que `@backend-dev` debe verificar en los 3 handlers.**
+- **R2 -- Indice ausente en el pool de chat.** `media_comentarios` tiene indice `(usuario_id, creado_en DESC)` (`023:101-102`), pero **`chat_mensajes` solo tiene indice por `sala`** (`008:54`): el agregado por `usuario_id` + ventana de 24h hara un **scan** sin indice de apoyo. D8 prohibe migracion nueva en este ADR. **Deuda declarada:** si el volumen lo justifica, una migracion futura (fuera de este ADR) debe anadir `(usuario_id, creado_en)` a `chat_mensajes`. No se optimiza antes de medir.
+- **R3 -- Sin filtro de `activo`.** El conteo espeja a medios (que no filtra): un mensaje/comentario desactivado por moderacion **sigue contando** dentro de su ventana de 24h. Se acepta como espejo exacto; si se quiere excluir, es un cambio posterior (no en este ADR).
+- **R4 -- Volumen de mensajes de chat sin tope fisico.** Con D6, el chat no tiene freno fisico adicional; un usuario podria enviar N mensajes y solo percibir XP decreciente. Se acepta (misma asimetria que el voto tras ADR-079). Si se necesitara un freno, es otro ADR.
+- **R5 -- Multiplicadores sobre base decayada.** El motor (nivel + origen, ADR-053/ADR-058) puede reescalar el `xp_final` por encima del `xp_base` decayado. Es intencional (el decay acota la base, no el techo del motor) y espeja al voto (`:5780`). Se declara para que no sorprenda en la verificacion.
+- **R6 -- Semantica historica del ledger.** Las filas `chat_comentario` anteriores a este cambio tienen `xp_base = 6` plano; las nuevas tendran `xp_base` decayado (0-6). Cualquier analitica por `xp_base` debe **cortar por fecha**. **Nota para `@docs-keeper`** en el pase de cierre; no es una regresion.
+- **R7 -- Estado real del contador y de las funciones de cupo (ratificado).** Las funciones **`getProgresoAlbum`/`updProgresoAlbum` NO se eliminan**: siguen sirviendo a `albumes_mes`/`xp_autor_dia`/`fotos_dia`. Lo unico que queda **congelado para el XP** son las **claves** `chat_n`/`chat_dia`/`comentarios_dia` (no se borran, ADR-003). Las funciones **`chatXpDisponible`/`registrarChatXp` quedan SIN llamadas (vestigiales / dead code)**; se registran como **deuda aceptada** (ver "Deuda aceptada" abajo). El grep confirma **0 consumidores** fuera de las propias funciones de cupo.
+
+### Deuda aceptada (explicita, ratificada en el cierre)
+
+Tres deudas quedan **aceptadas** (no bloquean el cierre; cada una con su disparador de revision):
+
+1. **Indice ausente en `chat_mensajes` (R2).** No existe indice `(usuario_id, creado_en)`: el agregado de la `carga` del chat hace un **scan** sin apoyo. Se **acepta** (no se optimiza antes de medir); si el volumen lo justifica, una **migracion futura** lo anade. **Fuera del alcance de este ADR** (D8: cero migraciones). Recomendacion no bloqueante registrada en `NEXT.md`.
+2. **Duplicacion leve en `crearComentarioMedia`.** El handler **repite inline** el query de carga en vez de llamar al helper `calcularXpTextoDecay`; es **funcionalmente equivalente** y pasa verificacion. Se acepta como duplicacion leve a unificar en un pase posterior.
+3. **Funciones muertas `chatXpDisponible`/`registrarChatXp`.** Quedaron **sin llamadas** (vestigiales) tras el reordenamiento; las claves JSONB que leian se conservan (ADR-003). **Dead code aceptado**; su retirada fisica no es obligatoria y no se ejecuta en este ADR.
+
+### Verificacion de este ADR
+
+- **Numero:** `Select-String -LiteralPath "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-092"` -> **1 coincidencia**. Antes de escribir: `Select-String "^## ADR-"` -> mayor **`ADR-091`** (linea **7622**). Por eso el ID es **092**.
+- **Formato:** cabecera y secciones calcadas del patron vigente (ADR-091): `**ID:**`, `**Fecha:**`, `**Autor:**`, `**Estado:**`, `**Numeracion:**`, `**Alcance:**`, `### Por que es un ADR nuevo`, `### Problema / Contexto`, `### Baseline verificado`, `### Opciones evaluadas`, `### Decisiones tomadas`, `### Orden de calculo y formula`, `### Impacto / superficies`, `### Consecuencias`, `### Deuda / riesgos`, `### Verificacion de este ADR`, `**ADRs relacionados:**`.
+- **Baseline (ADR-006):** verificado con `Select-String` y `Read` acotado sobre `api/interacciones.js` (`:301-302`, `:455-470`, `:4955-4981`, `:5758-5794`, `:5995-6049`, `:10516-10554`, `:10905-10939`), `db/migrations/008_comunidad_social.sql` (`:43`, `:54`) y `db/migrations/023_interacciones_media_unificadas.sql` (`:84`, `:101-102`). **Ningun fichero > 150 KB se leyo completo** (techo `AGENTS.md` 10/18).
+- **Hallazgos que corrigen/afinan el contexto de partida (declarados):** (i) en medios la `carga` se calcula **antes** del INSERT, mientras que el chat y los comentarios insertan **antes** de calcular: el auto-conteo (R1) es el punto critico real, no un detalle; (ii) `media_comentarios` **si** tiene indice `(usuario_id, creado_en)` pero `chat_mensajes` **no** tiene indice por `usuario_id` (R2); (iii) el ledger del voto usa `xp_base` decayado (`:5787`), lo que fija el contrato de `xp_base` para el texto.
+- **ASCII:** lo anadido aqui es **ASCII puro, 0 bytes > 127**; los backticks que aparecen son marcas markdown de este documento, no de `api/*.js`. Identificadores, columnas, rutas y SQL van **sin tildes** (ADR-002).
+- **Sin codigo:** este ADR **no ejecuta** `npm test` ni nada en `scripts/`, **no implementa** el helper ni los handlers, y **no escribe** en `TASKS.md` ni en `NEXT.md` (R2: pase de cierre aparte, `@docs-keeper`).
+- **Integridad del fichero:** la escritura se hizo sobre `DECISIONS.md` **unico**; ningun otro fichero fue modificado.
+- **Fuente unica (ADR-084):** el argumento de D1-D8 y de la formula vive **una sola vez, aqui**.
+- **Estado:** **ACEPTADO E IMPLEMENTADO (2026-10-09)** -- implementado por `@backend-dev`, con veredicto **APRUEBA con 4 condiciones** de `@architect-review` y **certificacion 4/4 + Escudo GOLD** de `@qa-auditor`. **D1-D8 son decisiones ya tomadas por el operador**: la revision pudo pedir redaccion mas clara, **no re-litigarlas**.
+
+**ADRs relacionados:**
+
+- **ADR-079** (derogacion del cooldown del voto; el decay queda como unica contencion): es el **precedente directo**. De aqui se toma la curva (`GREATEST`/ventana 24h), el clamp, el tope duro y la **prohibicion de UI** (punto 3), y de aqui viene el hecho de que el voto calcule la `carga` **antes** de escribir.
+- **ADR-053** (Gamificacion v6; "informar en vez de castigar"; los caps como contencion real): fija la postura que este ADR extiende al texto. `cap_aplicado='accion'` proviene de su Dec 7.
+- **ADR-003** (Cero Borrado Logico): `chat_n` y `comentarios_dia` **se conservan intactas**; no se borran filas ni claves (D3, R7).
+- **ADR-002** (ASCII-safe): identificadores, columnas, rutas y SQL sin tildes; escapes `\uXXXX` en cualquier codigo derivado.
+- **ADR-058** (Multiplicador de Origen) y **ADR-053** (multiplicador de nivel): el decay actua sobre `xp_base` **antes** del motor; el `xp_final` sigue saliendo de `calcularXpAcreditado`.
+- **ADR-018** (el nivel es **DERIVADO** con `calcularNivelLocal(xpTotal)`): no hay columna que actualizar; el cambio solo altera `xp_base`/`xp_total`.
+- **ADR-010 / ADR-001** (presupuesto 8/8; Vanilla JS): este ADR **no crea endpoint, ni fichero en `api/`, ni migracion**; todo vive en `interacciones.js`.
+- **ADR-084** (fuente unica del relato): el argumento de D1-D8 y de la formula vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` apuntan.

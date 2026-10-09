@@ -5047,5 +5047,39 @@ Los IDs `#grid-destinos` / `#contenedor-planes` / `#feed-audiovisual` / `#lista-
 
 Codigo (working tree, **SIN commit; NO desplegado**): **95 `.html` ELIMINADOS** + `index.html` (**+10/-115**) + `index-api-connector.js` (**+5/-11**) + `comunidad.html` (**+17/-15**). **`api/` sin tocar: 8/8 INTACTO**, cero migracion, cero endpoint nuevo. Documentacion (este pase, unico): `TASKS.md` (esta seccion + el indice superior) y `NEXT.md` (entrada en "Completado reciente" + seccion en "Que se estaba haciendo"). **`DECISIONS.md` y `PROJECT.md` SIN TOCAR**: no hay decision de arquitectura que registrar (la recomendacion de la politica de rewrite queda como texto en `NEXT.md`, no como ADR).
 
+## TSK-205 - Decay de XP de chat y comentarios de media (ADR-092): `carga` derivada del historial propio en 24h, espejo del decay del voto - 2026-10-09 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL, SIN COMMIT Y SIN DESPLEGAR.** Cierra la tanda del **ADR-092** (redactado por `@architect`). **NO abre ADR nuevo** (ADR-084). **`api/` extendido en un solo fichero** (`api/interacciones.js`); **8/8 endpoints INTACTO**, **cero migraciones nuevas, cero endpoints nuevos**. El argumento de la decision (D1-D8, formula, calibracion) vive **una sola vez** en `DECISIONS.md` ADR-092 (ADR-084 D1); aqui solo el cierre.
+
+### Alcance REAL ejecutado (ADR-006, contra el archivo real)
+
+1. **Constantes de texto:** `TEXTO_DIA_MAX = 20` / `TEXTO_DECAY_DIV = 20` (`api/interacciones.js:307-308`), propias del texto (mismos numeros que el voto, sin acoplar la constante voto-nombrada).
+2. **Helper compartido:** `TEXTO_TABLAS` / `xpTextoDesdeFila` / `calcularXpTextoDecay` (`:5492-5523`).
+3. **Handlers realineados:** `chat_msg` (`:10566-10607`), `plan_chat_msg` (`:10958-10994`), `media_comentar`/`crearComentarioMedia` (`:6044-6101`). **Orden critico:** la `carga` se calcula **ANTES** del INSERT (R1: sin auto-conteo de la accion en curso).
+4. **INTACTO (ADR-003 / D8):** base `chat_comentario=6` (`:468`); claves JSONB `chat_n`/`chat_dia`/`comentarios_dia` conservadas; 429 anti-spam 30/24h (`:6051`) intacto; `getProgresoAlbum`/`updProgresoAlbum` (`:5620`,`:5625`) intactas. `chatXpDisponible`/`registrarChatXp` (`:4966`,`:4981`) quedaron **vestigiales** (dead code, deuda aceptada).
+
+### Revision y certificacion
+
+- **`@architect-review`: APRUEBA con 4 condiciones vinculantes** -- orden carga->INSERT en los 3 handlers; **fail-open = base completa**; `xp_base` decayado en motor/detalle/ledger con `cap_aplicado='accion'`; no eliminar `getProgresoAlbum`/`updProgresoAlbum` ni las claves JSONB.
+- **`@qa-auditor`: CERTIFICA 4/4 condiciones + Escudo GOLD limpio.**
+
+### Verificacion (ADR-006, medida en este pase)
+
+- `node --check` OK (api + 3 smokes); **ASCII-safety 0 bytes > 127**.
+- `npm test` -> **VERDE (exit 0, 0 FAIL)**.
+- `scripts/smoke_test_comunidad.js` -> **32 PASS** (bloque anti-farm realineado al nuevo helper).
+- `scripts/smoke_036_media_unificada.js` -> **93/93, 0 FAIL** (`:337`, `:358`).
+- `scripts/smoke_gamificacion_v6.js` -> **sin cambios**.
+
+### Deudas aceptadas (detalle en ADR-092, seccion "Deuda aceptada")
+
+1. **`chat_mensajes` sin indice `(usuario_id, creado_en)`** -> scan aceptado; migracion futura fuera de este ADR.
+2. **`crearComentarioMedia` repite inline el query de carga** en vez de llamar a `calcularXpTextoDecay` (duplicacion leve, funcionalmente equivalente).
+3. **`chatXpDisponible`/`registrarChatXp` muertas** (vestigiales / dead code aceptado).
+
+### Archivos tocados
+
+Codigo (working tree, **SIN commit; NO desplegado**): `api/interacciones.js` (**8/8 INTACTO**, cero migracion, cero endpoint nuevo) + `scripts/smoke_test_comunidad.js` + `scripts/smoke_036_media_unificada.js` (realineados al nuevo helper). `scripts/smoke_gamificacion_v6.js` sin cambios. Documentacion (este pase, unico): `DECISIONS.md` (ADR-092: estado ACEPTADO E IMPLEMENTADO, fail-open, R7 y deuda aceptada), `TASKS.md` (esta seccion) y `NEXT.md` (relevo + recomendacion no bloqueante).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

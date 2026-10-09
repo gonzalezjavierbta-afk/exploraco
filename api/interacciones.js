@@ -300,6 +300,12 @@ var VISITA_BONO_RURAL = 25;
 // sigue intacto.
 var VOTOS_DIA_MAX = 20;
 var VOTO_DECAY_DIV = 20;
+// ADR-092: decay del XP de texto (chat y comentarios de media), espejo del
+// decay del voto. Constantes propias de texto con los mismos numeros que el
+// voto, SIN acoplar el significado de la constante voto-nombrada (un futuro
+// recaulibrado del voto no debe mover el texto en silencio).
+var TEXTO_DIA_MAX = 20;
+var TEXTO_DECAY_DIV = 20;
 // ADR-033 (v17): escalado de XP segun la amplitud del area de verificacion
 // del lugar. Areas extensas (ciudades, parques metropolitanos) debilitan la
 // presencia fisica, asi que rinden menos XP. La visita SIEMPRE se registra
@@ -5477,6 +5483,45 @@ function conDegradacionMedia(promesa, etiqueta, valor) {
   });
 }
 
+// ADR-092: decay del XP de texto (chat y comentarios de media), espejo exacto
+// del decay del voto (ADR-079). La carga reciente ponderada por tiempo en la
+// ventana de 24h decide el factor; el tope duro NO bloquea la accion, solo
+// corta el XP a 0 (D6). Tabla WHITELISTEADA: solo chat_mensajes (pool chat,
+// compartido entre chat_msg y plan_chat_msg, D5) o media_comentarios (pool
+// independiente). Sin filtro de activo ni de sala: espejo de :5761.
+var TEXTO_TABLAS = { chat_mensajes: true, media_comentarios: true };
+
+// Math pura: de la fila agregada (n + carga) al xp_base decayado del texto.
+// FAIL-OPEN: una carga ausente o no finita cuenta como 0, luego factor 1 y
+// base COMPLETA (espejo de conDegradacionMedia, nunca fail-closed).
+function xpTextoDesdeFila(fila) {
+  var n = parseInt(fila && fila.n, 10) || 0;
+  if (n >= TEXTO_DIA_MAX) return { n: n, carga: 0, xp_base: 0, tope: true };
+  var carga = Number(fila && fila.carga);
+  if (!isFinite(carga) || carga < 0) carga = 0;
+  if (carga > TEXTO_DIA_MAX) carga = TEXTO_DIA_MAX;
+  var factor = 1 - (carga / TEXTO_DECAY_DIV);
+  if (factor < 0) factor = 0;
+  return {
+    n: n, carga: carga, tope: false,
+    xp_base: Math.round(XP_BASES.chat_comentario * factor * 100) / 100
+  };
+}
+
+// Agregado carga/n sobre el historial propio en 24h de la tabla indicada.
+// Se calcula ANTES del INSERT de la accion en curso para que esta no se
+// auto-cuente (espejo de :5758-5762). Degrada al valor base si el esquema
+// esta ausente (conDegradacionMedia).
+function calcularXpTextoDecay(sqlFn, usuarioId, tabla) {
+  if (!TEXTO_TABLAS[tabla]) return Promise.resolve(xpTextoDesdeFila({ n: 0 }));
+  return conDegradacionMedia(
+    sqlFn("SELECT COUNT(*)::int AS n, "
+      + "COALESCE(SUM(GREATEST(0, 1 - EXTRACT(EPOCH FROM (NOW() - creado_en)) / 86400.0)), 0) AS carga "
+      + "FROM " + tabla + " WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL '1 day'", [usuarioId]),
+    tabla, [{ n: 0 }]
+  ).then(function(cnt) { return xpTextoDesdeFila((cnt && cnt[0]) || {}); });
+}
+
 // ADR-089: validador de la nota. Devuelve el entero 1-5 o null (rechazo).
 // Rechaza strings con decimales, vacios, booleanos y fuera de rango: el
 // DEFAULT 3 de media_votos NO se usa como red.
@@ -5997,11 +6042,17 @@ function crearComentarioMedia(sqlFn, usuarioId, fuente, itemId, texto, parentId,
     return validarPadre.then(function(errPadre) {
       if (errPadre) return { ok: false, status: errPadre.status, error: errPadre.error };
       return conDegradacionMedia(
-        sqlFn("SELECT COUNT(*)::int AS n FROM media_comentarios WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL '1 day'", [usuarioId]),
+        sqlFn("SELECT COUNT(*)::int AS n, "
+          + "COALESCE(SUM(GREATEST(0, 1 - EXTRACT(EPOCH FROM (NOW() - creado_en)) / 86400.0)), 0) AS carga "
+          + "FROM media_comentarios WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL '1 day'", [usuarioId]),
         'media_comentarios', [{ n: 0 }]
       ).then(function(cnt) {
-        if (((cnt[0] && parseInt(cnt[0].n, 10)) || 0) >= 30)
+        var filaCom = cnt[0] || {};
+        if ((parseInt(filaCom.n, 10) || 0) >= 30)
           return { ok: false, status: 429, error: 'Limite de 30 comentarios por dia alcanzado' };
+        // ADR-092: carga y xp_base decayado ANTES del INSERT (la fila en curso
+        // no se auto-cuenta). El tope solo corta el XP, nunca el envio (D6).
+        var xpBaseCom = xpTextoDesdeFila(filaCom).xp_base;
         return sqlFn(
           'INSERT INTO media_comentarios (usuario_id, fuente, item_id, parent_id, texto)'
           + ' VALUES ($1, $2, $3, $4, $5)'
@@ -6021,31 +6072,30 @@ function crearComentarioMedia(sqlFn, usuarioId, fuente, itemId, texto, parentId,
             ).then(function(d){ return ((d[0] && parseInt(d[0].d, 10)) || 0) + 1; });
           }
           return nivelP.then(function(nivel) {
-            return getProgresoAlbum(sqlFn, usuarioId).then(function(prog) {
-              var h = hoy();
-              var dia = (prog.comentarios_dia_fecha === h) ? (parseInt(prog.comentarios_dia, 10) || 0) : 0;
-              var xp = dia < 10 ? XP_BASES.chat_comentario : 0;
+            {
               var xpComentarioEntregado = 0;
               var detalleComentario = null;
-              // ADR-053 Dec 7 (v25): el cupo del chat/comentario es de 10
-              // XP/dia, por eso la fila del ledger va con cap_aplicado
-              // 'accion' (el invariante multiplicativo no aplica a este cap
-              // denominado en XP; xp_final es lo realmente acreditado).
-              var aplicar = xp > 0
+              // ADR-053 Dec 7 (v25): el cupo del chat/comentario esta
+              // denominado en XP, por eso la fila del ledger va con
+              // cap_aplicado 'accion' (el invariante multiplicativo no aplica
+              // a este cap; xp_final es lo realmente acreditado). ADR-092: la
+              // base ya viene decayada desde el historial propio en 24h.
+              var aplicar = xpBaseCom > 0
                 ? contextoXpE(sqlFn, usuarioId).then(async function(ctxComentario) {
                     // ADR-058: punto geografico del media (destino/album/foto).
                     var puntoCom = await puntoDeMedia(sqlFn, target);
-                    var resCom = await calcularXpAcreditado(sqlFn, XP_BASES.chat_comentario,
+                    var resCom = await calcularXpAcreditado(sqlFn, xpBaseCom,
                       ctxComentario.nivel_clase, ctxComentario.clase_id, ctxComentario.tag,
                       { nivel_usuario: ctxComentario.nivel_usuario, usuario_id: usuarioId, punto: puntoCom });
                     xpComentarioEntregado = resCom.xp_final;
-                    detalleComentario = armarXpDetalle(XP_BASES.chat_comentario, resCom, 0, xpComentarioEntregado, 'accion');
+                    detalleComentario = armarXpDetalle(xpBaseCom, resCom, 0, xpComentarioEntregado, 'accion');
                     await sqlFn('UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2', [xpComentarioEntregado, usuarioId]).catch(function(){});
                     await acreditarClaseYCofre(sqlFn, usuarioId, ctxComentario, xpComentarioEntregado);
                     await repartirXpReferidos(sqlFn, usuarioId, xpComentarioEntregado);
-                    await updProgresoAlbum(sqlFn, usuarioId, { comentarios_dia: dia + 1, comentarios_dia_fecha: h });
+                    // ADR-092: progreso_album.comentarios_dia deja de ser
+                    // fuente de XP (clave conservada, ADR-003); no se toca.
                     await registrarXpLedger(sqlFn, Object.assign({
-                      usuario_id: usuarioId, accion: 'chat_comentario', xp_base: XP_BASES.chat_comentario,
+                      usuario_id: usuarioId, accion: 'chat_comentario', xp_base: xpBaseCom,
                       mult_nivel: resCom.m_nivel, mult_stack: resCom.mult_stack,
                       mult_final: resCom.mult_global_c, cap_aplicado: 'accion',
                       xp_final: xpComentarioEntregado, contexto: { fuente: f, item_id: id, canal: 'comentario_media' }
@@ -6078,7 +6128,7 @@ function crearComentarioMedia(sqlFn, usuarioId, fuente, itemId, texto, parentId,
                   logros: ml[1],
                 };
               });
-            });
+            }
           });
         });
       });
@@ -10429,7 +10479,7 @@ module.exports = async function handler(req, res) {
       // Se manejan ANTES del guard generico de destino_id porque operan
       // sobre salas/planes, no sobre destinos. Todos validan capacidad
       // server-side via misionCompletada() y, cuando hay XP (chat),
-      // aplican el tope diario anti-farming (chatXpDisponible).
+      // aplican el decay con tope duro ADR-092 (calcularXpTextoDecay).
       // Las capacidades las traduce api/usuarios.js desde
       // usuarios.progreso_misiones (DESBLOQUEOS).
 
@@ -10513,6 +10563,11 @@ module.exports = async function handler(req, res) {
           return res.status(403).json({ ok: false, error: 'Solo el administrador puede publicar en el canal oficial' });
         var autorMsg = await sql('SELECT nombre FROM usuarios WHERE id=$1 LIMIT 1', [usuarioId2]).catch(function(){ return []; });
         var nombreMsg = autorMsg[0] && autorMsg[0].nombre ? String(autorMsg[0].nombre).slice(0, 60) : 'Viajero';
+        // ADR-092: la carga y el xp_base decayado se calculan ANTES del
+        // INSERT (la fila en curso no se auto-cuenta). Pool de chat compartido
+        // chat_mensajes (sin filtro de sala); el tope solo corta el XP (D6).
+        var textoChat = await calcularXpTextoDecay(sql, usuarioId2, 'chat_mensajes');
+        var xpBaseChat = textoChat.xp_base;
         var msgIns = await sql(
           'INSERT INTO chat_mensajes (sala_id, usuario_id, nombre, texto) '
           + 'VALUES ($1, $2, $3, $4) RETURNING id, creado_en',
@@ -10520,36 +10575,34 @@ module.exports = async function handler(req, res) {
         );
         var xpChat = 0, misionesChat = [], logrosChat = [];
         var detalleChat = null;
-        var dispChat = await chatXpDisponible(sql, usuarioId2);
-        if (dispChat.disponible) {
-          xpChat = dispChat.xp;
+        if (xpBaseChat > 0) {
+          xpChat = xpBaseChat;
           var ctxChat = await contextoXpE(sql, usuarioId2);
           // ADR-058: una sala de CIUDAD esta anclada a su ciudad (sala.nombre)
           // resuelta via geo_ciudades; el chat general/viajeros no tiene punto
           // -> el motor deja el factor de origen en 1.00.
           var puntoChat = (salaValida[0].tipo === 'ciudad')
             ? await buscarCoordsCiudad(sql, salaValida[0].nombre) : null;
-          var resChat = await calcularXpAcreditado(sql, XP_BASES.chat_comentario,
+          var resChat = await calcularXpAcreditado(sql, xpBaseChat,
             ctxChat.nivel_clase, ctxChat.clase_id, ctxChat.tag,
             { nivel_usuario: ctxChat.nivel_usuario, usuario_id: usuarioId2, punto: puntoChat });
           var xpChatFinal = resChat.xp_final;
-          // ADR-053 Dec 7 (v25): cupo de chat = 10 XP/dia -> la fila del
-          // ledger va con cap_aplicado 'accion' y xp_final real.
-          detalleChat = armarXpDetalle(XP_BASES.chat_comentario, resChat, 0, xpChatFinal, 'accion');
+          // ADR-053 Dec 7 (v25): el cupo de chat esta denominado en XP -> la
+          // fila del ledger va con cap_aplicado 'accion' y xp_final real.
+          detalleChat = armarXpDetalle(xpBaseChat, resChat, 0, xpChatFinal, 'accion');
           await sql(
             'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id = $2',
             [xpChatFinal, usuarioId2]
           ).catch(function(){});
           await acreditarClaseYCofre(sql, usuarioId2, ctxChat, xpChatFinal);
-          await registrarChatXp(sql, usuarioId2, dispChat.hoy, dispChat.n);
           // v13: reparto multinivel del XP ganado (piramide de
           // referidos, no bloquea).
           await repartirXpReferidos(sql, usuarioId2, xpChatFinal);
           await registrarXpLedger(sql, Object.assign({
-            usuario_id: usuarioId2, accion: 'chat_comentario', xp_base: XP_BASES.chat_comentario,
+            usuario_id: usuarioId2, accion: 'chat_comentario', xp_base: xpBaseChat,
             mult_nivel: resChat.m_nivel, mult_stack: resChat.mult_stack,
             mult_final: resChat.mult_global_c, cap_aplicado: 'accion',
-            xp_final: xpChatFinal, contexto: { sala_id: msgSala, canal: 'chat' }
+            xp_final: xpChatFinal, contexto: { sala_id: msgSala, canal: 'chat', carga: textoChat.carga }
           }, origenLedger(resChat, puntoChat ? 'ciudad' : 'sin_punto', puntoChat)));
           xpChat = xpChatFinal;
         }
@@ -10863,8 +10916,8 @@ module.exports = async function handler(req, res) {
 
       // Mensaje en el chat privado de un plan (epic 2026-09-13): gates
       // de membresia (miembro o creador) y de capacidad de chat (misma
-      // mision que chat_msg); +2 XP con tope diario de 20 via
-      // registrarChatXp (helper reutilizado, no duplicado). Mismo shape
+      // mision que chat_msg); +6 XP con decay y tope duro ADR-092 via
+      // calcularXpTextoDecay (helper compartido, no duplicado). Mismo shape
       // que chat_msg + plan_id.
       if (tipo2 === 'plan_chat_msg') {
         if (!usuarioId2)
@@ -10902,6 +10955,10 @@ module.exports = async function handler(req, res) {
           [usuarioId2]
         ).catch(function(){ return []; });
         var nombrePcm = autorPcm[0] && autorPcm[0].nombre ? String(autorPcm[0].nombre).slice(0, 60) : 'Viajero';
+        // ADR-092: carga y xp_base decayado ANTES del INSERT (la fila en curso
+        // no se auto-cuenta). Comparte el pool chat_mensajes con chat_msg (D5).
+        var textoPcm = await calcularXpTextoDecay(sql, usuarioId2, 'chat_mensajes');
+        var xpBasePcm = textoPcm.xp_base;
         var pcmIns = await sql(
           'INSERT INTO chat_mensajes (sala_id, usuario_id, nombre, texto) '
           + 'VALUES ($1, $2, $3, $4) RETURNING id, creado_en',
@@ -10909,32 +10966,30 @@ module.exports = async function handler(req, res) {
         );
         var xpPcm = 0, misionesPcm = [], logrosPcm = [];
         var detallePcm = null;
-        var dispPcm = await chatXpDisponible(sql, usuarioId2);
-        if (dispPcm.disponible) {
-          xpPcm = dispPcm.xp;
+        if (xpBasePcm > 0) {
+          xpPcm = xpBasePcm;
           var ctxPcm = await contextoXpE(sql, usuarioId2);
           // ADR-058: el chat privado de un plan esta anclado al destino del
           // plan (planes_viaje.destino, texto) resuelto via geo_ciudades.
           // Sin match -> el motor deja el factor de origen en 1.00.
           var puntoPcm = await buscarCoordsCiudad(sql, pcmPlan[0].destino);
-          var resPcm = await calcularXpAcreditado(sql, XP_BASES.chat_comentario,
+          var resPcm = await calcularXpAcreditado(sql, xpBasePcm,
             ctxPcm.nivel_clase, ctxPcm.clase_id, ctxPcm.tag,
             { nivel_usuario: ctxPcm.nivel_usuario, usuario_id: usuarioId2, punto: puntoPcm });
           var xpPcmFinal = resPcm.xp_final;
-          detallePcm = armarXpDetalle(XP_BASES.chat_comentario, resPcm, 0, xpPcmFinal, 'accion');
+          detallePcm = armarXpDetalle(xpBasePcm, resPcm, 0, xpPcmFinal, 'accion');
           await sql(
             'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id = $2',
             [xpPcmFinal, usuarioId2]
           ).catch(function(){});
           await acreditarClaseYCofre(sql, usuarioId2, ctxPcm, xpPcmFinal);
-          await registrarChatXp(sql, usuarioId2, dispPcm.hoy, dispPcm.n);
           // v13: reparto multinivel del XP ganado (no bloquea).
           await repartirXpReferidos(sql, usuarioId2, xpPcmFinal);
           await registrarXpLedger(sql, Object.assign({
-            usuario_id: usuarioId2, accion: 'chat_comentario', xp_base: XP_BASES.chat_comentario,
+            usuario_id: usuarioId2, accion: 'chat_comentario', xp_base: xpBasePcm,
             mult_nivel: resPcm.m_nivel, mult_stack: resPcm.mult_stack,
             mult_final: resPcm.mult_global_c, cap_aplicado: 'accion',
-            xp_final: xpPcmFinal, contexto: { plan_id: pcmPlanId, canal: 'plan_chat' }
+            xp_final: xpPcmFinal, contexto: { plan_id: pcmPlanId, canal: 'plan_chat', carga: textoPcm.carga }
           }, origenLedger(resPcm, puntoPcm ? 'ciudad' : 'sin_punto', puntoPcm)));
           xpPcm = xpPcmFinal;
         }

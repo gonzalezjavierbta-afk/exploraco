@@ -2,7 +2,8 @@
 // reales en api/interacciones.js. Valida el catalogo gaming nuevo
 // (misiones/logros), el registro de los 7 tipos POST nuevos (no caen en
 // "tipo invalido"), los gates de capacidad (403 sin mision completada) y
-// el anti-farming del chat (tope diario 20 XP / 10 mensajes).
+// el anti-farming del texto (ADR-092: decay espejo del voto de media, base
+// chat_comentario=6, divisor 20, tope duro 20 acciones/24h y FAIL-OPEN).
 // Reutiliza el patron de smoke_test_milestones_v2.js.
 global.require_orig = require;
 const Module = require('module');
@@ -32,11 +33,13 @@ const sandboxInt = { module: { exports: {} }, require, console, process, fetch: 
 sandboxInt.exports = sandboxInt.module.exports;
 vm.createContext(sandboxInt);
 vm.runInContext(srcInt + '\nmodule.exports.MISIONES = MISIONES; module.exports.LOGROS = LOGROS;'
-  + ' module.exports.chatXpDisponible = chatXpDisponible; module.exports.misionCompletada = misionCompletada;',
+  + ' module.exports.xpTextoDesdeFila = xpTextoDesdeFila; module.exports.calcularXpTextoDecay = calcularXpTextoDecay;'
+  + ' module.exports.misionCompletada = misionCompletada;',
   sandboxInt, { filename: 'api/interacciones.js' });
 const MISIONES = sandboxInt.module.exports.MISIONES;
 const LOGROS = sandboxInt.module.exports.LOGROS;
-const chatXpDisponible = sandboxInt.module.exports.chatXpDisponible;
+const xpTextoDesdeFila = sandboxInt.module.exports.xpTextoDesdeFila;
+const calcularXpTextoDecay = sandboxInt.module.exports.calcularXpTextoDecay;
 const misionCompletada = sandboxInt.module.exports.misionCompletada;
 
 const misIds = MISIONES.map(function(m){ return m.id; });
@@ -125,27 +128,39 @@ function run() {
   }).then(function(mc3) {
     check('misionCompletada: true si progreso_misiones la marca completada', mc3 === true);
 
-    // Anti-farming del chat
-    var hoy = new Date();
-    var hoyStr = hoy.getUTCFullYear() + '-' + String(hoy.getUTCMonth()+1).padStart(2,'0') + '-' + String(hoy.getUTCDate()).padStart(2,'0');
-    return chatXpDisponible(function(){ return Promise.resolve([{ progreso_social: { chat_dia: hoyStr, chat_n: 10 } }]); }, 'u1');
-  }).then(function(a1) {
-    check('Anti-farm: 10 mensajes hoy -> sin XP', a1.disponible === false && a1.xp === 0);
-    return chatXpDisponible(function(){ return Promise.resolve([{ progreso_social: { chat_dia: hoyStr(), chat_n: 3 } }]); }, 'u1');
-  }).then(function(a2) {
-    check('Anti-farm: 3 mensajes hoy -> +2 XP', a2.disponible === true && a2.xp === 2);
-    return chatXpDisponible(function(){ return Promise.resolve([{ progreso_social: {} }]); }, 'u1');
-  }).then(function(a3) {
-    check('Anti-farm: sin progreso_social -> +2 XP', a3.disponible === true && a3.xp === 2);
+    // Anti-farming del texto (ADR-092): decay espejo del voto de media.
+    // La carga sale del historial propio en 24h de la tabla whitelisteada;
+    // factor = 1 - carga/20; base chat_comentario = 6; tope duro 20
+    // acciones/24h corta el XP a 0; FAIL-OPEN si el esquema esta ausente.
+    return calcularXpTextoDecay(function(){ return Promise.resolve([{ n: 0, carga: 0 }]); }, 'u1', 'chat_mensajes');
+  }).then(function(t1) {
+    check('Decay texto: carga 0 -> base completa 6', t1.xp_base === 6 && t1.tope === false);
+    return calcularXpTextoDecay(function(){ return Promise.resolve([{ n: 3, carga: 10 }]); }, 'u1', 'chat_mensajes');
+  }).then(function(t2) {
+    check('Decay texto: carga 10/20 -> factor 0.5 -> 3', t2.xp_base === 3 && t2.tope === false);
+    return calcularXpTextoDecay(function(){ return Promise.resolve([{ n: 5, carga: 20 }]); }, 'u1', 'chat_mensajes');
+  }).then(function(t3) {
+    check('Decay texto: carga >= divisor 20 -> xp 0', t3.xp_base === 0 && t3.tope === false);
+    return calcularXpTextoDecay(function(){ return Promise.resolve([{ n: 20, carga: 0 }]); }, 'u1', 'chat_mensajes');
+  }).then(function(t4) {
+    check('Decay texto: tope n>=20 -> xp 0 con tope true', t4.xp_base === 0 && t4.tope === true);
+    return calcularXpTextoDecay(function(){
+      var e = new Error('relation chat_mensajes does not exist');
+      e.code = '42P01';
+      return Promise.reject(e);
+    }, 'u1', 'chat_mensajes');
+  }).then(function(t5) {
+    check('Decay texto: fail-open 42P01 -> base completa 6', t5.xp_base === 6);
+    var invalido = xpTextoDesdeFila({ n: 'x', carga: 'boom' });
+    check('Decay texto: fila/valor invalido -> fail-open base 6', invalido.xp_base === 6 && invalido.tope === false);
+    return calcularXpTextoDecay(function(){ return Promise.resolve([]); }, 'u1', 'usuarios');
+  }).then(function(t6) {
+    check('Decay texto: tabla fuera de whitelist -> base 6 sin SQL', t6.xp_base === 6);
 
     console.log('SMOKE COMUNIDAD: OK');
   }).catch(function(err){
     console.log('FAIL - smoke comunidad lanz\u00f3 error: ' + err.message);
     process.exitCode = 1;
   });
-}
-function hoyStr() {
-  var h = new Date();
-  return h.getUTCFullYear() + '-' + String(h.getUTCMonth()+1).padStart(2,'0') + '-' + String(h.getUTCDate()).padStart(2,'0');
 }
 run();
