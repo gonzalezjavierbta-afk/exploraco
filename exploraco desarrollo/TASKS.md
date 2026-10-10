@@ -5164,5 +5164,69 @@ El catalogo de la guia de XP queda **desacoplado del backend** sin gastar una fu
 
 **Archivos tocados.** Codigo (working tree, **SIN commit; NO desplegado**): `usuario-session.js` (catalogo + filtro; **8/8 INTACTO**, cero migracion, cero endpoint nuevo) + `scripts/smoke_xp_guia.js` (**NUEVO, 9/9**). Documentacion (este pase, unico): `DECISIONS.md` (**ADR-094**), `TASKS.md` (esta seccion) y `NEXT.md` (relevo + deuda ASCII + opcional regalias). `BUGS_HISTORICOS.md` **NO se toco**: no hubo bug nuevo.
 
+## TSK-208 - [TAREA NUEVA / ABIERTA] Saneo ASCII de `usuario-session.js`: 2443 bytes > 127 preexistentes (ADR-002) - ABIERTA / PENDIENTE
+
+**Estado: ABIERTA / PENDIENTE (tarea nueva, NO cerrada).** Pedido explicito del operador en el pase de cierre de la tanda 2 (ADR-095 / TSK-209). Cumple **ADR-002** (ASCII-safe). **No toca el rango de la guia de XP** (catalogo + chip de progreso + bloque de regalias), que ya aporta **0 bytes no-ASCII**.
+
+### Contexto
+
+`usuario-session.js` arrastra **2443 bytes > 127 PREEXISTENTES en HEAD**: comentarios con **guiones de caja** y **acentos en strings de UI** anteriores a la guia de XP (ADR-094 / ADR-095). El rango del catalogo de XP y el de la tanda 2 (chip de progreso + bloque de regalias) son **ASCII puro (0 bytes no-ASCII)**; el pendiente es el **resto del archivo**.
+
+### Alcance
+
+- Sanear los **2443 bytes > 127** de `usuario-session.js` para cumplir **ADR-002** (cero bytes > 127), **sin cambiar comportamiento**: normalizar los comentarios con guiones de caja a ASCII y convertir a escapes `\uXXXX` los acentos de los strings de UI.
+- **No** introducir backticks nuevos (ADR-002).
+- Verificar el conteo de bytes > 127 **descontando** los rangos de la guia (ya limpios) y confirmar **0** residuos.
+
+### Criterio de cierre
+
+`usuario-session.js` con **0 bytes > 127** y **0 backticks**, sin regresion en los smokes de la guia (`smoke_xp_guia.js` **9/9**, `smoke_xp_contrato.js` **5/5**) ni en el render de la UI. Cerrar en un unico pase documental (R2).
+
+**Archivos a tocar (previsto).** Codigo: `usuario-session.js`. Documentacion (al cerrar): `TASKS.md` (esta seccion) y `NEXT.md`. `BUGS_HISTORICOS.md` **NO** se toca: no es un bug, es deuda de ADR-002.
+
+---
+
+## TSK-209 - Guia de XP (tanda 2): progreso del dia (visita/voto_media/chat_comentario) y saldo de regalias pendiente en la guia (ADR-095) - 2026-10-10 - CERRADO EN WORKING TREE (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL, SIN COMMIT Y SIN DESPLEGAR.** Abre **ADR-095** (`DECISIONS.md`), donde vive **una sola vez** el argumento de la decision (ADR-084 D1); aqui solo el cierre. **8/8 endpoints INTACTO** (ningun fichero nuevo en `api/`, ningun endpoint nuevo), **cero migraciones**. Segunda tanda sobre la guia "Como ganar XP" (la primera fue TSK-207 / ADR-094).
+
+### Que cambia el producto
+
+La guia "Como ganar XP" (`window.ExploraCO.abrirGuiaXP`) pasa a mostrar, **con sesion activa**, el **progreso del dia** de las fuentes rastreables y el **saldo de regalias pendiente**:
+
+- **Chip de progreso** en la fila activa: **"Hoy: usado/tope"**; con `restante=0`, **"Tope diario alcanzado"**.
+- **Bloque "Regalias pendientes"** (solo si `pendiente > 0`): **informativo**, **sin boton de reclamo** (el reclamo vive en el perfil).
+
+### Backend (`api/interacciones.js`, rama GET `catalogo_xp`, `:9447`)
+
+- Acepta un **`usuario_id` OPCIONAL**; con UUID valido (guard `if (usuarioId && MERCADO_UUID_RE.test(usuarioId))`, `:9488`) **anade** `data.progreso` = `{ visita, voto_media, chat_comentario }` (cada `{usado,tope,restante}`) y `data.regalias` = `{pendiente}`.
+- **Sin `usuario_id`** la respuesta queda **byte a byte la de antes**: **degradacion silenciosa, sin `res.status(400)`**.
+- Solo usa topes con **fuente unica**: `VISITAS_DIA_MAX` (`:294`), `VOTOS_DIA_MAX` (`:301`) y el helper `chatXpDisponible` (`:4966`). Los demas caps siguen como literales y **no se duplican** (el comentario de la rama `:9444-9446` lo prohibe).
+- `regalias.pendiente` = `SELECT COALESCE(SUM(xp_acumulado),0) FROM regalias WHERE autor_id=$1::uuid AND reclamado_en IS NULL` (`:9508-9510`), con `.catch` que degrada a **0**.
+
+### Frontend (`usuario-session.js`)
+
+- `catalogoXp()` (`:2277`) anexa `&usuario_id=` con `encodeURIComponent` **solo si hay sesion**.
+- Chip `ecGuiaXpChip` (`:2760`); bloque "Regalias pendientes" (`:2858`).
+
+### Verificacion (ADR-006)
+
+- `node scripts/smoke_xp_contrato.js` (**NUEVO**) -> **5/5** (sin usuario limpio, sin `400`, constantes compartidas, formula de `restante`, uso del helper de chat).
+- **Regresion:** `smoke_xp_guia.js` **9/9**, `smoke_gamificacion_v6.js` **30/30**, `smoke_niveles_espejos.js` **10/10**.
+- **Capa gratuita:** OK (cascada vigente ADR-083).
+- El rango nuevo (backend `catalogo_xp` + chip/regalias en `usuario-session.js`) aporta **0 bytes > 127**; el smoke nuevo es **0 bytes > 127**.
+
+### Deuda registrada
+
+`[DEUDA]` El tope de `chat_comentario` es el literal `10` dentro de `chatXpDisponible()` (`api/interacciones.js:4976`); coincide con el cap real 10/dia (ADR-015) pero no esta como constante unica. Convertirlo en constante compartida queda como **pendiente OPCIONAL** (`NEXT.md`).
+
+`[DEUDA]` **Saneo ASCII de `usuario-session.js`** (2443 bytes > 127 preexistentes): tarea aparte, sigue **ABIERTA** como **TSK-208**.
+
+### Nota de cierre
+
+La guia gana **contexto personal** (que llevo hoy, cuanto me queda, que regalias pendientes tengo) **sin gastar una funcion serverless**: el progreso se calcula en el **backend** reusando las **constantes y el helper existentes**, y el **chip** vive en el cliente, con degradacion silenciosa cuando no hay sesion. **Pendiente y no resuelto:** commit + push + deploy y el saneo ASCII de `usuario-session.js` (TSK-208).
+
+**Archivos tocados.** Codigo (working tree, **SIN commit; NO desplegado**): `api/interacciones.js` (rama `catalogo_xp`), `usuario-session.js` (chip + bloque de regalias) + `scripts/smoke_xp_contrato.js` (**NUEVO, 5/5**). Documentacion (este pase, unico): `DECISIONS.md` (**ADR-095**), `TASKS.md` (esta seccion + TSK-208) y `NEXT.md`. `BUGS_HISTORICOS.md` **NO se toco**: no hubo bug nuevo.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

@@ -244,6 +244,27 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-10 (pase documental unico R2, 21a tanda) - TSK-209 / ADR-095: la guia de XP muestra el progreso del dia y el saldo de regalias pendiente (cierre)
+
+**Que se estaba haciendo:** extender la guia de XP (TSK-207 / ADR-094) para que, **con sesion activa**, muestre el **progreso del dia** de las fuentes rastreables (`visita`, `voto_media`, `chat_comentario`) y el **saldo de regalias pendiente**, sin endpoint nuevo y sin duplicar topes. El argumento de la decision vive **una sola vez** en `DECISIONS.md` **ADR-095** (ADR-084 D1); aqui solo el relevo.
+
+**Lo que quedo entregado (working tree, SIN commit; NO desplegado). Solo 3 ficheros:**
+- **`api/interacciones.js`** (rama GET `catalogo_xp`, `:9447`): acepta `usuario_id` OPCIONAL; con UUID valido (`MERCADO_UUID_RE`, guard `:9488`) anade `data.progreso` = `{visita, voto_media, chat_comentario}` (cada `{usado,tope,restante}`) y `data.regalias` = `{pendiente}`. Sin `usuario_id` la respuesta queda **byte-identica** y **NO** hay `400`. Solo usa topes con fuente unica (`VISITAS_DIA_MAX`, `VOTOS_DIA_MAX`) o helper (`chatXpDisponible`).
+- **`usuario-session.js`**: `catalogoXp()` (`:2277`) anexa `&usuario_id=` con `encodeURIComponent` si hay sesion; chip de progreso en la fila activa (`ecGuiaXpChip`, `:2760`) con "Hoy: usado/tope" o "Tope diario alcanzado"; bloque "Regalias pendientes" (`:2858`) si `pendiente > 0`, informativo y sin boton de reclamo.
+- **`scripts/smoke_xp_contrato.js` (NUEVO, 5/5)**: sin usuario limpio, sin `400`, constantes compartidas, formula de `restante`, uso del helper de chat.
+
+**Verificacion:** `node scripts/smoke_xp_contrato.js` **5/5**; regresion `smoke_xp_guia.js` **9/9**, `smoke_gamificacion_v6.js` **30/30**, `smoke_niveles_espejos.js` **10/10**. Verificacion de capa gratuita: **OK** (cascada vigente ADR-083). **8/8 endpoints INTACTO; cero migraciones.**
+
+**Que sigue / pendientes:**
+1. **ABIERTO -- saneo ASCII de `usuario-session.js`** (`TASKS.md` **TSK-208**, ADR-002): quedan **2443 bytes > 127 preexistentes**; los rangos nuevos del catalogo y de esta tanda aportan **0**. No bloquea el cierre.
+2. **OPCIONAL (no comprometido) -- extender el progreso del dia a mas fuentes:** exigiria **refactorizar a constantes** los literales de esos caps antes de exponerlos (evita la segunda fuente de verdad).
+3. **OPCIONAL (no comprometido) -- constante unica del tope de `chat_comentario`:** hoy es el literal `10` dentro de `chatXpDisponible()` (`api/interacciones.js:4976`); convertirlo en constante compartida.
+4. **Commit + push + deploy PENDIENTES** (working tree, sin commit).
+
+**Riesgos activos:**
+1. **Tope de `chat_comentario` duplicado:** el literal `10` del helper y el `10` del catalogo deben cambiar a la par; es deuda menor, no un bug.
+2. **Deuda ASCII viva:** `usuario-session.js` sigue con 2443 bytes > 127 preexistentes; descontar los rangos nuevos (limpios) en cualquier analisis.
+
 ### WORKING TREE 2026-10-10 (pase documental unico R2, 20a tanda) - TSK-207 / ADR-094: la guia de XP ("Como ganar XP") se filtra por la capacidad real del usuario y explica la dinamica por fuente (cierre)
 
 **Que se estaba haciendo:** que el modal **"Como ganar XP"** (`window.ExploraCO.abrirGuiaXP`) deje de ser un catalogo plano y pase a **filtrarse por la capacidad real del usuario** y a **explicar la dinamica** de cada fuente. El argumento del modelo cliente/backend vive **una sola vez** en `DECISIONS.md` **ADR-094** (ADR-084 D1); aqui solo el relevo.
@@ -259,8 +280,8 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 **Verificacion:** smoke `scripts/smoke_xp_guia.js` **9/9**; regresion **10/10** y **30/30**; `usuario-session.js` **2443 bytes > 127 preexistentes en HEAD** (rango nuevo del catalogo: **0**); smoke nuevo **0 bytes > 127**. **8/8 endpoints INTACTO; cero migraciones; cero endpoint nuevo.**
 
 **Que sigue / pendientes (uno obligatorio, uno opcional):**
-1. **OBLIGATORIO -- saneo ASCII de `usuario-session.js`:** quedan **2443 bytes > 127 preexistentes en HEAD** (comentarios con guiones de caja y acentos de UI anterior a este cambio). El rango nuevo del catalogo aporta **0**. Es una **tarea aparte** (ADR-002): no se resolvio en este pase y no bloquea el cierre.
-2. **OPCIONAL (no comprometido) -- saldo real de regalias en la guia:** mostrar en la guia el **saldo real de regalias** del usuario via `GET ?tipo=mis_regalias` (`api/interacciones.js:8878`) + `POST tipo=reclamar_regalias` (`:13228`). Queda **marcado como OPCIONAL y NO comprometido**: no hay decision de producto ni tarea abierta; si el operador lo pide, se planifica como tarea nueva.
+1. **ABIERTO -- saneo ASCII de `usuario-session.js`** (`TASKS.md` **TSK-208**): quedan **2443 bytes > 127 preexistentes en HEAD** (comentarios con guiones de caja y acentos de UI anterior a este cambio). Los rangos nuevos del catalogo y de la tanda 2 aportan **0**. Es una **tarea aparte** (ADR-002): no se resolvio en este pase y no bloquea el cierre.
+2. **[HECHO / RETIRADO] -- saldo real de regalias en la guia:** la parte **informativa** se implemento en la **tanda 2** (`DECISIONS.md` **ADR-095** / `TASKS.md` **TSK-209**): la guia informa el saldo `data.regalias.pendiente` (con `.catch` que degrada a 0) y lo pinta si `> 0`, **SIN boton de reclamo** (el reclamo vive en el perfil). Se **descarto** exponer `POST tipo=reclamar_regalias` desde la guia; esa via queda **RETIRADA** del pendiente.
 3. **Commit + push + deploy PENDIENTES** (unico pendiente obligatorio del ciclo documental, junto al saneo ASCII).
 
 **Riesgos activos:**

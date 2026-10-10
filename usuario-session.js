@@ -2275,7 +2275,10 @@
   }
 
   window.ExploraCO.catalogoXp = function () {
-    return ecJson('/api/interacciones?tipo=catalogo_xp');
+    var uid = ecUid();
+    var url = '/api/interacciones?tipo=catalogo_xp';
+    if (uid) url += '&usuario_id=' + encodeURIComponent(uid);
+    return ecJson(url);
   };
   window.ExploraCO.misCartas = function (usuarioId) {
     return ecJson('/api/usuarios?tipo=cartas_mias&usuario_id=' + encodeURIComponent(ecUid(usuarioId)));
@@ -2308,6 +2311,10 @@
     sub: 'font-size:11px;line-height:1.45;color:#6B7280;margin:-3px 0 8px 0;padding-bottom:7px;'
       + 'border-bottom:1px solid rgba(255,255,255,.08);',
     sur: 'color:#4B5563;',
+    // Chip pequeno de progreso del dia dentro de una fila activa (B2).
+    chip: 'display:inline-block;margin-left:8px;font-size:10px;font-weight:700;'
+      + 'color:#FF4A00;background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.35);'
+      + 'border-radius:9px;padding:1px 7px;vertical-align:middle;',
     // Banner de sesion (arriba del todo).
     banner: 'font-size:12px;line-height:1.5;color:#9CA3AF;background:rgba(255,74,0,.08);'
       + 'border:1px solid rgba(255,74,0,.28);border-radius:10px;padding:9px 11px;margin-bottom:16px;',
@@ -2747,6 +2754,29 @@
     return '<div style="' + EC_GUIA_STYLE.banner + '">' + ecEsc(txt) + '</div>';
   }
 
+  // Chip de progreso diario (B2): casa la accion de la fila con su clave
+  // en d.progreso. Robusto: nunca lee una propiedad de un progreso que no
+  // existe ni pinta undefined/NaN. Devuelve '' si no hay dato.
+  function ecGuiaXpChip(gr, progreso) {
+    if (!gr || !progreso || typeof progreso !== 'object') return '';
+    var claves = (gr.acciones && gr.acciones.length) ? gr.acciones : [gr.id];
+    for (var i = 0; i < claves.length; i++) {
+      var k = claves[i];
+      if (!k || !progreso[k]) continue;
+      var p = progreso[k];
+      if (!p || typeof p !== 'object') continue;
+      var usado = Number(p.usado);
+      var tope = Number(p.tope);
+      if (!isFinite(usado) || !isFinite(tope)) continue;
+      var restante = Number(p.restante);
+      var texto = (isFinite(restante) && restante === 0)
+        ? 'Tope diario alcanzado'
+        : ('Hoy: ' + usado + '/' + tope);
+      return '<span style="' + EC_GUIA_STYLE.chip + '">' + ecEsc(texto) + '</span>';
+    }
+    return '';
+  }
+
   function ecGuiaXpHtml(d) {
     if (!d || typeof d !== 'object') return ecEsc('La guia aun no esta disponible.');
     var esArray = Array.isArray(d);
@@ -2764,6 +2794,11 @@
     // dejaria una guia vacia o llena de bloqueos sin sentido.
     var soloGeneral = !conSesion;
     var grupos = ecXpAgrupar(fuentes);
+
+    // Progreso del dia (B2): solo llega con sesion (backend). Si falta, no
+    // aparecen chips y la guia queda identica al anonimo. Nunca se asume.
+    var progreso = (!esArray && d.progreso && typeof d.progreso === 'object')
+      ? d.progreso : null;
 
     var abiertas = '';
     var bloqueadas = '';
@@ -2790,8 +2825,9 @@
         // Degradacion: sin bases conocidas y sin dinamica no hay fila que
         // pintar; nunca se emite 'undefined', 'NaN' ni texto vacio.
         if (!bases && !sub) return;
+        var chip = progreso ? ecGuiaXpChip(gr, progreso) : '';
         abiertas += '<div style="' + EC_GUIA_STYLE.row + '">'
-          + '<div style="' + EC_GUIA_STYLE.rowN + '">' + ecEsc(nombre) + '</div>'
+          + '<div style="' + EC_GUIA_STYLE.rowN + '">' + ecEsc(nombre) + chip + '</div>'
           + '<div style="' + EC_GUIA_STYLE.rowD + '">' + ecEsc(bases) + '</div></div>'
           + (sub ? '<div style="' + EC_GUIA_STYLE.sub + '">' + sub + '</div>' : '');
       } else {
@@ -2819,6 +2855,18 @@
     }
 
     if (!esArray) {
+      // Regalias pendientes (B2): solo informa el saldo; el reclamo vive en
+      // el perfil. Si pendiente es 0, ausente o no numerico, NO se pinta.
+      var reg = d.regalias;
+      var regPend = (reg && typeof reg === 'object') ? Number(reg.pendiente) : NaN;
+      if (isFinite(regPend) && regPend > 0) {
+        html += '<div style="' + EC_GUIA_STYLE.block + '">'
+          + '<div style="' + EC_GUIA_STYLE.h + '">Regalias pendientes</div>'
+          + '<div style="' + EC_GUIA_STYLE.row + '">'
+          + '<div style="' + EC_GUIA_STYLE.rowN + '">Saldo</div>'
+          + '<div style="' + EC_GUIA_STYLE.rowD + '">' + ecEsc(fmtXp(regPend)) + '</div></div>'
+          + '</div>';
+      }
       html += ecGuiaTopes(d.topes);
       html += ecGuiaXpParams('Topes de multiplicador', d.caps);
       html += ecGuiaXpParams('Multiplicadores', d.multiplicadores || d.mult);

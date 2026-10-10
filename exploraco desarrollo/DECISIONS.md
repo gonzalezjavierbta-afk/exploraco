@@ -8277,3 +8277,72 @@ La **primera version** del catalogo exigia **nivel 5** para **`ao_proponer`**. E
 - **ADR-002** (ASCII-safe): el catalogo nuevo es ASCII puro (Assert E); la deuda de los 2443 bytes > 127 es **preexistente y ajena a este cambio**.
 - **ADR-010 / ADR-001** (presupuesto 8/8; Vanilla JS): este ADR **no crea endpoint, ni fichero en `api/`, ni migracion**; todo vive en `usuario-session.js` + el smoke.
 - **ADR-084** (fuente unica del relato): el argumento vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` **solo apuntan**.
+
+## ADR-095: La rama GET `catalogo_xp` acepta un `usuario_id` OPCIONAL y, con UUID valido, expone el progreso del dia (visita/voto_media/chat_comentario) y el saldo de regalias pendiente, sin endpoint nuevo y sin duplicar topes [NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-095
+**Fecha:** 2026-10-10
+**Autor:** `@docs-keeper` (pase documental unico R2), sobre una implementacion ya ejecutada y verificada con smoke propio.
+**Estado:** **ACEPTADO E IMPLEMENTADO (2026-10-10).** Implementado en **working tree**, **SIN commit y SIN desplegar**. Verificacion y cierre en `TASKS.md` **TSK-209**; relevo en `NEXT.md`. Cobertura del smoke nuevo: **5/5** (`scripts/smoke_xp_contrato.js`).
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-094`** (linea **8213**, catalogo de la guia de XP); **no existia ningun `ADR-095`**. Este ADR se escribe como **095**, el siguiente consecutivo libre.
+
+### Decision
+
+La rama **GET** `tipo=catalogo_xp` de `api/interacciones.js` (**linea 9447**) acepta un parametro **`usuario_id` OPCIONAL**. Cuando el valor **pasa el regex de UUID** que ya usa el resto del handler (`MERCADO_UUID_RE`; guard `if (usuarioId && MERCADO_UUID_RE.test(usuarioId))`, **linea 9488**), la respuesta **ANADE** dos bloques a `data`:
+
+- **`data.progreso`** = `{ visita, voto_media, chat_comentario }`; cada uno es `{ usado, tope, restante }` del **dia en curso**.
+- **`data.regalias`** = `{ pendiente }` (suma de `xp_acumulado` sin reclamar).
+
+**Sin `usuario_id`** (o si el valor **no** pasa el regex), la respuesta es **byte a byte la de antes**: **degradacion silenciosa, sin `res.status(400)`**. La rama **no crea un endpoint nuevo**: el presupuesto de **8/8 funciones serverless de Vercel queda INTACTO** (ADR-010/ADR-001).
+
+### Regla de oro respetada: solo se exponen topes con fuente unica
+
+**SOLO** se exponen los topes que ya son **CONSTANTE COMPARTIDA** (`VISITAS_DIA_MAX` = 30, `api/interacciones.js:294`; `VOTOS_DIA_MAX` = 20, `:301`) o **HELPER COMPARTIDO** (`chatXpDisponible()`, `:4966`). Los **demas caps** (chat, compartir, planes, album, ao...) siguen como **literales en sus handlers** y **NO se duplican en el catalogo**: el propio comentario de la rama (`:9444-9446`) lo prohibe de forma explicita. Esto **evita la segunda fuente de verdad** que persiguen ADR-084 D1 y la Regla de No-Duplicidad.
+
+### Por que estos 3 y no mas
+
+`visita`, `voto_media` y `chat_comentario` son los **unicos** cuyo tope rastrea **una unica fuente**:
+
+- `progreso.visita.usado` = `COUNT(*)` de `interacciones` tipo `'visita'` en **24h** (`api/interacciones.js:9494`), con `tope` = `VISITAS_DIA_MAX`.
+- `progreso.voto_media.usado` = `COUNT(*)` de `media_votos` en **24h** (`:9498`), con `tope` = `VOTOS_DIA_MAX`.
+- `progreso.chat_comentario.usado` = `chatXpDisponible(sql, usuarioId).n` (`:9502`), con `tope` = **10**.
+
+Los demas se exponen como **`topes[]` sin progreso**. Extender el progreso a mas fuentes queda como **decision futura** y exigiria **refactorizar esos literales a constantes**.
+
+### Contrato del chip en UI
+
+La **fila activa** de la guia muestra un **chip** de progreso (`ecGuiaXpChip`, `usuario-session.js:2760`):
+
+- Con `restante > 0` -> **"Hoy: usado/tope"**.
+- Con `restante = 0` -> **"Tope diario alcanzado"**.
+- Sin dato -> **no pinta nada** (nunca `undefined`/`NaN`).
+
+`catalogoXp()` (`usuario-session.js:2277`) anexa `&usuario_id=` con `encodeURIComponent` **solo cuando hay sesion**. Si `pendiente > 0`, el bloque **"Regalias pendientes"** (`usuario-session.js:2858`) **informa el saldo**; **NO lleva boton de reclamo** -- el reclamo vive en el perfil.
+
+### Control
+
+`scripts/smoke_xp_contrato.js` (**5/5**) verifica el contrato por parseo simple, **sin BD ni red**:
+
+1. **Sin usuario:** `progreso`/`regalias` **solo** se anaden bajo el guard de `usuario_id`.
+2. **Degradacion:** la rama **NO** emite `res.status(400)`.
+3. **Constantes:** `tope` usa `VISITAS_DIA_MAX` / `VOTOS_DIA_MAX` (no literales).
+4. **Restante:** formula `Math.max(0, tope - u)` (resta + clamp).
+5. **Chat:** `chatXpDisponible()` se invoca en la rama.
+
+**Regresion:** `smoke_xp_guia.js` **9/9**, `smoke_gamificacion_v6.js` **30/30**, `smoke_niveles_espejos.js` **10/10**.
+
+### Deuda menor registrada (no se corrige aqui)
+
+El tope de `chat_comentario` es el **literal `10`** dentro de `chatXpDisponible()` (`api/interacciones.js:4976`, `n < 10`). **Coincide** con el cap real de 10/dia (ADR-015) pero **no esta como constante unica**: quien cambie el cap tendria que tocar **dos sitios** (el helper y el catalogo). Convertirlo en constante compartida queda como **deuda menor** y **pendiente OPCIONAL** en `NEXT.md`.
+
+### Alcance
+
+**8/8 funciones serverless INTACTAS (ADR-010):** cero ficheros nuevos en `api/`, cero endpoints nuevos, **cero migraciones, cero SQL de esquema**. Ficheros tocados: `api/interacciones.js` (rama `catalogo_xp`), `usuario-session.js` (chip de progreso + bloque de regalias) y `scripts/smoke_xp_contrato.js` (**NUEVO, 5/5**).
+
+**ADRs relacionados:**
+
+- **ADR-094** (catalogo de la guia de XP): esta extension **continua** ese catalogo; alli la prosa y los gates, aqui el progreso del dia y el saldo de regalias.
+- **ADR-015** (cap de chat 10/dia): el literal `10` del helper `chatXpDisponible()` coincide con ese cap; es la deuda menor de arriba.
+- **ADR-006** (baseline = archivo real): todos los line-sites se verificaron contra `api/interacciones.js` y `usuario-session.js`.
+- **ADR-010 / ADR-001** (presupuesto 8/8; Vanilla JS): este ADR **no crea endpoint, ni fichero en `api/`, ni migracion**; extiende una rama GET existente y usa solo cliente Vanilla.
+- **ADR-083 / ADR-084** (cascada de coste y fuente unica del relato): la verificacion de capa gratuita paso OK; el argumento vive **una sola vez, aqui** y `TASKS.md`/`NEXT.md` **solo apuntan**.

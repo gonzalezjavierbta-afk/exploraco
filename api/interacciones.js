@@ -9457,33 +9457,64 @@ module.exports = async function handler(req, res) {
             aplica_m_nivel: true
           });
         });
-        return res.status(200).json({
-          ok: true,
-          data: {
-            bases: cxBases,
-            caps: {
-              progresion: cxCfg.capProgresion,
-              global: cxCfg.capGlobal,
-              m_nivel_max: cxCfg.mNivelMax
+        var cxData = {
+          bases: cxBases,
+          caps: {
+            progresion: cxCfg.capProgresion,
+            global: cxCfg.capGlobal,
+            m_nivel_max: cxCfg.mNivelMax
+          },
+          multiplicadores: {
+            clase: BONUS_CLASE,
+            casa: { rezagada: 1.30, equilibrada: 1.0, dominante: 0.85 },
+            origen: {
+              local: cxCfg.factorOrigenLocal,
+              nomada_max: cxCfg.factorOrigenNomadaMax,
+              extranjero_max: cxCfg.factorOrigenExtranjeroMax
             },
-            multiplicadores: {
-              clase: BONUS_CLASE,
-              casa: { rezagada: 1.30, equilibrada: 1.0, dominante: 0.85 },
-              origen: {
-                local: cxCfg.factorOrigenLocal,
-                nomada_max: cxCfg.factorOrigenNomadaMax,
-                extranjero_max: cxCfg.factorOrigenExtranjeroMax
-              },
-              amuleto: { amuleto_x2: 2.0 },
-              lider: 1.1
-            },
-            topes: [
-              { accion: 'visita', tope: VISITAS_DIA_MAX, unidad: 'acciones_dia' },
-              { accion: 'voto_media', tope: VOTOS_DIA_MAX, unidad: 'acciones_dia' },
-              { accion: 'referidos_directos', tope: 500, unidad: 'acumulado' }
-            ]
-          }
-        });
+            amuleto: { amuleto_x2: 2.0 },
+            lider: 1.1
+          },
+          topes: [
+            { accion: 'visita', tope: VISITAS_DIA_MAX, unidad: 'acciones_dia' },
+            { accion: 'voto_media', tope: VOTOS_DIA_MAX, unidad: 'acciones_dia' },
+            { accion: 'referidos_directos', tope: 500, unidad: 'acumulado' }
+          ]
+        };
+        // Extension B1 (2026-10-10): si llega un usuario_id valido se ANADE
+        // progreso del dia y saldo de regalias pendiente. Sin usuario_id (o si
+        // no pasa el regex de UUID que ya usa slot_catalogo) se degrada en
+        // silencio y la respuesta queda identica a la de hoy. Nunca 400.
+        if (usuarioId && MERCADO_UUID_RE.test(usuarioId)) {
+          var cxBloque = function(usado, tope) {
+            var u = parseInt(usado, 10) || 0;
+            if (u < 0) u = 0;
+            return { usado: u, tope: tope, restante: Math.max(0, tope - u) };
+          };
+          var cxVisitas = await sql(
+            'SELECT COUNT(*)::int AS n FROM interacciones WHERE usuario_id=$1 AND tipo=\'visita\' AND creado_en > NOW() - INTERVAL \'24 hours\'',
+            [usuarioId]
+          ).catch(function(){ return [{ n: 0 }]; });
+          var cxVotos = await sql(
+            'SELECT COUNT(*)::int AS n FROM media_votos WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL \'1 day\'',
+            [usuarioId]
+          ).catch(function(){ return [{ n: 0 }]; });
+          var cxChat = await chatXpDisponible(sql, usuarioId);
+          cxData.progreso = {
+            visita: cxBloque(cxVisitas[0] && cxVisitas[0].n, VISITAS_DIA_MAX),
+            voto_media: cxBloque(cxVotos[0] && cxVotos[0].n, VOTOS_DIA_MAX),
+            chat_comentario: cxBloque(cxChat && cxChat.n, 10)
+          };
+          var cxReg = await sql(
+            'SELECT COALESCE(SUM(xp_acumulado),0) AS pend FROM regalias WHERE autor_id=$1::uuid AND reclamado_en IS NULL',
+            [usuarioId]
+          ).catch(function(eCxReg){
+            console.warn('[interacciones] GET catalogo_xp regalias no disponible (037 pendiente): ' + (eCxReg && eCxReg.message));
+            return [{ pend: 0 }];
+          });
+          cxData.regalias = { pendiente: red2(numXp(cxReg[0] && cxReg[0].pend)) };
+        }
+        return res.status(200).json({ ok: true, data: cxData });
       }
 
       // ADR-086 / TSK-184: catalogo de los 4 sumideros. Solo LECTURA: precio
