@@ -255,6 +255,8 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 **Verificacion:** `node scripts/smoke_xp_contrato.js` **5/5**; regresion `smoke_xp_guia.js` **9/9**, `smoke_gamificacion_v6.js` **30/30**, `smoke_niveles_espejos.js` **10/10**. Verificacion de capa gratuita: **OK** (cascada vigente ADR-083). **8/8 endpoints INTACTO; cero migraciones.**
 
+**Refinamiento de UI de TSK-209 (decision de producto del operador):** se retiraron de la guia de XP las capas **"Topes de multiplicador"** (que pintaba `d.caps`) y **"Multiplicadores"** (que pintaba `d.multiplicadores`), y la auxiliar `ecGuiaXpParams` quedo **eliminada por quedar sin uso**. La seccion **"Topes"** (`ecGuiaTopes(d.topes)`, tope diario) **se mantiene**. El backend `api/interacciones.js` **sigue enviando** `caps` y `multiplicadores` (contrato intacto): el frontend deja de renderizarlos, sin tocar el backend ni su contrato.
+
 **Que sigue / pendientes:**
 1. **ABIERTO -- saneo ASCII de `usuario-session.js`** (`TASKS.md` **TSK-208**, ADR-002): quedan **2443 bytes > 127 preexistentes**; los rangos nuevos del catalogo y de esta tanda aportan **0**. No bloquea el cierre.
 2. **OPCIONAL (no comprometido) -- extender el progreso del dia a mas fuentes:** exigiria **refactorizar a constantes** los literales de esos caps antes de exponerlos (evita la segunda fuente de verdad).

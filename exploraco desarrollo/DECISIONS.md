@@ -8346,3 +8346,5 @@ El tope de `chat_comentario` es el **literal `10`** dentro de `chatXpDisponible(
 - **ADR-006** (baseline = archivo real): todos los line-sites se verificaron contra `api/interacciones.js` y `usuario-session.js`.
 - **ADR-010 / ADR-001** (presupuesto 8/8; Vanilla JS): este ADR **no crea endpoint, ni fichero en `api/`, ni migracion**; extiende una rama GET existente y usa solo cliente Vanilla.
 - **ADR-083 / ADR-084** (cascada de coste y fuente unica del relato): la verificacion de capa gratuita paso OK; el argumento vive **una sola vez, aqui** y `TASKS.md`/`NEXT.md` **solo apuntan**.
+
+**Nota (2026-10-10, refinamiento de TSK-209):** por decision de producto del operador, la **UI** de la guia de XP **retiro** las capas "Topes de multiplicador" (pintaba `d.caps`) y "Multiplicadores" (pintaba `d.multiplicadores`), y la auxiliar `ecGuiaXpParams` quedo **eliminada por quedar sin uso**. La seccion "Topes" (`ecGuiaTopes(d.topes)`, tope diario) **se mantiene**. El backend `api/interacciones.js` **sigue devolviendo** `caps`/`multiplicadores` (`:9462-9467`): **contrato intacto**, sin consumo en el cliente. Relevo en `NEXT.md` (bloque WORKING TREE 21a tanda).
