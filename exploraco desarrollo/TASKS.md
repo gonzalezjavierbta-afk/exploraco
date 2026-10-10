@@ -14,6 +14,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 - **CERRADA / EN WORKING TREE (2026-10-09; pase documental unico R2; commit PENDIENTE; NO desplegada).** **TSK-204 - Limpieza de contenido hardcodeado: retiro de 95 paginas estaticas legacy + vaciado de arrays hardcodeados en `index.html` + retiro de `MOCK_LB` en `comunidad.html` (render 100% dependiente de la API con estados vacios estrictos).** Codigo (working tree, **SIN commit**): **95 `.html` ELIMINADOS** (`git status` = **95 D**; paginas de destino con `L.marker([<numeros>])` fijo y popups erroneos duplicados; las sigue sirviendo el rewrite `vercel.json:8` `/:slug.html` -> `api/pagina-destino?slug=:slug`), `index.html` (**+10/-115**; `const AGENDA_EVENTS=[]` `:1413` y `var DEST_FEATURED_IDS=[]` `:1885`; retirados `MM_PINS` (codigo muerto), `SLIDES`, `V360_DATA`, el bloque SLIDESHOW `buildSlides`/`goSlide` y los fondos Unsplash del hero; `renderAgenda` con estado vacio neutro si `AGENDA_EVENTS.length===0` `:3097`), `index-api-connector.js` (**+5/-11**; retirado el merge que REINTRODUCIA eventos hardcodeados: `AGENDA_EVENTS` refleja SOLO la API), `comunidad.html` (**+17/-15**; `MOCK_LB` y sus 2 usos retirados; estados vacios en mensajes de sala, parches abiertos y ranking, tambien en error). **FALSO POSITIVO corregido:** `perfil.html` (marcador DINAMICO, lo lee `scripts/smoke_021_xp_decimal_rankings.js:41`) **se restauro con git**; NO era contenido hardcodeado. **`api/*.js` y `admin.html` SIN tocar: 8/8 INTACTO; cero migraciones; cero endpoint nuevo; SIN ADR** (no es arquitectura). Verificacion medida: `node scripts/docs-evidencia.js --test` -> **exit code 0** (incluye `smoke_021` 45/45 y `smoke_niveles_espejos` OK); `verificar-capa-gratis.js` OK; Escudo GOLD OK (divs `index` 375/375, `comunidad` 461/461). Deuda: bytes >127 preexistentes (`index.html` 1.139 / `comunidad.html` 238); hero con fondo neutro; docs historicos con `MOCK_LB`. Detalle en la seccion TSK-204 al final de este fichero.
 
+- **CERRADA / EN WORKING TREE (2026-10-10; pase documental unico R2; commit PENDIENTE; NO desplegada).** **TSK-207 / ADR-094 - Guia de XP ("Como ganar XP") filtrada por la capacidad real del usuario y con la dinamica explicada por fuente.** El modal `window.ExploraCO.abrirGuiaXP` ahora evalua **100% en el cliente** contra `window.ExploraCO.usuario`: el catalogo `EC_XP_CATALOGO` (`usuario-session.js:2417`) / `EC_XP_GRUPOS` (`:2593`) aporta la **prosa de la dinamica** y los **requisitos** (sesion, nivel, capacidad, email verificado), mientras los **NUMEROS** (base, topes, multiplicadores) siguen viniendo del backend (`GET ?tipo=catalogo_xp`). Presentacion: **activas primero**; **bloqueadas** en un `<details>` plegado con el requisito exacto; **anonimo** ve el catalogo completo + banner de iniciar sesion; **nivel 0** degrada a disponible (nunca bloquea de mas); **claves desconocidas** se pintan genericas (ADR-006). **6 exclusiones justificadas** (`publicar_basico`/`publicar_intermedio`/`publicar_completo`/`publicar_bono_geo`/`publicar_bono_foto` las reparte el admin con `ADMIN_SECRET`, `api/interacciones.js:15439`; `spot_atributos` huerfana) y `visita_bono_rural` documentada dentro de `visita` (`:15970`). **Cero cambios de backend, cero endpoints nuevos (8/8 INTACTO), cero migraciones.** Verificacion: smoke NUEVO `scripts/smoke_xp_guia.js` **9/9** + regresion **10/10** y **30/30**; desync real corregido (`ao_proponer` sin nivel, Assert D2). Deuda: **2443 bytes >127 preexistentes** en `usuario-session.js` (tarea aparte, ADR-002). Detalle en la seccion TSK-207 al final de este fichero.
+
 - **CERRADA / COMMITEADA Y PUSHEADA (2026-10-04; commit `8315fb0` en `main`; anterior `d9f2878`).** **TSK-177 / ADR-077 ENMIENDA 1** -- Misiones desplegables por ESTADO + galeria de perfil dentro del modal de subida + boton "+ Subir material" en "Gestion del Museo".
 - **Alcance:** 3 cambios de UI en `mi-perfil.html` + 2 smokes afectados. `api/*` sin tocar (**8/8 INTACTO**, ADR-010); sin migracion ni endpoint nuevo.
 - **Verificacion (medida):** `npm test` EXIT 0 (22 pasos, 0 FAIL); `smoke_grupos_perfil.js` 73 -> 109 (109/109 PASS); `smoke_042` 30 -> 45; divs 526/526; residuos del modulo retirado = 0; ASCII 0 bytes > 127.
@@ -5125,6 +5127,42 @@ Al completarse el Pasaporte de viajero (los **10 datos combinados** de **ADR-069
 Cierra el circuito de producto abierto por ADR-069 ENMIENDA 1 / ADR-072 sin tocar el esquema: el passport se **cierra** en vez de re-abrirse, y la **permanencia del sellado se apoya en un hecho ya existente en la base** (la fila de `billeteras`) en lugar de en una columna nueva que habria exigido migracion y gate SQL. Queda **pendiente y no resuelto**: la **migracion 042 en Neon** (sigue PENDIENTE), y **commit + push + deploy**.
 
 **Archivos tocados.** Codigo (working tree, **SIN commit; NO desplegado**): `api/usuarios.js` (v26; **8/8 INTACTO**, cero migracion, cero endpoint nuevo) + `mi-perfil.html` (insercion pura, 25/0) + `scripts/smoke_042_pasaporte_billetera.js` (**50/50**). Documentacion (este pase, unico): `DECISIONS.md` (**ADR-093**), `TASKS.md` (esta seccion) y `NEXT.md` (relevo + deudas `[DEUDA-EXPRESS]`). `BUGS_HISTORICOS.md` **NO se toco**: no hubo bug nuevo.
+
+## TSK-207 - Guia de XP ("Como ganar XP") filtrada por la capacidad real del usuario y con la dinamica explicada por fuente (ADR-094) - 2026-10-10 - CERRADO EN WORKING TREE (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL, SIN COMMIT Y SIN DESPLEGAR.** Abre **ADR-094** (`DECISIONS.md`), que es donde vive **una sola vez** el argumento del modelo cliente/backend (ADR-084 D1); aqui solo el cierre. **8/8 endpoints INTACTO** (ningun fichero nuevo en `api/`, ningun endpoint nuevo), **cero migraciones**. **Solo 2 ficheros tocados** (`usuario-session.js` + el smoke nuevo).
+
+### Que cambia el producto
+
+El modal **"Como ganar XP"** (`window.ExploraCO.abrirGuiaXP`) deja de mostrar un catalogo plano y pasa a **filtrarse por la capacidad real del usuario** y a **explicar la dinamica de cada fuente**. El catalogo (`EC_XP_CATALOGO` `:2417`, `EC_XP_GRUPOS` `:2593` en `usuario-session.js`) aporta **prosa y requisitos**; los **NUMEROS** (base de XP, topes, multiplicadores) siguen viniendo del backend (`GET /api/interacciones?tipo=catalogo_xp`). El filtro se evalua **100% en el cliente** contra `window.ExploraCO.usuario` usando `nivelActual()` y `usuario.capacidades`.
+
+### Presentacion
+
+- **Activas primero**; **bloqueadas** en un unico `<details>` plegado con el **requisito exacto**.
+- **Anonimo:** catalogo **completo** como "vista general" + **banner de iniciar sesion**.
+- **Nivel 0** (sesion sin datos): **degrada a disponible** (nunca bloquea de mas).
+- **Claves desconocidas (ADR-006):** fila **generica sin dinamica**, no desaparecen.
+
+### Exclusiones justificadas (6 claves)
+
+`publicar_basico`/`publicar_intermedio`/`publicar_completo`/`publicar_bono_geo`/`publicar_bono_foto` (las reparte el admin con `ADMIN_SECRET`, `api/interacciones.js:15439`) y `spot_atributos` (huerfana: 0 call-sites desde la UI). `visita_bono_rural` **no es fila propia**: es un modificador de `visita` en zona rural (`api/interacciones.js:15970`), documentada dentro de esa fila.
+
+### Verificacion (ADR-006)
+
+- `node scripts/smoke_xp_guia.js` -> **9/9** (Assert A cobertura, B fantasmas, C unicidad/conteo == **19**, D nivel vs gate real, **D2 `ao_proponer` sin nivel**, E ASCII del rango del catalogo).
+- **Regresion:** **10/10** y **30/30**.
+- **Desync real corregido:** la 1a version exigia nivel 5 para `ao_proponer`; el motor NO tiene gate de nivel para proponer (`api/interacciones.js:10036-10052`, solo `email_verificado`) y `ao_votar` SI exige nivel 5 (`:10142`). Corregido y vigilado por el Assert D2.
+- `usuario-session.js`: **2443 bytes > 127 preexistentes en HEAD**; el rango nuevo del catalogo aporta **0** bytes no-ASCII. `scripts/smoke_xp_guia.js`: **0 bytes > 127**.
+
+### Deuda registrada
+
+`[DEUDA]` **Saneo ASCII de `usuario-session.js`:** 2443 bytes > 127 preexistentes (comentarios con guiones de caja y acentos de UI anterior a este cambio). Tarea aparte (ADR-002); no se resuelve aqui. Detalle en `NEXT.md`.
+
+### Nota de cierre
+
+El catalogo de la guia de XP queda **desacoplado del backend** sin gastar una funcion serverless: la **prosa y los gates** viven en el cliente, los **numeros** en el motor, y un **smoke espejo** impide que ambos deriven en silencio. **Pendiente y no resuelto:** commit + push + deploy y el saneo ASCII de `usuario-session.js`.
+
+**Archivos tocados.** Codigo (working tree, **SIN commit; NO desplegado**): `usuario-session.js` (catalogo + filtro; **8/8 INTACTO**, cero migracion, cero endpoint nuevo) + `scripts/smoke_xp_guia.js` (**NUEVO, 9/9**). Documentacion (este pase, unico): `DECISIONS.md` (**ADR-094**), `TASKS.md` (esta seccion) y `NEXT.md` (relevo + deuda ASCII + opcional regalias). `BUGS_HISTORICOS.md` **NO se toco**: no hubo bug nuevo.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

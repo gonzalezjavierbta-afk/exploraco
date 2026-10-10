@@ -244,6 +244,29 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-10 (pase documental unico R2, 20a tanda) - TSK-207 / ADR-094: la guia de XP ("Como ganar XP") se filtra por la capacidad real del usuario y explica la dinamica por fuente (cierre)
+
+**Que se estaba haciendo:** que el modal **"Como ganar XP"** (`window.ExploraCO.abrirGuiaXP`) deje de ser un catalogo plano y pase a **filtrarse por la capacidad real del usuario** y a **explicar la dinamica** de cada fuente. El argumento del modelo cliente/backend vive **una sola vez** en `DECISIONS.md` **ADR-094** (ADR-084 D1); aqui solo el relevo.
+
+**Lo que quedo entregado (working tree, SIN commit; NO desplegado). Solo 2 ficheros:**
+- **`usuario-session.js`**: catalogo `EC_XP_CATALOGO` (`:2417`) y `EC_XP_GRUPOS` (`:2593`) con la **prosa de la dinamica** y los **requisitos** (sesion, nivel, capacidad, email verificado); filtro **100% cliente** contra `window.ExploraCO.usuario` via `nivelActual()` + `usuario.capacidades`. Los **NUMEROS** siguen del backend (`GET ?tipo=catalogo_xp`). Presentacion: activas primero, bloqueadas en `<details>` plegado con el requisito exacto, anonimo ve el catalogo completo + banner de iniciar sesion, nivel 0 degrada a disponible, claves desconocidas se pintan genericas (ADR-006).
+- **`scripts/smoke_xp_guia.js` (NUEVO, 9/9)**: patron espejo de `smoke_niveles_espejos.js`; Assert A cobertura, B fantasmas, C unicidad/conteo (19), D nivel vs gate real, **D2 `ao_proponer` sin nivel**, E ASCII del rango del catalogo.
+
+**Exclusiones justificadas (6):** `publicar_basico`/`publicar_intermedio`/`publicar_completo`/`publicar_bono_geo`/`publicar_bono_foto` (admin con `ADMIN_SECRET`, `api/interacciones.js:15439`) y `spot_atributos` (huerfana, 0 call-sites). `visita_bono_rural` no es fila propia: modificador de `visita` en zona rural (`:15970`).
+
+**Desync real corregido:** la 1a version exigia nivel 5 para `ao_proponer`; el motor NO tiene gate de nivel para proponer (`:10036-10052`, solo `email_verificado`), y `ao_votar` SI exige nivel 5 (`:10142`). Corregido y vigilado por el Assert D2.
+
+**Verificacion:** smoke `scripts/smoke_xp_guia.js` **9/9**; regresion **10/10** y **30/30**; `usuario-session.js` **2443 bytes > 127 preexistentes en HEAD** (rango nuevo del catalogo: **0**); smoke nuevo **0 bytes > 127**. **8/8 endpoints INTACTO; cero migraciones; cero endpoint nuevo.**
+
+**Que sigue / pendientes (uno obligatorio, uno opcional):**
+1. **OBLIGATORIO -- saneo ASCII de `usuario-session.js`:** quedan **2443 bytes > 127 preexistentes en HEAD** (comentarios con guiones de caja y acentos de UI anterior a este cambio). El rango nuevo del catalogo aporta **0**. Es una **tarea aparte** (ADR-002): no se resolvio en este pase y no bloquea el cierre.
+2. **OPCIONAL (no comprometido) -- saldo real de regalias en la guia:** mostrar en la guia el **saldo real de regalias** del usuario via `GET ?tipo=mis_regalias` (`api/interacciones.js:8878`) + `POST tipo=reclamar_regalias` (`:13228`). Queda **marcado como OPCIONAL y NO comprometido**: no hay decision de producto ni tarea abierta; si el operador lo pide, se planifica como tarea nueva.
+3. **Commit + push + deploy PENDIENTES** (unico pendiente obligatorio del ciclo documental, junto al saneo ASCII).
+
+**Riesgos activos:**
+1. **Deriva catalogo vs motor:** el catalogo de gates/prosa es una **segunda fuente**; la acota el smoke `smoke_xp_guia.js` (espejo), pero **el smoke se corre suelto** -- no esta encadenado a `npm test`. Recomendacion no bloqueante: encadenarlo.
+2. **Deuda ASCII viva:** `usuario-session.js` sigue con 2443 bytes > 127 preexistentes; cualquier analisis de ASCII-safety del archivo debe **descontar el rango del catalogo**, que es limpio.
+
 ### WORKING TREE 2026-10-10 (pase documental unico R2, 19a tanda) - TSK-206 / ADR-093: sellado PERMANENTE del Pasaporte de viajero apoyado en la fila de `billeteras`, sin migracion y sin columna nueva (cierre)
 
 **Que se estaba haciendo:** al completarse el Pasaporte de viajero (los **10 datos combinados** de ADR-069 ENMIENDA 1 / ADR-072), el modulo **deja de mostrar la barra de progreso con las 10 filas** y se muestra **cerrado**, con un sello **`COMPLETADO`**. El sello es **PERMANENTE**: si despues el usuario pierde un dato, el modulo **NO se reabre**. La decision de que el sello sea permanente y se apoye en la **existencia de la fila en `billeteras`** en lugar de una columna nueva esta argumentada **una sola vez** en `DECISIONS.md` **ADR-093** (ADR-084 D1); aqui solo el relevo.

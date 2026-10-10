@@ -8209,3 +8209,71 @@ Ese `<=>` es lo que hace el sello permanente **sin columna nueva**: perder un da
 - **ADR-002** (ASCII-safe): `api/*.js` con **0 bytes > 127 y 0 backticks**; los backticks existentes en `index.html`, `admin.html`, `mi-perfil.html` y `scripts/` son **preexistentes y ajenos a la tanda**.
 - **ADR-010 / ADR-001** (presupuesto 8/8; Vanilla JS): este ADR **no crea endpoint, ni fichero en `api/`, ni migracion**; todo vive en `usuarios.js` + el HTML.
 - **ADR-084** (fuente unica del relato): el argumento vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` **solo apuntan**.
+
+## ADR-094: El catalogo de la guia de XP ("Como ganar XP") vive en el CLIENTE y se filtra por la capacidad real del usuario: prosa y requisitos en `usuario-session.js`, numeros del backend, cero cambios de backend y cero endpoints nuevos [NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-094
+**Fecha:** 2026-10-10
+**Autor:** `@docs-keeper` (pase documental unico R2), sobre una implementacion ya ejecutada y verificada con smoke propio.
+**Estado:** **ACEPTADO E IMPLEMENTADO (2026-10-10).** Implementado en **working tree**, **SIN commit y SIN desplegar**. Verificacion y cierre en `TASKS.md` **TSK-207**; relevo, deuda ASCII y opcional de regalias en `NEXT.md`. Cobertura del smoke nuevo: **9/9**.
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-093`** (linea **8160**, sellado permanente del Pasaporte); **no existia ningun `ADR-094`**. Este ADR se escribe como **094**, el siguiente consecutivo libre.
+
+### Decision
+
+El catalogo que alimenta el modal **"Como ganar XP"** (`window.ExploraCO.abrirGuiaXP`, invocado desde `comunidad.html:551` y desde la guia de bienvenida) vive en el **CLIENTE**, en `usuario-session.js`, en dos estructuras: **`EC_XP_CATALOGO`** (`:2417`, una fila por fuente de XP) y **`EC_XP_GRUPOS`** (`:2593`, el agrupamiento de las filas para el render). El catalogo aporta **dos cosas que el backend no da**: la **prosa de la dinamica** de cada fuente (como se gana, que la habilita) y los **requisitos de participacion** (sesion, nivel, capacidad, email verificado).
+
+Los **NUMEROS no se duplican**: la **base de XP, los topes y los multiplicadores** siguen viniendo del **backend** (`GET /api/interacciones?tipo=catalogo_xp`), que es la unica fuente de la aritmetica. El catalogo del cliente **no repite una sola cifra de XP**; solo la relaciona con la clave de la fuente.
+
+El filtro se evalua **100% en el cliente**, contra `window.ExploraCO.usuario` (refrescado con JWT en cada carga de la pagina), usando `window.ExploraCO.nivelActual()` y `usuario.capacidades`. **Cero cambios de backend, cero endpoints nuevos, cero migraciones:** el presupuesto de **8/8 funciones serverless de Vercel queda INTACTO** (ADR-010).
+
+### Presentacion
+
+1. **Activas primero:** las fuentes que el usuario puede ejecutar hoy se listan arriba.
+2. **Bloqueadas en un bloque plegado:** las fuentes que el usuario aun no alcanza se agrupan en un unico `<details>` **plegado por defecto**, con el **requisito exacto** que falta (nivel N, email verificado, capacidad X).
+3. **Usuario anonimo:** ve el catalogo **completo** como **"vista general"**, mas un **banner de iniciar sesion**; no se le oculta nada.
+4. **Degradacion por nivel 0:** si `nivelActual()` devuelve **0** (sesion sin datos cargados todavia), el catalogo **degrada a disponible** -- **nunca bloquea de mas**. El defecto es mostrar, no esconder.
+5. **Claves desconocidas (ADR-006):** una clave que el **backend** entregue y que el **catalogo del cliente no conozca** se pinta como **fila generica sin dinamica** (nombre de la accion + base de XP), en vez de desaparecer. El catalogo **nunca esconde** una fuente de XP que el motor si paga.
+
+### Exclusiones justificadas del catalogo del usuario
+
+El catalogo del jugador **no lista 6 claves** de `XP_BASES`, y cada exclusion esta argumentada:
+
+1. **`publicar_basico` / `publicar_intermedio` / `publicar_completo` / `publicar_bono_geo` / `publicar_bono_foto`** (5 claves): **no son fuente del jugador**. Las reparte el **admin server-to-server** con `ADMIN_SECRET` (`api/interacciones.js:15439`), no una accion que el usuario pueda ejecutar. Listarlas seria prometer una via de XP que el usuario no tiene.
+2. **`spot_atributos`**: verificada **huerfana** -- **0 call-sites desde la UI**. El motor la conoce, pero ningun flujo del cliente la dispara; se excluye hasta que exista un flujo real que la invoque.
+
+Ademas, **`visita_bono_rural` NO es una fila propia**: es un **modificador de `visita`** cuando la zona es **rural** (`api/interacciones.js:15970`), asi que **se documenta dentro de la fila `visita`**, no como fuente independiente.
+
+### Alternativas descartadas
+
+1. **Filtrar en el backend con `usuario_id`.** Habria puesto el filtro donde vive el `usuario`, pero **exige gate de `@backend-dev` + Escudo GOLD** (§2) para un cambio puramente de presentacion, y **rompe los smokes que assertean `XP_BASES` literal** (`scripts/smoke_gamificacion_v6.js:146`). **Descartada.**
+2. **Archivo separado `xp-guias-data.js` al estilo de `niveles-data.js`.** Habria aislado los datos, pero **exige editar `comunidad.html` y `mi-perfil.html`** (2 HTML mas) para un catalogo que **se consume en un solo lugar**. El coste de mantenimiento supera al beneficio del aislamiento. **Descartada.**
+
+### Riesgo de deriva y su control
+
+El catalogo de **gates y prosa** es una **segunda fuente** respecto al **motor** de XP: si el backend cambia una base o un gate, el catalogo puede quedar desincronizado **en silencio**. Se acota con el smoke **`scripts/smoke_xp_guia.js`** (patron **espejo** de `scripts/smoke_niveles_espejos.js`), que compara el catalogo del cliente contra el fuente del motor:
+
+- **Assert A -- cobertura:** toda clave de `XP_BASES` (**sin las exclusiones**) tiene fila en el catalogo.
+- **Assert B -- fantasmas:** toda clave del catalogo existe en `XP_BASES`.
+- **Assert C -- unicidad y conteo:** sin claves repetidas y conteo **== 19** (`ESPERADO_FILAS`).
+- **Assert D -- nivel:** el `{nivel:N}` declarado en la guia coincide con el **gate real** del backend.
+- **Assert D2 -- `ao_proponer` sin nivel:** el catalogo **NO** debe declarar `{nivel:N}` para `ao_proponer` (el motor lo exime).
+- **Assert E -- ASCII:** el rango del catalogo es **ASCII puro** (ADR-002).
+
+### Correccion de un desync real detectado en este cambio
+
+La **primera version** del catalogo exigia **nivel 5** para **`ao_proponer`**. El motor real **NO** tiene gate de nivel para proponer: `api/interacciones.js:10036-10052` documenta explicitamente *"propone sin gate de nivel"* y solo exige **`email_verificado`**. En cambio **`ao_votar` SI exige nivel 5** (`api/interacciones.js:10142`). El desync se **corrigio** y el smoke ahora **lo vigila** con el **Assert D2**, para que no pueda reaparecer.
+
+### Deuda registrada (no se corrige aqui)
+
+`usuario-session.js` tiene **2443 bytes > 127 preexistentes en HEAD** (comentarios con guiones de caja y acentos de UI anterior a este cambio). El **rango nuevo del catalogo aporta 0 bytes no-ASCII**. Sanear el archivo entero es una **tarea aparte** (ADR-002), registrada en `NEXT.md`; **no se resuelve en este pase**.
+
+### Alcance
+
+**8/8 funciones serverless INTACTAS (ADR-010):** cero ficheros nuevos en `api/`, cero endpoints nuevos, **cero migraciones, cero SQL de esquema**. Ficheros tocados: `usuario-session.js` (catalogo + filtro) y `scripts/smoke_xp_guia.js` (**NUEVO**, **9/9**). El smoke nuevo se corre suelto; su encadenado a `npm test` queda como recomendacion.
+
+**ADRs relacionados:**
+
+- **ADR-006** (baseline = archivo real): los line-sites de gates y de exclusiones se verificaron contra `api/interacciones.js`; una clave desconocida se pinta generica en vez de desaparecer.
+- **ADR-002** (ASCII-safe): el catalogo nuevo es ASCII puro (Assert E); la deuda de los 2443 bytes > 127 es **preexistente y ajena a este cambio**.
+- **ADR-010 / ADR-001** (presupuesto 8/8; Vanilla JS): este ADR **no crea endpoint, ni fichero en `api/`, ni migracion**; todo vive en `usuario-session.js` + el smoke.
+- **ADR-084** (fuente unica del relato): el argumento vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` **solo apuntan**.

@@ -2302,7 +2302,25 @@
     h: 'font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#FF4A00;margin-bottom:6px;',
     row: 'display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08);',
     rowN: 'font-weight:600;color:#F9FAFB;',
-    rowD: 'color:#9CA3AF;text-align:right;flex:0 0 auto;max-width:55%;'
+    rowD: 'color:#9CA3AF;text-align:right;flex:0 0 auto;max-width:55%;',
+    // Sub-linea atenuada bajo cada fila: la DINAMICA (que hacer, cuantas
+    // veces, que lo limita). Sin numeros: los pone el backend.
+    sub: 'font-size:11px;line-height:1.45;color:#6B7280;margin:-3px 0 8px 0;padding-bottom:7px;'
+      + 'border-bottom:1px solid rgba(255,255,255,.08);',
+    sur: 'color:#4B5563;',
+    // Banner de sesion (arriba del todo).
+    banner: 'font-size:12px;line-height:1.5;color:#9CA3AF;background:rgba(255,74,0,.08);'
+      + 'border:1px solid rgba(255,74,0,.28);border-radius:10px;padding:9px 11px;margin-bottom:16px;',
+    // Fila bloqueada: misma estructura, apagada + requisito a la derecha.
+    bRow: 'display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);',
+    bN: 'font-weight:600;color:#6B7280;',
+    bD: 'color:#FF4A00;text-align:right;flex:0 0 auto;max-width:55%;font-size:11px;',
+    bSub: 'font-size:11px;line-height:1.45;color:#4B5563;margin:-3px 0 8px 0;padding-bottom:7px;'
+      + 'border-bottom:1px solid rgba(255,255,255,.05);',
+    // Bloque plegado nativo (<details>/<summary>), sin librerias.
+    det: 'border:1px solid rgba(255,74,0,.25);border-radius:12px;padding:9px 11px;margin-bottom:14px;',
+    detSum: 'font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;'
+      + 'color:#FF4A00;cursor:pointer;outline:none;'
   };
 
   function ecGuiaXpItem(it) {
@@ -2383,11 +2401,423 @@
       + '<div style="' + EC_GUIA_STYLE.h + '">Topes</div>' + filas + '</div>';
   }
 
+  // ---- Catalogo de fuentes de XP (solo texto, CERO numeros) ----
+  // Regla dura: aqui NO vive ningun monto de XP, ni tope, ni
+  // multiplicador. Todo numero viene del backend (`bases[]` de GET
+  // /api/interacciones?tipo=catalogo_xp). Este catalogo aporta SOLO:
+  // la clave `accion` (para casar con bases[]), el nombre legible, la
+  // DINAMICA en espanol y los REQUISITOS para poder usarla de verdad.
+  // Si el motor anade una clave que este catalogo no conoce, se
+  // renderiza una fila GENERICA (nombre + base del backend, sin
+  // dinamica): nunca se deja de pintar una clave entregada (ADR-006).
+  //
+  // `requisitos` acepta: 'sesion' | 'email_verificado' | {nivel:N} |
+  // {capacidad:'flag'}. `tipo`: 'activa' (haces algo) | 'pasiva'
+  // (te llega sola). `superficie`: donde se hace.
+  var EC_XP_CATALOGO = {
+    visita: {
+      accion: 'visita',
+      nombre: 'Marcar visita estando en el lugar',
+      dinamica: 'Tienes que estar ahi: el GPS del dispositivo tiene que caer dentro del radio '
+        + 'del destino. Hay espera entre visita y visita y un tope diario; si el destino esta '
+        + 'en zona rural, la visita suma ademas un bono rural.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Ficha del destino'
+    },
+    resena_larga: {
+      accion: 'resena_larga',
+      grupo: 'resena',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Ficha del destino (pestana Resenas)'
+    },
+    resena_corta: {
+      accion: 'resena_corta',
+      grupo: 'resena',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Ficha del destino (pestana Resenas)'
+    },
+    rating: {
+      accion: 'rating',
+      nombre: 'Votar un destino con estrellas',
+      dinamica: 'Un solo voto por destino, con o sin texto. Puedes volver a cambiarlo en la ficha, '
+        + 'pero la cuenta se hace una unica vez.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Ficha del destino, cards y resultados de busqueda'
+    },
+    guardado: {
+      accion: 'guardado',
+      nombre: 'Guardar un lugar en tu lista',
+      dinamica: 'Guardar y quitar es ilimitado y lo puedes hacer cuando quieras, pero el destino '
+        + 'solo cuenta la primera vez que lo guardas: si lo quitas y lo vuelves a guardar, ya no suma.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Cualquier ficha, card o resultado de busqueda'
+    },
+    voto_media: {
+      accion: 'voto_media',
+      nombre: 'Votar una foto o un video de la galeria',
+      dinamica: 'Vota el material de la galeria de un destino. No puedes votar tu propia publicacion, '
+        + 'hay tope diario y el voto pierde peso cuando una foto acumula muchas visitas.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Galeria de fotos y videos del destino'
+    },
+    compartir: {
+      accion: 'compartir',
+      nombre: 'Compartir un lugar',
+      dinamica: 'La primera vez que compartes un lugar vale mucho mas que las siguientes; el backend '
+        + 'es el que reparte el monto entre la primera y las posteriores. Hay tope de eventos por dia.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Boton compartir de la ficha o de la card'
+    },
+    foto_viajero: {
+      accion: 'foto_viajero',
+      nombre: 'Subir tu propia foto',
+      dinamica: 'Se desbloquea al completar la mision de fotografo. Sube una foto tuya desde la galeria '
+        + 'de cualquier destino o desde un album.',
+      requisitos: [{ capacidad: 'subir_fotos' }],
+      tipo: 'activa',
+      superficie: 'Galeria de un destino o tu album'
+    },
+    album_crear: {
+      accion: 'album_crear',
+      nombre: 'Crear un album',
+      dinamica: 'Se abre al llegar al nivel 2. Hay un maximo de albums por mes, asi que conviene crearlos '
+        + 'cuando ya tengas material que ordenar.',
+      requisitos: [{ nivel: 2 }],
+      tipo: 'activa',
+      superficie: 'Tu perfil, seccion Albums'
+    },
+    album_foto: {
+      accion: 'album_foto',
+      nombre: 'Anadir una foto a tu album',
+      dinamica: 'Solo a albums tuyos: la foto queda dentro del album que tu creaste. Hay maximo de fotos '
+        + 'por album y un tope diario de subidas.',
+      requisitos: [{ nivel: 2 }],
+      tipo: 'activa',
+      superficie: 'Tu perfil, dentro de tu album'
+    },
+    album_foto_autor: {
+      accion: 'album_foto_autor',
+      nombre: 'Bono por tu foto en el album de otro',
+      dinamica: 'No haces nada: se activa solo cuando otro viajero agrega una de tus fotos a su album. '
+        + 'El bono llega una vez por dia.',
+      requisitos: [{ nivel: 2 }],
+      tipo: 'pasiva',
+      superficie: 'Desde el album de cualquier otro viajero'
+    },
+    album_guardado: {
+      accion: 'album_guardado',
+      nombre: 'Guardar el album o la foto de otro viajero',
+      dinamica: 'Guardas material ajeno desde cualquier galeria o album. El dueno del album recibe su '
+        + 'propio bono por tu guardado.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Galeria o album de otro viajero'
+    },
+    album_guardado_autor: {
+      accion: 'album_guardado_autor',
+      nombre: 'Bono porque alguien guardo tu album',
+      dinamica: 'Llega sola cuando un viajero guarda tu album. No tienes que hacer nada para cobrarlo.',
+      requisitos: [{ nivel: 2 }],
+      tipo: 'pasiva',
+      superficie: 'Desde el album de cualquier otro viajero'
+    },
+    chat_comentario: {
+      accion: 'chat_comentario',
+      nombre: 'Escribir en el chat publico',
+      dinamica: 'Se desbloquea al completar la mision de chat. El tope diario es pequeno a proposito: '
+        + 'esta pensado para conversar, no para acumular XP en cadena.',
+      requisitos: [{ capacidad: 'chat' }],
+      tipo: 'activa',
+      superficie: 'Chat publico del destino'
+    },
+    plan_crear: {
+      accion: 'plan_crear',
+      nombre: 'Crear un plan de viaje',
+      dinamica: 'Crear un plan pide el chat ya desbloqueado: primero completa la mision de chat. '
+        + 'Hay tope de planes por dia.',
+      requisitos: [{ capacidad: 'chat' }],
+      tipo: 'activa',
+      superficie: 'Comunidad, pestana Planes'
+    },
+    plan_unirse: {
+      accion: 'plan_unirse',
+      nombre: 'Unirte al plan de otro',
+      dinamica: 'Te unes al plan que creo otro viajero. No puedes unirte a tu propio plan; hay tope '
+        + 'diario de uniones.',
+      requisitos: [{ capacidad: 'chat' }],
+      tipo: 'activa',
+      superficie: 'Comunidad, pestana Planes'
+    },
+    ao_proponer: {
+      accion: 'ao_proponer',
+      nombre: 'Proponer un Activo Oculto',
+      dinamica: 'Con tu email verificado describes el activo y su ubicacion; no hay minimo de nivel. '
+        + 'Hay un tope de propuestas por dia y el XP se paga solo cuando la comunidad aprueba tu propuesta.',
+      requisitos: ['sesion', 'email_verificado'],
+      tipo: 'activa',
+      superficie: 'Comunidad, pestana Activo Oculto'
+    },
+    ao_votar: {
+      accion: 'ao_votar',
+      nombre: 'Votar un Activo Oculto',
+      dinamica: 'Requiere nivel 5 y email verificado. Votas los activos que otros ya propusieron; '
+        + 'los tuyos no se votan.',
+      requisitos: ['sesion', { nivel: 5 }, 'email_verificado'],
+      tipo: 'activa',
+      superficie: 'Comunidad, pestana Activo Oculto'
+    },
+    ao_checkin: {
+      accion: 'ao_checkin',
+      nombre: 'Check-in en un Activo Oculto',
+      dinamica: 'Se registra solo, con el dispositivo desde el que estas navegando. Hay espera entre '
+        + 'check-ins y un tope diario.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Ficha del Activo Oculto'
+    }
+  };
+
+  // ---- AGRUPACION documentada: resena_larga + resena_corta ----
+  // El backend manda `resena_larga` y `resena_corta` como dos claves
+  // con base distinta, pero para el usuario son LA MISMA accion
+  // (escribir una resena en un destino, una sola vez). Se pintan
+  // fusionadas en UNA fila de guia, con las dos bases del backend
+  // al lado. Decision de UI, no del motor: no se pierde ninguna clave.
+  var EC_XP_GRUPOS = {
+    resena: {
+      nombre: 'Escribir una resena',
+      dinamica: 'Una sola resena por destino: no se repite, y no sirve de nada editar la misma para '
+        + 'volver a sumar. El texto largo paga mas que el corto; son la misma accion con dos montos.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Ficha del destino (pestana Resenas)'
+    }
+  };
+
+  // Etiqueta legible de cada capacidad de mision (sin la clave tecnica).
+  var EC_XP_CAP_ETIQUETA = {
+    subir_fotos: 'Completa la mision de fotografo',
+    chat: 'Completa la mision de chat',
+    crear_planes: 'Desbloquea la creacion de planes',
+    organizar_actividad: 'Desbloquea organizar actividades'
+  };
+
+  function ecXpPretty(accion) {
+    return String(accion || '').replace(/_/g, ' ');
+  }
+
+  // Texto pendiente de un requisito: lo que le falta al usuario.
+  function ecXpRequisitoTexto(req) {
+    if (req === 'sesion') return 'Inicia sesion';
+    if (req === 'email_verificado') return 'Verifica tu email';
+    if (req && typeof req === 'object') {
+      if (req.nivel != null) return 'Necesitas nivel ' + Number(req.nivel);
+      if (req.capacidad) return EC_XP_CAP_ETIQUETA[req.capacidad]
+        || ('Completa la mision: ' + ecXpPretty(req.capacidad));
+    }
+    return '';
+  }
+
+  // Capacidad efectiva: fuente de verdad = flag de usuario.capacidades.
+  // Si el flag no esta, se degrada a DISPONIBLE cuando el nivel ya alcanzo
+  // el umbral de CAPACIDADES_POR_NIVEL, y tambien cuando no hay datos de
+  // nivel (nivelActual() === 0). Nunca se bloquea de mas.
+  function ecXpTieneCapacidad(nombre, nivel) {
+    if (nivel <= 0) return true;
+    var u = window.ExploraCO.usuario;
+    if (u && u.capacidades && u.capacidades[nombre]) return true;
+    var claves = Object.keys(CAPACIDADES_POR_NIVEL);
+    for (var i = 0; i < claves.length; i++) {
+      if (CAPACIDADES_POR_NIVEL[claves[i]] === nombre
+          && nivel >= Number(claves[i])) return true;
+    }
+    return false;
+  }
+
+  // Evalua UN requisito contra el estado del cliente.
+  function ecXpRequisitoOk(req, nivel, conSesion) {
+    if (req === 'sesion') return conSesion;
+    if (req === 'email_verificado') {
+      // Solo bloquea si el backend afirmo explicitamente que NO lo tiene:
+      // undefined/null = dato desconocido -> degradar a disponible.
+      var u = window.ExploraCO.usuario;
+      return !(u && u.email_verificado === false);
+    }
+    if (req && typeof req === 'object') {
+      if (req.nivel != null) return (nivel <= 0) || (nivel >= Number(req.nivel));
+      if (req.capacidad) return ecXpTieneCapacidad(req.capacidad, nivel);
+    }
+    return true;
+  }
+
+  // Devuelve null si la fuente esta disponible, o el texto del requisito
+  // que falta (el primero pendiente, en orden).
+  function ecXpFalta(requisitos, nivel, conSesion) {
+    if (!Array.isArray(requisitos)) return null;
+    for (var i = 0; i < requisitos.length; i++) {
+      if (!ecXpRequisitoOk(requisitos[i], nivel, conSesion)) {
+        return ecXpRequisitoTexto(requisitos[i]) || 'Requisito pendiente';
+      }
+    }
+    return null;
+  }
+
+  // Base que llego del backend. `compartir` llega con base:null y el
+  // desglose en `detalle` ({primero, posterior}); se imprime tal cual.
+  // Nunca inventa ni deriva un numero.
+  function ecXpBaseTexto(it) {
+    if (!it || typeof it !== 'object') return '';
+    var partes = [];
+    var base = (it.xp_base != null) ? it.xp_base : it.base;
+    var nb = Number(base);
+    if (base != null && base !== '' && isFinite(nb) && nb !== 0) {
+      partes.push('+' + fmtXp(nb) + ' XP');
+    }
+    var det = it.detalle;
+    if (det && typeof det === 'object' && !Array.isArray(det)) {
+      var ks = Object.keys(det);
+      for (var i = 0; i < ks.length; i++) {
+        var v = Number(det[ks[i]]);
+        if (isFinite(v) && v !== 0) partes.push(ecXpPretty(ks[i]) + ' +' + fmtXp(v));
+      }
+    } else if (typeof det === 'string' && det) {
+      partes.push(det);
+    }
+    return partes.join(' / ');
+  }
+
+  // Agrupa bases[] del backend por clave (o por grupo, p.ej. las dos
+  // resenas). Devuelve [{id, meta, partes, acciones}]. Las claves que el
+  // catalogo NO conoce entran igual, con meta:null (fila generica).
+  function ecXpAgrupar(fuentes) {
+    var orden = [];
+    var mapa = {};
+    if (!Array.isArray(fuentes)) fuentes = fuentes ? [fuentes] : [];
+    fuentes.forEach(function (b) {
+      if (!b || typeof b !== 'object') return;
+      var acc = String(b.accion || b.clave || '').trim();
+      if (!acc) return;
+      var cat = EC_XP_CATALOGO[acc] || null;
+      var gid = (cat && cat.grupo) ? cat.grupo : acc;
+      if (!mapa[gid]) {
+        mapa[gid] = { id: gid, acciones: [], partes: [], meta: null };
+        orden.push(gid);
+      }
+      mapa[gid].acciones.push(acc);
+      var txt = ecXpBaseTexto(b);
+      if (txt && mapa[gid].partes.indexOf(txt) === -1) mapa[gid].partes.push(txt);
+    });
+    return orden.map(function (g) {
+      var gr = mapa[g];
+      if (EC_XP_GRUPOS[g]) {
+        gr.meta = EC_XP_GRUPOS[g];
+      } else {
+        for (var i = 0; i < gr.acciones.length; i++) {
+          var c = EC_XP_CATALOGO[gr.acciones[i]];
+          if (c) { gr.meta = c; break; }
+        }
+      }
+      return gr;
+    });
+  }
+
+  // Banner superior: quien eres y que se esta filtrando.
+  function ecGuiaXpBanner() {
+    var u = window.ExploraCO.usuario;
+    var txt;
+    if (!u) {
+      txt = 'Inicia sesion para ver solo las fuentes que tienes disponibles. '
+        + 'Mientras tanto te mostramos el catalogo completo.';
+    } else if (nivelActual() <= 0) {
+      txt = 'Sesion activa, pero tu nivel aun no esta calculado: te mostramos todas las fuentes '
+        + 'como disponibles.';
+    } else {
+      txt = 'Sesion activa. Nivel ' + nivelActual()
+        + (u.xp_total != null && u.xp_total !== '' && isFinite(Number(u.xp_total))
+          ? ' \u00b7 ' + fmtXp(Number(u.xp_total)) + ' XP acumulados'
+          : '') + '.';
+    }
+    return '<div style="' + EC_GUIA_STYLE.banner + '">' + ecEsc(txt) + '</div>';
+  }
+
   function ecGuiaXpHtml(d) {
     if (!d || typeof d !== 'object') return ecEsc('La guia aun no esta disponible.');
     var esArray = Array.isArray(d);
     var fuentes = esArray ? d : (d.fuentes || d.catalogo || d.items || d.bases || null);
-    var html = ecGuiaXpLista('Fuentes de XP', fuentes);
+
+    var u = window.ExploraCO.usuario;
+    var conSesion = !!u;
+    // nivelActual(): -1 = sin sesion, 0 = sesion sin datos de nivel.
+    // El 0 NO gatea nada: degrada a disponible todo (nunca bloquear de mas).
+    var nivel = conSesion ? nivelActual() : -1;
+    // ANONIMO = vista general: NO se gatea. catalogo_xp es publico y sin
+    // sesion no hay dato fiable para afirmar un requisito ('sesion' no se
+    // puede "fallar" cuando no hay cuenta). Se pinta TODO en la seccion
+    // abierta + el banner que invita a iniciar sesion. Filtrar al anon
+    // dejaria una guia vacia o llena de bloqueos sin sentido.
+    var soloGeneral = !conSesion;
+    var grupos = ecXpAgrupar(fuentes);
+
+    var abiertas = '';
+    var bloqueadas = '';
+    var nBloq = 0;
+
+    grupos.forEach(function (gr) {
+      var meta = gr.meta;
+      // Fila GENERICA: clave que el backend entrego y el catalogo no
+      // conoce. Se pinta con nombre + base, sin dinamica (ADR-006).
+      var nombre = meta ? (meta.nombre || ecXpPretty(gr.id)) : ecXpPretty(gr.id);
+      var dinamica = meta ? (meta.dinamica || '') : '';
+      var superficie = meta ? (meta.superficie || '') : '';
+      var pasiva = meta ? (meta.tipo === 'pasiva') : false;
+      var falta = (soloGeneral || !meta)
+        ? null : ecXpFalta(meta.requisitos, nivel, conSesion);
+      var bases = gr.partes.join(' / ');
+
+      var sub = '';
+      if (superficie) sub += ecEsc(superficie) + ' \u00b7 ';
+      sub += ecEsc((pasiva ? 'Pasiva: ' : '') + dinamica);
+      if (!dinamica) sub = superficie ? ecEsc(superficie) : '';
+
+      if (!falta) {
+        // Degradacion: sin bases conocidas y sin dinamica no hay fila que
+        // pintar; nunca se emite 'undefined', 'NaN' ni texto vacio.
+        if (!bases && !sub) return;
+        abiertas += '<div style="' + EC_GUIA_STYLE.row + '">'
+          + '<div style="' + EC_GUIA_STYLE.rowN + '">' + ecEsc(nombre) + '</div>'
+          + '<div style="' + EC_GUIA_STYLE.rowD + '">' + ecEsc(bases) + '</div></div>'
+          + (sub ? '<div style="' + EC_GUIA_STYLE.sub + '">' + sub + '</div>' : '');
+      } else {
+        nBloq++;
+        bloqueadas += '<div style="' + EC_GUIA_STYLE.bRow + '">'
+          + '<div style="' + EC_GUIA_STYLE.bN + '">' + ecEsc(nombre) + '</div>'
+          + '<div style="' + EC_GUIA_STYLE.bD + '">' + ecEsc(falta) + '</div></div>'
+          + (sub ? '<div style="' + EC_GUIA_STYLE.bSub + '">' + sub + '</div>' : '');
+      }
+    });
+
+    var html = ecGuiaXpBanner();
+    html += '<div style="' + EC_GUIA_STYLE.block + '">'
+      + '<div style="' + EC_GUIA_STYLE.h + '">Tus fuentes de XP</div>'
+      + (abiertas || '<div style="' + EC_GUIA_STYLE.sub + '">'
+        + 'Aun no tienes fuentes de XP activas: completa las de la seccion de abajo.</div>')
+      + '</div>';
+
+    // Bloque plegado NATIVO. Solo si N > 0, y nunca vacio.
+    if (nBloq > 0) {
+      html += '<details style="' + EC_GUIA_STYLE.det + '">'
+        + '<summary style="' + EC_GUIA_STYLE.detSum + '">'
+        + 'Fuentes aun bloqueadas (' + nBloq + ')</summary>'
+        + bloqueadas + '</details>';
+    }
+
     if (!esArray) {
       html += ecGuiaTopes(d.topes);
       html += ecGuiaXpParams('Topes de multiplicador', d.caps);
