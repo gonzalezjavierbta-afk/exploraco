@@ -2296,9 +2296,11 @@
   };
 
   // -- E1: guia "Como ganar XP" (modal reutilizable) -----------
-  // Consume GET ?tipo=catalogo_xp (publico) y muestra fuentes, caps y
-  // multiplicadores SIN inventar numeros: solo pinta lo que el motor
-  // devuelve. Abrible con ExploraCO.abrirGuiaXP() desde cualquier pagina.
+  // Consume GET ?tipo=catalogo_xp (publico; admite usuario_id) y muestra
+  // las fuentes de XP con su dinamica, el progreso del dia y el saldo de
+  // regalias SIN inventar numeros: solo pinta lo que el motor devuelve.
+  // Las capas de caps/multiplicadores se retiraron de la UI a proposito.
+  // Abrible con ExploraCO.abrirGuiaXP() desde cualquier pagina.
   // Estilos inline (no inyecta CSS global; respeta ADR-004).
   var EC_GUIA_STYLE = {
     block: 'margin-bottom:14px;',
@@ -2358,32 +2360,6 @@
         + '<div style="' + EC_GUIA_STYLE.rowD + '">' + ecEsc(det) + '</div>'
         + '</div>';
     });
-    if (!filas) return '';
-    return '<div style="' + EC_GUIA_STYLE.block + '">'
-      + '<div style="' + EC_GUIA_STYLE.h + '">' + ecEsc(titulo) + '</div>' + filas + '</div>';
-  }
-
-  function ecGuiaXpParams(titulo, obj) {
-    if (!obj) return '';
-    var filas = '';
-    if (Array.isArray(obj)) {
-      obj.forEach(function (it) {
-        var row = ecGuiaXpItem(it);
-        if (!row) return;
-        filas += '<div style="' + EC_GUIA_STYLE.row + '">'
-          + '<div style="' + EC_GUIA_STYLE.rowN + '">' + ecEsc(row.nombre) + '</div>'
-          + '<div style="' + EC_GUIA_STYLE.rowD + '">' + ecEsc(row.detalle) + '</div></div>';
-      });
-    } else if (typeof obj === 'object') {
-      Object.keys(obj).forEach(function (k) {
-        var v = obj[k];
-        if (v == null) return;
-        var txt = (typeof v === 'object') ? JSON.stringify(v) : v;
-        filas += '<div style="' + EC_GUIA_STYLE.row + '">'
-          + '<div style="' + EC_GUIA_STYLE.rowN + '">' + ecEsc(k.replace(/_/g, ' ')) + '</div>'
-          + '<div style="' + EC_GUIA_STYLE.rowD + '">' + ecEsc(txt) + '</div></div>';
-      });
-    }
     if (!filas) return '';
     return '<div style="' + EC_GUIA_STYLE.block + '">'
       + '<div style="' + EC_GUIA_STYLE.h + '">' + ecEsc(titulo) + '</div>' + filas + '</div>';
@@ -2868,8 +2844,6 @@
           + '</div>';
       }
       html += ecGuiaTopes(d.topes);
-      html += ecGuiaXpParams('Topes de multiplicador', d.caps);
-      html += ecGuiaXpParams('Multiplicadores', d.multiplicadores || d.mult);
     }
     return html || ecEsc('La guia aun no esta disponible.');
   }
