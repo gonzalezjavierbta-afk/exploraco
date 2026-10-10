@@ -8156,3 +8156,56 @@ Tres deudas quedan **aceptadas** (no bloquean el cierre; cada una con su dispara
 - **ADR-018** (el nivel es **DERIVADO** con `calcularNivelLocal(xpTotal)`): no hay columna que actualizar; el cambio solo altera `xp_base`/`xp_total`.
 - **ADR-010 / ADR-001** (presupuesto 8/8; Vanilla JS): este ADR **no crea endpoint, ni fichero en `api/`, ni migracion**; todo vive en `interacciones.js`.
 - **ADR-084** (fuente unica del relato): el argumento de D1-D8 y de la formula vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` apuntan.
+
+## ADR-093: El sello del Pasaporte de viajero es PERMANENTE y se apoya en la **existencia de la fila en `billeteras`**, no en una columna nueva [NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-093
+**Fecha:** 2026-10-10
+**Autor:** `@docs-keeper` (pase documental unico R2), sobre una implementacion ya ejecutada y certificada por QA.
+**Estado:** **ACEPTADO E IMPLEMENTADO (2026-10-10).** Implementado en **working tree**, **SIN commit y SIN desplegar**. Verificacion y cierre en `TASKS.md` **TSK-206**; relevo y deudas `[DEUDA-EXPRESS]` en `NEXT.md`. Veredicto de QA: **APRUEBA CON OBSERVACIONES, sin bloqueantes**.
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-092`** (linea **8000**, decay de XP de chat y comentarios de media); **no existia ningun `ADR-093`**. Este ADR se escribe como **093**, el siguiente consecutivo libre.
+
+### Por que es un ADR nuevo y no una enmienda del ADR-069 / ADR-072
+
+**Es un ADR nuevo, no una enmienda.** ADR-069 ENMIENDA 1 y ADR-072 definieron **los 10 datos combinados** y el **que** se muestra en el modulo del Pasaporte; ninguno de los dos decidio **cual es el mecanismo que hace que el modulo se cierre de forma permanente**. En concreto, ninguno decidio ni **(a)** que el estado terminal sea un **sello** en lugar de una barra de progreso al 100%, ni **(b)** **donde vive la memoria de ese estado terminal**. El ADR-069 se fijo antes de que existiera la `billeteras` como entidad, y su premisa ("el progreso se refleja mientras falten datos") queda **sustituida** por la nueva regla cuando el progreso llega a 10/10. Sustituir una premisa es exactamente el criterio que ADR-089, ADR-090, ADR-091 y ADR-092 declararon para abrir un ADR nuevo en lugar de enmendar; lo que este ADR **enmienda de facto** es el comportamiento terminal del ADR-069, y lo hace **sin tocar su texto** (Cero Borrado Logico, ADR-003).
+
+### Decision de producto: el sello es permanente
+
+Al completarse los 10 datos, el modulo **deja de mostrar la barra de progreso con las 10 filas** y se muestra **cerrado**, con un sello `COMPLETADO`. **El sello NO se revierte**: si el usuario pierde despues un dato, el modulo **no se reabre** y la barra de progreso no vuelve. Es una decision de producto de una sola dirección, no un estado recalculable.
+
+### Decision de modelo de datos: la fila en `billeteras` ES el sello
+
+**Se descarta, por decision, añadir una columna de sellado y su migracion.** La **permanencia** del sello se apoya en un hecho que **ya existe en la base**: la **existencia de la fila del usuario en `billeteras`**.
+
+La equivalencia que sostiene el argumento, medida contra el archivo real (ADR-006): un grep de `billeteras` en todo `api/*.js` da **5 coincidencias, todas en `usuarios.js`**, y el **unico `INSERT INTO billeteras` de todo `api/` esta en `usuarios.js:991`**. Nadie mas crea esa fila, y se crea **unicamente** cuando el pasaporte esta completo, con `ON CONFLICT (usuario_id) DO NOTHING`. Por tanto:
+
+> **"existe fila en `billeteras` para este usuario" <=> "el pasaporte se completo alguna vez"**
+
+Ese `<=>` es lo que hace el sello permanente **sin columna nueva**: perder un dato despues no borra la fila, y por tanto no puede reabrir el modulo. La fila **es** la memoria del sellado.
+
+### Por que esta opcion y no las alternativas
+
+1. **Columna `pasaporte_sellado_en` + migracion.** Habria dado una fecha y una semantica explicita, pero exige **migracion en Neon y gate SQL**, es decir trabajo fuera del alcance de un pase express, y anade un segundo almacen para un hecho que la `billeteras` ya expresa. **Descartada**; la *fecha de sellado* queda como **deuda etiquetada `[DEUDA-EXPRESS]`** en `NEXT.md`, no resuelta.
+2. **Recalcular `completo` en cada lectura** (sin sello). Es lo que hacia el modulo antes: se reabria en cuanto faltaba un dato. **Descartada** porque contradice directamente la decision de producto "el sello es permanente".
+3. **Fila en `billeteras` como sello (ELEGIDA).** Cero migraciones, cero SQL de esquema, **8/8 endpoints INTACTO**, y la permanencia sale de una invariante ya verificada en el codigo (un unico punto de insercion). Es la unica opcion que cumple la decision de producto **dentro** del presupuesto de un pase express.
+
+### Consecuencias tecnicas que se aceptan
+
+- **`calcularPasaporte()` NO se toca.** Su `completo` sigue siendo **la verdad del servidor** y **nunca se falsea**. `sellado` es un campo **derivado y adicional**; `completo` y `sellado` pueden diferir (caso 9/10 con fila previa), y en ese caso el **sellado manda** en la UI y en el guard de la billetera.
+- **El guard de la billetera cambia de `if (bmPasaporte.completo)` a `if (bmPasaporte.sellado)`** para que un usuario **sellado con 9/10 siga recibiendo su billetera**, reutilizando la fila por `ON CONFLICT ... DO NOTHING`. Sin este cambio, perder un dato dejaria al usuario sellado **sin billetera**.
+- **Coste de lectura:** cuando `completo` es `true` no se consulta nada (`sellado = true` directo). Cuando no lo es, se hace **un** `SELECT ... FROM billeteras WHERE usuario_id=$1 LIMIT 1`. El `catch` **solo se traga `42P01`/`42703`** y **relanza el resto**: es la degradacion por la **migracion 042, que sigue PENDIENTE en Neon**.
+- **Degradacion de despliegue:** `mi-perfil.html` resuelve `p.sellado` y cae a `p.completo` como respaldo, de modo que el HTML nuevo **no rompe** contra un despliegue viejo de `api/usuarios.js` (y a la inversa, el HTML viejo no explota con el servidor nuevo).
+- **Deuda aceptada (no resuelta):** el camino raro en que `completo===true` **y** ya existe fila produce **2 consultas** (un INSERT que no inserta + un SELECT de respaldo). Es **preexistente**, no lo introdujo esta tanda. Y el smoke es **estatico sobre el fuente**: nadie cubre el recorrido runtime con `sql()` simulando fila de `billeteras` existente y `completo=false`.
+
+### Alcance
+
+**8/8 funciones serverless INTACTAS (ADR-010):** cero ficheros nuevos en `api/`, cero endpoints nuevos, **cero migraciones, cero SQL de esquema**. Ficheros tocados: `api/usuarios.js` (v25 -> v26), `mi-perfil.html` (insercion pura, 25 inserciones / 0 borrados) y `scripts/smoke_042_pasaporte_billetera.js` (**45 -> 50/50**). El CSS nuevo cuelga del silo `.pf-pasaporte .pf-pas-sello*` (**ADR-004**, nada suelto en `:root`), y la rama no sellada queda **byte-identica**.
+
+**ADRs relacionados:**
+
+- **ADR-069 ENMIENDA 1** y **ADR-072**: definen **los 10 datos combinados** del Pasaporte. Este ADR **sustituye su premisa de comportamiento terminal** (el progreso se refleja mientras falten datos) sin reescribir su texto; el argumento vive **una sola vez, aqui** (ADR-084 D1).
+- **ADR-003** (Cero Borrado Logico): los residuos `pf-pas-grid` / `pf-pas-bar` / `pfPasItem` / `PF_PAS_ACCION` / `pfPasValor` **se conservan vivos**; el sellado **anade** una rama, no elimina la anterior.
+- **ADR-004** (Aislamiento Atomico): el CSS del sello vive bajo `.pf-pasaporte`; el CSS `.pf-pas-*` plano heredado, que sigue fuera del silo, queda como **deuda `[DEUDA-EXPRESS]`**.
+- **ADR-002** (ASCII-safe): `api/*.js` con **0 bytes > 127 y 0 backticks**; los backticks existentes en `index.html`, `admin.html`, `mi-perfil.html` y `scripts/` son **preexistentes y ajenos a la tanda**.
+- **ADR-010 / ADR-001** (presupuesto 8/8; Vanilla JS): este ADR **no crea endpoint, ni fichero en `api/`, ni migracion**; todo vive en `usuarios.js` + el HTML.
+- **ADR-084** (fuente unica del relato): el argumento vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` **solo apuntan**.

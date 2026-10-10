@@ -244,6 +244,31 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-10 (pase documental unico R2, 19a tanda) - TSK-206 / ADR-093: sellado PERMANENTE del Pasaporte de viajero apoyado en la fila de `billeteras`, sin migracion y sin columna nueva (cierre)
+
+**Que se estaba haciendo:** al completarse el Pasaporte de viajero (los **10 datos combinados** de ADR-069 ENMIENDA 1 / ADR-072), el modulo **deja de mostrar la barra de progreso con las 10 filas** y se muestra **cerrado**, con un sello **`COMPLETADO`**. El sello es **PERMANENTE**: si despues el usuario pierde un dato, el modulo **NO se reabre**. La decision de que el sello sea permanente y se apoye en la **existencia de la fila en `billeteras`** en lugar de una columna nueva esta argumentada **una sola vez** en `DECISIONS.md` **ADR-093** (ADR-084 D1); aqui solo el relevo.
+
+**Lo que quedo entregado (working tree, SIN commit; NO desplegado). Solo 3 ficheros:**
+- **`api/usuarios.js` v25 -> v26** (cabecera `:2`): `calcularPasaporte()` (`:669`) **intacta** y su `completo` **nunca se falsea**; se anade `bmPasaporte.sellado` (`:924-946`) -- si `completo` es true -> `sellado = true` sin consultar nada; si no -> un `SELECT ... FROM billeteras WHERE usuario_id=$1 LIMIT 1` (`:935`) con catch que **SOLO traga `42P01`/`42703`** y relanza el resto. El guard de la billetera paso de `if (bmPasaporte.completo)` a **`if (bmPasaporte.sellado)`** (`:983`), para que un usuario **sellado con 9/10 siga recibiendo su billetera** reutilizando la fila (`ON CONFLICT ... DO NOTHING`, `:991`).
+- **`mi-perfil.html`**: helper `pfPasSelloHtml()` (`:6724`), rama de sellado en `renderPasaporte()` con degradacion `p.sellado` y respaldo en `p.completo` (despliegue viejo), CSS colgado del silo `.pf-pasaporte .pf-pas-sello*` (`:422-428`, ADR-004). La rama **NO sellada** (barra + grid de 10 items) queda **byte-identica**.
+- **`scripts/smoke_042_pasaporte_billetera.js`**: assert v25 -> v26 (`:38`) y **5 checks nuevos** (**45 -> 50/50**).
+
+**Como se sostiene el sello permanente:** **sin migracion y sin columna nueva.** La fila en `billeteras` **ES** el sello. Medido contra el archivo real (ADR-006): un grep de `billeteras` en todo `api/*.js` da **5 coincidencias, todas en `usuarios.js`**, y el **unico `INSERT INTO billeteras` de todo `api/` esta en `usuarios.js:991`**. Nadie mas crea esa fila y se crea **unicamente** cuando el pasaporte esta completo, luego **"existe fila" <=> "se completo alguna vez"**.
+
+**Verificacion (ADR-006, medida por QA independiente):** `npm test` **EXIT=0, 0 FAIL** (13 SKIP preexistentes por ADR-089); `node scripts/smoke_042_pasaporte_billetera.js` **50/50**; `node --check` de `api/usuarios.js` y del `<script>` inline de `mi-perfil.html` **OK**; `api/*.js` **0 bytes > 127 y 0 backticks** (los backticks existentes estan en `index.html`, `admin.html`, `mi-perfil.html` y `scripts/`, y son **preexistentes y ajenos a la tanda**); balance de `<div>` en `mi-perfil.html` **574/574, delta 0**; residuos vivos `pf-pas-grid`/`pf-pas-bar`/`pfPasItem`/`PF_PAS_ACCION`/`pfPasValor`; `git diff --stat` de `mi-perfil.html` **25 inserciones, 0 borrados** (insercion pura). **Veredicto de QA: APRUEBA CON OBSERVACIONES, sin bloqueantes.**
+
+**Que sigue:**
+1. **La migracion 042 SIGUE PENDIENTE en Neon.** No se aplico en esta tanda (no era el objeto) y el `catch` del sello degrada con `42P01`/`42703` mientras tanto. Aplicarla requiere **gate SQL** (`@sql-security` + `@data-migration`).
+2. **Commit + push + deploy PENDIENTES.** Nada de esto esta commiteado; el estado real es working tree. Nada llega a produccion sin push.
+3. **QA visual en navegador** del sello `COMPLETADO` y del **respaldo en `p.completo`** (HTML nuevo contra despliegue viejo). Ojo: el smoke es **estatico sobre el fuente**, no renderiza.
+
+**Riesgos activos:**
+1. `[DEUDA-EXPRESS]` **Fecha de sellado:** se pidio y se **descarto**; exigiria columna + migracion, o sea **gate SQL**. **Fuera de express**, no resuelta.
+2. `[DEUDA-EXPRESS]` **CSS `.pf-pas-*` plano heredado, fuera del silo `.pf-pasaporte`** (ADR-004). **No se refactorizo en esta tanda.**
+3. `[DEUDA-EXPRESS]` **Camino raro preexistente:** con `completo===true` y fila ya existente se hacen **2 consultas** (INSERT que no inserta + SELECT de respaldo). Es **PREEXISTENTE**, no lo introdujo esta tanda.
+4. `[DEUDA-EXPRESS]` **El smoke es estatico sobre el fuente:** nadie cubre el recorrido runtime con `sql()` simulando fila de `billeteras` existente y `completo=false`.
+5. **Contrapartida asumida del sellado permanente:** un usuario que pierda un dato **no puede recuperar la barra de progreso** ni re-editar el modulo; y si pierde el dato que habilitaba la billetera, **no la recupera** salvo que se apoye en el guard `sellado` de la v26.
+
 ### WORKING TREE 2026-10-09 (pase documental unico R2, 18a tanda) - ADR-092: decay de XP de chat y comentarios de media (cierre)
 
 **Tanda ADR-092 CERRADA.** El decay estilo "Rising Star" del voto (ADR-079) se **extendio al texto**: la `carga` de chat (`chat_mensajes.creado_en`) y de comentarios de media (`media_comentarios.creado_en`) se **deriva del historial propio en 24h**; base `chat_comentario=6`, divisor 20, tope duro 20/24h; **sin UI, sin endpoint y sin migracion** (**8/8 INTACTO**). Todo vive en `api/interacciones.js`: constantes `TEXTO_DIA_MAX`/`TEXTO_DECAY_DIV` (`:307-308`), helper compartido `TEXTO_TABLAS`/`xpTextoDesdeFila`/`calcularXpTextoDecay` (`:5492-5523`) y los 3 handlers (`chat_msg` `:10566-10607`, `plan_chat_msg` `:10958-10994`, `crearComentarioMedia` `:6044-6101`). **Orden critico resuelto:** la `carga` se calcula **antes** del INSERT (sin auto-conteo). Base `chat_comentario=6`, claves JSONB y 429 anti-spam 30/24h **intactos** (ADR-003); `getProgresoAlbum`/`updProgresoAlbum` **no se eliminan**.

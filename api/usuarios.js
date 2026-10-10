@@ -1,4 +1,5 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
+// v26 (2026-10-10): SELLADO del pasaporte. La EXISTENCIA de la fila en billeteras es el sello (nadie mas la crea). El flag sellado se anade al objeto pasaporte: si ya existio, la billetera se sigue devolviendo aunque hoy falte un dato. NO es una columna: se calcula en cada lectura. completo NO se falsea nunca; el SELECT de comprobacion solo corre cuando completo=false (tolerante a 42P01/42703, migracion 042 pendiente) y su fila se reutiliza, sin segunda consulta.
 // v25 (2026-09-29): Pasaporte combinado = 10 datos (union de checklist 042 + misiones de perfil); billetera_mia amplia columnas para calcularlo.
 // v24 (2026-09-29): Pasaporte + billetera + fotos de perfil (migracion 042).
 //   POST perfil_actualizar acepta fecha_nacimiento (PII owner-only; editable
@@ -922,6 +923,30 @@ module.exports = async (req, res) => {
 
         var bmPasaporte = calcularPasaporte(bmU, bmFotos);
 
+        // v26: SELLADO. La fila en billeteras ES el sello: si existio, el
+        // pasaporte se completo alguna vez y no se revierte aunque hoy falte
+        // un dato. completo (verdad del calculo) NO se falsea nunca.
+        var bmSelloFila = null;
+        if (bmPasaporte.completo) {
+          bmPasaporte.sellado = true;
+        } else {
+          try {
+            var bmSelloSel = await sql(
+              'SELECT id, codigo_publico, estado, creada_en FROM billeteras WHERE usuario_id=$1 LIMIT 1',
+              [bmId]
+            );
+            if (bmSelloSel.length) {
+              bmSelloFila = bmSelloSel[0];
+              bmPasaporte.sellado = true;
+            } else {
+              bmPasaporte.sellado = false;
+            }
+          } catch (eSello) {
+            if (!eSello || (eSello.code !== '42P01' && eSello.code !== '42703')) throw eSello;
+            bmPasaporte.sellado = false;
+          }
+        }
+
         var bmCdr = 0;
         try {
           // ADR-086 / TSK-183 (B4): segunda subconsulta escalar del mismo
@@ -955,26 +980,32 @@ module.exports = async (req, res) => {
         } catch (eInv) { bmConsumibles = []; }
 
         var bmBilletera = null;
-        if (bmPasaporte.completo) {
-          try {
-            var bmIns = await sql(
-              'INSERT INTO billeteras (usuario_id, codigo_publico)'
-              + ' VALUES ($1, $2) ON CONFLICT (usuario_id) DO NOTHING'
-              + ' RETURNING id, codigo_publico, estado, creada_en',
-              [bmId, generarCodigoBilletera()]
-            );
-            if (bmIns.length) {
-              bmBilletera = bmIns[0];
-            } else {
-              var bmSel = await sql(
-                'SELECT id, codigo_publico, estado, creada_en FROM billeteras WHERE usuario_id=$1 LIMIT 1',
-                [bmId]
+        if (bmPasaporte.sellado) {
+          // v26: si el sello ya venia de una fila previa, se reutiliza esa
+          // fila y no se vuelve a consultar.
+          if (bmSelloFila) {
+            bmBilletera = bmSelloFila;
+          } else {
+            try {
+              var bmIns = await sql(
+                'INSERT INTO billeteras (usuario_id, codigo_publico)'
+                + ' VALUES ($1, $2) ON CONFLICT (usuario_id) DO NOTHING'
+                + ' RETURNING id, codigo_publico, estado, creada_en',
+                [bmId, generarCodigoBilletera()]
               );
-              bmBilletera = bmSel.length ? bmSel[0] : null;
+              if (bmIns.length) {
+                bmBilletera = bmIns[0];
+              } else {
+                var bmSel = await sql(
+                  'SELECT id, codigo_publico, estado, creada_en FROM billeteras WHERE usuario_id=$1 LIMIT 1',
+                  [bmId]
+                );
+                bmBilletera = bmSel.length ? bmSel[0] : null;
+              }
+            } catch (eBil) {
+              if (!eBil || (eBil.code !== '42P01' && eBil.code !== '42703')) throw eBil;
+              bmBilletera = null;
             }
-          } catch (eBil) {
-            if (!eBil || (eBil.code !== '42P01' && eBil.code !== '42703')) throw eBil;
-            bmBilletera = null;
           }
         }
 

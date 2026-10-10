@@ -417,6 +417,15 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-pas-btn:hover{background:var(--gold);color:var(--black)}
 .pf-pas-ok-txt{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:#22C55E;flex-shrink:0}
 @media (max-width:600px){.pf-pas-val{max-width:100%}}
+/* Silo atomico (ADR-004): modulo SELLADO del pasaporte. Todo lo nuevo cuelga de
+   .pf-pasaporte; las reglas planas .pf-pas-* de arriba NO se tocan. */
+.pf-pasaporte .pf-pas-sello{display:flex;justify-content:center;padding:26px 14px;background:radial-gradient(120% 100% at 50% 0%,rgba(74,222,128,.14),rgba(0,0,0,0) 72%)}
+.pf-pasaporte .pf-pas-sello-inner{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;max-width:340px;padding:20px 26px;text-align:center;border:2px solid rgba(74,222,128,.65);border-radius:14px;box-shadow:0 0 0 4px rgba(74,222,128,.10),inset 0 0 22px rgba(34,197,94,.10);transform:rotate(-1.4deg)}
+.pf-pasaporte .pf-pas-sello-inner::before{content:'';position:absolute;inset:7px;border:1px dashed rgba(244,198,106,.35);border-radius:9px;pointer-events:none}
+.pf-pasaporte .pf-pas-sello-word{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;text-transform:uppercase;letter-spacing:5px;line-height:1;color:#4ade80;text-shadow:0 1px 0 rgba(0,0,0,.55)}
+.pf-pasaporte .pf-pas-sello-txt{font-size:13px;font-weight:600;line-height:1.5;color:#4ade80;max-width:30ch}
+@media (max-width:600px){.pf-pasaporte .pf-pas-sello{padding:20px 8px}.pf-pasaporte .pf-pas-sello-inner{transform:none;padding:18px}.pf-pasaporte .pf-pas-sello-word{font-size:24px;letter-spacing:3px}}
+@media (prefers-reduced-motion:reduce){.pf-pasaporte .pf-pas-sello-inner{transform:none}}
 .pf-billetera{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px}
 .pf-bil-card{flex:1;min-width:140px;background:linear-gradient(150deg,rgba(255,74,0,.14),rgba(255,255,255,.03));border:1px solid rgba(255,74,0,.35);border-radius:12px;padding:14px}
 .pf-bil-wide{flex-basis:100%}
@@ -6708,10 +6717,26 @@ function pfPasItem(c, u) {
     + '<span class="pf-pas-lbl">' + esc(c.label) + '</span>'
     + valHtml + accHtml + '</div>';
 }
+/* Ramo de SELLADO (sellado === true, con degradacion a completo): el pasaporte
+   ya no se edita, asi que no se pintan ni la barra ni el grid de 10 items, solo
+   el modulo cerrado. Todo el texto es estatico del modulo: no interpola nada
+   del servidor, por eso no lleva esc(). */
+function pfPasSelloHtml() {
+  return '<div class="pf-pas-sello">'
+    + '<div class="pf-pas-sello-inner" role="img" aria-label="Pasaporte completado">'
+    + '<div class="pf-pas-sello-word">COMPLETADO</div>'
+    + '<div class="pf-pas-sello-txt">Pasaporte completo: tu insignia y tu billetera estan activas.</div>'
+    + '</div>'
+    + '</div>';
+}
 function renderPasaporte(p) {
   var box = document.getElementById('pf-pasaporte');
   if (!box) return;
   if (!p) { box.innerHTML = ''; return; }
+  /* Degradacion: si el backend aun no manda sellado (despliegue viejo), cae a
+     completo. Si manda sellado, manda sellado. */
+  var sellado = (p.sellado != null) ? !!p.sellado : !!p.completo;
+  if (sellado) { box.innerHTML = pfPasSelloHtml(); return; }
   var total = p.total || 0;
   var hechos = total - (p.faltan || 0);
   var pct = total ? Math.round((hechos / total) * 100) : 0;

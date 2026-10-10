@@ -35,7 +35,7 @@ check('042: ASCII-safe', (function () {
 })());
 
 // api/usuarios.js
-check('usuarios: version v25 en cabecera', usr.indexOf('// v25 (2026-09-29)') !== -1);
+check('usuarios: version v26 en cabecera', usr.indexOf('// v26 (2026-10-10)') !== -1);
 check('usuarios: rama foto_agregar', usr.indexOf("c.tipo === 'foto_agregar'") !== -1);
 check('usuarios: rama foto_principal', usr.indexOf("c.tipo === 'foto_principal'") !== -1);
 check('usuarios: rama foto_quitar', usr.indexOf("c.tipo === 'foto_quitar'") !== -1);
@@ -95,6 +95,46 @@ check('mi-perfil: boton Principal en las miniaturas del modal',
 check('mi-perfil: boton Quitar en las miniaturas del modal',
   perfil.indexOf('class="pf-gal-btn danger" onclick="pfFotoQuitar(') !== -1);
 check('mi-perfil: campo fecha de nacimiento', perfil.indexOf("campo === 'fecha_nacimiento'") !== -1);
+
+// Lote SELLADO (v26): el sello ya no viene de un campo nuevo sino de la
+// EXISTENCIA de la fila en billeteras. Se extrae el cuerpo de pfPasSelloHtml
+// con un patron ACOTADO (desde su declaracion hasta la funcion siguiente) para
+// poder auditarlo sin arrastrar el resto de renderPasaporte.
+const sello = (function () {
+  var a = perfil.indexOf('function pfPasSelloHtml()');
+  if (a === -1) return '';
+  var b = perfil.indexOf('function renderPasaporte(', a);
+  return (b > a) ? perfil.slice(a, b) : '';
+})();
+
+// El flag se CALCULA, no se copia: tiene que existir la rama que lo pone en
+// true y la que lo devuelve a false (tolerante a 42P01/42703).
+check('usuarios: calcula el flag sellado (ramas true y false)', (function () {
+  var re = /bmPasaporte\.sellado\s*=\s*(true|false)\s*;/g;
+  var m, t = 0, f = 0;
+  while ((m = re.exec(usr)) !== null) { if (m[1] === 'true') t++; else f++; }
+  return t > 0 && f > 0;
+})());
+check('usuarios: el sello se lee de billeteras (no de un campo nuevo)',
+  usr.indexOf('FROM billeteras WHERE usuario_id=$1 LIMIT 1') !== -1);
+check('mi-perfil: helper del sello con la palabra COMPLETADO', (function () {
+  return sello.indexOf('function pfPasSelloHtml()') !== -1
+    && sello.indexOf('COMPLETADO') !== -1
+    && sello.indexOf('pf-pas-sello') !== -1;
+})());
+check('mi-perfil: degradacion p.sellado con respaldo en p.completo', (function () {
+  return perfil.indexOf('var sellado = (p.sellado != null) ? !!p.sellado : !!p.completo;') !== -1
+    && perfil.indexOf('if (sellado) { box.innerHTML = pfPasSelloHtml(); return; }') !== -1;
+})());
+// NEGATIVO: el modulo cerrado solo pinta el sello. Si el helper volviera a
+// incluir el grid de 10 items o la barra de progreso, el passport sellado
+// mostraria el formulario editable. Se exige sello no vacio para que el
+// negativo no pase en vacuo si el helper desaparece.
+check('mi-perfil: ya NO pinta pf-pas-grid ni pf-pas-bar en el sello', (function () {
+  return sello.length > 0
+    && sello.indexOf('pf-pas-grid') === -1
+    && sello.indexOf('pf-pas-bar') === -1;
+})());
 
 // Fase C: C4 ubicacion + optimizacion de media
 check('C4: album_foto acepta destino_id (insert con fallback)', int.indexOf('lat, lng, destino_id)') !== -1);

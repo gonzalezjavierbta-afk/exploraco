@@ -5081,5 +5081,50 @@ Codigo (working tree, **SIN commit; NO desplegado**): **95 `.html` ELIMINADOS** 
 
 Codigo (working tree, **SIN commit; NO desplegado**): `api/interacciones.js` (**8/8 INTACTO**, cero migracion, cero endpoint nuevo) + `scripts/smoke_test_comunidad.js` + `scripts/smoke_036_media_unificada.js` (realineados al nuevo helper). `scripts/smoke_gamificacion_v6.js` sin cambios. Documentacion (este pase, unico): `DECISIONS.md` (ADR-092: estado ACEPTADO E IMPLEMENTADO, fail-open, R7 y deuda aceptada), `TASKS.md` (esta seccion) y `NEXT.md` (relevo + recomendacion no bloqueante).
 
+## TSK-206 - Sellado PERMANENTE del Pasaporte de viajero: el sello `COMPLETADO` se apoya en la EXISTENCIA de la fila en `billeteras`, sin migracion y sin columna nueva (ADR-093) - 2026-10-10 - IMPLEMENTADO EN WORKING TREE (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO EN WORKING TREE, SIN COMMIT Y SIN DESPLEGAR.** Abre **ADR-093** (`DECISIONS.md`), que es donde vive **una sola vez** el argumento del modelo de datos (ADR-084 D1); aqui solo el cierre. **8/8 endpoints INTACTO** (ningun fichero nuevo en `api/`, ningun endpoint nuevo), **cero migraciones, cero SQL de esquema**. **Solo 3 ficheros tocados.**
+
+### Que cambia el producto
+
+Al completarse el Pasaporte de viajero (los **10 datos combinados** de **ADR-069 ENMIENDA 1** / **ADR-072**), el modulo **deja de mostrar la barra de progreso con las 10 filas** y se muestra **cerrado**, con un sello que dice **`COMPLETADO`**. El sello es **PERMANENTE**: si despues el usuario pierde un dato, el modulo **NO se reabre** y la barra no vuelve.
+
+### Como se sostiene el sello sin migracion y sin columna nueva
+
+**La fila en `billeteras` ES el sello.** Medido contra el archivo real (ADR-006): un grep de `billeteras` en todo `api/*.js` da **5 coincidencias, todas en `usuarios.js`**, y el **unico `INSERT INTO billeteras` de todo `api/` esta en `usuarios.js:991`**. Nadie mas crea esa fila, y se crea **unicamente** cuando el pasaporte esta completo (`ON CONFLICT (usuario_id) DO NOTHING`). O sea, **"existe fila" <=> "se completo alguna vez"**, y por tanto la fila es la **memoria permanente** del sellado.
+
+### Alcance REAL ejecutado (ADR-006, contra el archivo real)
+
+1. **`api/usuarios.js`, v25 -> v26** (cabecera `// v26 (2026-10-10)`, `:2`):
+   - `calcularPasaporte()` (`:669`) **intacta**: su `completo` sigue siendo **la verdad del servidor** y **nunca se falsea**.
+   - Se anade **`bmPasaporte.sellado`** (`:924-946`): si `completo` es `true` -> `sellado = true` **sin consultar nada**; si no -> un `SELECT id, codigo_publico, estado, creada_en FROM billeteras WHERE usuario_id=$1 LIMIT 1` (`:935`), con `catch` que **SOLO se traga `42P01`/`42703`** (la migracion **042 sigue PENDIENTE en Neon**) y **relanza el resto** (`:945`).
+   - El guard de la billetera paso de `if (bmPasaporte.completo)` a **`if (bmPasaporte.sellado)`** (`:983`), para que un usuario **sellado con 9/10** siga recibiendo su billetera **reutilizando la fila** (`ON CONFLICT ... DO NOTHING`, `:991`).
+2. **`mi-perfil.html`**: helper `pfPasSelloHtml()` (`:6724`) con la palabra **`COMPLETADO`** (`:6727`); rama de sellado en `renderPasaporte()` con degradacion `p.sellado` y **respaldo en `p.completo`** (despliegue viejo todavia abierto); CSS nuevo **colgado del silo `.pf-pasaporte .pf-pas-sello*`** (`:422-428`, ADR-004). La rama **NO sellada** (barra + grid de 10 items) queda **byte-identica**.
+3. **`scripts/smoke_042_pasaporte_billetera.js`**: assert de version **v25 -> v26** (`:38`) y **5 checks nuevos** (**45 -> 50/50**).
+
+### Verificacion (ADR-006, medida por QA independiente)
+
+- `npm test` -> **EXIT=0, 0 FAIL** (13 SKIP preexistentes por ADR-089).
+- `node scripts/smoke_042_pasaporte_billetera.js` -> **50/50**.
+- `node --check` de `api/usuarios.js` y del `<script>` inline de `mi-perfil.html` -> **OK**.
+- `api/*.js`: **0 bytes > 127 y 0 backticks**. Los backticks que existen estan en `index.html`, `admin.html`, `mi-perfil.html` y `scripts/`, y son **preexistentes y ajenos a la tanda**.
+- Balance de `<div>` en `mi-perfil.html`: **574/574, delta 0**.
+- Residuos vivos preservados: `pf-pas-grid` / `pf-pas-bar` / `pfPasItem` / `PF_PAS_ACCION` / `pfPasValor` (ADR-003, Cero Borrado Logico).
+- `git diff --stat` de `mi-perfil.html`: **25 inserciones, 0 borrados** (insercion pura; las reglas CSS planas heredadas **no se tocaron**).
+- **Veredicto de QA: APRUEBA CON OBSERVACIONES, sin bloqueantes.**
+
+### Deudas aceptadas (tag `[DEUDA-EXPRESS]`, detalle en `NEXT.md`)
+
+1. **Fecha de sellado:** se pidio y se **descarto**; exigiria columna + migracion, o sea **gate SQL**. Fuera de express.
+2. **CSS `.pf-pas-*` plano heredado** fuera del silo `.pf-pasaporte` (ADR-004): no se refactorizo en esta tanda.
+3. **Camino raro preexistente:** con `completo===true` y fila ya existente se hacen **2 consultas** (INSERT que no inserta + SELECT de respaldo). Es **PREEXISTENTE**, no lo introdujo esta tanda.
+4. **El smoke es estatico sobre el fuente:** nadie cubre el recorrido runtime con `sql()` simulando fila de `billeteras` existente y `completo=false`.
+
+### Nota de cierre
+
+Cierra el circuito de producto abierto por ADR-069 ENMIENDA 1 / ADR-072 sin tocar el esquema: el passport se **cierra** en vez de re-abrirse, y la **permanencia del sellado se apoya en un hecho ya existente en la base** (la fila de `billeteras`) en lugar de en una columna nueva que habria exigido migracion y gate SQL. Queda **pendiente y no resuelto**: la **migracion 042 en Neon** (sigue PENDIENTE), y **commit + push + deploy**.
+
+**Archivos tocados.** Codigo (working tree, **SIN commit; NO desplegado**): `api/usuarios.js` (v26; **8/8 INTACTO**, cero migracion, cero endpoint nuevo) + `mi-perfil.html` (insercion pura, 25/0) + `scripts/smoke_042_pasaporte_billetera.js` (**50/50**). Documentacion (este pase, unico): `DECISIONS.md` (**ADR-093**), `TASKS.md` (esta seccion) y `NEXT.md` (relevo + deudas `[DEUDA-EXPRESS]`). `BUGS_HISTORICOS.md` **NO se toco**: no hubo bug nuevo.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
