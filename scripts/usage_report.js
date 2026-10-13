@@ -394,6 +394,89 @@ function loadDetail(db, ids, opts) {
 
 /* ------------------------------- metricas ------------------------------- */
 
+// --- A4: DETECCION DE MEDICION DESFASADA -------------------------------------
+// opencode.db se escribe al CIERRE del turno: la ultima fila puede ser de hace
+// horas o dias mientras la sesion sigue corriendo. Un reporte que imprime el
+// modelo sin decirlo presenta un snapshot viejo como si fuera el vigente
+// (medido 2026-10-13: --preflight, reparto e informe-cuota devolvieron el mismo
+// snapshot congelado, 3 dias, tres veces seguidas, y --preflight reportando PAGO
+// con el modelo activo real en FREE). Se compara la ultima fila persistida con
+// la hora actual y por encima del umbral se AVISA con el numero de retraso.
+// No se FALLA: el dato no se inventa, se declara viejo.
+var UMBRAL_DESFASE_MS = 15 * 60 * 1000; // 15 min
+
+function evaluarDesfase(db, ids, umbralMs) {
+  var u = (isFinite(umbralMs) && umbralMs > 0) ? umbralMs : UMBRAL_DESFASE_MS;
+  var ahora = Date.now();
+  var out = { desfasado: false, ahoraMs: ahora, ultimaFilaMs: 0, edadMs: 0, umbralMs: u, motivo: '', sesiones: 0 };
+  if (!ids || !ids.length) return out;
+  var maxMsg = 0;
+  var batches = chunk(ids, 400);
+  for (var b = 0; b < batches.length; b++) {
+    var ph = batches[b].map(function () { return '?'; }).join(',');
+    var r = all(db, 'SELECT MAX(time_created) AS mx FROM message WHERE session_id IN (' + ph + ')', batches[b])[0];
+    if (r && num(r.mx) > maxMsg) maxMsg = num(r.mx);
+  }
+  out.sesiones = ids.length;
+  out.ultimaFilaMs = maxMsg;
+  if (!maxMsg) {
+    out.motivo = 'no hay ningun mensaje persistido todavia en las ' + ids.length + ' sesiones del rango';
+    return out;
+  }
+  out.edadMs = Math.max(0, ahora - maxMsg);
+  if (out.edadMs > u) {
+    out.desfasado = true;
+    out.motivo = 'la ultima fila persistida de opencode.db es de ' + fmtDate(maxMsg) +
+      ' y ahora es ' + fmtDate(ahora) + ' (' + Math.round(out.edadMs / 60000) +
+      ' min de retraso, umbral ' + Math.round(u / 60000) + ' min)';
+  }
+  return out;
+}
+
+function lineaDesfase(d) {
+  if (!d || !d.desfasado) return null;
+  return 'AVISO DE MEDICION DESFASADA: ' + d.motivo +
+    '. Los totales y el modelo de este reporte pueden NO ser los actuales.';
+}
+
+// --- A1: tabla por sesion / agente / modelo ----------------------------------
+// Misma fuente que el resto del script (opencode.db en solo lectura), sin otro
+// origen. El modelo sale de session.model ya normalizado a provider/model por
+// buildMetrics; el coste es el MEDIDO en la fila.
+function tablaSesionAgenteModelo(list) {
+  var mapa = {};
+  list.forEach(function (s) {
+    if (!mapa[s.id]) {
+      mapa[s.id] = {
+        sesion: s.id, agente: s.agent || '(principal)', modelo: s.model || '(sin modelo)',
+        padre: s.parent_id || '', turnos: 0, tokens: 0, cost: 0, actualizado: s.time_updated,
+      };
+    }
+    mapa[s.id].turnos += s.turns || 0;
+    mapa[s.id].tokens += s.total || 0;
+    mapa[s.id].cost += s.cost || 0;
+  });
+  return Object.keys(mapa).map(function (k) { return mapa[k]; })
+    .sort(function (a, b) { return num(b.actualizado) - num(a.actualizado); });
+}
+
+function imprimirTablaSesionAgenteModelo(list) {
+  var filas = tablaSesionAgenteModelo(list);
+  var L = [];
+  L.push('');
+  L.push('POR SESION / AGENTE / MODELO (fuente: opencode.db en solo lectura, la misma del reporte)');
+  L.push(renderGrid([
+    { h: 'SESION', get: function (r) { return r.sesion; } },
+    { h: 'AGENTE', get: function (r) { return r.agente; } },
+    { h: 'MODELO', get: function (r) { return r.modelo; } },
+    { h: 'TURNOS', right: true, get: function (r) { return fmtInt(r.turnos); } },
+    { h: 'TOKENS', right: true, get: function (r) { return fmtInt(r.tokens); } },
+    { h: 'COST', right: true, get: function (r) { return '$' + r.cost.toFixed(6); } },
+  ], filas));
+  L.push('');
+  return L.join('\n');
+}
+
 function buildMetrics(rows, turnsMap, toolsMap) {
   return rows.map(function (r) {
     var ti = num(r.tokens_input), to = num(r.tokens_output), tr = num(r.tokens_reasoning);
@@ -555,6 +638,8 @@ function renderSummary(list, totals, opts) {
   if (rows.length > shown.length) {
     out += '\n(mostrando ' + shown.length + ' de ' + rows.length + ' sesiones; usa --top N para ampliar)';
   }
+  /* A1: la vista pedida, sesion/agente/modelo con el coste medido. */
+  out += '\n' + imprimirTablaSesionAgenteModelo(list);
   return out;
 }
 
@@ -987,7 +1072,8 @@ function parseArgs(argv) {
   var o = {
     modes: [], sinceRaw: null, untilRaw: null, project: null, agent: null, root: null,
     db: null, detail: false, withContent: false, maxChars: 2000, out: null,
-    top: 50, topExplicit: false, help: false, maxSessions: MAX_SESSIONS_DEFAULT
+    top: 50, topExplicit: false, help: false, maxSessions: MAX_SESSIONS_DEFAULT,
+    desfaseMs: null
   };
   var i = 0;
   function needValue(flag) {
@@ -1021,6 +1107,7 @@ function parseArgs(argv) {
       case '--out': o.out = (val !== null ? val : needValue('--out')); break;
       case '--max-chars': o.maxChars = parseInt(val !== null ? val : needValue('--max-chars'), 10); break;
       case '--max-sessions': o.maxSessions = parseInt(val !== null ? val : needValue('--max-sessions'), 10); break;
+      case '--desfase-ms': o.desfaseMs = parseInt(val !== null ? val : needValue('--desfase-ms'), 10); break;
       case '--top': o.top = parseInt(val !== null ? val : needValue('--top'), 10); o.topExplicit = true; break;
       default: fail('Opcion desconocida: ' + a + ' (usa --help)');
     }
@@ -1030,6 +1117,7 @@ function parseArgs(argv) {
   if (!isFinite(o.maxChars) || o.maxChars < 0) fail('--max-chars invalido');
   if (!isFinite(o.top)) fail('--top invalido');
   if (!isFinite(o.maxSessions) || o.maxSessions < 0) fail('--max-sessions invalido');
+  if (o.desfaseMs != null && (!isFinite(o.desfaseMs) || o.desfaseMs < 0)) fail('--desfase-ms invalido');
   if (o.withContent && !o.detail) o.detail = true;
 
   o.since = (o.sinceRaw != null) ? parseTime(o.sinceRaw, '--since') : null;
@@ -1167,7 +1255,32 @@ function main() {
   }
 
   try {
+    /* A1: sin filtro explicito el alcance es "hoy". Si HOY no hay ninguna
+       sesion, la tabla sale vacia con total 0, que se lee como "no se uso nada"
+       cuando en realidad no hay datos de hoyTodavia: opencode.db se escribe al
+       CIERRE del turno, asi que el dia en curso puede estar todavia vacio.
+       Cuando ocurre eso se cae al ULTIMO DIA CON DATOS y se dice, en lugar de
+       presentar un 0 como si fuera una medicion. */
     var loaded = loadSessions(db, opts);
+    if (opts.implicitToday && !loaded.rows.length && opts.mode !== 'overhead') {
+      var ultimo = all(db, 'SELECT MAX(time_created) AS mx FROM session', [])[0];
+      var mx = ultimo ? num(ultimo.mx) : 0;
+      if (mx > 0) {
+        var d = new Date(mx);
+        var inicioDia = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        var r = all(db, 'SELECT COUNT(*) AS n FROM session WHERE time_created >= ? AND time_created < ?',
+          [inicioDia, inicioDia + 86400000])[0];
+        opts.effSince = inicioDia;
+        opts.effUntil = inicioDia + 86400000;
+        loaded = loadSessions(db, opts);
+        opts.periodoCayoAlUltimoDia = true;
+        process.stderr.write('[AVISO] No hay ninguna sesion registrada HOY (' + fmtDate(Date.now()) +
+          '): opencode.db se escribe al cierre del turno y el dia en curso aun no tiene filas.\n' +
+          '         Se muestra el ULTIMO DIA CON DATOS (' + fmtDate(mx) + ', ' +
+          (r ? fmtInt(r.n) : '0') + ' sesiones), no un total 0.\n' +
+          '         Para medir de verdad hoy: vuelve a ejecutarlo al cerrar el turno, o pasa --since.\n');
+      }
+    }
     if (opts.root && loaded.rootInfo && !loaded.rootInfo.exists) {
       process.stderr.write('AVISO: no existe la sesion raiz indicada: ' + opts.root + '\n');
     }
@@ -1189,6 +1302,15 @@ function main() {
 
     var totals = computeTotals(list);
     var byAg = byAgent(list);
+
+    /* A4: si la ultima fila persistida es vieja, el reporte lo dice en vez de
+       presentar el snapshot congelado como si fuera el estado actual. */
+    var desfase = evaluarDesfase(db, ids, opts.desfaseMs);
+    if (desfase.desfasado) {
+      process.stderr.write('[MEDICION DESFASADA] ' + desfase.motivo +
+        '\n  El modelo y los totales de este reporte pueden NO ser los actuales. ' +
+        'El modelo vigente se lee en el selector de la sesion, no en opencode.db.\n');
+    }
     var detailEntries = opts.detail ? loadDetail(db, ids, opts) : null;
 
     var text;

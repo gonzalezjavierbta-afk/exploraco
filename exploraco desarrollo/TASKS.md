@@ -5286,5 +5286,35 @@ La variable de entorno `alert()` del diseno original fue **descartada**: el repo
 
 **Archivos tocados.** Codigo (working tree, **SIN commit; NO desplegado**): `dictado-voz.js` (**NUEVO**), `dictado-voz.css` (**NUEVO**), `publicar.html`, `comunidad.html`, `mi-perfil.html`, `api/pagina-destino.js`. Documentacion (este pase, unico): `TASKS.md` (esta seccion) y `NEXT.md`. `DECISIONS.md` **NO se toco** (sin ADR); `BUGS_HISTORICOS.md` **NO se toco** (no hubo bug nuevo).
 
+## TSK-211 - ADR-096 implementado (`ROTOS` en 4 listas con motivo, `tierDe(modelo, rol)` fail-closed, check (f) estricto) + reparacion de los 3 puntos ciegos de medicion (`usage_report.js`, `verificar-herencia`, snapshot desfasado) + comando `.opencode/commands/sesion-cero.md` - 2026-10-13 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO / VERIFICADO LOCAL (working tree, SIN commit; NO desplegado).** El argumento de la decision vive **una sola vez** en `DECISIONS.md` **ADR-096** (ADR-084 D1); aqui solo el relevo y la medicion.
+
+### Lo que quedo entregado
+
+1. **ADR-096 implementado** (por `@js-silo-dev`): `ROTOS` partido en **4 listas con motivo** — `NO_SUBAGENTE`, `NO_MEDIDO`, `NO_CATALOGO`, `SIN_ADMITIR`; **`tierDe(modelo, rol)` fail-closed** con `rol` retrocompatible (default `sesion`); **coincidencia exacta de ids** (nada de prefijos ni sufijos); **check (f) estricto**; bloque **`AVISOS:`** separado y no bloqueante.
+2. **`usage_report.js --summary` devolvia "0 sesiones"**: filtraba implicitamente `time_created >= hoy`. No era otra fuente: era el mismo fichero mal filtrado. Ahora **cae al ultimo dia con datos y avisa**.
+3. **`verificar-herencia` daba 3 falsos positivos "CASCADA ROTA"** en cuanto el operador cambiaba de modelo a mitad de sesion (comparaba contra una **raiz unica**). Ahora compara **por instante de spawn** y **degrada a AVISO, nunca a FALLA**.
+4. **Snapshot desfasado detectado y avisado** en `--preflight`, `reparto` e `informe-cuota --task`: la ultima fila persistida de `opencode.db` puede llevar **dias de retraso** (medido **4.351 minutos**; umbral **15**).
+5. **NUEVO `.opencode/commands/sesion-cero.md`**: procedimiento "SESION $0", **sin `model:` en el frontmatter** (un pin ahi reintroduciria pines y romperia `verificar-herencia`). `AGENTS.md` §0 apunta a el en **una linea** (ADR-096 B3).
+
+### Verificacion (ADR-006, contra el archivo real)
+
+- `node scripts/ejecucion/verificar-capa-gratis.js` -> `Agentes: 18 | primarios: 2 | subagentes heredados: 16`; `(e) OK 0 pines en 18 agentes`; `(a)-(f) OK`; **`RESULTADO: OK. Cascada vigente`** (re-medido en este pase documental, no citado).
+- Encargo de ADR-096: **6/6 verificaciones**; smoke **14/14** (segun el retorno de `@js-silo-dev`).
+- Evidencia empirica de modelos: ver el **anexo T4** de `scripts/ejecucion/sondas/sonda-modelos.md`.
+- `DECISIONS.md` **NO se toco** en este pase (no cambian sus conteos de lineas); `BUGS_HISTORICOS.md` **NO se toco** (no hubo bug nuevo).
+
+### Pendiente / lo que queda
+
+1. **Desfase de estado en el propio ADR:** ADR-096 se declara `ACEPTADO, PENDIENTE DE IMPLEMENTAR` y **ya esta implementado**. Se registra aqui y **no se corrige en este pase**: este rol **no edita** ADR-096. Lo pasa a implementado `@architect`.
+2. **Contradiccion T3 / T4: RESUELTA, no era una contradiccion** (aclaracion medida en el anexo **T4** de `scripts/ejecucion/sondas/sonda-modelos.md`): el mensaje del proveedor es **generico** y el gate real es **por modelo**; `opencode/big-pickle` cae como subagente en **2 mediciones independientes** frente a las **3 subsesiones a $0.000000** de `space-bunny-free`. **No es bug: NO se abre `BUG-XXX`.** No queda re-medicion pendiente.
+3. **5 modelos $0 sin clasificar** en el catalogo del proveedor: `opencode/cat-jam-free`, `opencode/exo-free`, `opencode/ling-3.1-flash-free`, `opencode/step-5-preview-free`, `opencode-go/step-5-preview-free`. Hoy ninguno esta referenciado por el roster ni por la allowlist.
+4. **Commit + push PENDIENTES** (working tree).
+
+### Riesgo activo de la tanda
+
+**El guard mide cadenas, no arranque.** Verifica pines, allowlists y `coste:`, pero **ninguno de los 6 checks lanza un subagente**: puede dar `OK` con la delegacion caida, porque el fallo de subagente ocurre **antes de persistir** en `opencode.db` y **no deja fila que leer**. Mitigacion actual: comando `sesion-cero` + `--preflight` + lectura de la cabecera del runtime del propio agente.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

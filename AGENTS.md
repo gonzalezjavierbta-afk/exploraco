@@ -19,6 +19,8 @@ Gobernanza de agentes y skills. Normativa: `exploraco desarrollo/BLUEPRINT.md`, 
 
 Con `default_agent: "build"` **sin pin** y `model`/`small_model` en la allowlist FREE, si el **selector recuerda `opencode-go/deepseek-v4.1-flash`**, la sesion abre en **PAGO sin ningun aviso**: el archivo `opencode.json` no le gana a un selector con memoria. No es un fallo del guard (el check (f) se cumple) sino un **hueco de la premisa nueva**, y se documenta en vez de ocultarse. Deteccion: `node scripts/ejecucion/verificar-capa-gratis.js --preflight` (modelo activo + contexto actual + coste estimado de continuar en PAGO) y la lectura de 10 s del operador: **preguntar el modelo activo antes y despues de pulsar Tab**.
 
+Procedimiento operativo de "SESION $0" (dejar la sesion en tier FREE antes de trabajar): `.opencode/commands/sesion-cero.md` (puntero mandado por ADR-096 B3).
+
 ## 1. Matriz de enrutamiento
 
 Roster único de **18 agentes** = **2 primarios (orquestación) + 16 subagentes especialistas**, **un único agente por dominio** (sin par gratuito/de pago, ADR-076). **La tabla ES el flujo de delegación**.

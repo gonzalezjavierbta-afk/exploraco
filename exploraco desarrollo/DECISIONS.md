@@ -8348,3 +8348,198 @@ El tope de `chat_comentario` es el **literal `10`** dentro de `chatXpDisponible(
 - **ADR-083 / ADR-084** (cascada de coste y fuente unica del relato): la verificacion de capa gratuita paso OK; el argumento vive **una sola vez, aqui** y `TASKS.md`/`NEXT.md` **solo apuntan**.
 
 **Nota (2026-10-10, refinamiento de TSK-209):** por decision de producto del operador, la **UI** de la guia de XP **retiro** las capas "Topes de multiplicador" (pintaba `d.caps`) y "Multiplicadores" (pintaba `d.multiplicadores`), y la auxiliar `ecGuiaXpParams` quedo **eliminada por quedar sin uso**. La seccion "Topes" (`ecGuiaTopes(d.topes)`, tope diario) **se mantiene**. El backend `api/interacciones.js` **sigue devolviendo** `caps`/`multiplicadores` (`:9462-9467`): **contrato intacto**, sin consumo en el cliente. Relevo en `NEXT.md` (bloque WORKING TREE 21a tanda).
+
+## ADR-096: `ROTOS` se parte en **cuatro** listas con motivo (**`NO_SUBAGENTE` medido / `NO_CATALOGO` / `NO_MEDIDO` / `SIN_ADMITIR`**), `tierDe()` recibe el **rol** (sesión vs subagente) con default documentado, la trampa `opencode-go/space-bunny` (PAGO) se cierra por **coincidencia exacta**, `longcat` sale del check (f) y el procedimiento "SESIÓN $0" vive en `.opencode/commands/sesion-cero.md` [NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-096
+**Fecha:** 2026-10-13 (rev. 1 el 2026-10-13, tras **SOLICITA CAMBIOS** de `@architect-review`: 7 cambios, 2 bloqueantes, ambos incorporados)
+**Autor:** `@architect` (diseño), sobre mediciones de la sesión `ses_ed9df7784ffervevDihdnHv8QM`. Gate de riesgo CONFIRMADO por el operador.
+**Estado:** **ACEPTADO E IMPLEMENTADO.** Evidencia medida: guard `RESULTADO: OK`, 18 agentes, 0 pines, exit 0; `scripts/smoke_guard_capa_gratis.js` **14/14 PASS**; `verificar-herencia --sesion ses_ed9df7784ffervevDihdnHv8QM` -> **OK, 12 pares**. Implementado por `@js-silo-dev` y certificado por `@qa-auditor` (8/8). El procedimiento "SESIÓN $0" ya existe en `.opencode/commands/sesion-cero.md` y el puntero de una línea de `AGENTS.md` §0 está puesto por el pase único R2 de `@docs-keeper`. Este ADR no modifica `scripts/`, ni `opencode.json`, ni `.opencode/agent/*.md`.
+**Numeración (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-095`** (línea 8281, catálogo_xp con `usuario_id` opcional); no existía ningún `ADR-096`. Se escribe como **096**, el siguiente consecutivo libre. Tamaño real medido hoy: **1.255,2 KB / 8.350 líneas**.
+**Renglones de `verificar-capa-gratis.js` citados por este ADR (verificados hoy contra el archivo real):** `:86-94` (`ROTOS`, **7 entradas reales**), `:188-190` (`esRoto`), `:194-200` (`tierDe`), `:210-218` (`modoDe`), `:320/331/332/345/350-352` (checks (d)/(e) y default de sesión), `:482-489` (`tierDeMensaje`), `:494` (`porTier`), `:531` (acumulación), `:549-550` y `:796` (lecturas de `res.tier`), `:819-827` (`preflight`), `:853` (informe), `:939-942` (`imprimirReparto`), `:1092` (`ok`), `:1096` (`rotos: ROTOS`), `:1105` (código de salida), `:1115-1118` (`module.exports`). Smoke: `scripts/smoke_guard_capa_gratis.js` (**250 líneas**, único test del guard).
+
+### Problema
+
+`scripts/ejecucion/verificar-capa-gratis.js` mantiene una lista plana `ROTOS` de **7 entradas** (`:86-94`) que mezcla **dos** cosas que NO son lo mismo: **un** rechazo medido con error literal y **seis** rechazos heredados de sondeos antiguos, sin error registrado. Encima hay una entrada fantasma dentro de una allowlist y 5 modelos gratis reales sin clasificar.
+
+Esa mezcla hace que `tierDe()` (`:194-200`) no pueda responder a la pregunta que el operador hace de verdad: **este modelo me sirve como sesión, como subagente, o para nada?** Y `tierDeMensaje()` (`:482-489`) usa además un **fallback sin `provider/`** (`:488`), así que el mismo modelo puede caer en dos etiquetas distintas según el camino de entrada.
+
+### Datos medidos (2026-10-13, sesión `ses_ed9df7784ffervevDihdnHv8QM`)
+
+1. **`opencode/big-pickle`**: está en el catálogo con input/output/cache = **$0** y `status: active`, pero falló **como SUBAGENTE por herencia, con 0 pines**, con el error literal `Subagent failed (sessionID: ses_eca2f5c86ffezUMEb3nG80ezGf): OpenCode's free tier can only be used from within OpenCode`. **0 tokens consumidos, $0.000000.** La sonda T1 del 2026-10-04 ya lo había medido fallando **con pin explícito**. **No existe ninguna medición de `big-pickle` como modelo de sesión/primario** (ADR-006: lo no medido no se afirma).
+2. **`opencode/space-bunny-free` SÍ funciona como subagente**: 3 subsesiones medidas a **$0.000000** (agentes `explore`, `js-silo-dev`, `js-silo-dev`) + control de sonda T1 (6.108 tokens, **$0.000000**). Es el **único** modelo con $0 medido que sirve **para primario Y subagentes**.
+3. **Fantasma:** `opencode-go/space-bunny-free` está en `FREE_SUPERVIVIENTES` pero **NO existe en el catálogo** del proveedor. `opencode-go/longcat-2.5-preview-free` sí existe.
+4. **Catálogo real:** 13 modelos con input=output=cache=0 y `status: active`. **5 están sin clasificar** (caen `FUERA-DE-ALLOWLIST`): `opencode/cat-jam-free`, `opencode/exo-free`, `opencode/ling-3.1-flash-free`, `opencode/step-5-preview-free`, `opencode-go/step-5-preview-free`.
+5. **Trampa de nombres:** `opencode-go/space-bunny` = **PAGO** ($0.15 entrada / $0.60 salida), nombre casi idéntico al gratis.
+6. **Mecanismo de comandos verificado** contra la documentación V2 de OpenCode (`https://opencode.ai/v2/docs/commands/`, instalada `opencode v2.0.27`): el directorio canónico es **`.opencode/commands/`** (plural); el singular legado `.opencode/command/` también se descubre, pero la guía pide `commands/` para lo nuevo. Hoy el repo **no tiene** ninguno de los dos.
+7. **Contenido real de `ROTOS` (`:86-94`, verificado hoy):** `opencode/big-pickle` (**único con error literal medido**, dato 1), `opencode/ling-3.0-flash-fin-free`, `opencode/longcat-2.5-preview-free`, `opencode/mimo-v2.6-flash-free`, `opencode/muse-spark-1.3-contributor-free`, `opencode/nemotron-3-ultra-free`, `opencode/nemotron-3.5-lightning-free` (**los 6 sin error literal registrado en el repo**). Nota de nombre: el 3.º es `opencode/longcat-2.5-preview-free`, **distinto** de `opencode-go/longcat-2.5-preview-free`, que está en `FREE_SUPERVIVIENTES`.
+
+### El mensaje del proveedor NO describe el gate real (aclaración, y **no es un bug del guard**)
+
+Dos agentes reportaron el error literal `OpenCode's free tier can only be used from within OpenCode` como posible contradicción. Es un mensaje **genérico** del proveedor y **no describe el gate real**, que es **por modelo**. Evidencia: `opencode/big-pickle` fue rechazado como subagente en **dos mediciones independientes** (pin explícito en la sonda T1 del 2026-10-04 y **por herencia con 0 pines** hoy, con **0 tokens** y **$0.000000**), mientras `opencode/space-bunny-free` acumula **3 subsesiones medidas a $0.000000**. Conclusión: el trabajo delegado a $0 **sí es posible** con `space-bunny-free`; `big-pickle` sirve como **primario** y no como subagente. El guard refleja fielmente ese comportamiento medido.
+
+### B1 -- Semántica de `ROTOS`: cuatro listas, una por motivo
+
+**Opciones**
+
+- **(a) Dejar `ROTOS` como lista plana.** Menos trabajo; mantiene la ambigüedad: el guard no puede decir *por qué* algo está prohibido ni si depende del rol. Rechazada: contradice ADR-006 (la razón medida existe y se pierde).
+- **(b) Dos listas** (`NO_SUBAGENTE` / `NO_CATALOGO`). Mejor, pero **borra sin destino** a los 6 heredados: no caben en `NO_SUBAGENTE` porque no hay fallo medido que los respalde, ni en `SIN_ADMITIR`, que queda definida solo para los 5 sin clasificar. Rechazada: sería afirmar un motivo que no está medido.
+- **(c) Cuatro listas con motivo, más un rol en `tierDe()`.** Cada entrada tiene un motivo que se puede citar y un rol al que aplica. **Elegida.**
+
+**Veredicto B1 (cambio 1 del revisor, BLOQUEANTE, incorporado)**
+
+`ROTOS` **se deja de usar** y se sustituye por **cuatro listas de identificadores completos `provider/model`**, cada una con su motivo y su alcance:
+
+| Lista | Contenido | Motivo | Aplica a |
+|---|---|---|---|
+| `NO_SUBAGENTE` | **`opencode/big-pickle`, y solo este** | Error literal **medido**: `OpenCode's free tier can only be used from within OpenCode`, 0 tokens | **solo rol subagente** |
+| `NO_CATALOGO` | `opencode-go/space-bunny-free` (y cualquier otra allowlist sin entrada en el catálogo) | **Medido**: no existe en el catálogo del proveedor | **cualquier rol** |
+| `NO_MEDIDO` | los **6 heredados**: `opencode/ling-3.0-flash-fin-free`, `opencode/longcat-2.5-preview-free`, `opencode/mimo-v2.6-flash-free`, `opencode/muse-spark-1.3-contributor-free`, `opencode/nemotron-3-ultra-free`, `opencode/nemotron-3.5-lightning-free` | Rechazo **heredado** de sondeos antiguos, **sin error literal registrado**. Se conservan **prohibidos** para no ceder terreno mientras no se midan | **ambos roles**, y no cuentan como `FREE` |
+| `SIN_ADMITIR` | los **5** gratis sin clasificar del dato 4 | Gratis **real** y **no medido** en este repo | cualquier rol, con aviso informativo |
+
+La separación `NO_SUBAGENTE` / `NO_MEDIDO` es exactamente la regla de ADR-006 aplicada a una lista: **el guard solo puede afirmar un motivo que tiene medido.** Los 6 heredados no se degradan a admitidos, porque admitirlos sin medir sería ceder la prohibición sin evidencia, pero tampoco se les inventa un error literal que el repo no registra.
+
+**Respuesta 1 del autor:** los 6 heredados van a `NO_MEDIDO`, no uno a uno a `SIN_ADMITIR`. Así el motivo "medido" sigue siendo verdad para `NO_SUBAGENTE`, y los 6 tienen hogar **sin mentir**. `SIN_ADMITIR` conserva su definición estricta: los 5 sin clasificar.
+
+**`opencode/big-pickle` NO se admite todavía como modelo de sesión/primario.** Pasa de "prohibido en general" a "**probado y prohibido como subagente; como primario, NO MEDIDO**". No se admite por defecto porque no existe la medición que lo sostenga.
+
+`tierDe()` pasa a **`tierDe(m, rol)`** (`:194-200`), con `rol in {sesion, subagente}` y este orden **fail-closed**:
+
+1. `NO_CATALOGO` -> **ROTO_CATALOGO** (gana a todo, en ambos roles).
+2. `NO_SUBAGENTE` **y** `rol === 'subagente'` -> **ROTO_SUBAGENTE**.
+3. `FREE` (y `FREE_SUPERVIVIENTES`) -> **FREE**.
+4. `PAGO` -> **PAGO**.
+5. `SIN_ADMITIR` -> **FUERA_ADMITIDO_A_CONSCIENCIA** (mismo valor de salida que hoy `FUERA-DE-ALLOWLIST`, mensaje distinto).
+6. resto -> **FUERA-DE-ALLOWLIST**.
+
+Dos reglas de seguridad acompañan al orden: un modelo en `NO_SUBAGENTE` **nunca** se degrada a `FREE` por el hecho de ser gratis, porque el paso (2) va **antes** de (3); y un modelo en `NO_MEDIDO` **tampoco**, porque va por una lista que se consulta antes de admitir.
+
+**Respuesta 2 del autor -- el rol en `reparto`.** En `repartoPorTier()` (`:482-494`) un mensaje de asistente es **indistinguible** entre sesión y subagente: la tabla `opencode.db` no lo marca. Por tanto `rol` es **`sesion` por defecto**, documentado en este ADR y en el `--help` del guard, y **`ROTO_SUBAGENTE` no puede contar como FREE en ninguna de las dos columnas**: en la columna `sesion` no puede aparecer `ROTO_SUBAGENTE` por construcción, porque el default es `sesion`; y si algún día se produce un `ROTO_SUBAGENTE` contado en `sesion`, es un dato que **obliga a re-preguntar al operador**, nunca un PASS.
+
+### B2 -- Allowlists, la trampa de nombres y el check (f)
+
+**Veredicto B2**
+
+1. **`opencode-go/space-bunny-free` sale de `FREE_SUPERVIVIENTES`** y entra en `NO_CATALOGO`. Un identificador que no existe en el catálogo **no puede ser un default de sesión ni una allowlist**: es una promesa que el proveedor no puede cumplir.
+2. **Los 5 gratis sin clasificar pasan de "error" a "fuera a conciencia".** Van a `SIN_ADMITIR`: el guard los **imprime** con el texto "gratis real, no medido en este repo, mídalo antes de usarlo" y **NO falla** por ellos. Se **miden y admiten** solo con sonda propia (subagente más primario) y **ADR de admisión**. Motivo: 5 admisiones a ciegas multiplican el riesgo de escalada tardía (ADR-083 D4) por 5.
+3. **La trampa `space-bunny` se cierra por coincidencia EXACTA, no por convención.** Reglas:
+   - Toda comparación de modelo es de **cadena completa `provider/model`**, nunca `startsWith`, `includes` ni prefijo. Se prohíben expresamente.
+   - Todo default de sesión se escribe **completo y entrecomillado**: `opencode/space-bunny-free`. Prohibido abreviarlo a `space-bunny-free`.
+   - El guard, al imprimir cualquier modelo, imprime la **cadena completa** y, si la cadena contiene `space-bunny` y **no** es exactamente `opencode/space-bunny-free`, emite una **línea de aviso explícita**: "ATENCIÓN: `<id>` es PAGO o no verificado; el único gratis verificado para primario y subagente es `opencode/space-bunny-free`". Esto ataca el fallo real, que ocurre en el **selector del TUI** (que busca por nombre), no en el código.
+   - La única combinación que el guard declara segura para una sesión completa es `FREE` **estricta** = `["opencode/space-bunny-free"]`, porque es la única con **$0 medido en ambos roles**.
+
+**Respuesta 3 del autor -- el caso `longcat` y el check (f) (cambio 4 del revisor).** Endurecer el check (f) a "default exactamente `opencode/space-bunny-free`" dejaba vivo a `FREE_SUPERVIVIENTES` con `opencode-go/longcat-2.5-preview-free`, que **sí existe en el catálogo** pero **no tiene $0 medido en ambos roles** (ADR-006). El criterio que se aplica, y que es el mismo para toda la lista:
+
+> **Permitido en `FREE_SUPERVIVIENTES`** = existe en el catálogo **y** no está en ninguna lista de prohibición.
+> **Permitido como default del check (f)** = `FREE` **estricta**, es decir **solo** los modelos con **$0 medido en primario Y subagente**. Hoy eso es **únicamente `opencode/space-bunny-free`**.
+
+Consecuencias: `opencode-go/longcat-2.5-preview-free` **permanece en `FREE_SUPERVIVIENTES`** (es un identificador real y no está prohibido), pero **no cumple la condición de `FREE` estricta** del check (f): si acaba siendo el default de sesión, el check (f) **no falla**, da **pase blando con AVISO** (`ok = true`) nombrando el modelo, tal como fija el punto 9 de "Cambios concretos" (formulación única, repetida solo como referencia); y `opencode-go/space-bunny-free` desaparece de las allowlists porque es **fantasma**, no porque sea de pago.
+
+### B3 -- Procedimiento "SESIÓN $0"
+
+**Verificación previa (obligatoria, ADR-006):** el mecanismo **sí existe** en esta versión. Documentación V2 de OpenCode (`opencode v2.0.27`, instalada en el repo): los comandos de proyecto se crean en **`.opencode/commands/<nombre>.md`** (plural canónico), el singular legado `.opencode/command/` también se descubre, solo se descubren `.md`, el cuerpo Markdown **es** la plantilla del prompt, y las recargas son automáticas al guardar.
+
+**Opciones**
+
+- **(a) Comando en `.opencode/commands/`.** Vive junto a la sesión, es invocable con `/sesion-cero`, y el bloque de shell pega la salida real del guard en el prompt. **Elegida.**
+- **(b) Sección nueva en `AGENTS.md` §0.** Correcta pero **nota, no ejecuta**: no verifica nada en el momento de la invocación. Aceptada solo como **puntero de una línea** a (a), para que el procedimiento sobreviva si el archivo de comando falta.
+
+**Veredicto B3: (a) como artefacto, (b) reducida a un puntero.**
+
+**Archivo a crear por el implementador: `.opencode/commands/sesion-cero.md`**, con este contenido exacto:
+
+```md
+---
+description: Verifica y deja en $0 la sesión actual antes de empezar a trabajar.
+agent: build
+---
+
+TAREA SESION $0. No ejecutes nada todavía.
+
+1. La salida del guard va pegada debajo. Léela y resume en UNA línea: modelo activo, tier, tokens de contexto.
+2. Si el tier NO es FREE: NO trabajes. Informa del modelo activo exacto, recuerda el único gratis verificado para primario y subagentes (identificador completo entrecomillado), y pide que lo elija en el selector. Después repite este comando y confirma el tier FREE.
+3. Si el tier es FREE: confirma el tier, recuerda que al modelo activo lo heredan los subagentes, y sigue la cascada de coste vigente.
+4. Si el tier es ROTO_CATALOGO o ROTO_SUBAGENTE: informa del motivo literal medido y para.
+
+Salida del guard:
+
+!`node scripts/ejecucion/verificar-capa-gratis.js --preflight`
+```
+
+**El comando NO lleva `model:` en el frontmatter, a propósito.** Un `model:` en un comando es un **pin explícito** que pisa el selector: meterlo reintroduciría pines (ADR-082 §2, check (a)) y rompería la aserción `verificar-herencia` (modelo del hijo igual al modelo del padre). La función del comando es **medir y Bloquear**, no cambiar el modelo. El modelo lo elige la persona, en el selector, y por eso el guard exige el `--preflight` antes de cualquier turno de trabajo.
+
+**Aclaración preventiva (cambio 7 del revisor), dos puntos que un auditor puede marcar por error:**
+
+- **`agent: build` NO es un pin de modelo.** Es un pin de **agente**, campo admitido por el frontmatter de los comandos, y es **legal aquí**: fija qué primario ejecuta el comando y no toca la cascada de coste. Los 18 agentes siguen **sin `model:`** y con `coste: heredado`, y este ADR no los toca.
+- **El bloque `!` es expansión de shell del HOST de OpenCode**, ejecutada por el propio OpenCode al evaluar el comando, y **no** es runtime Node en cliente. **ADR-001 (Vanilla JS puro, Node.js prohibido en runtime cliente) no le aplica.** El binario que se invoca es el guard de `scripts/`, que sí es Node, pero corre en la máquina del operador, como cualquier `node scripts/...`. En cambio, el archivo `.opencode/commands/sesion-cero.md` **sí queda bajo ASCII-safety (ADR-002)**, por ser un prompt.
+
+**Cómo se verifica que funciona** (implementador):
+
+1. Guardado automático: el archivo aparece como `/sesion-cero` en el TUI sin reiniciar el servicio.
+2. Invocación `/sesion-cero` en sesión limpia: el prompt expandido contiene **la salida real** del guard (no vacía, no `!` literal), lo que prueba a la vez el descubrimiento del archivo y el bloque de shell.
+3. Con modelo activo PAGO: la regla 2 del prompt se cumple y **no** se ejecuta ninguna herramienta de escritura.
+4. Con modelo activo FREE: la regla 3 se cumple y la sesión sigue normal.
+
+### Cambios concretos que debe hacer el guard (`scripts/ejecucion/verificar-capa-gratis.js`)
+
+Cada cambio lleva su **tratamiento exacto** sobre los puntos de llamada reales verificados hoy. **Ninguno puede cambiar el contrato de salida de `verificar` ni de `preflight`.**
+
+1. **Sustituir `ROTOS` (`:86-94`) por las 4 listas**, cada una con su motivo: `NO_SUBAGENTE` = solo `opencode/big-pickle`; `NO_MEDIDO` = los 6 heredados; `NO_CATALOGO` = `opencode-go/space-bunny-free`; `SIN_ADMITIR` = los 5 sin clasificar. **Los 6 heredados no pueden entrar en `NO_SUBAGENTE`**: no hay fallo medido que los respalde (cambio 1 del revisor).
+2. **Reemplazar `esRoto()` (`:188-190`) por 4 predicados** (`esNoSubagente`, `esNoCatalogo`, `esNoMedido`, `esSinAdmitir`) más `esRoto(m)` **como unión de los tres primeros**, para no tener que tocar `:320`, `:331-332`, `:345`, `:350-352`, `:853`, `:941` ni `:1096`.
+3. **Cambiar la firma a `tierDe(m, rol)`** (`:194-200`) aplicando el orden 1-6 de B1. `modoDe()` (`:210-218`) **también** recibe `rol`, y su etiqueta `ROTO` pasa a distinguir `ROTO_SUBAGENTE`, `ROTO_CATALOGO` y `NO_MEDIDO`, conservando `ROTO` como etiqueta agregada.
+4. **`tierDeMensaje(m)` (`:482-489`) es el punto de llamada que más se rompe, y es el que fija el cambio 2 del revisor.** Tratamiento exacto, en este orden:
+   - `tierDeMensaje(m, rol)` acepta `rol` con **default `sesion`** (respuesta 2 del autor), porque la fila de `opencode.db` no distingue sesión de subagente.
+   - **El fallback sin `provider/` de `:488` se elimina.** Hoy `enAllowlist(lleno) ? 'FUERA' : tierDe(m.modelID)` es la razón por la que un mismo modelo puede dar dos etiquetas distintas según el camino. `tierDe()` **debe recibir siempre el id completo `provider/model`**; si falta `providerID`, el resultado es **`SIN-PROVEEDOR`**, un dato que obliga a mirar el registro, no una etiqueta adivinada.
+   - **`FUERA` y `FUERA-DE-ALLOWLIST` se unifican** en `FUERA-DE-ALLOWLIST`. La etiqueta `FUERA` de `:488` nunca se emitió como valor de salida y su único consumidor es la agregación de `:531`, que en `:942` ya suma `(res.porTier.FUERA || 0) + (res.porTier['FUERA-DE-ALLOWLIST'] || 0)`.
+   - **`ROTO_SUBAGENTE` no puede entrar en la columna `FREE`**: con `rol = sesion` por defecto no se produce, y si se produce, `imprimirReparto` (`:939-942`) lo imprime como **dato a re-preguntar**, nunca como PASS.
+5. **`porTier` (`:494`)**: el objeto conserva **`FREE: 0, PAGO: 0, ROTO: 0, FUERA: 0`** tal cual, que son los 4 que ya imprime `:939-942`, y **añade** `ROTO_SUBAGENTE: 0`, `ROTO_CATALOGO: 0`, `NO_MEDIDO: 0` y `FUERA_ADMITIDO_A_CONSCIENCIA: 0`. La acumulación de `:531` (`res.porTier[e.tier] = (res.porTier[e.tier] || 0) + e.mensajes`) ya es tolerante a claves nuevas; las nuevas se **agregan al final** de `imprimirReparto` para no alterar el formato de las 4 líneas existentes. Las lecturas de `:549-550` y `:796` pasan a usar el default `sesion`.
+6. **`preflight` (`:819-827`)**: la comparación literal de `:825` (`res.tier === 'ROTO' || res.tier === 'FUERA-DE-ALLOWLIST'`) pasa a cubrir `ROTO_CATALOGO`, `ROTO_SUBAGENTE`, `NO_MEDIDO` y `FUERA-DE-ALLOWLIST`. `FUERA_ADMITIDO_A_CONSCIENCIA` **no** entra en ese bloque de `fallas`: va a `res.avisos` (`:822` ya usa `res.avisos.push` para el caso PAGO), de modo que `--preflight` con un modelo de `SIN_ADMITIR` devuelve **`RESULTADO: AVISO`**, no `OK` ni fallo.
+7. **`module.exports` (`:1115-1118`)**: **conserva el nombre `tierDe`** y **añade `rol` como segundo parámetro con default `sesion`**, para que cualquier consumidor que llame `tierDe(m)` con **un** argumento siga funcionando y reciba el comportamiento de sesión. `ROTOS` se **sustituye** por las 4 listas con su propia clave de exportación, y se **mantiene `rotos`** como unión, porque `:1096` lo publica en el JSON de `--json`.
+8. **`SIN_ADMITIR` no suma en `fallas` en ninguna rama** (cambio 3 del revisor): los 5 van a un bloque **`AVISOS:`** separado y `fallas` sigue en **0**.
+9. **Endurecer el check (f) (`:345`)**: el default de sesión debe ser exactamente `opencode/space-bunny-free` (`FREE` estricta). `opencode-go/longcat-2.5-preview-free` **no cumple esa condición estricta** hasta tener $0 medido en ambos roles (respuesta 3 del autor). Formulación única, verdadera a ambos lados (B2 y aquí): si el default está en `FREE_SUPERVIVIENTES` y no es el estricto, el check (f) **no falla**: da **pase blando con AVISO** (`ok = true`) nombrando el modelo, declarado explícitamente como **relajación consciente del cambio 4** del revisor; solo es **FALLO** si el default es de **PAGO**, **no-catálogo** o **prohibido**.
+10. **Prohibir comparaciones por prefijo o subcadena**: toda búsqueda de modelo es de cadena completa.
+11. **Añadir la línea de aviso anti-trampa** cuando el modelo impreso contenga `space-bunny` y no sea exactamente el gratis verificado.
+12. **Añadir flag `--rol sesion|subagente`** (default `sesion`) para que el guard pueda juzgar subagentes explícitamente.
+13. El resumen final imprime **el conteo de las 4 listas y sus motivos**, no solo `RESULTADO: OK`.
+14. Los 18 agentes **siguen sin pin** y con `coste: heredado`: este ADR **no toca** `.opencode/agent/*.md` ni `opencode.json`.
+
+### Verificación exigible al implementador
+
+1. **`scripts/smoke_guard_capa_gratis.js` (250 líneas, único test del guard) debe seguir en verde, y es exigible por el cambio 3 del revisor.** El smoke fabrica sus series con **`space-bunny-free` (FREE) y el modelo PAGO** (`:79` fija `FREE_M` y `FREE_P`; las series de `:125-140`), y **no usa ningún modelo de `SIN_ADMITIR`**. El riesgo real es otro: **si `SIN_ADMITIR` acaba sumando a `fallas`, `ok` (`:1092`) pasa a falso y el smoke entero falla aunque los 8 casos sigan bien.** Por eso el cambio 8 es exigible en su forma exacta: los 5 a **`AVISOS:`** y `fallas` en **0**.
+2. **Se añaden al smoke 3 casos nuevos**, todos offline, con la misma técnica que ya usa (DB sintética en `%TEMP%`, guard real como subproceso con `--db`, lectura única):
+   - un mensaje de **`SIN_ADMITIR`** (`opencode/exo-free`): `fallas = 0`, `ok = true`, y `AVISOS:` **no vacío**;
+   - un mensaje de **`opencode/big-pickle`** con `--rol subagente` da `ROTO_SUBAGENTE`, y con `--rol sesion` (default) **no** da `ROTO_SUBAGENTE`;
+   - **`tierDe(m)` con UN argumento** (firma retrocompatible de `:1117`) da un resultado idéntico a `tierDe(m, 'sesion')`.
+3. **`node --check`** sobre `verificar-capa-gratis.js` y sobre `smoke_guard_capa_gratis.js`, y **ASCII-safety (ADR-002)** de ambos: **0 bytes > 127**. A diferencia de este ADR, que es documentación de gobernanza y sí admite tildes.
+4. **`--json` (`:1091-1106`) sigue siendo JSON válido** y conserva las claves `allowlist_free`, `allowlist_pago` y `rotos`, más las 4 listas nuevas.
+5. **Ningún cambio altera el código de salida** de `verificar` (`res.fallas.length ? 1 : 0`, `:1105`) ni el de `preflight`.
+6. Regresión de la cascada: `node scripts/ejecucion/verificar-capa-gratis.js` sigue reportando `Agentes: 18 | primarios: 2 | subagentes heredados: 16` y `RESULTADO: OK`, y `verificar-herencia` sigue en verde.
+
+### La sonda de admisión de `big-pickle` (respuesta 4 del autor)
+
+**Cómo se fija el modelo sin reintroducir pines (cambio 6 del revisor): la sonda la ejecuta el OPERADOR, en el selector del TUI, en una sesión limpia.** En concreto:
+
+1. El operador abre una **sesión nueva y limpia** y elige `opencode/big-pickle` **en el selector del TUI**, antes de escribir nada.
+2. **No se toca `opencode.json`, ni `.opencode/agent/*.md`, ni ningún `model:` de comando.** No hay `-m` en la línea de órdenes, ni variable de entorno con el modelo, ni cambio de `default_agent`.
+3. En esa sesión lanza **un** subagente de sonda (cualquiera de los 16, sin pin) y hace **una** llamada trivial, y comprueba en el selector que el modelo activo **sigue siendo** el del primario: si el hijo cambia de modelo, la herencia está rota y la sonda se anula.
+4. Registra el resultado: el `message.data.modelID` real de la fila y el coste. **`session.model` del header NO sirve** (ADR-083: es un campo trampa que registra el último modelo, nunca el de apertura).
+
+**Respuesta 4 del autor: la sonda NO se automatiza en `scripts/`, nunca.** Automatizarla exigiría una de dos cosas, y las dos están vetadas: pasar el modelo por `opencode.json` (**veto documentado**, este ADR no lo toca) o reintroducir un pin en algún sitio (**check (a) de ADR-082**). Automatizaría el veto para poder medirlo, que es peor que medirlo a mano. El resultado de la sonda va a un **ADR nuevo**, nunca a una edición silenciosa de este.
+
+### Impacto y no-regresión
+
+- **No cambia** ninguna regla de coste de ADR-082/083/084: ni pines, ni gates, ni `verificar-herencia`, ni la atribución por `message.data.modelID`.
+- **No crea endpoint**, ni toca `api/*.js`, ni el presupuesto de 8/8 funciones de Vercel.
+- **No-regresión de contrato, ahora explícita:** los 4 puntos de llamada que el cambio 2 del revisor rompe tienen tratamiento asignado **uno a uno** en "Cambios concretos": `tierDeMensaje` (`:482-489`) en el punto 4, `porTier` (`:494`) en el punto 5, la comparación literal de `:825` en el punto 6, y `module.exports.tierDe` (`:1117`) en el punto 7. **Ningún consumidor existente cambia de nombre de clave ni de código de salida**; lo único que se añade son claves nuevas en `porTier` y en el JSON.
+- **Mejora** el mensaje de fallo: hoy `big-pickle` falla en runtime con un error de OpenCode en inglés; con este ADR el guard lo dice antes, con el motivo medido y el rol al que aplica.
+- **Riesgo residual aceptado:** durante la ventana entre este ADR y la sonda de `big-pickle`, `big-pickle` no es usable como primario. Es el precio de no afirmar lo no medido.
+
+### Verificación del propio ADR
+
+Número correlativo, y secciones de problema / datos medidos / B1 / B2 / B3 / cambios / verificación exigible / sonda / impacto. Los **7 puntos de `@architect-review` quedan respondidos punto por punto**: (1) lista `NO_MEDIDO` añadida y los 6 enumerados uno a uno; (2) los 4 puntos de llamada con línea verificada y tratamiento; (3) smoke exigido con `AVISOS:` y `fallas = 0`; (4) criterio de `longcat` y del check (f); (5) prosa en español: los anglicismos que señaló el revisor quedaron traducidos (a "tratamiento" y "punto de llamada"), de modo que su conteo en esta sección es **0**; (6) sonda solo desde el selector del TUI; (7) `agent: build` legal y bloque `!` no es runtime cliente. ASCII-safety **no aplica** a este fichero (ADR-002: los `.md` de gobernanza admiten tildes); sí aplica a `scripts/`, `api/*.js`, HTML y al prompt del comando. Verificación de escritura:
+
+```
+Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Select-Object -Last 1
+```
+
+Debe devolver **`## ADR-096:`**, y el conteo de ADR debe subir de 95 a 96. El cierre documental (`TASKS.md`, `NEXT.md`, `AGENTS.md` §0) corresponde al **pase único R2** de `@docs-keeper`, no a este ADR.

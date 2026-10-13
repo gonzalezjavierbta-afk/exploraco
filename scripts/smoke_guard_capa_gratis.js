@@ -14,11 +14,26 @@
 //   (f) PREFLIGHT por debajo del umbral -> RESULTADO: OK.
 //   (g) verificar-herencia: padre e hijo con el mismo modelo (no se pierde).
 //   (h) ASCII-safety del guard (ADR-002) y DB sintetica solo en %TEMP%.
+//   ADR-096 (nuevos, todos offline):
+//   (i) SIN_ADMITIR (opencode/exo-free) NO falla: fallas 0 y bloque AVISOS no
+//       vacio; y el check estatico sigue saliendo con codigo 0.
+//   (j) opencode/big-pickle: ROTO_SUBAGENTE con --rol subagente y NO con el
+//       default --rol sesion.
+//   (k) tierDe(m) con UN argumento == tierDe(m, 'sesion') y la coincidencia de
+//       ids es EXACTA (una variante abreviada o parecida NO es FREE).
+//   (l) control positivo de deteccion: un hijo con un modelo PROPIO sigue dando
+//       CASCADA ROTA con exit 1 (no se pierde poder de deteccion).
+//   (m) el reparto imprime las claves nuevas sin romper las 4 lineas de siempre.
 //
 // Metodo: NO hay red, NO hay opencode.db real y NO se escribe nada en el repo.
 // Se fabrican dos DB sinteticas minimas en %TEMP% con el esquema que el guard lee
 // (session + message) y se ejecuta el guard REAL como subproceso con --db, leido
 // en SOLO LECTURA. El script es idempotente: reconstruye las DB en cada corrida.
+//
+// Nota de datos sinteticos: un hijo sin ningun mensaje de asistente NO es
+// fechable (filasSesion no devuelve time_created), asi que para reconstruir el
+// instante de spawn cada hijo de prueba lleva al menos un mensaje, igual que en
+// opencode.db real. El caso "no reconstruible" degrada a AVISO, nunca a FALLA.
 //
 // Run: node scripts/smoke_guard_capa_gratis.js
 // ASCII-safe (ADR-002): 0 bytes > 127, 0 backticks. CommonJS (BUG-001).
@@ -78,6 +93,8 @@ function esSintetica(dest) {
 
 var FREE_M = 'space-bunny-free', FREE_P = 'opencode';
 var PAGO_M = 'deepseek-v4.1-flash', PAGO_P = 'opencode-go';
+var SIN_ADMITIR_M = 'exo-free', SIN_ADMITIR_P = 'opencode';
+var BIG_PICKLE_M = 'big-pickle', BIG_PICKLE_P = 'opencode';
 var CTX_ALTO = 700000; // >= suelo: escalada tardia real
 var CTX_BAJO = 20000;  // contexto de arranque
 
@@ -152,7 +169,33 @@ crearDb(DB_GRANDE, [
   {
     id: 'qa-her-free-hijo', parent_id: 'qa-her-free', agent: 'architect',
     model: FREE_P + '/' + FREE_M, dir: 'C:/qa-sintetico', upd: 1700000005,
-    tokensInput: 100, tokensCache: CTX_BAJO, mensajes: [],
+    tokensInput: 100, tokensCache: CTX_BAJO,
+    mensajes: serie(CTX_BAJO, FREE_M, FREE_P, 'architect', 1),
+  },
+  // ADR-096 (i): gratis REAL y no medido -> informativo, nunca falla.
+  {
+    id: 'qa-sin-admitir', agent: 'free-build', model: SIN_ADMITIR_P + '/' + SIN_ADMITIR_M,
+    dir: 'C:/qa-sintetico', upd: 1700000004, tokensInput: 100, tokensCache: CTX_BAJO,
+    mensajes: serie(CTX_BAJO, SIN_ADMITIR_M, SIN_ADMITIR_P, 'free-build', 2),
+  },
+  // ADR-096 (j): big-pickle (NO_SUBAGENTE), unico con error literal medido.
+  {
+    id: 'qa-big-pickle', agent: 'free-build', model: BIG_PICKLE_P + '/' + BIG_PICKLE_M,
+    dir: 'C:/qa-sintetico', upd: 1700000003, tokensInput: 100, tokensCache: CTX_BAJO,
+    mensajes: serie(CTX_BAJO, BIG_PICKLE_M, BIG_PICKLE_P, 'free-build', 2),
+  },
+  // ADR-096 (l): control positivo de deteccion. El hijo declara un modelo propio
+  // (PAGO) mientras el padre corria en FREE en el instante del spawn.
+  {
+    id: 'qa-pin-roto', agent: 'free-build', model: FREE_P + '/' + FREE_M,
+    dir: 'C:/qa-sintetico', upd: 1700000002, tokensInput: 100, tokensCache: CTX_BAJO,
+    mensajes: serie(CTX_BAJO, FREE_M, FREE_P, 'free-build', 3),
+  },
+  {
+    id: 'qa-pin-roto-hijo', parent_id: 'qa-pin-roto', agent: 'js-silo-dev',
+    model: PAGO_P + '/' + PAGO_M, dir: 'C:/qa-sintetico', upd: 1700000001,
+    tokensInput: 100, tokensCache: CTX_BAJO,
+    mensajes: serie(CTX_BAJO, PAGO_M, PAGO_P, 'js-silo-dev', 1),
   },
 ]);
 
@@ -244,6 +287,84 @@ check('(h) guard ASCII-safe (0 bytes > 127, 0 backticks) y DB solo en %TEMP%',
   esSintetica(DB_GRANDE) && esSintetica(DB_MINI) &&
   fs.existsSync(DB_GRANDE) && fs.existsSync(DB_MINI),
   'bytes>127=' + altos);
+
+// --- Casos nuevos de ADR-096 --------------------------------------------------
+
+// (i) SIN_ADMITIR es informativo: fallas 0 y bloque AVISOS no vacio. El guard
+// NO puede pasar a CASCADA ROTA (ni a falla) por un gratis real sin medir.
+var i1 = correr(['reparto', '--sesion', 'qa-sin-admitir', '--db', DB_GRANDE]);
+var i1Obj = guard.repartoPorTier(DB_GRANDE, 'qa-sin-admitir');
+var i2 = correr([]);
+var i2Obj = guard.verificar(REPO);
+check('(i) SIN_ADMITIR: reparto con fallas 0, AVISOS no vacio y exit 0',
+  i1.code === 0 &&
+  i1Obj.fallas.length === 0 &&
+  i1Obj.avisos.length > 0 &&
+  i1Obj.porTier.FUERA_ADMITIDO_A_CONSCIENCIA === 2 &&
+  i1.out.indexOf('AVISOS:') >= 0 &&
+  i1.out.indexOf('RESULTADO: OK') >= 0,
+  'fallas=' + i1Obj.fallas.length + ' avisos=' + i1Obj.avisos.length +
+  ' tier=' + (i1Obj.porModelo[0] ? i1Obj.porModelo[0].tier : '?'));
+check('(i2) el check estatico sigue con exit 0 y publica SIN_ADMITIR en AVISOS',
+  i2.code === 0 &&
+  i2Obj.fallas.length === 0 &&
+  i2Obj.avisos.length > 0 &&
+  i2.out.indexOf('AVISOS:') >= 0 &&
+  i2.out.indexOf('SIN_ADMITIR (5)') >= 0 &&
+  i2.out.indexOf('RESULTADO: OK') >= 0,
+  i2.out.split('\n').filter(function (l) { return /RESULTADO|SIN_ADMITIR \(/.test(l); }).join(' / '));
+
+// (j) big-pickle: ROTO_SUBAGENTE SOLO con --rol subagente.
+var j1 = correr(['reparto', '--sesion', 'qa-big-pickle', '--rol', 'subagente', '--db', DB_GRANDE]);
+var j2 = correr(['reparto', '--sesion', 'qa-big-pickle', '--db', DB_GRANDE]);
+var j1Obj = guard.repartoPorTier(DB_GRANDE, 'qa-big-pickle', 'subagente');
+var j2Obj = guard.repartoPorTier(DB_GRANDE, 'qa-big-pickle');
+check('(j) big-pickle: ROTO_SUBAGENTE con --rol subagente, y NO con el default sesion',
+  j1.code === 0 && j2.code === 0 &&
+  j1Obj.porModelo[0].tier === 'ROTO_SUBAGENTE' &&
+  j1.out.indexOf('| ROTO_SUBAGENTE |') >= 0 &&
+  j2Obj.porModelo[0].tier === 'FUERA-DE-ALLOWLIST' &&
+  guard.tierDe('opencode/' + BIG_PICKLE_M, 'subagente') === 'ROTO_SUBAGENTE' &&
+  guard.tierDe('opencode/' + BIG_PICKLE_M) === 'FUERA-DE-ALLOWLIST',
+  'subagente=' + j1Obj.porModelo[0].tier + ' sesion=' + j2Obj.porModelo[0].tier);
+
+// (k) firma retrocompatible: tierDe(m) == tierDe(m, 'sesion') en todos los casos,
+// y la coincidencia de ids es EXACTA (una variante parecida NO es FREE).
+var ids = ['opencode/space-bunny-free', 'opencode-go/longcat-2.5-preview-free',
+  'opencode/big-pickle', 'opencode/exo-free', 'opencode-go/space-bunny-free',
+  'opencode-go/deepseek-v4.1-flash', 'opencode-go/space-bunny', 'opencode/space-bunny',
+  'space-bunny-free', 'opencode/nemotron-3.5-lightning-free'];
+var firmaOk = ids.every(function (m) { return guard.tierDe(m) === guard.tierDe(m, 'sesion'); });
+check('(k) tierDe(m) con UN argumento == tierDe(m, sesion) y coincidencia exacta de ids',
+  firmaOk &&
+  guard.tierDe('opencode/space-bunny-free') === 'FREE' &&
+  guard.tierDe('opencode/space-bunny') !== 'FREE' &&
+  guard.tierDe('space-bunny-free') !== 'FREE' &&
+  guard.tierDe('opencode-go/space-bunny-free') === 'ROTO_CATALOGO' &&
+  guard.tierDe('opencode/exo-free') === 'FUERA_ADMITIDO_A_CONSCIENCIA' &&
+  guard.tierDe('opencode/nemotron-3.5-lightning-free') === 'NO_MEDIDO' &&
+  guard.esTrampaDeNombre('opencode-go/space-bunny') === true &&
+  guard.esTrampaDeNombre('opencode/space-bunny-free') === false,
+  'variante=' + guard.tierDe('opencode/space-bunny') + ' gratis=' + guard.tierDe('opencode/space-bunny-free'));
+
+// (l) control positivo: un hijo con modelo propio sigue dando CASCADA ROTA (exit 1).
+var l = correr(['verificar-herencia', '--sesion', 'qa-pin-roto', '--db', DB_GRANDE]);
+var lObj = guard.verificarHerencia(DB_GRANDE, 'qa-pin-roto');
+check('(l) pin real detectado: CASCADA ROTA con exit 1 (no se pierde deteccion)',
+  l.code === 1 && l.out.indexOf('CASCADA ROTA') >= 0 && lObj.fallas.length === 1,
+  'exit=' + l.code + ' fallas=' + lObj.fallas.length);
+
+// (m) el reparto conserva las 4 lineas de siempre y anade las claves nuevas.
+check('(m) reparto: 4 claves de siempre intactas mas las claves nuevas de ADR-096',
+  i1.out.indexOf('Reparto por tier (mensajes de asistente): FREE ') >= 0 &&
+  i1.out.indexOf(' | PAGO ') >= 0 &&
+  i1.out.indexOf(' | ROTO ') >= 0 &&
+  i1.out.indexOf(' | fuera de allowlist ') >= 0 &&
+  i1.out.indexOf('ROTO_SUBAGENTE') >= 0 &&
+  i1.out.indexOf('NO_MEDIDO') >= 0 &&
+  Object.prototype.hasOwnProperty.call(i1Obj.porTier, 'FUERA') &&
+  Object.prototype.hasOwnProperty.call(i1Obj.porTier, 'ROTO_CATALOGO'),
+  'claves=' + Object.keys(i1Obj.porTier).join(','));
 
 console.log('');
 console.log('SMOKE OK: ' + passed + '/' + (passed + failed) + ' | DB sintetica: ' + TMP_DIR);

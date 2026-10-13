@@ -95,3 +95,139 @@ pinearse, o el proveedor cambia la precedencia, esa asercion lo detecta.
 
 Los dos agentes de sonda (`sonda-pago-p` y `sonda-hereda`) se **BORRARON** tras la
 medicion: no forman parte del roster de 20.
+# T3 - REGRESION: el FREE que arrancaba ya no arranca como subagente (2026-10-13)
+
+Medido dentro de OpenCode, sesion `ses_ed9df7784ffervevDihdnHv8QM`, agente `build`.
+Turno padre en FREE real (cabecera del runtime: `opencode/space-bunny-free`).
+Coste de toda la tanda: $0.000000. Los 6 intentos fallaron ANTES de consumir tokens.
+
+## Resultado
+
+| # | modelo | veredicto | mensaje literal |
+|---|---|---|---|
+| padre | `opencode/space-bunny-free` (herencia) | OK | (ninguno) |
+| 1 | herencia, sin `model:` | FALLA | `Subagent failed (sessionID: ses_eca5a0fc...): OpenCode's free tier can only be used from within OpenCode` |
+| 2 | `opencode-go/space-bunny-free` | INEXISTENTE | `Model "opencode-go/space-bunny-free" is not available` |
+| 3 | `opencode/opencode/cat-jam-free` | ID INVALIDO | `not available` (3 segmentos; el parametro `model` exige 2) |
+| 4 | `opencode/space-bunny-free` | FALLA | mismo error free tier (ses_eca59c80) |
+| 5 | `opencode/cat-jam-free` | FALLA | mismo error free tier (ses_eca59b80) |
+| 6 | `opencode/longcat-2.5-preview-free` | FALLA | mismo error free tier (ses_eca59a58) |
+
+## T1 vs T3: esto es una REGRESION, no una propiedad del modelo
+
+T1 (2026-10-04) midio `opencode/space-bunny-free` como **OK**: 6.108 tokens, $0.000000,
+2 turnos, 0 tools. T3 (2026-10-13) lo mide como **FALLA** en 2 de 2 intentos, con el
+mismo id de modelo. La variable que cambio no es el modelo: es la plataforma o la
+configuracion del proveedor entre ambas fechas.
+
+Consecuencia para el bloque ROTOS: ese bloque clasifica como "modelo roto" a
+`opencode/big-pickle` por este mismo error literal. Esa generalizacion era incorrecta:
+el error no identifica un modelo malo, identifica **la ruta de delegacion + free tier**.
+Por eso 3 modelos FREE distintos y validos fallan hoy con la misma cadena.
+
+## Rastro en opencode.db: CERO
+
+`ses_eca5a0fc`, `ses_eca59c80`, `ses_eca59b80` y `ses_eca59a58` **no existen** en la
+tabla `session`. El fallo ocurre antes de persistir. Consecuencia directa: el guard no
+puede detectar esta rotura leyendo la DB, porque no hay fila que leer.
+
+## Por que el guard da OK con la delegacion caida
+
+```
+(a) OK 0 pines | (b) OK 16/16 heredado | (c) OK 2 primarios | (d) OK | (e) OK 0 pines | (f) OK
+```
+
+Los 6 checks son **estaticos**: leen `.opencode/agent/*.md` y `opencode.json`. Ninguno
+lanza un subagente. Ademas la allowlist ya no describe la realidad: el catalogo vivo
+reporta 69 modelos y 12 candidatos FREE; la allowlist describe 3, y uno de esos tres
+(`opencode-go/space-bunny-free`) **no existe**.
+
+## El preflight va un turno por detras (lectura util para el operador)
+
+`--preflight` informa el modelo del **ultimo mensaje de asistente ya escrito** en
+`opencode.db`. En el turno en curso todavia no hay mensaje de asistente, asi que el
+preflight no puede ver el modelo que se esta usando ahora. Fuente autoritativa del
+turno en curso: la cabecera del runtime del propio agente.
+
+## Metodo que SI reproduce (el de T1, punto 3)
+
+`opencode run` NO sirve con `--agent` (cae al primario, no prueba nada del modelo del
+subagente). SI sirve ordenando un `task` dentro de un primario conductor, contra un
+agente de sonda con `model:` explicito, desde un PROCESO NUEVO (el registro de agentes
+no hace hot-reload). Ese es el unico metodo automatizable de prueba real de subagente,
+y es el que falta como check: hoy el guard verifica cadenas, no arranque.
+
+## Constancia
+
+No se toco `opencode.json`, ni el roster, ni `DECISIONS.md`. Cero modelos de pago.
+
+# T4 - ANEXO MEDIDO: herencia con 0 pines, evidencia positiva del FREE, entrada fantasma, trampa de nombres y resolucion de la aparente contradiccion T3/T4 (2026-10-13)
+
+Evidencia empirica de la tanda que implemento **ADR-096**. El argumento de la decision vive
+**una sola vez** en `DECISIONS.md` ADR-096 (ADR-084 D1); este anexo solo aporta datos.
+
+## 1. `opencode/big-pickle` es ROTO como SUBAGENTE tambien por HERENCIA y con 0 pines
+
+T1 (2026-10-04) lo habia medido **solo con pin explicito**. Dato nuevo, medido con el roster
+en **0 pines** y la delegacion por **herencia**:
+
+```
+Subagent failed (sessionID: ses_eca2f5c86ffezUMEb3nG80ezGf): OpenCode's free tier can only be used from within OpenCode
+```
+
+**0 tokens consumidos. $0.000000.** El fallo **no depende del pin**: ocurre igual por herencia.
+Consecuencia para el guard: `NO_SUBAGENTE` es una clasificacion **medida**, no una cita de T1.
+
+## 2. `opencode/space-bunny-free`: el unico activo con $0 medido para PRIMARIO y SUBAGENTES
+
+Evidencia **positiva** (no un argumento, una medicion): 3 subsesiones reales a **$0.000000**,
+ejecutadas en `ses_ed9df7784ffervevDihdnHv8QM`:
+
+| # | agente invocado | modelo | costo medido | tokens |
+|---|---|---|---|---|
+| 1 | `explore` | `opencode/space-bunny-free` | $0.000000 | (subsesion real) |
+| 2 | `js-silo-dev` | `opencode/space-bunny-free` | $0.000000 | (subsesion real) |
+| 3 | `js-silo-dev` | `opencode/space-bunny-free` | $0.000000 | (subsesion real) |
+
+Mas el **control de T1**: `opencode/space-bunny-free` como subagente pineado, **6.108 tokens**,
+**$0.000000**. Por eso el guard lo marca como la **unica FREE estricta con $0 medido en primario
+Y subagente**.
+
+## 3. Entrada FANTASMA en la allowlist: `opencode-go/space-bunny-free`
+
+Estaba en `FREE_SUPERVIVIENTES` y **no existe en el catalogo del proveedor**. Confirmado por dos
+vias independientes: T3 #2 (`Model "opencode-go/space-bunny-free" is not available`) y el guard,
+que hoy lo aisla como `NO_CATALOGO` (**1**).
+
+Catalogo real medido del proveedor: **13 modelos $0 activos**, de los cuales **5 siguen sin
+clasificar**: `opencode/cat-jam-free`, `opencode/exo-free`, `opencode/ling-3.1-flash-free`,
+`opencode/step-5-preview-free`, `opencode-go/step-5-preview-free`. Ninguno esta referenciado.
+
+## 4. Trampa de nombres: misma familia, precio OPUESTO
+
+| id | tier | precio |
+|---|---|---|
+| `opencode/space-bunny-free` | FREE | $0 |
+| `opencode-go/space-bunny` | **PAGO** | $0.15 entrada / $0.60 salida |
+
+Dos ids que un humano lee como "el mismo modelo" y el proveedor cobra al reves. Es la razon
+medida por la que ADR-096 exige **coincidencia exacta de ids** en lugar de prefijos o sufijos.
+
+## T3 vs T4: NO es una contradiccion (ACLARACION MEDIDA, 2026-10-13)
+
+El mensaje del proveedor (`the free tier can only be used from within OpenCode`) es **generico y
+NO describe el gate real**, que es **por modelo**. Evidencia: `opencode/big-pickle` fue rechazado
+como subagente en **2 mediciones independientes** (pin explicito en la sonda T1 del 2026-10-04 y
+**por herencia con 0 pines** hoy: 0 tokens, $0.000000), mientras `opencode/space-bunny-free` tiene
+**3 subsesiones medidas a $0.000000**. Conclusion operativa: el **trabajo delegado a $0 SI es
+posible** en este repo con `space-bunny-free`; `big-pickle` sirve como **primario** y **no** como
+**subagente**.
+
+**Esto NO es un bug: no debe registrarse como `BUG-XXX`.** Quien vuelva a leer T3 y T4 como
+contradiccion encuentra aqui la explicacion. El registro de T3 **NO se borra** (ADR-003): sigue
+siendo la medicion valida de lo que pasa al delegar a un modelo sin permiso de subagente.
+
+## Constancia
+
+No se toco `opencode.json`, ni el roster, ni `DECISIONS.md`, ni `AGENTS.md` por este anexo.
+Cero modelos de pago: toda la evidencia de este anexo es $0.000000.

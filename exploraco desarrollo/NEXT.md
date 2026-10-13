@@ -244,6 +244,27 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-13 (pase documental unico R2) - TSK-211: ADR-096 implementado + reparacion de los 3 puntos ciegos de medicion + comando `sesion-cero` (cierre)
+
+**Que se estaba haciendo:** cerrar la tanda que **implementa ADR-096** (`ROTOS` partido en 4 listas con motivo, `tierDe(modelo, rol)` fail-closed con `rol` retrocompatible, coincidencia exacta de ids, check (f) estricto, bloque `AVISOS:` separado) y **reparar los 3 puntos ciegos de medicion** que la hicieron falta. El argumento de la decision vive **una sola vez** en `DECISIONS.md` **ADR-096** (ADR-084 D1); aqui solo el relevo.
+
+**Lo que quedo entregado (detalle en TSK-211):** ADR-096 implementado por `@js-silo-dev` (**6/6** verificaciones, smoke **14/14**, guard `RESULTADO: OK` con **18 agentes / 0 pines** re-medido en este pase); `usage_report.js --summary` ya no devuelve "0 sesiones" (filtraba `time_created >= hoy`; ahora cae al ultimo dia con datos y avisa); `verificar-herencia` compara **por instante de spawn** y **degrada a AVISO** (eran 3 falsos "CASCADA ROTA" al cambiar de modelo a mitad de sesion); `--preflight`, `reparto` e `informe-cuota --task` **avisan de snapshot desfasado** (medido **4.351 minutos**, umbral **15**); **NUEVO** `.opencode/commands/sesion-cero.md`, sin `model:` en el frontmatter, con puntero de una linea en `AGENTS.md` §0.
+
+**Que sigue (con criterio de verificacion):**
+
+1. **Pasar ADR-096 de `ACEPTADO, PENDIENTE DE IMPLEMENTAR` a implementado** (`@architect`; este pase no lo edita). **Criterio:** el Estado del ADR dice lo mismo que TSK-211, el argumento **no se duplica** en ningun otro fichero y los conteos de lineas de `DECISIONS.md` cambian **solo** por esa razon.
+2. **RESUELTO (misma fecha) — no era una contradiccion:** el anexo **T4** de `sonda-modelos.md` explica que el mensaje del proveedor es **generico** y el gate real es **por modelo**: `opencode/big-pickle` cae como subagente en **2 mediciones independientes** (pin explicito en T1 el 2026-10-04 y por herencia con **0 pines** hoy), mientras `opencode/space-bunny-free` tiene **3 subsesiones medidas a $0.000000**. El trabajo delegado a $0 **SI es posible** con `space-bunny-free`. **NO es un bug y no se registra como `BUG-XXX`.** No queda re-medicion pendiente.
+3. **Clasificar los 5 modelos $0 sin clasificar** (`opencode/cat-jam-free`, `opencode/exo-free`, `opencode/ling-3.1-flash-free`, `opencode/step-5-preview-free`, `opencode-go/step-5-preview-free`). **Criterio:** cada id acaba en una de las **4 listas de `ROTOS`** o en la allowlist, con la medicion que lo justifica.
+4. **Commit + push PENDIENTES** (working tree, sin commit, sin desplegar).
+5. **PENDIENTE ABIERTO — dueño: `operador`. `opencode.json` tiene 2 borrados SIN respaldo de ADR:** `subagent_depth: 2` y `compaction.prune: true`, detectados **de forma independiente** por `@architect-review` y `@qa-auditor`. **No proviene de ninguno de los encargos de esta tanda**, y **este pase NO los restaura** (`opencode.json` no se toca). Las dos decisiones a tomar, literales: **(i)** si son **intencionales**, que **ADR o decision escrita los respalda**; **(ii)** si **no** lo son, **restaurarlos**. **Criterio:** ambos valores aparecen respaldados por un ADR citado, o vuelven al archivo.
+
+**Riesgos activos:**
+
+1. **El guard mide cadenas, no arranque:** sus 6 checks son **estaticos** (leen `.opencode/agent/*.md` y `opencode.json`) y **ninguno lanza un subagente**; puede dar `OK` con la delegacion caida, porque el fallo ocurre **antes de persistir** en `opencode.db`. Mitigacion: comando `sesion-cero` + `--preflight` + lectura de la cabecera del runtime.
+2. **Snapshot desfasado:** la ultima fila persistida de `opencode.db` puede llevar **dias** de retraso; los informes derivados de ella ahora lo **avisan**, pero siguen siendo un dato viejo.
+3. **Trampa de nombres:** `opencode/space-bunny-free` (**$0**) frente a `opencode-go/space-bunny` (**PAGO**). Un id "casi igual" cambia el tier; por eso el guard exige **coincidencia exacta**.
+4. **Entrada fantasma corregida, no eliminada de la historia:** `opencode-go/space-bunny-free` estaba en la allowlist FREE y **no existe** en el catalogo del proveedor; hoy el guard lo separa como `NO_CATALOGO` (**1**).
+
 ### WORKING TREE 2026-10-12 (pase documental unico R2) - TSK-210: dictado por voz a texto (Web Speech API) en los formularios de creacion de puntos y resenas (cierre)
 
 **Que se estaba haciendo:** anadir un micro de **dictado por voz** a los campos de texto largos de los formularios de creacion (alta de destino, Activo Oculto / Wayfarer, comentarios de album y resena de la ficha). Feature **100% cliente**, implementacion directa **sin ADR aprobado** y **sin ADR retroactivo**.

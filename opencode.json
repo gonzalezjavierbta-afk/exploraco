@@ -3,7 +3,6 @@
   "model": "opencode/space-bunny-free",
   "small_model": "opencode/space-bunny-free",
   "default_agent": "build",
-  "subagent_depth": 2,
   "permission": {
     "read": "allow",
     "edit": "allow",
@@ -22,7 +21,6 @@
   },
   "compaction": {
     "auto": true,
-    "prune": true,
     "reserved": 10000
   },
   "watcher": {

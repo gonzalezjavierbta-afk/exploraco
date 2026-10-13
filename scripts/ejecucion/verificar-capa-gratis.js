@@ -16,8 +16,17 @@
 //   (d) Cobertura de tiers POR LA SESION (D2), no por el frontmatter del agente:
 //       las dos allowlists existen, son disjuntas y el default arranca en FREE.
 //       El reparto real se mide con repartoPorTier() sobre message.data.modelID.
-//   (e) Cero pines en TODO el roster, ninguno en ROTOS, ninguno fuera de allowlist.
-//   (f) El default de sesion (opencode.json model y small_model) sigue en FREE.
+//   (e) Cero pines en TODO el roster, ninguno en las listas de prohibicion
+//       (ADR-096 B1: NO_SUBAGENTE / NO_CATALOGO / NO_MEDIDO, cada una con su
+//       motivo), ninguno fuera de allowlist.
+//   (f) El default de sesion (opencode.json model y small_model) es FREE
+//       ESTRICTA: exactamente los ids con $0 MEDIDO en primario Y subagente
+//       (ADR-096 B2). Un gratuito solo permitido en la allowlist da AVISO, no OK.
+//
+// ADR-096 (B1/B2) en una linea: el tier depende del ROL (tierDe(m, rol), con
+// 'sesion' por defecto), la coincidencia de ids es EXACTA (prohibido startsWith
+// o includes para decidir tier) y los modelos SIN_ADMITIR son INFORMATIVOS:
+// van al bloque AVISOS y nunca suman en fallas.
 //
 // DELIBERADAMENTE NO EXISTE el check "una sesion no debe contener mas de un modelo":
 // ese check prohibia exactamente lo que el operador quiere hacer (abrir en FREE y
@@ -38,8 +47,13 @@
 //   node scripts/ejecucion/verificar-capa-gratis.js
 //   node scripts/ejecucion/verificar-capa-gratis.js --json
 //   node scripts/ejecucion/verificar-capa-gratis.js verificar-herencia --sesion <id>
-//   node scripts/ejecucion/verificar-capa-gratis.js reparto --sesion <id>
-//   node scripts/ejecucion/verificar-capa-gratis.js --preflight [--umbral <tokens>]
+//   node scripts/ejecucion/verificar-capa-gratis.js reparto --sesion <id> [--rol sesion|subagente]
+//   node scripts/ejecucion/verificar-capa-gratis.js --preflight [--umbral <tokens>] [--rol sesion|subagente]
+//   node scripts/ejecucion/verificar-capa-gratis.js --help
+//
+// --rol (ADR-096, cambio 12) distingue el rol que se juzga: 'sesion' por defecto
+// y 'subagente' explicito. La tabla opencode.db no marca cual es cual, asi que el
+// default es 'sesion' y se documenta en vez de adivinarse.
 //
 // Todos los modos abren opencode.db en SOLO LECTURA (node:sqlite) y exigen, para
 // verificar-herencia, que hijo.model == padre.model. Sin --sesion se salta.
@@ -66,9 +80,21 @@ const FREE = [
 
 // Supervivientes de ADR-074 (dentro del FREE verificado alli). NO se usan como
 // pin de primario: solo se aceptan como default de sesion en el check (f).
+// ADR-096 B2: opencode-go/space-bunny-free SALE de aqui porque es FANTASMA (no
+// existe en el catalogo del proveedor); pasa a NO_CATALOGO.
+// opencode-go/longcat-2.5-preview-free PERMANECE (existe en el catalogo y no
+// esta prohibido), pero queda FUERA del check (f), porque el check (f) exige
+// FREE ESTRICTA: la unica con $0 MEDIDO en primario Y subagente.
+// Criterio: permitido en allowlist != permitido como default del check (f).
 const FREE_SUPERVIVIENTES = [
-  'opencode-go/space-bunny-free',
   'opencode-go/longcat-2.5-preview-free',
+];
+
+// ADR-096 B2: FREE ESTRICTA = la unica combinacion segura para una sesion
+// completa, porque es la unica con $0.000000 MEDIDO en LOS DOS roles (3
+// subsesiones + control de la sonda T1). Hoy es un solo identificador.
+const FREE_ESTRICTA = [
+  'opencode/space-bunny-free',
 ];
 
 // PAGO medido. Marcadas como pagadas, no como gratuitas: usarlas es una decision
@@ -79,12 +105,37 @@ const PAGO = [
   'opencode-go/glm-5.3-flash',
 ];
 
-// ROTOS: parecen gratis por el nombre pero el proveedor los rechaza como
-// subagente. Error LITERAL medido para opencode/big-pickle:
-//   Error from provider (Console): OpenCode's free tier can only be used from within OpenCode
-// No usarlos en .opencode/agent/*.md (verificado 2026-09-30, reaffirmed 2026-10-04).
-const ROTOS = [
+// --- Prohibidos: CUATRO listas, una por motivo (ADR-096 B1) -------------------
+// ADR-096 parte la antigua lista plana ROTOS, que mezclaba un rechazo medido con
+// seis heredados. Regla que lo obliga (ADR-006): el guard solo puede afirmar un
+// motivo que tiene MEDIDO. Cada lista lleva su motivo y su rol.
+
+// NO_SUBAGENTE: unico con error LITERAL medido como subagente (2026-10-13, por
+// herencia y con 0 pines, 0 tokens, $0.000000):
+//   Subagent failed (...): OpenCode's free tier can only be used from within OpenCode
+// Aplica SOLO al rol subagente. Como modelo de sesion/primario esta NO MEDIDO,
+// asi que NO se admite (fuera de allowlist hasta su sonda).
+const NO_SUBAGENTE = [
   'opencode/big-pickle',
+];
+const ERR_BIG_PICKLE = 'OpenCode' + String.fromCharCode(39) + 's free tier can only be used from within OpenCode';
+const MOTIVO_NO_SUBAGENTE =
+  'error literal medido como subagente: "' + ERR_BIG_PICKLE + '" (0 tokens, $0.000000) | aplica SOLO al rol subagente';
+
+// NO_CATALOGO: allowlists que NO existen en el catalogo del proveedor (fantasma).
+// Un id que no existe no puede ser default de sesion ni allowlist: es una promesa
+// que el proveedor no puede cumplir. Gana a cualquier otro veredicto, en ambos roles.
+const NO_CATALOGO = [
+  'opencode-go/space-bunny-free',
+];
+const MOTIVO_NO_CATALOGO =
+  'medido: NO existe en el catalogo del proveedor (fantasma) | gana en ambos roles';
+
+// NO_MEDIDO: los 6 rechazos HEREDADOS de sondeos antiguos, SIN error literal
+// registrado en el repo. Se conservan prohibidos para no ceder terreno sin
+// medicion, pero no se les inventa un motivo medido. Aplican a ambos roles y
+// NUNCA cuentan como FREE.
+const NO_MEDIDO = [
   'opencode/ling-3.0-flash-fin-free',
   'opencode/longcat-2.5-preview-free',
   'opencode/mimo-v2.6-flash-free',
@@ -92,6 +143,27 @@ const ROTOS = [
   'opencode/nemotron-3-ultra-free',
   'opencode/nemotron-3.5-lightning-free',
 ];
+const MOTIVO_NO_MEDIDO =
+  'rechazo heredado de sondeos antiguos, sin error literal registrado en el repo | prohibidos en ambos roles hasta medirlos';
+
+// SIN_ADMITIR: gratis REAL (input=output=cache=0, status active) pero NO medido
+// en este repo. INFORMATIVO: va al bloque AVISOS, nunca a fallas. Se admiten solo
+// con sonda propia (subagente MAS primario) y un ADR de admision.
+const SIN_ADMITIR = [
+  'opencode/cat-jam-free',
+  'opencode/exo-free',
+  'opencode/ling-3.1-flash-free',
+  'opencode/step-5-preview-free',
+  'opencode-go/step-5-preview-free',
+];
+const MOTIVO_SIN_ADMITIR =
+  'gratis real, NO medido en este repo: midalo antes de usarlo';
+
+// ROTOS: union DERIVADA de las tres listas de prohibicion. Se mantiene porque el
+// JSON publica "rotos" y porque hay checks de coherencia que preguntan "esta
+// prohibido, si o no". NO usar esta lista para decidir el tier: para eso estan
+// los predicados por motivo (el rol cambia el veredicto).
+const ROTOS = NO_SUBAGENTE.concat(NO_CATALOGO, NO_MEDIDO);
 
 const N_SUBAGENTES_ESPERADOS = 16;
 const N_PRIMARIOS_ESPERADOS = 2;
@@ -119,6 +191,27 @@ const UMBRAL_PREFLIGHT_TOKENS = 100000; // ~$0.0077 por turno a deepseek
 // FREE -> PAGO es un CAMBIO DE TIER, no una escalada tardia: el riesgo es distinto
 // (el segundo no justifica la alarma de las ~35x) y el turno sigue costando ~$0.
 const UMBRAL_ESCALADA_TARDIA_TOKENS = UMBRAL_PREFLIGHT_TOKENS;
+
+// --- TRAMPA DE NOMBRES (medida; no re-sondear) --------------------------------
+// Dos modelos de familia "space-bunny" con precios opuestos. El nombre NO dice
+// si el turno cuesta $0: lo dice el PROVEEDOR.
+//   opencode/space-bunny-free -> FREE verificado ($0.000000 en opencode.db).
+//   opencode-go/space-bunny   -> PAGO. Medido: $0.15 por Mtokens de entrada y
+//                                $0.60 por Mtokens de salida.
+const MODELO_FREE = FREE[0];
+const MODELO_PARADOJO = 'opencode-go/space-bunny';
+const PRECIO_USD_POR_MTOK_ENTRADA_PARADOJO = 0.15;
+const PRECIO_USD_POR_MTOK_SALIDA_PARADOJO = 0.60;
+
+// --- DESFASADE DE LA MEDICION (medido) ---------------------------------------
+// opencode.db se escribe al CIERRE del turno: la ultima fila persistida puede
+// ser de hace horas mientras el operador ya cambio de modelo en el selector. Un
+// reporte que imprime ese modelo sin decirlo presenta un dato viejo como si
+// fuera el vigente (medido 2026-10-13: --preflight, reparto e informe-cuota
+// devolvieron el mismo snapshot congelado, 3 dias, tres veces seguidas).
+// Por encima de este umbral la medicion se declara desfasada y el modelo
+// reportado se marca como "puede no ser el actual".
+const UMBRAL_DESFASE_MS = 15 * 60 * 1000; // 15 min
 
 // --- Parseo ------------------------------------------------------------------
 
@@ -161,20 +254,61 @@ function leerConfig(p) {
 function esFree(m) {
   return FREE.indexOf(m) >= 0 || FREE_SUPERVIVIENTES.indexOf(m) >= 0;
 }
+function esFreeEstricta(m) {
+  return FREE_ESTRICTA.indexOf(m) >= 0;
+}
 function esPago(m) {
   return PAGO.indexOf(m) >= 0;
 }
+// ADR-096 B1: un predicado por motivo (coincidencia EXACTA de cadena completa
+// provider/model; prohibido startsWith/includes para decidir tier).
+function esNoSubagente(m) {
+  return NO_SUBAGENTE.indexOf(m) >= 0;
+}
+function esNoCatalogo(m) {
+  return NO_CATALOGO.indexOf(m) >= 0;
+}
+function esNoMedido(m) {
+  return NO_MEDIDO.indexOf(m) >= 0;
+}
+function esSinAdmitir(m) {
+  return SIN_ADMITIR.indexOf(m) >= 0;
+}
+// Union de las TRES listas de prohibicion. Es un agregado de coherencia, no un
+// veredicto de tier: NO_SUBAGENTE solo aplica al rol subagente.
 function esRoto(m) {
-  return ROTOS.indexOf(m) >= 0;
+  return esNoSubagente(m) || esNoCatalogo(m) || esNoMedido(m);
+}
+// Motivo citable del veredicto prohibido (para que el mensaje diga el POR QUE).
+function motivoProhibido(m) {
+  if (esNoCatalogo(m)) return 'NO_CATALOGO: ' + MOTIVO_NO_CATALOGO;
+  if (esNoSubagente(m)) return 'NO_SUBAGENTE: ' + MOTIVO_NO_SUBAGENTE;
+  if (esNoMedido(m)) return 'NO_MEDIDO: ' + MOTIVO_NO_MEDIDO;
+  return '';
 }
 function enAllowlist(m) {
   return esFree(m) || esPago(m);
 }
-function tierDe(m) {
+
+// ROL: el veredicto depende de si el modelo va a usarse como sesion (primario) o
+// como subagente. La tabla opencode.db NO distingue los dos casos, asi que el
+// default documentado es 'sesion' (ADR-096, respuesta 2 del autor).
+function normRol(rol) {
+  return rol === 'subagente' ? 'subagente' : 'sesion';
+}
+
+// tierDe(m, rol): orden FAIL-CLOSED (ADR-096 B1). NO_SUBAGENTE se evalua ANTES de
+// FREE para que un modelo gratis nunca se degrade a FREE por el hecho de serlo;
+// NO_MEDIDO tambien va antes de admitir. Coincidencia EXACTA de id completo.
+function tierDe(m, rol) {
+  const r = normRol(rol);
   if (!m) return 'SIN-MODELO';
-  if (esRoto(m)) return 'ROTO';
+  if (esNoCatalogo(m)) return 'ROTO_CATALOGO';
+  if (r === 'subagente' && esNoSubagente(m)) return 'ROTO_SUBAGENTE';
+  if (esNoMedido(m)) return 'NO_MEDIDO';
   if (esFree(m)) return 'FREE';
   if (esPago(m)) return 'PAGO';
+  if (esSinAdmitir(m)) return 'FUERA_ADMITIDO_A_CONSCIENCIA';
   return 'FUERA-DE-ALLOWLIST';
 }
 
@@ -187,12 +321,26 @@ function capaDe(a) {
   return 'ESPECIALISTA-HEREDADO';
 }
 
-function modoDe(a) {
+// modoDe(a, rol): etiqueta corta. Distingue ROTO_SUBAGENTE / ROTO_CATALOGO /
+// NO_MEDIDO; ROTO sigue siendo la etiqueta agregada (esRoto y porTier.ROTO).
+function modoDe(a, rol) {
   if (!a.model) return 'hereda';
-  if (esFree(a.model)) return 'free';
-  if (esRoto(a.model)) return 'ROTO';
-  if (esPago(a.model)) return 'pago';
+  const t = tierDe(a.model, rol);
+  if (t === 'FREE') return 'free';
+  if (t === 'PAGO') return 'pago';
+  if (t === 'ROTO_SUBAGENTE' || t === 'ROTO_CATALOGO' || t === 'NO_MEDIDO') return t;
+  if (t === 'FUERA_ADMITIDO_A_CONSCIENCIA') return 'FUERA_ADMITIDO_A_CONSCIENCIA';
   return 'FUERA';
+}
+
+// ADR-096 B2: la trampa real vive en el SELECTOR del TUI, que busca por nombre.
+// Aqui se ataca imprimiendo el id COMPLETO y anadiendo una linea explicita cuando
+// la cadena contiene space-bunny sin ser el unico gratis verificado.
+function esTrampaDeNombre(m) {
+  return typeof m === 'string' && m.indexOf('space-bunny') >= 0 && m !== MODELO_FREE;
+}
+function avisoTrampaNombre(m) {
+  return 'ATENCION: ' + m + ' es PAGO o no verificado; el unico gratis verificado para primario y subagente es ' + MODELO_FREE + '.';
 }
 
 // Texto de todas las sondas: un modelo fuera de las allowlists solo se admite
@@ -216,13 +364,14 @@ function textoSondas(dir) {
 
 // --- Checks estaticos (a) a (f) ----------------------------------------------
 
-function verificar(root) {
+function verificar(root, rol) {
   const agDir = path.join(root, '.opencode', 'agent');
   const agentes = leerAgentes(agDir);
   const cfg = leerConfig(path.join(root, 'opencode.json'));
   const sondas = textoSondas(path.join(root, 'scripts', 'ejecucion', 'sondas'));
   const fallas = [];
   const checks = [];
+  const avisos = [];
 
   if (!agentes.length) fallas.push('No se encontro ningun agente en .opencode/agent/*.md');
   if (!cfg) fallas.push('opencode.json no existe o no es JSON valido');
@@ -298,17 +447,25 @@ function verificar(root) {
   PAGO.forEach((m) => {
     if (esRoto(m)) fallas.push('(d) ' + m + ' esta en PAGO y en ROTOS a la vez');
   });
+  // ADR-096 B2: la FREE ESTRICTA (default del check (f)) tiene que seguir siendo
+  // un subconjunto de la allowlist FREE: si no, el check (f) exigiria algo que la
+  // allowlist no autoriza.
+  FREE_ESTRICTA.filter((m) => !esFree(m)).forEach((m) => {
+    fallas.push('(d) ' + m + ' esta en FREE_ESTRICTA (default del check (f)) y no en la allowlist FREE');
+  });
   checks.push({
     id: 'd',
     ok: !fallas.some((f) => f.indexOf('(d)') === 0),
-    detalle: 'tiers por sesion: FREE ' + FREE.length + ' modelo(s) | PAGO ' + PAGO.length +
+    detalle: 'tiers por sesion: FREE ' + FREE.length + ' modelo(s) | FREE estricta ' + FREE_ESTRICTA.length +
+      ' (unica con $0 medido en primario Y subagente) | PAGO ' + PAGO.length +
       ' modelo(s) | 0 pines en el roster; el reparto real se mide por message.data.modelID',
   });
 
-  // (e) Cero pines en todo el roster, y ninguno en ROTOS ni fuera de allowlist.
+  // (e) Cero pines en todo el roster, y ninguno en las listas de prohibicion ni
+  // fuera de allowlist. El motivo se imprime con su lista (ADR-096 B1).
   pineados.forEach((a) => {
     if (esRoto(a.model)) {
-      fallas.push('(e) ' + a.name + ' pinea ' + a.model + ', que esta en ROTOS (el proveedor lo rechaza como subagente)');
+      fallas.push('(e) ' + a.name + ' pinea ' + a.model + ', que esta prohibido -> ' + motivoProhibido(a.model));
       return;
     }
     if (!enAllowlist(a.model)) {
@@ -321,33 +478,58 @@ function verificar(root) {
   });
   if (cfg && pineados.length === 0 && (cfg.model || cfg.small_model)) {
     [cfg.model, cfg.small_model].forEach((m) => {
-      if (m && esRoto(m)) fallas.push('(e) el default de sesion ' + m + ' esta en ROTOS');
+      if (m && esRoto(m)) fallas.push('(e) el default de sesion ' + m + ' esta prohibido -> ' + motivoProhibido(m));
     });
   }
   checks.push({
     id: 'e',
     ok: pineados.length === 0 || pineados.every((a) => !esRoto(a.model) && enAllowlist(a.model)),
-    detalle: pineados.length + ' pines en ' + agentes.length + ' agentes | ROTOS: ' + ROTOS.length +
-      ' modelos, ninguno referenciado | opencode/big-pickle sigue ROTO',
+    detalle: pineados.length + ' pines en ' + agentes.length + ' agentes | prohibidos: NO_SUBAGENTE ' +
+      NO_SUBAGENTE.length + ', NO_CATALOGO ' + NO_CATALOGO.length + ', NO_MEDIDO ' + NO_MEDIDO.length +
+      ' modelos, ninguno referenciado | opencode/big-pickle sigue prohibido como subagente',
   });
 
-  // (f) Default de sesion FREE: que ninguna sesion arranque en pago por omision.
+  // (f) ADR-096 B2, endurecido: el default de sesion debe ser FREE ESTRICTA, es
+  // decir EXACTAMENTE los ids con $0 medido en primario Y subagente (hoy:
+  // opencode/space-bunny-free). Un modelo de FREE_SUPERVIVIENTES (permitido en la
+  // allowlist) NO vale como default: se marca como AVISO, no como falla.
+  // Criterio: permitido en allowlist != permitido en el check (f).
   if (cfg) {
     ['model', 'small_model'].forEach((k) => {
       const v = cfg[k];
       if (!v) {
         fallas.push('(f) opencode.json no declara "' + k + '"');
-      } else if (!esFree(v)) {
+      } else if (esFreeEstricta(v)) {
+        // correcto: es la unica combinacion segura para una sesion completa.
+      } else if (esFree(v)) {
+        avisos.push(
+          '(f) opencode.json "' + k + '" = ' + v + ' esta en FREE_SUPERVIVIENTES (permitido en la allowlist) ' +
+          'pero NO es FREE estricta: no tiene $0 medido en primario Y subagente. Default exigido: ' +
+          FREE_ESTRICTA.join(', ')
+        );
+      } else {
         fallas.push(
-          '(f) opencode.json "' + k + '" = ' + v + ' no esta en la allowlist FREE -> la sesion arrancaria en pago. Allowlist: ' +
-          FREE.concat(FREE_SUPERVIVIENTES).join(', ')
+          '(f) opencode.json "' + k + '" = ' + v + ' no es FREE estricta -> la sesion arrancaria en pago o en un modelo no medido. FREE estricta: ' +
+          FREE_ESTRICTA.join(', ') + ' | allowlist FREE: ' + FREE.concat(FREE_SUPERVIVIENTES).join(', ')
         );
       }
+      if (esTrampaDeNombre(v)) avisos.push('(f) ' + avisoTrampaNombre(v));
     });
   }
-  checks.push({ id: 'f', ok: !fallas.some((f) => f.indexOf('(f)') === 0), detalle: 'default de sesion: ' + (cfg ? cfg.model + ' / ' + cfg.small_model : '?') });
+  checks.push({ id: 'f', ok: !fallas.some((f) => f.indexOf('(f)') === 0), detalle: 'default de sesion: ' + (cfg ? cfg.model + ' / ' + cfg.small_model : '?') + ' | exigido: ' + FREE_ESTRICTA.join(', ') });
 
-  return { agentes, cfg, fallas, checks, nPrim: prims.length, nSub: subs.length, nPines: pineados.length };
+  // ADR-096 B1/B2: las listas sin medicion van a AVISO, nunca a falla.
+  if (NO_MEDIDO.length) {
+    avisos.push('NO_MEDIDO (' + NO_MEDIDO.length + '): ' + MOTIVO_NO_MEDIDO + '. Sigues sin poder usarlos, pero no hay error literal que citar.');
+  }
+  if (SIN_ADMITIR.length) {
+    avisos.push('SIN_ADMITIR (' + SIN_ADMITIR.length + '): ' + MOTIVO_SIN_ADMITIR + '. ' + SIN_ADMITIR.join(', '));
+  }
+  if (NO_CATALOGO.length) {
+    avisos.push('NO_CATALOGO (' + NO_CATALOGO.length + '): ' + MOTIVO_NO_CATALOGO + '. Fuera de las allowlists: ' + NO_CATALOGO.join(', '));
+  }
+
+  return { agentes, cfg, fallas, checks, avisos, nPrim: prims.length, nSub: subs.length, nPines: pineados.length };
 }
 
 // --- Lectura de opencode.db (solo lectura) -----------------------------------
@@ -381,18 +563,22 @@ function normModel(m) {
 }
 
 function filasSesion(db, sesionId, avisos) {
+  // time_updated y el ultimo message.time_created son las marcas de actualizacion
+  // que usa la deteccion de medicion desfasada (evaluarDesfase).
   const sql =
-    'WITH RECURSIVE d(id,parent_id,agent,model,cost) AS (' +
-    'SELECT id,parent_id,agent,model,cost FROM session WHERE id = ?' +
+    'WITH RECURSIVE d(id,parent_id,agent,model,cost,time_updated) AS (' +
+    'SELECT id,parent_id,agent,model,cost,time_updated FROM session WHERE id = ?' +
     ' UNION ALL ' +
-    'SELECT s.id,s.parent_id,s.agent,s.model,s.cost FROM session s JOIN d ON s.parent_id = d.id' +
-    ') SELECT id,parent_id,agent,model,cost FROM d';
+    'SELECT s.id,s.parent_id,s.agent,s.model,s.cost,s.time_updated FROM session s JOIN d ON s.parent_id = d.id' +
+    ') SELECT d.id,d.parent_id,d.agent,d.model,d.cost,d.time_updated,' +
+    '(SELECT MAX(m.time_created) FROM message m WHERE m.session_id = d.id) AS ultimoMensaje FROM d';
   try {
     return db.prepare(sql).all(sesionId);
   } catch (e) {
     // Fallback: sin CTE, se reconstruye la cadena en JS.
     avisos.push('CTE no disponible, se reconstruyo la cadena en JS (' + e.message + ')');
-    const todas = db.prepare('SELECT id,parent_id,agent,model,cost FROM session').all();
+    const todas = db.prepare('SELECT id,parent_id,agent,model,cost,time_updated,' +
+      '(SELECT MAX(m.time_created) FROM message m WHERE m.session_id = session.id) AS ultimoMensaje FROM session').all();
     const raices = todas.filter((r) => r.id === sesionId);
     if (!raices.length) return [];
     const dentro = new Set([sesionId]);
@@ -454,20 +640,28 @@ function mensajesAsistente(db, ids, avisos) {
   return out;
 }
 
-function tierDeMensaje(m) {
-  const lleno = m.providerID ? m.providerID + '/' + m.modelID : m.modelID;
-  if (esFree(lleno)) return 'FREE';
-  if (esPago(lleno)) return 'PAGO';
-  if (esRoto(lleno)) return 'ROTO';
-  // Algunos proveedores se filtran sin proveedor en la allowlist: compara por id.
-  return enAllowlist(lleno) ? 'FUERA' : tierDe(m.modelID);
+// ADR-096 (cambio 4): tierDeMensaje manda el id COMPLETO provider/model a tierDe.
+// El fallback sin provider/ de antes se elimina: si falta providerID el resultado
+// es SIN-PROVEEDOR (un dato que obliga a mirar el registro, no una etiqueta
+// adivinada). FUERA y FUERA-DE-ALLOWLIST quedan unificados en FUERA-DE-ALLOWLIST.
+// rol: default 'sesion' (la tabla opencode.db no distingue sesion de subagente).
+function tierDeMensaje(m, rol) {
+  if (!m || !m.providerID) return 'SIN-PROVEEDOR';
+  return tierDe(m.providerID + '/' + m.modelID, normRol(rol));
 }
 
-function repartoPorTier(dbPath, sesionId) {
+function repartoPorTier(dbPath, sesionId, rol) {
+  const r = normRol(rol);
   const res = {
-    sesion: sesionId, db: dbPath, filas: [], mensajes: [],
-    porModelo: [], porTier: { FREE: 0, PAGO: 0, ROTO: 0, FUERA: 0 },
-    escalada: null, avisos: [], fallas: [],
+    sesion: sesionId, db: dbPath, filas: [], mensajes: [], rol: r,
+    porModelo: [],
+    // Las 4 claves de siempre (formato de salida intacto) + las nuevas de ADR-096.
+    porTier: {
+      FREE: 0, PAGO: 0, ROTO: 0, FUERA: 0,
+      ROTO_SUBAGENTE: 0, ROTO_CATALOGO: 0, NO_MEDIDO: 0, FUERA_ADMITIDO_A_CONSCIENCIA: 0,
+      'SIN-PROVEEDOR': 0,
+    },
+    escalada: null, avisos: [], fallas: [], desfase: null,
   };
   const ab = abrirDb(dbPath);
   if (!ab.db) { res.fallas.push(ab.error); return res; }
@@ -482,6 +676,7 @@ function repartoPorTier(dbPath, sesionId) {
       res.fallas.push('la sesion ' + sesionId + ' no existe en ' + dbPath);
       return res;
     }
+    res.desfase = evaluarDesfase(db, res.filas, UMBRAL_DESFASE_MS);
     res.mensajes = mensajesAsistente(db, res.filas.map((f) => f.id), res.avisos);
   } catch (e) {
     res.fallas.push('error leyendo la sesion: ' + e.message);
@@ -492,7 +687,7 @@ function repartoPorTier(dbPath, sesionId) {
   const mapa = new Map();
   res.mensajes.forEach((m) => {
     const k = m.modelo;
-    if (!mapa.has(k)) mapa.set(k, { modelo: k, tier: tierDeMensaje(m), mensajes: 0, tokens: 0, cost: 0, agentes: new Set() });
+    if (!mapa.has(k)) mapa.set(k, { modelo: k, tier: tierDeMensaje(m, r), mensajes: 0, tokens: 0, cost: 0, agentes: new Set() });
     const e = mapa.get(k);
     e.mensajes++;
     e.tokens += m.tokens;
@@ -503,7 +698,11 @@ function repartoPorTier(dbPath, sesionId) {
     .map((e) => ({ modelo: e.modelo, tier: e.tier, mensajes: e.mensajes, tokens: e.tokens, cost: e.cost, agentes: Array.from(e.agentes).sort() }))
     .sort((a, b) => b.tokens - a.tokens);
   res.porModelo.forEach((e) => { res.porTier[e.tier] = (res.porTier[e.tier] || 0) + e.mensajes; });
-  res.escalada = escaladaTardia(res.mensajes);
+  // ADR-096 (cambio 8): un modelo de SIN_ADMITIR es informativo, no una falla.
+  res.porModelo.filter((e) => e.tier === 'FUERA_ADMITIDO_A_CONSCIENCIA').forEach((e) => {
+    res.avisos.push(MOTIVO_SIN_ADMITIR + ': ' + e.modelo + ' (' + e.mensajes + ' mensajes de asistente)');
+  });
+  res.escalada = escaladaTardia(res.mensajes, r);
   return res;
 }
 
@@ -516,12 +715,13 @@ function repartoPorTier(dbPath, sesionId) {
 //     (el mismo turno ya no es barato y la asimetria de momento se paga).
 //   - por debajo del suelo -> CAMBIO-DE-TIER: el operador cambio de precio en el
 //     selector y el turno sigue costando ~$0; se informa, sin lenguaje de escalada.
-function escaladaTardia(mensajes) {
+function escaladaTardia(mensajes, rol) {
   if (!mensajes || mensajes.length < 2) return null;
+  const r = normRol(rol);
   const primero = mensajes[0];
   const ultimo = mensajes[mensajes.length - 1];
-  const t0 = tierDeMensaje(primero);
-  const t1 = tierDeMensaje(ultimo);
+  const t0 = tierDeMensaje(primero, r);
+  const t1 = tierDeMensaje(ultimo, r);
   if (!(t0 === 'FREE' && t1 === 'PAGO')) return null;
   const coste = (tokens) => tokens * COSTO_USD_POR_TOKEN_PAGO;
   const factor = primero.tokens > 0 ? ultimo.tokens / primero.tokens : 0;
@@ -538,6 +738,52 @@ function escaladaTardia(mensajes) {
   };
 }
 
+// --- Deteccion de medicion desfasada (A4) ------------------------------------
+// Compara la ultima fila persistida de la sesion (message.time_created) con la
+// marca de actualizacion de la fila de sesion y con la hora actual. Si la
+// diferencia supera UMBRAL_DESFASE_MS, el snapshot es viejo: el modelo que se
+// reporte puede no ser el vigente. NO se falla por esto: es un AVISO con numero,
+// porque el dato no se inventa, se declara viejo.
+function marcasDeActualizacion(filas) {
+  let maxMsg = 0;
+  let maxSes = 0;
+  (filas || []).forEach((f) => {
+    if (f.time_updated && f.time_updated > maxSes) maxSes = f.time_updated;
+    if (f.ultimoMensaje && f.ultimoMensaje > maxMsg) maxMsg = f.ultimoMensaje;
+  });
+  return { maxMsg: maxMsg, maxSesion: maxSes };
+}
+
+function evaluarDesfase(db, filas, umbralMs) {
+  const u = isFinite(umbralMs) && umbralMs > 0 ? umbralMs : UMBRAL_DESFASE_MS;
+  const ahora = Date.now();
+  const m = marcasDeActualizacion(filas);
+  const ultimaFila = Math.max(m.maxMsg, m.maxSesion);
+  const res = {
+    desfasado: false, ahoraMs: ahora, ultimaFilaMs: ultimaFila,
+    ultimoMensajeMs: m.maxMsg, ultimaSesionMs: m.maxSesion,
+    edadMs: 0, umbralMs: u, motivo: '',
+  };
+  if (!ultimaFila) {
+    res.motivo = 'no hay ninguna fila persistida en esta sesion todavia';
+    return res;
+  }
+  res.edadMs = Math.max(0, ahora - ultimaFila);
+  if (res.edadMs > u) {
+    res.desfasado = true;
+    res.motivo = 'la ultima fila persistida de opencode.db es de ' +
+      new Date(ultimaFila).toISOString() + ' y ahora es ' + new Date(ahora).toISOString() +
+      ' (' + Math.round(res.edadMs / 60000) + ' min de retraso, umbral ' + Math.round(u / 60000) + ' min)';
+  }
+  return res;
+}
+
+function lineaDesfase(desfase) {
+  if (!desfase || !desfase.desfasado) return null;
+  return 'AVISO DE MEDICION DESFASADA: ' + desfase.motivo +
+    '. El modelo reportado puede NO ser el actual: verificalo en el selector antes de decidir.';
+}
+
 function fmtTokens(n) {
   return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
@@ -548,7 +794,7 @@ function fmtUsd(x) {
 // --- Asercion de herencia (ADR-082, punto 4) --------------------------------
 
 function verificarHerencia(dbPath, sesionId) {
-  const res = { sesion: sesionId, db: dbPath, filas: [], comparadas: 0, fallas: [], avisos: [] };
+  const res = { sesion: sesionId, db: dbPath, filas: [], comparadas: 0, noComparables: 0, fallas: [], avisos: [], desfase: null };
   const ab = abrirDb(dbPath);
   if (!ab.db) { res.fallas.push(ab.error); return res; }
   const db = ab.db;
@@ -558,6 +804,7 @@ function verificarHerencia(dbPath, sesionId) {
       return res;
     }
     res.filas = filasSesion(db, sesionId, res.avisos);
+    res.desfase = evaluarDesfase(db, res.filas, UMBRAL_DESFASE_MS);
   } catch (e) {
     res.fallas.push('error leyendo la sesion: ' + e.message);
     return res;
@@ -571,24 +818,91 @@ function verificarHerencia(dbPath, sesionId) {
   }
   const porId = {};
   res.filas.forEach((f) => { porId[f.id] = f; });
+
+  // Timeline del padre: modelo del padre en cada instante, para comparar al hijo
+  // contra el modelo ACTIVO en el instante de su spawn, no contra una unica raiz.
+  // Motivo (ADR-083 D1): el padre puede cambiar de modelo en el selector a mitad
+  // de sesion; session.model es solo el ULTIMO, asi que comparar contra el
+  // produce "CASCADA ROTA" en cuanto el padre escalo. El hijo que se lanzo antes
+  // del cambio esta correctamente en el modelo anterior.
+  const timelines = new Map();
+  const ids = res.filas.map((f) => f.id);
+  if (ids.length) {
+    const ab2 = abrirDb(dbPath);
+    if (ab2.db) {
+      const db2 = ab2.db;
+      try {
+        mensajesAsistente(db2, ids, res.avisos).forEach((m) => {
+          if (!timelines.has(m.sesion)) timelines.set(m.sesion, []);
+          timelines.get(m.sesion).push(m);
+        });
+      } catch (e) {
+        res.avisos.push('no se pudo reconstruir la linea de tiempo de modelos: ' + e.message);
+      } finally {
+        try { db2.close(); } catch (e) { /* cierre */ }
+      }
+    }
+  }
+
+  // Modelo del padre en el instante t (ultimo mensaje de asistente del padre
+  // con time_created <= t). null si todavia no hay ninguno.
+  const padreEn = (padreId, t) => {
+    const tl = timelines.get(padreId) || [];
+    let elegido = null;
+    for (let i = 0; i < tl.length; i++) {
+      if (tl[i].t <= t) elegido = tl[i];
+      else break;
+    }
+    return elegido;
+  };
+
+  const cambiosPadre = new Set();
   res.filas.forEach((f) => {
     if (!f.parent_id) return;
     const padre = porId[f.parent_id];
     const hi = normModel(f.model);
-    const pa = padre ? normModel(padre.model) : null;
     if (padre === undefined) {
-      res.avisos.push('el padre de ' + f.agent + ' no esta en la cadena reconstruida: no comparable');
+      res.avisos.push('el padre de ' + (f.agent || f.id) + ' no esta en la cadena reconstruida: no comparable');
       return;
     }
+
+    const tlPadre = timelines.get(padre.id) || [];
+    const tlHijo = timelines.get(f.id) || [];
+    const spawnHijo = tlHijo.length ? tlHijo[0].t : (f.time_created || f.ultimoMensaje || 0);
+    const ref = padreEn(padre.id, spawnHijo);
+    const pa = ref ? ref.modelo : null;
+
+    if (!pa) {
+      // No se puede reconstruir el instante: se degrada a AVISO (no FALLA).
+      res.avisos.push(
+        'no reconstruible: ' + (f.agent || f.id) + ' declara ' + (hi || '(sin modelo)') +
+        ' y su padre ' + (padre.agent || padre.id) + ' no tiene ningun mensaje de asistente escrito en el instante de su spawn' +
+        ' -> no comparable (ADVERTENCIA, no FALLA)'
+      );
+      return;
+    }
+
     res.comparadas++;
-    if (!hi || !pa || hi !== pa) {
+    if (normModel(pa) !== hi) {
+      // Comparacion relevante: el padre Tenia un modelo en ese instante.
       res.fallas.push(
-        'CASCADA ROTA: ' + (f.agent || f.id) + ' corre en ' + (f.model || '(sin modelo)') +
-        ' pero su padre ' + (padre.agent || padre.id) + ' corre en ' + (padre.model || '(sin modelo)') +
-        ' -> un subagente no puede tener modelo propio; quitalo del frontmatter (check (a))'
+        'CASCADA ROTA: ' + (f.agent || f.id) + ' corre en ' + (hi || '(sin modelo)') +
+        ' pero su padre ' + (padre.agent || padre.id) + ' corria en ' + pa +
+        ' en el instante de su spawn -> un subagente no puede tener modelo propio; quitalo del frontmatter (check (a))'
       );
     }
+    if (tlPadre.length > 1) {
+      const primero = tlPadre[0].modelo;
+      const ultimo = tlPadre[tlPadre.length - 1].modelo;
+      if (primero !== ultimo) {
+        cambiosPadre.add(
+          'el padre ' + (padre.agent || padre.id) + ' cambio de modelo durante la sesion (' +
+          primero + ' -> ' + ultimo + '): cada hijo se compara contra el modelo del padre EN SU INSTANTE, no contra una raiz unica'
+        );
+      }
+    }
   });
+  cambiosPadre.forEach((a) => res.avisos.push(a));
   return res;
 }
 
@@ -616,12 +930,14 @@ function tokensDeSesion(s) {
     (s.tokens_cache_read || 0) + (s.tokens_cache_write || 0);
 }
 
-function preflight(dbPath, root, umbral) {
+function preflight(dbPath, root, umbral, rol) {
+  const r = normRol(rol);
   const res = {
-    db: dbPath, umbral: umbral, sesion: null, agente: null,
+    db: dbPath, umbral: umbral, sesion: null, agente: null, rol: r,
     modelo: null, tier: null, contexto: 0, origen: '', turno: 0,
     avisos: [], fallas: [], porEncima: false,
     costeAhora: 0, costeAnclaBaja: 0, costeAnclaAlta: 0,
+    caminoGratis: false, desfase: null,
   };
   const ab = abrirDb(dbPath);
   if (!ab.db) { res.avisos.push(ab.error); return res; }
@@ -641,6 +957,7 @@ function preflight(dbPath, root, umbral) {
     res.sesion = s.id;
     res.agente = s.agent || '(sin agent)';
     const cadena = filasSesion(db, s.id, res.avisos);
+    res.desfase = evaluarDesfase(db, cadena, UMBRAL_DESFASE_MS);
     mensajes = mensajesAsistente(db, cadena.map((f) => f.id), res.avisos);
   } catch (e) {
     res.avisos.push('error leyendo la sesion activa: ' + e.message);
@@ -651,7 +968,7 @@ function preflight(dbPath, root, umbral) {
   if (mensajes.length) {
     const ultimo = mensajes[mensajes.length - 1];
     res.modelo = ultimo.modelo;
-    res.tier = tierDeMensaje(ultimo);
+    res.tier = tierDeMensaje(ultimo, r);
     res.contexto = ultimo.tokens;
     res.origen = 'message.data.tokens del ultimo turno de la cadena';
     res.turno = mensajes.length;
@@ -674,11 +991,25 @@ function preflight(dbPath, root, umbral) {
   res.costeAnclaBaja = ANCLA_BAJA_TOKENS * COSTO_USD_POR_TOKEN_PAGO;
   res.costeAnclaAlta = ANCLA_ALTA_TOKENS * COSTO_USD_POR_TOKEN_PAGO;
   res.porEncima = res.contexto >= res.umbral;
+  if (res.tier === 'FREE') {
+    res.caminoGratis = true;
+  }
   if (res.tier === 'PAGO') {
     res.avisos.push('el modelo activo ya es de PAGO: cada turno siguiente se factura al precio de pago');
   }
-  if (res.tier === 'ROTO' || res.tier === 'FUERA-DE-ALLOWLIST') {
-    res.fallas.push('el modelo activo (' + res.modelo + ') no esta en las allowlists medidas');
+  // ADR-096 (cambio 6): el bloque de fallas cubre los cuatro tiers prohibidos.
+  // FUERA_ADMITIDO_A_CONSCIENCIA NO entra aqui: va a avisos, y el preflight
+  // devuelve RESULTADO: AVISO (no OK y tampoco fallo).
+  if (res.tier === 'ROTO_CATALOGO' || res.tier === 'ROTO_SUBAGENTE' ||
+      res.tier === 'NO_MEDIDO' || res.tier === 'FUERA-DE-ALLOWLIST' ||
+      res.tier === 'SIN-PROVEEDOR') {
+    res.fallas.push('el modelo activo (' + res.modelo + ') no esta en las allowlists medidas [tier ' + res.tier + ']');
+  }
+  if (res.tier === 'FUERA_ADMITIDO_A_CONSCIENCIA') {
+    res.avisos.push(MOTIVO_SIN_ADMITIR + ': ' + res.modelo);
+  }
+  if (esTrampaDeNombre(res.modelo)) {
+    res.avisos.push(avisoTrampaNombre(res.modelo));
   }
   return res;
 }
@@ -704,8 +1035,14 @@ function imprimir(res) {
     ' | primarios: ' + res.nPrim +
     ' | subagentes heredados: ' + res.nSub);
   console.log('Allowlist FREE: ' + FREE.concat(FREE_SUPERVIVIENTES).join(', '));
+  console.log('Allowlist FREE estricta (unica con $0 medido en primario Y subagente): ' + FREE_ESTRICTA.join(', '));
   console.log('Allowlist PAGO (pagadas, no gratuitas): ' + PAGO.join(', '));
-  console.log('ROTOS: ' + ROTOS.length + ' modelos, incluido opencode/big-pickle');
+  // ADR-096 (cambio 13): el resumen imprime el conteo de las 4 listas CON su motivo.
+  console.log('Prohibidos y no medidos, por motivo (ADR-096 B1):');
+  console.log('  NO_SUBAGENTE (' + NO_SUBAGENTE.length + '): ' + NO_SUBAGENTE.join(', ') + ' -> ' + MOTIVO_NO_SUBAGENTE);
+  console.log('  NO_CATALOGO (' + NO_CATALOGO.length + '): ' + NO_CATALOGO.join(', ') + ' -> ' + MOTIVO_NO_CATALOGO);
+  console.log('  NO_MEDIDO (' + NO_MEDIDO.length + '): ' + NO_MEDIDO.join(', ') + ' -> ' + MOTIVO_NO_MEDIDO);
+  console.log('  SIN_ADMITIR (' + SIN_ADMITIR.length + '): ' + SIN_ADMITIR.join(', ') + ' -> ' + MOTIVO_SIN_ADMITIR);
   console.log('');
   console.log('Checks:');
   res.checks.forEach((c) => console.log('  (' + c.id + ') ' + (c.ok ? 'OK  ' : 'FALLA') + ' ' + c.detalle));
@@ -714,6 +1051,12 @@ function imprimir(res) {
   console.log('|---|---|---|---|');
   filas.forEach((f) => console.log('| ' + f.agente + ' | ' + f.capa + ' | ' + f.modelo + ' | ' + f.coste + ' |'));
   console.log('');
+
+  if (res.avisos && res.avisos.length) {
+    console.log('AVISOS:');
+    res.avisos.forEach((a) => console.log('  - ' + a));
+    console.log('');
+  }
 
   if (res.fallas.length) {
     console.log('RESULTADO: FALLA (' + res.fallas.length + ')');
@@ -743,7 +1086,10 @@ function imprimirHerencia(res) {
   console.log('');
   console.log('DB (solo lectura): ' + res.db);
   console.log('Sesion: ' + res.sesion + ' | filas en la cadena: ' + res.filas.length);
+  console.log('Cada hijo se compara contra el modelo de su padre EN EL INSTANTE DE SU SPAWN.');
   console.log('');
+  const ld = lineaDesfase(res.desfase);
+  if (ld) console.log(ld);
   res.filas.forEach((f) => {
     console.log('  ' + (f.parent_id ? 'hijo  ' : 'raiz  ') +
       String(f.agent || '(sin agent)').padEnd(22) +
@@ -760,6 +1106,10 @@ function imprimirHerencia(res) {
   }
   console.log('RESULTADO: OK. ' + res.comparadas + ' par(es) padre/hijo coinciden en modelo.');
   console.log('  El padre fija el modelo del turno y el subagente lo hereda: la cascada sigue vigente.');
+  console.log('  Comparacion por instante de spawn: si el padre cambia de modelo en el selector a mitad de');
+  console.log('  sesion, el hijo lanzado antes del cambio esta bien en el modelo anterior. Por eso NO se');
+  console.log('  compara contra una raiz unica de modelo (daba falsos positivos en sesiones con escalada).');
+  console.log('  Cuando el instante no es reconstruible el caso degrada a AVISO, nunca a FALLA.');
   console.log('  session.model registra el ULTIMO modelo de la fila, no el de apertura: por eso');
   console.log('  el reparto por tier se mide con message.data.modelID, mensaje a mensaje.');
   console.log('');
@@ -772,9 +1122,11 @@ function imprimirReparto(res) {
   console.log('');
   console.log('DB (solo lectura): ' + res.db);
   console.log('Sesion: ' + res.sesion + ' | filas en la cadena: ' + res.filas.length +
-    ' | mensajes de asistente: ' + res.mensajes.length);
+    ' | mensajes de asistente: ' + res.mensajes.length + ' | rol: ' + (res.rol || 'sesion'));
   console.log('Fuente: message.data.modelID + message.data.providerID (session.model NO sirve).');
   console.log('');
+  const ld = lineaDesfase(res.desfase);
+  if (ld) console.log(ld);
   console.log('| Modelo | Tier | Mensajes | Tokens | Coste medido | Agentes |');
   console.log('|---|---|---|---|---|---|');
   res.porModelo.forEach((m) => {
@@ -786,8 +1138,29 @@ function imprimirReparto(res) {
     ' | PAGO ' + (res.porTier.PAGO || 0) +
     ' | ROTO ' + (res.porTier.ROTO || 0) +
     ' | fuera de allowlist ' + ((res.porTier.FUERA || 0) + (res.porTier['FUERA-DE-ALLOWLIST'] || 0)));
+  // ADR-096 (cambio 5): las claves nuevas van AL FINAL, sin tocar las 4 lineas de arriba.
+  console.log('  (ADR-096) ROTO_SUBAGENTE ' + (res.porTier.ROTO_SUBAGENTE || 0) +
+    ' | ROTO_CATALOGO ' + (res.porTier.ROTO_CATALOGO || 0) +
+    ' | NO_MEDIDO ' + (res.porTier.NO_MEDIDO || 0) +
+    ' | fuera a conciencia (SIN_ADMITIR) ' + (res.porTier.FUERA_ADMITIDO_A_CONSCIENCIA || 0) +
+    ' | sin proveedor ' + (res.porTier['SIN-PROVEEDOR'] || 0));
+  // ADR-096 B1: un ROTO_SUBAGENTE contado como sesion es un dato que obliga a
+  // re-preguntar al operador; nunca un PASS.
+  if ((res.porTier.ROTO_SUBAGENTE || 0) > 0 && (res.rol || 'sesion') === 'sesion') {
+    console.log('  DATO A RE-PREGUNTAR: hay ' + res.porTier.ROTO_SUBAGENTE +
+      ' mensaje(s) de un modelo prohibido como subagente contados en la columna sesion.');
+    console.log('    La tabla opencode.db no distingue sesion de subagente: confirma con el operador');
+    console.log('    de que rol viene ese mensaje antes de dar el reparto por bueno (no es un PASS).');
+  }
   console.log('');
-  res.avisos.forEach((a) => console.log('AVISO: ' + a));
+  // ADR-096 B2: ataque a la trampa de nombres (el selector del TUI busca por nombre).
+  res.porModelo.forEach((m) => {
+    if (esTrampaDeNombre(m.modelo)) console.log(avisoTrampaNombre(m.modelo));
+  });
+  if (res.avisos.length) {
+    console.log('AVISOS:');
+    res.avisos.forEach((a) => console.log('  - ' + a));
+  }
   if (res.escalada) {
     const e = res.escalada;
     if (e.tipo === 'ESCALADA-TARDIA') {
@@ -830,17 +1203,42 @@ function imprimirPreflight(res) {
   console.log('');
   console.log('DB (solo lectura): ' + res.db);
   console.log('Sesion activa: ' + (res.sesion || '(ninguna)') + ' | agente: ' + (res.agente || '?'));
-  console.log('Modelo activo: ' + res.modelo + ' | tier: ' + res.tier);
+  console.log('Modelo activo: ' + res.modelo + ' | tier: ' + res.tier + ' | rol juzgado: ' + (res.rol || 'sesion'));
+  if (esTrampaDeNombre(res.modelo)) console.log(avisoTrampaNombre(res.modelo));
   console.log('Contexto actual (turno ' + res.turno + '): ' + fmtTokens(res.contexto) + ' tokens');
   console.log('  origen del numero: ' + res.origen);
   console.log('Umbral de aviso: ' + fmtTokens(res.umbral) + ' tokens de contexto');
   console.log('');
+  if (res.caminoGratis) {
+    console.log('CAMINO GRATIS ACTIVO: el modelo activo es ' + MODELO_FREE + ' (FREE verificado, $0.000000 medido).');
+  } else {
+    console.log('CAMINO GRATIS: NO activo segun el modelo reportado (' + res.modelo + ').');
+    if (res.desfase && res.desfase.desfasado) {
+      console.log('  La medicion esta DESFASADA, asi que ese modelo puede no ser el vigente.');
+    }
+  }
+  if (res.caminoGratis || (res.desfase && res.desfase.desfasado)) {
+    console.log('  - Si el selector esta en ' + MODELO_FREE + ' (FREE verificado, $0.000000 medido):');
+    console.log('    el primario y los ' + N_SUBAGENTES_ESPERADOS + ' subagentes de este turno van a $0 (ninguno lleva pin).');
+    console.log('  - Cambiar de modelo en el SELECTOR es la unica palanca de precio; cambiar de agente no lo es.');
+    console.log('  - TRAMPA DE NOMBRES: ' + MODELO_FREE + ' = $0, pero ' + MODELO_PARADOJO +
+      ' = PAGO ($' + PRECIO_USD_POR_MTOK_ENTRADA_PARADOJO.toFixed(2) +
+      ' por Mtokens de entrada, $' + PRECIO_USD_POR_MTOK_SALIDA_PARADOJO.toFixed(2) + ' por Mtokens de salida).');
+    console.log('    Mismo nombre de familia, proveedor distinto, precio opuesto: el nombre NO dice si el turno cuesta $0.');
+    console.log('');
+  }
+  const ld = lineaDesfase(res.desfase);
+  if (ld) console.log(ld);
   console.log('Si el operador pasa a un modelo de PAGO ahora mismo:');
   console.log('  - este turno, con ' + fmtTokens(res.contexto) + ' tokens de contexto: ' + fmtUsd(res.costeAhora));
   console.log('  - la misma llamada en el turno 2 (~' + fmtTokens(ANCLA_BAJA_TOKENS) + ' tokens): ' + fmtUsd(res.costeAnclaBaja));
   console.log('  - la misma llamada en el turno 25 (~' + fmtTokens(ANCLA_ALTA_TOKENS) + ' tokens): ' + fmtUsd(res.costeAnclaAlta));
   console.log('');
-  res.avisos.forEach((a) => console.log('AVISO: ' + a));
+  if (res.avisos.length) {
+    console.log('AVISOS:');
+    res.avisos.forEach((a) => console.log('  - ' + a));
+    console.log('');
+  }
   if (res.fallas.length) {
     console.log('RESULTADO: FALLA (' + res.fallas.length + ')');
     res.fallas.forEach((f, i) => console.log('  ' + (i + 1) + '. ' + f));
@@ -851,6 +1249,10 @@ function imprimirPreflight(res) {
     console.log('RESULTADO: AVISO. Contexto por encima del umbral: pasar a PAGO aqui cuesta ' +
       fmtUsd(res.costeAhora) + ' por turno, no ' + fmtUsd(res.costeAnclaBaja) + '.');
     console.log('  No es un bloqueo (el selector es del operador): es el numero que hay que saber antes de cambiar.');
+  } else if (res.tier === 'FUERA_ADMITIDO_A_CONSCIENCIA') {
+    // ADR-096 (cambio 6): gratis real y no medido -> AVISO, ni OK ni falla.
+    console.log('RESULTADO: AVISO. El modelo activo es gratis real pero NO medido en este repo: midalo antes de usarlo.');
+    console.log('  No es un bloqueo y no es un visto bueno: no hay $0 medido en primario Y subagente que lo respalde (ADR-006).');
   } else {
     console.log('RESULTADO: OK. Contexto por debajo del umbral: cambiar de modelo aqui sigue siendo barato.');
   }
@@ -869,16 +1271,38 @@ function main() {
   };
   const sesion = valor('--sesion') || valor('--session');
   const dbOpt = valor('--db');
+  // ADR-096 (cambio 12): --rol sesion|subagente. Default 'sesion' (documentado):
+  // la tabla opencode.db no distingue sesion de subagente, asi que el guard pide
+  // el rol de forma explicita en vez de adivinarlo.
+  const rol = normRol(valor('--rol'));
   const quiereHerencia = argv.indexOf('verificar-herencia') >= 0 || (!!sesion && argv.indexOf('reparto') < 0);
   const quiereReparto = argv.indexOf('reparto') >= 0;
   const quierePreflight = argv.indexOf('--preflight') >= 0;
+
+  if (argv.indexOf('--help') >= 0 || argv.indexOf('-h') >= 0) {
+    console.log('');
+    console.log('uso: node scripts/ejecucion/verificar-capa-gratis.js [modo] [opciones]');
+    console.log('  (sin modo)                          checks estaticos (a)-(f) del roster');
+    console.log('  --json                              los mismos checks en JSON');
+    console.log('  verificar-herencia --sesion <id>    asercion hijo.model == padre.model');
+    console.log('  reparto --sesion <id>               reparto real por tier (message.data.modelID)');
+    console.log('  --preflight [--umbral <tokens>]     modelo activo, contexto y coste estimado');
+    console.log('  --db <ruta>                         otro opencode.db (por defecto ' + dbPorDefecto() + ')');
+    console.log('  --rol sesion|subagente              rol que se juzga (default: sesion)');
+    console.log('');
+    console.log('  --rol distingue el veredicto de los modelos que solo fallan en un rol:');
+    console.log('  opencode/big-pickle es ROTO_SUBAGENTE con --rol subagente y NO lo es por defecto.');
+    console.log('');
+    return 0;
+  }
 
   if (quiereHerencia || quiereReparto) {
     if (!sesion) {
       console.log('');
       console.log('uso: node scripts/ejecucion/verificar-capa-gratis.js ' +
-        (quiereReparto ? 'reparto' : 'verificar-herencia') + ' --sesion <id>');
+        (quiereReparto ? 'reparto' : 'verificar-herencia') + ' --sesion <id> [--rol sesion|subagente]');
       console.log('     (--db <ruta> para otro opencode.db; por defecto ' + dbPorDefecto() + ')');
+      console.log('     (--rol: default sesion; la tabla opencode.db no distingue sesion de subagente)');
       console.log('');
       return 1;
     }
@@ -891,7 +1315,7 @@ function main() {
       return 1;
     }
     return quiereReparto
-      ? imprimirReparto(repartoPorTier(dbPath, sesion))
+      ? imprimirReparto(repartoPorTier(dbPath, sesion, rol))
       : imprimirHerencia(verificarHerencia(dbPath, sesion));
   }
 
@@ -907,10 +1331,10 @@ function main() {
     }
     const u = Number(valor('--umbral'));
     const umbral = isFinite(u) && u > 0 ? u : UMBRAL_PREFLIGHT_TOKENS;
-    return imprimirPreflight(preflight(dbPath, root, umbral));
+    return imprimirPreflight(preflight(dbPath, root, umbral, rol));
   }
 
-  const res = verificar(root);
+  const res = verificar(root, rol);
 
   if (argv.indexOf('--json') >= 0) {
     console.log(JSON.stringify({
@@ -918,8 +1342,22 @@ function main() {
       adr: 'ADR-083',
       adr_mecanica: 'ADR-082',
       allowlist_free: FREE.concat(FREE_SUPERVIVIENTES),
+      allowlist_free_estricta: FREE_ESTRICTA,
       allowlist_pago: PAGO,
       rotos: ROTOS,
+      prohibidos: {
+        no_subagente: NO_SUBAGENTE,
+        no_catalogo: NO_CATALOGO,
+        no_medido: NO_MEDIDO,
+      },
+      sin_admitir: SIN_ADMITIR,
+      motivos: {
+        no_subagente: MOTIVO_NO_SUBAGENTE,
+        no_catalogo: MOTIVO_NO_CATALOGO,
+        no_medido: MOTIVO_NO_MEDIDO,
+        sin_admitir: MOTIVO_SIN_ADMITIR,
+      },
+      rol: rol,
       primarios: res.nPrim,
       pines: res.nPines,
       subagentes: res.nSub,
@@ -928,6 +1366,7 @@ function main() {
       umbral_escalada_tardia_tokens: UMBRAL_ESCALADA_TARDIA_TOKENS,
       checks: res.checks,
       agentes: tabla(res.agentes),
+      avisos: res.avisos,
       fallas: res.fallas,
     }, null, 2));
     return res.fallas.length ? 1 : 0;
@@ -940,6 +1379,9 @@ if (require.main === module) process.exit(main());
 
 module.exports = {
   verificar, verificarHerencia, repartoPorTier, escaladaTardia, preflight,
-  FREE, PAGO, ROTOS, capaDe, modoDe, tierDe, main,
+  FREE, FREE_SUPERVIVIENTES, FREE_ESTRICTA, PAGO, ROTOS,
+  NO_SUBAGENTE, NO_CATALOGO, NO_MEDIDO, SIN_ADMITIR,
+  esFree, esFreeEstricta, esPago, esNoSubagente, esNoCatalogo, esNoMedido, esSinAdmitir, esRoto,
+  capaDe, modoDe, tierDe, tierDeMensaje, normRol, esTrampaDeNombre, main,
   UMBRAL_PREFLIGHT_TOKENS, UMBRAL_ESCALADA_TARDIA_TOKENS, ANCLA_BAJA_TOKENS, ANCLA_ALTA_TOKENS,
 };

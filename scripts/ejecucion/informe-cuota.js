@@ -553,6 +553,26 @@ function runTask() {
   params = params.concat(mc.params);
   var msgs = query.apply(null, [sql].concat(params));
 
+  /* A4: Deteccion de medicion desfasada. opencode.db se escribe al CIERRE del
+     turno, asi que el rango medido puede no incluir los turnos en curso. Se
+     compara la ultima marca persistida contra la hora actual y se declara
+     desfasado por encima del umbral (15 min): el snapshot puede no ser el
+     vigente. No es un fallo: es decir que el numero es viejo. */
+  var UMBRAL_DESFASE_MS = 15 * 60 * 1000;
+  var sqlDesfase = "SELECT MAX(m.time_created) AS mx FROM message m " +
+    "JOIN session s ON s.id = m.session_id WHERE s.directory LIKE ?" +
+    (mark.sessionId ? " AND m.session_id = ?" : "");
+  var parsDesfase = ['%' + DIR_FILTER + '%'].concat(mark.sessionId ? [mark.sessionId] : []);
+  var ultimaFila = query.apply(null, [sqlDesfase].concat(parsDesfase))[0];
+  var mx = (ultimaFila && ultimaFila.mx) ? ultimaFila.mx : 0;
+  var desfasado = (now - mx) > UMBRAL_DESFASE_MS;
+  if (desfasado) {
+    process.stderr.write('[MEDICION DESFASADA] ultima fila persistida de opencode.db: ' +
+      new Date(mx).toISOString() + ' | ahora: ' + new Date(now).toISOString() +
+      ' (' + Math.round((now - mx) / 60000) + ' min de retraso, umbral 15 min).\n' +
+      '  Este informe describe un snapshot PERSISTIDO: el turno en curso puede no estar dentro.\n');
+  }
+
   function emptyAgg() { return { in: 0, out: 0, rea: 0, cr: 0, cw: 0, cost: 0, sess: {} }; }
   function totalOf(a) { return a.in + a.out + a.rea + a.cr + a.cw; }
   var tot = emptyAgg();
@@ -596,6 +616,10 @@ function runTask() {
   md += '- Marca: ' + mark.label + '\n';
   md += '- Ventana: desde ' + fmtDate(mark.from) + ' hasta ' + fmtDate(now) + '\n';
   md += '- Origen: ' + DB_PATH + ' (tablas session y message)\n';
+  if (desfasado) {
+    md += '- MEDICION DESFASADA: ultima fila persistida ' + new Date(mx).toISOString() +
+      ', ' + Math.round((now - mx) / 60000) + ' min de retraso (umbral 15 min): el turno en curso puede no estar dentro.\n';
+  }
   md += '- Proyecto (filtro dir): *' + DIR_FILTER + '*\n';
   md += '- Sesiones en la ventana: ' + Object.keys(sessSet).length + ' | Mensajes: ' + msgs.length + '\n';
   if (MAX_SESSIONS) md += '- Limite --max-sessions: ' + MAX_SESSIONS + ' sesiones mas recientes\n';
