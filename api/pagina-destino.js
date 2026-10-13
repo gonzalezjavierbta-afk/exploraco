@@ -421,6 +421,14 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".wrlbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:4px}"
 +".wrinp{width:100%;border:1.5px solid var(--border);border-radius:5px;padding:10px 12px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);background:#fff;outline:none;margin-bottom:12px}"
 +".wrinp:focus{border-color:var(--gold)}textarea.wrinp{resize:vertical;min-height:88px}"
+// SILO dv- del widget de resenas/opiniones: la base (.dv-wrap/.dv-btn) la
+// aporta dictado-voz.css; aqui SOLO se ajusta al contexto .wr (formulario).
+// Todo cuelga del selector padre .wr (Aislamiento Atomico). Sin !important.
++".wr .dv-wrap{display:flex;align-items:stretch;gap:8px}"
++".wr .dv-wrap>.wrinp{flex:1 1 auto;width:auto;min-width:0;margin-bottom:0}"
++".wr .dv-wrap>.dv-slot{flex:0 0 auto;display:flex;align-items:stretch}"
++".wr .dv-slot>.dv-btn{min-height:38px;padding:0 12px}"
++".wr .dv-slot>.dv-btn .dv-icon{font-size:15px;line-height:1}"
 +".sprow{display:flex;gap:5px;margin-bottom:12px}.spk{font-size:26px;cursor:pointer;color:#DDD;user-select:none}.spk.on{color:var(--gold-ink)}"
 +".rvtag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;background:var(--gold-light);color:var(--gold-ink);margin:2px 6px 2px 0}"
 +".rvdims{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px;font-size:9px;color:var(--muted)}"
@@ -2216,8 +2224,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<div class="sprow" id="rv-stars">'
     + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="setRvScore('+i+')">\u2605</span>'; }).join('')
     + '</div>'
-    + '<input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
-    + '<textarea id="rvt" placeholder="'+placeholderResenas+'" class="wrinp"></textarea>'
+    + '<div class="dv-wrap"><input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
+    + '<div class="dv-slot" id="dv-slot-nombre"></div></div>'
+    + '<div class="dv-wrap"><textarea id="rvt" placeholder="'+placeholderResenas+'" class="wrinp"></textarea>'
+    + '<div class="dv-slot" id="dv-slot-resena"></div></div>'
     + '<button class="wrsub" onclick="submitRv()">'+btnResenas+'</button>'
     + '<div class="wrok" id="rvok">'+textoRvOk+'</div>'
     // Voto rapido (1-5 estrellas, +10 XP) para TODAS las categorias
@@ -2491,6 +2501,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<meta name="theme-color" content="#FF4A00">\n'
     + '<link rel="canonical" href="'+BASE+'/'+esc(d.slug)+'.html">\n'
     + schemaLD(d, cat, autor) + '\n'
+    + '<link rel="stylesheet" href="dictado-voz.css?v=1">\n'
     + '<style>'+CSS+'</style>\n</head>\n<body'+(cat==='blog'?' class="blog"':'')+'>\n\n'
 
     + '<div class="topbar"><a class="tl" href="/index.html"><img src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL"></a><div class="tsep"></div>'
@@ -2581,6 +2592,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
 
     + '<script src="/usuario-session.js"><\/script>\n'
     + '<script src="/compartir.js"><\/script>\n'
+    + '<script src="dictado-voz.js?v=1"><\/script>\n'
     + '<script>\n'
     + 'var DID="'+esc(String(d.id))+'";\n'
     + 'var RV_AVG='+rat+';\n'
@@ -2973,6 +2985,28 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     // guardarEnAlbum) que solo era alcanzable desde la grilla #fp-grid
     // eliminada. Sin referencias huerfanas a fp-grid.
     + 'fetch("/api/utilidades?tipo=visitas",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({destino_id:DID})}).catch(function(){});\n'
+    // TSK-DV:inyeccion del boton de dictado por voz (degradacion condicional).
+    // Si window.DictadoVoz no existe o el navegador no soporta la Web Speech
+    // API, NO se dibuja nada: el campo queda limpio (sin boton huerfano).
+    // Los ids de campo (rvn/rvt) los emite buildHTML UNA sola vez por pagina
+    // (seccion #resenas), asi que no hay riesgo de id duplicado.
+    + '(function(){\n'
+    + '  if(!window.DictadoVoz||!DictadoVoz.esSoportado())return;\n'
+    + '  var pares=[["dv-slot-nombre","rvn"],["dv-slot-resena","rvt"]];\n'
+    + '  for(var i=0;i<pares.length;i++){\n'
+    + '    var slot=document.getElementById(pares[i][0]);\n'
+    + '    var campo=document.getElementById(pares[i][1]);\n'
+    + '    if(!slot||!campo)continue;\n'
+    + '    var b=document.createElement("button");\n'
+    + '    b.type="button";\n'
+    + '    b.className="dv-btn";\n'
+    + '    b.title="Dictar por voz";\n'
+    + '    b.setAttribute("aria-label","Dictar por voz");\n'
+    + '    b.innerHTML="<span class=\\"dv-icon\\">&#127908;</span><span>Dictar</span>";\n'
+    + '    b.setAttribute("onclick","DictadoVoz.toggle(document.getElementById(\'"+pares[i][1]+"\'), this)");\n'
+    + '    slot.appendChild(b);\n'
+    + '  }\n'
+    + '})();\n'
     + '<\/script>\n</body>\n</html>';
 }
 

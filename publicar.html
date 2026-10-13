@@ -162,6 +162,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">
 
 <meta property="og:image" content="https://latawel.com/assets/brand/og/latawel-og-1200x630.png">
+<link rel="stylesheet" href="dictado-voz.css?v=1">
 </head>
 <body>
 
@@ -217,7 +218,10 @@
 
       <div class="field" id="f-nombre">
         <label>Nombre del lugar <span class="req">*</span></label>
-        <input type="text" id="nombre" placeholder="Ej: Hostal La Candelaria" maxlength="100">
+        <div class="dv-wrap">
+          <input type="text" id="nombre" placeholder="Ej: Hostal La Candelaria" maxlength="100">
+          <span id="dv-slot-nombre"></span>
+        </div>
         <div class="field-error">El nombre es requerido</div>
       </div>
 
@@ -367,14 +371,20 @@
 
       <div class="field" id="f-descripcion">
         <label>Descripción corta <span class="req">*</span> <small style="font-weight:400;color:var(--muted)">(aparece en el directorio)</small></label>
-        <textarea id="descripcion_corta" rows="2" placeholder="1–2 frases que resuman tu lugar" maxlength="200"></textarea>
+        <div class="dv-wrap">
+          <textarea id="descripcion_corta" rows="2" placeholder="1-2 frases que resuman tu lugar" maxlength="200"></textarea>
+          <span id="dv-slot-desc-corta"></span>
+        </div>
         <div class="field-hint"><span id="cnt-corta">0</span>/200 caracteres</div>
         <div class="field-error">La descripción es requerida (mín. 30 caracteres)</div>
       </div>
 
       <div class="field">
         <label>Descripción completa <small style="font-weight:400;color:var(--muted)">(opcional pero recomendada)</small></label>
-        <textarea id="descripcion_larga" rows="5" placeholder="Cuéntale a los viajeros qué hace especial tu lugar..." maxlength="1500"></textarea>
+        <div class="dv-wrap">
+          <textarea id="descripcion_larga" rows="5" placeholder="Cuentale a los viajeros que hace especial tu lugar..." maxlength="1500"></textarea>
+          <span id="dv-slot-desc-larga"></span>
+        </div>
         <div class="field-hint"><span id="cnt-larga">0</span>/1500 caracteres</div>
       </div>
 
@@ -729,6 +739,7 @@
 </div>
 
 <script src="media-upload.js"></script>
+<script src="dictado-voz.js?v=1"></script>
 <script>
 // ============================================================
 // ESTADO GLOBAL
@@ -1212,6 +1223,42 @@ async function submitForm() {
     alert('Error: ' + (err.message || 'No se pudo conectar. Intenta de nuevo.'));
   }
 }
+</script>
+
+<script>
+// ---------------------------------------------------------------
+// INYECTAR BOTONES DE DICTADO POR VOZ
+// Degradacion obligatoria: si el navegador no soporta la Web
+// Speech API (iOS Safari, Firefox), los slots quedan vacios y
+// el formulario sigue funcionando igual.
+// ---------------------------------------------------------------
+(function () {
+  if (typeof DictadoVoz === 'undefined' || !DictadoVoz.esSoportado()) return;
+
+  var pares = [
+    { slot: 'dv-slot-nombre',      campo: 'nombre' },
+    { slot: 'dv-slot-desc-corta',  campo: 'descripcion_corta' },
+    { slot: 'dv-slot-desc-larga',  campo: 'descripcion_larga' }
+  ];
+
+  pares.forEach(function (p) {
+    var slot = document.getElementById(p.slot);
+    var campo = document.getElementById(p.campo);
+    if (!slot || !campo) return;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dv-btn';
+    btn.title = 'Dictar por voz';
+    btn.setAttribute('aria-label', 'Dictar por voz');
+    btn.innerHTML = '<span class="dv-icon">&#127908;</span>Dictar';
+    // El helper exige el ELEMENTO, no un id string.
+    btn.setAttribute('onclick',
+      "DictadoVoz.toggle(document.getElementById('" + p.campo + "'), this)");
+
+    slot.appendChild(btn);
+  });
+})();
 </script>
 </body>
 </html>

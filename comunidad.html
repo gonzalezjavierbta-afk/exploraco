@@ -12,6 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="mapa-cultural.css?v=10">
+<link rel="stylesheet" href="dictado-voz.css?v=1">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -943,6 +944,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 <script src="media-embed.js?v=1"></script>
 <script src="mapa-cultural.js?v=16"></script>
 <script src="media-actions.js"></script>
+<script src="dictado-voz.js?v=1"></script>
 <script src="mymapa.js?v=8"></script>
 <script src="mercado.js?v=2"></script>
 <script>
@@ -3278,8 +3280,14 @@ function renderAoProponer() {
     + '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">\uD83D\uDD75\uFE0F Proponer punto aqu\u00ed</div>'
     + '<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:12px">Descubre un lugar secreto y prop\u00f3nlo a la comunidad. Si alcanza quorum, se publica y ganas +50 XP.</div>'
     + (verif
-      ? '<input class="chat-inp" id="ao-nombre" maxlength="120" placeholder="Nombre del punto (ej: Mirador del silencio)" style="margin-bottom:8px">'
-        + '<input class="chat-inp" id="ao-desc" maxlength="500" placeholder="Descripci\u00f3n breve (opcional)" style="margin-bottom:8px">'
+      ? '<div class="dv-wrap" style="margin-bottom:8px">'
+        + '<input class="chat-inp" id="ao-nombre" maxlength="120" placeholder="Nombre del punto (ej: Mirador del silencio)" style="margin-bottom:0">'
+        + '<div id="dv-slot-ao-nombre" style="display:contents"></div>'
+        + '</div>'
+        + '<div class="dv-wrap" style="margin-bottom:8px">'
+        + '<input class="chat-inp" id="ao-desc" maxlength="500" placeholder="Descripci\u00f3n breve (opcional)" style="margin-bottom:0">'
+        + '<div id="dv-slot-ao-desc" style="display:contents"></div>'
+        + '</div>'
         + '<div style="display:flex;gap:8px;margin-bottom:8px">'
         + '<select class="chat-inp" id="ao-categoria" style="margin-bottom:0;flex:1">'
         + '<option value="">Categor\u00eda</option>'
@@ -3296,6 +3304,34 @@ function renderAoProponer() {
         + '<button class="pand-btn" style="margin-top:8px;width:100%" onclick="aoEnviarPropuesta()">Enviar propuesta</button>'
       : '<div style="font-size:11px;color:rgba(255,255,255,.4);padding:8px 0;text-align:center" title="Verifica tu correo primero">Verifica tu correo primero para proponer un punto.</div>')
     + '</div>';
+  dvMontarActivoOculto();
+}
+
+// Inyecta los botones de dictado en los slots del formulario Activo Oculto.
+// Degradacion: si no hay soporte (Firefox, iOS Safari) no se dibuja nada y
+// el formulario sigue funcionando igual.
+function dvMontarActivoOculto() {
+  if (!window.DictadoVoz || !DictadoVoz.esSoportado()) return;
+  dvInyectarBoton('dv-slot-ao-nombre', 'ao-nombre');
+  dvInyectarBoton('dv-slot-ao-desc', 'ao-desc');
+}
+
+// Construye un <button type="button" class="dv-btn"> dentro de un slot y lo
+// engancha a DictadoVoz.toggle(inputEl, btn). No duplica markup en el HTML.
+function dvInyectarBoton(slotId, inputId) {
+  var slot = document.getElementById(slotId);
+  var input = document.getElementById(inputId);
+  if (!slot || !input || slot.firstChild) return;
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'dv-btn';
+  btn.title = 'Dictar por voz';
+  btn.setAttribute('aria-label', 'Dictar por voz');
+  btn.innerHTML = '<span class="dv-icon">&#127908;</span><span>Dictar</span>';
+  btn.onclick = function () {
+    DictadoVoz.toggle(document.getElementById(inputId), btn);
+  };
+  slot.appendChild(btn);
 }
 
 function aoObtenerUbicacion() {

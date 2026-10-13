@@ -5228,5 +5228,63 @@ La guia gana **contexto personal** (que llevo hoy, cuanto me queda, que regalias
 
 **Archivos tocados.** Codigo (working tree, **SIN commit; NO desplegado**): `api/interacciones.js` (rama `catalogo_xp`), `usuario-session.js` (chip + bloque de regalias) + `scripts/smoke_xp_contrato.js` (**NUEVO, 5/5**). Documentacion (este pase, unico): `DECISIONS.md` (**ADR-095**), `TASKS.md` (esta seccion + TSK-208) y `NEXT.md`. `BUGS_HISTORICOS.md` **NO se toco**: no hubo bug nuevo.
 
+## TSK-210 - Dictado por voz a texto (Web Speech API) en los formularios de creacion de puntos y resenas - 2026-10-12 - IMPLEMENTADO EN WORKING TREE (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO EN WORKING TREE, SIN COMMIT Y SIN DESPLEGAR.** Feature **100% cliente**: **cero endpoints nuevos** (presupuesto de Vercel Hobby **8/8 INTACTO**), **cero migraciones**, **sin ADR** (implementacion directa por peticion del operador; **NO** se escribe ADR retroactivo). La transcripcion ocurre **en el navegador**.
+
+### Que cambia el producto
+
+Micro-boton de dictado por voz junto a los campos de texto largos de los formularios de creacion. El usuario pulsa, habla, y el texto transcrito se escribe en el campo. El boton **solo se inyecta si el navegador soporta la Web Speech API**; donde no la soporta (iOS Safari, Firefox) **no se renderiza nada** y el formulario se sigue pudiendo enviar a mano.
+
+### Ficheros
+
+- **NUEVO `dictado-voz.js`** (259 lineas, ASCII-safe: 0 bytes > 127, `node --check` exit 0): helper global `window.DictadoVoz`.
+- **NUEVO `dictado-voz.css`** (172 lineas, 0 bytes > 127): silo de clases `dv-` + estado `grabando-activo`.
+- **MODIFICADOS (4):** `publicar.html` (alta de destino: micro en `#nombre`, `#descripcion_corta`, `#descripcion_larga`), `comunidad.html` (Activo Oculto / Wayfarer: micro en `#ao-nombre`, `#ao-desc`, inyectado desde `renderAoProponer()`), `mi-perfil.html` (comentarios de album: `#album-descripcion`, `#edit-album-descripcion`), `api/pagina-destino.js` (widget de resena: micro en `input#rvn` y `textarea#rvt`).
+
+### API publica de `window.DictadoVoz`
+
+`grabando`, `esSoportado()`, `iniciar(inputEl, btn, alTerminar)`, `detener(btn)`, `toggle(inputEl, btn, alTerminar)`, `detenerTodo()`. **`iniciar` y `toggle` reciben el ELEMENTO DOM, no un `id`.** El callback `alTerminar` recibe `(motivo)` con motivo `'usuario' | 'navegador' | 'error'`.
+
+### Decisiones tecnicas que quedan registradas (SIN ADR)
+
+1. **100% cliente, cero endpoints nuevos en `/api/`:** el presupuesto de Vercel Hobby sigue en **8/8 funciones**; la transcripcion ocurre en el navegador.
+2. **Degradacion obligatoria:** el boton se inyecta **solo** si `DictadoVoz.esSoportado()` es true. En **iOS Safari y Firefox no se renderiza nada** y el formulario se sigue pudiendo enviar a mano.
+3. **Buffer de resultados `isFinal`:** NO se concatena el texto inicial en cada `onresult`; con `continuous=true` esa via **duplicaba y perdia texto**.
+4. **`alTerminar` recibe `motivo`:** con `continuous=true` el navegador cierra la sesion solo (Chrome ~60s o por silencio) y ese corte **no es un error del usuario**.
+5. **Cierre limpio:** `detenerTodo()` enganchado a `visibilitychange` y `pagehide` para que el microfono **nunca quede abierto**.
+6. **`type="button"` en todos los botones** para que no disparen `submit`.
+
+### Descartado
+
+La variable de entorno `alert()` del diseno original fue **descartada**: el repo ya tiene `toast()` en `media-actions.js` y se usa ese.
+
+### Verificacion (ADR-006, contra el archivo real)
+
+- `node --check dictado-voz.js` -> **exit 0**.
+- ASCII-safety (ADR-002): `dictado-voz.js` **0 bytes > 127**, `dictado-voz.css` **0 bytes > 127**.
+- Conteo real de lineas: `dictado-voz.js` **259**, `dictado-voz.css` **172**.
+- `git status --porcelain`: `dictado-voz.js` y `dictado-voz.css` **untracked (`??`)**; `publicar.html`, `comunidad.html`, `mi-perfil.html` y `api/pagina-destino.js` **modificados (`M`)**.
+- Call-sites de `DictadoVoz` medidos: `publicar.html` **2**, `comunidad.html` **3**, `mi-perfil.html` **2**, `api/pagina-destino.js` **3**.
+- **8/8 endpoints INTACTO; cero migraciones; cero endpoint nuevo.**
+
+### Deuda registrada
+
+`[DEUDA]` **Aislamiento Atómico (ADR-004):** el silo `.dv-wrap` / `.dv-btn` de `dictado-voz.css` es **GLOBAL, sin selector padre unico**, salvo en el render de `api/pagina-destino.js`, donde si se acota con `.wr`. Es defendible por ser una feature transversal, pero queda anotado.
+
+`[DEUDA]` **Codigo muerto:** en `dictado-voz.js`, `estado.textoBase` se escribe pero **nunca se lee** (`escribir()` usa una variable local `base`). Inofensivo.
+
+`[DEUDA]` **PREEXISTENTE, NO de esta feature:** `scripts/smoke_auditoria_pagina_destino.js` tiene **5 FAILs del lightbox** (`lbHTML`, `gal-thumbs onclick`, `lb-bg`, `lb-close`, `lb-prev`/`lb-next`). Verificado con `git stash` que **ya fallaban antes** de esta feature; ademas ese smoke **no contiene ninguna referencia** al dictado (`Dictado|dictado` = **0 coincidencias**). **NO se atribuye a esta tanda**; queda como deuda previa de `api/pagina-destino.js`.
+
+### Que sigue (v2, diferido por decision del operador)
+
+**NO implementado:** "**parseo inteligente**" de dictado, es decir que el usuario dicte `Nombre: ... Descripcion: ...` en **un solo microfono** y se reparta en varios campos independientes. Queda diferido por decision del operador.
+
+### Nota de cierre
+
+**8/8 INTACTO:** la feature **no gasto una funcion serverless**. Todo el coste es cliente: una Web Speech API que solo existe en algunos navegadores, con degradacion silenciosa donde no existe. **Pendiente y no resuelto:** commit + push + deploy, y el **parseo inteligente** (v2, diferido). El **ADR no existe**: esta tanda fue implementacion directa, y el **silo CSS global** es la desviacion formal mas relevante frente a ADR-004.
+
+**Archivos tocados.** Codigo (working tree, **SIN commit; NO desplegado**): `dictado-voz.js` (**NUEVO**), `dictado-voz.css` (**NUEVO**), `publicar.html`, `comunidad.html`, `mi-perfil.html`, `api/pagina-destino.js`. Documentacion (este pase, unico): `TASKS.md` (esta seccion) y `NEXT.md`. `DECISIONS.md` **NO se toco** (sin ADR); `BUGS_HISTORICOS.md` **NO se toco** (no hubo bug nuevo).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

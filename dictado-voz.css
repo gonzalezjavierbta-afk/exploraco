@@ -1,0 +1,172 @@
+/* =====================================================================
+   dictado-voz.css  --  Aislamiento atomico (silo `dv-`)
+   Estilos del boton de dictado por voz. Se carga en varias paginas,
+   por eso TODO selector lleva el prefijo `dv-`.
+   El helper window.DictadoVoz anade/quita la clase `grabando-activo`.
+   ===================================================================== */
+
+/* --- Contenedor del campo + boton --------------------------------- */
+.dv-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: .5rem;
+}
+
+/* El campo crece; el boton se queda pegado a el (escritorio). */
+.dv-wrap > input,
+.dv-wrap > textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* --- Boton --------------------------------------------------------- */
+.dv-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: .55rem .85rem;
+  font-family: inherit;
+  font-size: .8125rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--brand, #FF4A00);
+  background: #fff;
+  border: 1px solid rgba(255, 74, 0, .38);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color .18s ease, color .18s ease,
+              border-color .18s ease, transform .12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dv-btn:hover {
+  background: rgba(255, 74, 0, .07);
+  border-color: rgba(255, 74, 0, .55);
+}
+
+.dv-btn:active {
+  transform: translateY(1px);
+}
+
+/* Foco visible accesible (tecla), sin penalizar el clic de raton. */
+.dv-btn:focus-visible {
+  outline: 3px solid var(--gold, #FF4A00);
+  outline-offset: 2px;
+}
+
+/* Fallback de foco para navegadores sin :focus-visible. */
+.dv-btn:focus {
+  outline: 3px solid var(--gold, #FF4A00);
+  outline-offset: 2px;
+}
+
+.dv-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* --- Icono --------------------------------------------------------- */
+.dv-icon {
+  font-size: 1rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* --- Estado grabando ---------------------------------------------- */
+.dv-btn.grabando-activo,
+.grabando-activo.dv-btn {
+  background: #EF4444;
+  color: #fff;
+  border-color: #EF4444;
+  animation: dv-pulso 1.5s infinite;
+}
+
+.dv-btn.grabando-activo:hover,
+.grabando-activo.dv-btn:hover {
+  background: #EF4444;
+  border-color: #EF4444;
+}
+
+.dv-btn.grabando-activo .dv-icon,
+.grabando-activo.dv-btn .dv-icon {
+  animation: dv-pulso-icon 1.5s infinite;
+}
+
+@keyframes dv-pulso {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, .7);
+  }
+  70% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+@keyframes dv-pulso-icon {
+  0%, 100% { transform: scale(1); }
+  70% { transform: scale(1.14); }
+}
+
+/* --- Pista de ayuda ------------------------------------------------ */
+.dv-hint {
+  flex-basis: 100%;
+  margin-top: .3rem;
+  font-size: .78rem;
+  color: var(--muted, #666);
+}
+
+/* --- Estado sin soporte (boton deshabilitado, opcional) ----------- */
+.dv-btn.dv-unsupported {
+  opacity: .45;
+  cursor: not-allowed;
+  border-color: rgba(0, 0, 0, .18);
+  color: var(--muted, #666);
+  background: #f4f2ef;
+}
+
+.dv-btn.dv-unsupported:hover {
+  background: #f4f2ef;
+  border-color: rgba(0, 0, 0, .18);
+}
+
+/* --- Movil: el boton ocupa el ancho completo ----------------------- */
+@media (max-width: 600px) {
+  .dv-wrap {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dv-btn {
+    width: 100%;
+    align-self: stretch;
+  }
+}
+
+/* --- Respeta la preferencia de movimiento reducido ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  .dv-btn,
+  .dv-btn.dv-btn {
+    animation: none;
+    transition: none;
+  }
+
+  .dv-btn.grabando-activo,
+  .grabando-activo.dv-btn {
+    animation: none;
+  }
+
+  .dv-btn.grabando-activo .dv-icon,
+  .grabando-activo.dv-btn .dv-icon {
+    animation: none;
+  }
+}

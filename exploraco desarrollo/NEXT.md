@@ -244,6 +244,43 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-12 (pase documental unico R2) - TSK-210: dictado por voz a texto (Web Speech API) en los formularios de creacion de puntos y resenas (cierre)
+
+**Que se estaba haciendo:** anadir un micro de **dictado por voz** a los campos de texto largos de los formularios de creacion (alta de destino, Activo Oculto / Wayfarer, comentarios de album y resena de la ficha). Feature **100% cliente**, implementacion directa **sin ADR aprobado** y **sin ADR retroactivo**.
+
+**Lo que quedo entregado (working tree, SIN commit; NO desplegado). 6 ficheros:**
+- **`dictado-voz.js` (NUEVO, 259 lineas):** helper global `window.DictadoVoz`. API publica: `grabando`, `esSoportado()`, `iniciar(inputEl, btn, alTerminar)`, `detener(btn)`, `toggle(inputEl, btn, alTerminar)`, `detenerTodo()`. **`iniciar` y `toggle` reciben el ELEMENTO DOM, no un `id`.** El callback `alTerminar` recibe **`(motivo)`** = `'usuario' | 'navegador' | 'error'`.
+- **`dictado-voz.css` (NUEVO, 172 lineas):** silo de clases `dv-` + estado `grabando-activo`.
+- **`publicar.html`:** micro en `#nombre`, `#descripcion_corta`, `#descripcion_larga`.
+- **`comunidad.html`:** micro en `#ao-nombre` y `#ao-desc` (Activo Oculto / Wayfarer), inyectado desde `renderAoProponer()`.
+- **`mi-perfil.html`:** micro en `#album-descripcion` y `#edit-album-descripcion` (comentarios de album).
+- **`api/pagina-destino.js`:** widget de resena, micro en `input#rvn` y `textarea#rvt`.
+
+**Decisiones tecnicas registradas (6):**
+1. **100% cliente, cero endpoints nuevos en `/api/`:** la transcripcion ocurre en el navegador; el presupuesto de Vercel Hobby sigue en **8/8 INTACTO**.
+2. **Degradacion obligatoria:** el boton se inyecta **solo** si `esSoportado()` es true; en **iOS Safari y Firefox no se renderiza nada** y el formulario se sigue pudiendo enviar a mano.
+3. **Buffer `isFinal`:** NO concatenar el texto inicial en cada `onresult`; con `continuous=true` esa via **duplicaba y perdia texto**.
+4. **`alTerminar` recibe `motivo`:** con `continuous=true` el navegador cierra la sesion solo (Chrome ~60s o por silencio) y ese corte **no es un error del usuario**.
+5. **Cierre limpio:** `detenerTodo()` en `visibilitychange` y `pagehide`; el microfono **nunca queda abierto**.
+6. **`type="button"` en todos los botones** para que no disparen `submit`.
+
+**Descartado:** la variable de entorno `alert()` del diseno original; el repo ya tiene `toast()` en `media-actions.js` y se usa ese.
+
+**Verificacion (ADR-006, contra el archivo real):** `node --check dictado-voz.js` **exit 0**; ASCII-safety (ADR-002) **0 bytes > 127** en los 2 ficheros nuevos; `git status --porcelain` = **2 `??`** (`dictado-voz.js`, `dictado-voz.css`) + **4 `M`** (`publicar.html`, `comunidad.html`, `mi-perfil.html`, `api/pagina-destino.js`); call-sites de `DictadoVoz` medidos 2 / 3 / 2 / 3. **8/8 endpoints INTACTO; cero migraciones; cero endpoint nuevo.** `DECISIONS.md` **NO se toco** (sin ADR); `BUGS_HISTORICOS.md` **NO se toco** (no hubo bug nuevo).
+
+**Que sigue / pendientes:**
+1. **DIFERIDO POR DECISION DEL OPERADOR (v2) -- "parseo inteligente" de dictado:** que el usuario dicte `Nombre: ... Descripcion: ...` en **un solo microfono** y se reparta en varios campos independientes. **NO implementado.** (Tambien fuera de alcance: TSK-208, saneo ASCII de `usuario-session.js`, sigue abierto y sin relacion.)
+2. **Commit + push + deploy PENDIENTES** (working tree, sin commit).
+
+**Deuda tecnica registrada:**
+1. **`[DEUDA]` ADR-004 (Aislamiento Atómico):** el silo `.dv-wrap` / `.dv-btn` de `dictado-voz.css` es **GLOBAL, sin selector padre unico**, salvo en el render de `api/pagina-destino.js`, donde si se acota con `.wr`. Defendible por ser feature transversal, pero queda anotado.
+2. **`[DEUDA]` Codigo muerto:** `estado.textoBase` en `dictado-voz.js` se escribe pero **nunca se lee** (`escribir()` usa una variable local `base`). Inofensivo.
+3. **`[DEUDA]` PREEXISTENTE, NO de esta feature:** `scripts/smoke_auditoria_pagina_destino.js` tiene **5 FAILs del lightbox** (`lbHTML`, `gal-thumbs onclick`, `lb-bg`, `lb-close`, `lb-prev`/`lb-next`). Verificado con `git stash` que **ya fallaban antes** de esta feature, y el smoke **no contiene ninguna referencia** al dictado (**0 coincidencias**). **NO se atribuye a esta tanda.**
+
+**Riesgos activos:**
+1. **Cobertura de navegador desigual:** la feature **solo existe** donde hay Web Speech API (**iOS Safari y Firefox quedan fuera**). El formulario se sigue pudiendo enviar a mano, pero en esos navegadores la capacidad **no existe** y no hay aviso: es degradacion silenciosa por diseno.
+2. **Silo CSS global (ADR-004):** `.dv-wrap` / `.dv-btn` sin selector padre unico puede colisionar con CSS futuro de otra superficie; hoy no colisiona (verificado por lectura), pero es la desviacion formal de la tanda.
+
 ### WORKING TREE 2026-10-10 (pase documental unico R2, 21a tanda) - TSK-209 / ADR-095: la guia de XP muestra el progreso del dia y el saldo de regalias pendiente (cierre)
 
 **Que se estaba haciendo:** extender la guia de XP (TSK-207 / ADR-094) para que, **con sesion activa**, muestre el **progreso del dia** de las fuentes rastreables (`visita`, `voto_media`, `chat_comentario`) y el **saldo de regalias pendiente**, sin endpoint nuevo y sin duplicar topes. El argumento de la decision vive **una sola vez** en `DECISIONS.md` **ADR-095** (ADR-084 D1); aqui solo el relevo.

@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@900&display=swap" rel="stylesheet">
 <!-- T7 (ADR-039): Leaflet para el map-picker de localizacion del Museo -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="dictado-voz.css?v=1"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -1136,7 +1137,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Descripcion</label>
-        <textarea id="album-descripcion" maxlength="1000" rows="3" placeholder="Describe tu album..." style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;"></textarea>
+        <div class="dv-wrap">
+          <textarea id="album-descripcion" maxlength="1000" rows="3" placeholder="Describe tu album..." style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;"></textarea>
+          <div id="dv-slot-album-descripcion" style="display:contents"></div>
+        </div>
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Tipo</label>
@@ -1242,7 +1246,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Descripci&oacute;n</label>
-        <textarea id="edit-album-descripcion" maxlength="1000" rows="3" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;"></textarea>
+        <div class="dv-wrap">
+            <textarea id="edit-album-descripcion" maxlength="1000" rows="3" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;"></textarea>
+            <div id="dv-slot-album-edit-descripcion" style="display:contents"></div>
+          </div>
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Portada (sube una imagen o pega una URL)</label>
@@ -1543,6 +1550,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <script src="map-picker.js?v=2"></script>
 <!-- ADR-052: media-actions.js (voto/guardado compartido) antes del inline -->
 <script src="media-actions.js"></script>
+<script src="dictado-voz.js?v=1"></script>
 <script src="media-embed.js?v=1"></script>
 <script src="media-upload.js"></script>
 <script src="mercado.js?v=2"></script>
@@ -7650,5 +7658,31 @@ window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>
   <script src="usuario-session.js"></script>
   <script src="album-comments.js?v=2"></script>
+  <script>
+  /* Dictado por voz en las descripciones de album. Degradacion total:
+     sin soporte (Firefox, iOS Safari) no se dibuja nada y los formularios
+     de alta y edicion siguen funcionando igual. El slot del modal existe
+     en el DOM estatico, asi que el boton queda listo al abrirlo. */
+  (function () {
+    if (!window.DictadoVoz || !DictadoVoz.esSoportado()) return;
+    function inyectar(slotId, inputId) {
+      var slot = document.getElementById(slotId);
+      var input = document.getElementById(inputId);
+      if (!slot || !input || slot.firstChild) return;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dv-btn';
+      btn.title = 'Dictar por voz';
+      btn.setAttribute('aria-label', 'Dictar por voz');
+      btn.innerHTML = '<span class="dv-icon">&#127908;</span><span>Dictar</span>';
+      btn.onclick = function () {
+        DictadoVoz.toggle(document.getElementById(inputId), btn);
+      };
+      slot.appendChild(btn);
+    }
+    inyectar('dv-slot-album-descripcion', 'album-descripcion');
+    inyectar('dv-slot-album-edit-descripcion', 'edit-album-descripcion');
+  })();
+  </script>
 </body>
 </html>
