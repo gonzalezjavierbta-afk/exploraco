@@ -266,6 +266,21 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 3. **Sin verificacion en vivo, la entrega no esta probada en el unico entorno donde corre** (navegador, con geolocalizacion y Leaflet desde CDN).
 4. **El boton Dictar del campo Nombre se retiro** a proposito; si `dictado-voz.js` se toca, afecta a **4 superficies** mas (`comunidad.html`, `mi-perfil.html`, `api/pagina-destino.js`).
 
+### EN PRODUCCION 2026-10-13 (pase documental unico R2) - TASK-021: pagina dinamica `la-redada-miscelanea-cultural` (sitio / cultura, Bogota / La Candelaria) dada de alta y verificada
+
+**Que se estaba haciendo:** dar de alta una pagina dinamica **nueva** en produccion y cerrarla documentalmente en un unico pase (R2). **En PRODUCCION Y VERIFICADA**, no es working tree: alta `POST /api/admin-destinos` -> **HTTP 201**, id `7803e60e-df83-4e8e-8cb4-c29a54f3d49d`, `status=published`; render `GET https://latawel.com/la-redada-miscelanea-cultural.html` -> **HTTP 200** (89.683 chars); `GET /api/destinos?categoria=sitio` -> el slug aparece (**77 items**) con **1 sola fila**; `GET https://latawel.com/sitemap.xml` -> **HTTP 200** con el `<loc>`. **Dominio canonico confirmado por el operador: `https://latawel.com`** (`exploraco.vercel.app` es solo **alias de Vercel**; el `sitemap.xml` emite el dominio correcto). **Escudo GOLD PASS** (`node --check` **3/3**, ASCII **0 bytes >127** y **0 backticks**, divs **226/226**, smoke **20/20 PASS** re-medido). `api/*` **SIN tocar**: el arreglo del gating ADR-016 fue **PURO DATO** (contenido remapeado a `recorridos`/`programacion`/`accesibilidad`/`contexto`/`horarios_zona`/`colecciones`), **el motor NO se modifico**. 4 artefactos NUEVOS (ficha + seed + smoke + loader). Sin ADR nuevo.
+
+**Que sigue (con criterio de verificacion):**
+
+1. **OPERADOR - subir las fotos reales al final.** Hoy `foto_hero` vacio y `destinos_fotos` vacia por decision del operador; la pagina muestra el **fallback Unsplash de categoria** del motor. **Criterio:** `destinos_fotos` con >=1 fila y el hero sin el fallback.
+2. **DECIDIR el fix de `money()` en el motor - `api/pagina-destino.js:130-142` (BUG-124, gate `@renderer-dev`, NO autorizado todavia).** `String(n).replace(/[^0-9]/g,'')` **concatena los digitos de un rango**: `'$10.000 - $30.000'` -> **`$1.000.030.000`**; `'$20.000 - $80.000 COP'` -> **`$2.000.080.000`**. En la pagina nueva se neutralizo **por dato**; `scripts/seed-centro-cultural-delia-zapata-olivella.js:84` **sigue con el rango** (posible cifra inflada en produccion). **Criterio:** `money()` no concatena rangos, Escudo GOLD PASS y los smokes de `buildHTML()` en verde; o decision escrita de NO tocarlo.
+
+**Hecho, no pendiente:** el **dominio canonico es `https://latawel.com`** (confirmado por el operador). El `sitemap.xml` es **correcto** al emitirlo; `exploraco.vercel.app` es solo alias de Vercel. HEAD reales: `https://latawel.com/la-redada-miscelanea-cultural.html` -> **200** y `https://latawel.com/sitemap.xml` -> **200**. **No hay pendiente de `@seo-dev` ni riesgo de dominio.**
+
+**Riesgos activos:**
+
+1. **La cifra inflada de `money()` solo la ve quien compara con la fuente:** el formato es valido y pasa cualquier verificacion de "formato"; una pagina con rango de precios puede publicar un numero falso sin que nada lo detecte. Mitigacion parcial ya existente: el check de smoke nuevo (tabla de entradas sin `NaN` ni cifras > $1.000.000) es **reutilizable** y deberia copiarse a toda pagina con precios.
+
 ### WORKING TREE 2026-10-13 (pase documental unico R2) - TSK-211: ADR-096 implementado + reparacion de los 3 puntos ciegos de medicion + comando `sesion-cero` (cierre)
 
 **Que se estaba haciendo:** cerrar la tanda que **implementa ADR-096** (`ROTOS` partido en 4 listas con motivo, `tierDe(modelo, rol)` fail-closed con `rol` retrocompatible, coincidencia exacta de ids, check (f) estricto, bloque `AVISOS:` separado) y **reparar los 3 puntos ciegos de medicion** que la hicieron falta. El argumento de la decision vive **una sola vez** en `DECISIONS.md` **ADR-096** (ADR-084 D1); aqui solo el relevo.

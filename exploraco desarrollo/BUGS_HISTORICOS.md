@@ -2143,6 +2143,22 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **LECCIÓN (patrón nuevo, gemela de BUG-098):** **un `opacity` en el grupo y otro en el hijo se multiplican, y el color heredado del contenedor multiplica otra vez.** El alfa efectivo de un glifo **no es el número que está en su regla**: es el producto de todas las dimensiones de alfa que le llegan. Con tres multiplicadores, un valor "razonable" (.2) se convierte en invisible (.124) sin que ningún número del CSS parezca anómalo. **Corolario de verificación:** todo smoke de contraste debe resolver la cascada real (herencia + multiplicación + desempate por línea), no leer el `opacity` de la regla; y **debe haber visto su propio bug en rojo alguna vez** -- aquí se demostró reinyectando el original. **Y el aviso previo era exacto:** un red de seguridad estática documenta que no renderiza, y el defecto que se coló por ahí estaba **anunciado por escrito**.
 
+## BUG-124: `money()` concatena los digitos de un RANGO de precios (`'$10.000 - $30.000'` -> `$1.000.030.000`) -- reincidente, no listado hasta hoy
+
+**Severidad:** ALTA / **de DATO visible en produccion**. **NO es un fallo de render:** el motor, el DOM y la pagina funcionan; lo que se ve es una **cifra falsa con formato valido**. **Estado: CONFIRMADO, SIN CORREGIR.** El fix real del motor es gate de `@renderer-dev` y **NO estaba autorizado** en la sesion que lo detecto (TASK-021). `api/*` **8/8 INTACTO**.
+
+**Causa raiz, medida contra el archivo real (ADR-006):** `api/pagina-destino.js:130-142`, funcion `money(n)`. La linea L132 hace `var s = String(n).replace(/[^0-9]/g, '');`: el `replace` **elimina todo lo que no sea digito y CONCATENA lo que queda**, de modo que un texto con **dos** numeros (un rango) se vuelve un unico entero con los digitos pegados; la funcion solo hace `parseInt` del resultado, sin detectar que habia un rango. Medido: `'$10.000 - $30.000'` -> **`$1.000.030.000`**; `'$20.000 - $80.000 COP'` -> **`$2.000.080.000`**.
+
+**Superficies afectadas (>=2 paginas publicadas):**
+- **La Redada Miscelanea Cultural (pagina nueva, `sitio`/`cultura`):** se neutralizo **por DATO**, sin tocar el motor -- `precio: '$10.000'` y el rango movido al texto de `incluye`, `precio_desde: 'Entradas desde $0 (aportes voluntarios)'`. Cierra la exposicion en esa pagina pero **NO** el defecto.
+- **`scripts/seed-centro-cultural-delia-zapata-olivella.js:84`:** conserva `precio: '$20.000 - $80.000 COP'` en la tabla de entradas; **quiza muestra la cifra inflada en produccion**. El fix del seed es de `@data-migration`/`@content-loader` (gate), no del motor.
+
+**Fix propuesto (NO aplicado):** que `money()` **no concatene rangos** -- tratar solo el primer numero, preservar el separador, o devolver el texto tal cual cuando detecte mas de un grupo de digitos. Es una correccion del **motor** (`api/pagina-destino.js`, `@renderer-dev`, **con gate**) y arrastra el Escudo GOLD y la re-verificacion de los smokes de `buildHTML()`.
+
+**Red de seguridad ya disponible:** el smoke de la pagina nueva incluye un check que valida que la tabla de entradas **no contenga `NaN` ni cifras > $1.000.000**. Patron **reutilizable** para toda pagina con precios.
+
+**LECCION:** una funcion de formateo de moneda que **no distingue un numero de un rango** convierte un texto legitimo en una cifra falsa **con formato correcto** -- el peor tipo de error de datos, porque pasa cualquier verificacion de "formato" y solo lo ve quien compara la cifra con la fuente. **Es la primera vez que se registra**, pese a que el patron existe desde la creacion de `money()`: se documenta como **BUG nuevo con ID nuevo** (reincidente no listado), no como reapertura de un bug previo.
+
 ## BUG-125: tres fallos de la geografia derivada `ciudad -> departamento -> zona` durante TSK-212 / ADR-097 -- **CORREGIDOS**
 
 **Severidad: MEDIA.** **Estado: los 3 CORREGIDOS y verificados** en el working tree de TSK-212 (sin commit, sin desplegar). Ninguno rompio produccion: los tres se detectaron **durante** la construccion de la cadena geografica, antes de que existiera el `INSERT` con `zona`. Se registran juntos porque comparten causa de fondo: **la geografia se estaba decidiendo en mas de un sitio y nadie lo contrastaba**.

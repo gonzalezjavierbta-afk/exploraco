@@ -5316,6 +5316,38 @@ La variable de entorno `alert()` del diseno original fue **descartada**: el repo
 
 **El guard mide cadenas, no arranque.** Verifica pines, allowlists y `coste:`, pero **ninguno de los 6 checks lanza un subagente**: puede dar `OK` con la delegacion caida, porque el fallo de subagente ocurre **antes de persistir** en `opencode.db` y **no deja fila que leer**. Mitigacion actual: comando `sesion-cero` + `--preflight` + lectura de la cabecera del runtime del propio agente.
 
+## TASK-021 - Pagina dinamica `la-redada-miscelanea-cultural` (categoria `sitio`, subcategoria `cultura`, Bogota / La Candelaria) - 2026-10-13 - EN PRODUCCION Y VERIFICADA
+
+**Estado: COMPLETADA / EN PRODUCCION Y VERIFICADA (2026-10-13).** Pagina dinamica dada de alta por el operador. `api/*` **SIN tocar**: el motor **no se modifico** (el arreglo del gating fue PURO DATO). Sin ADR nuevo. Pase documental unico R2 (R2 / ADR-084 D1).
+
+**Slug:** `la-redada-miscelanea-cultural`. **Categoria:** `sitio`. **Subcategoria:** `cultura`. **Lugar:** Bogota / La Candelaria.
+
+**Artefactos NUEVOS (4):**
+- `ficha/ficha-la-redada-miscelanea-cultural.md`
+- `scripts/seed-la-redada-miscelanea-cultural.js`
+- `scripts/smoke_test_la_redada_miscelanea_cultural.js`
+- `scripts/load-la-redada-miscelanea-cultural-api.js`
+
+**Evidencia fisica (literal, verificada contra produccion y contra el archivo real, ADR-006):**
+- **Alta:** `POST /api/admin-destinos` -> **HTTP 201**, id `7803e60e-df83-4e8e-8cb4-c29a54f3d49d`, status `published`, destacado `true`.
+- **Render:** `GET https://exploraco.vercel.app/la-redada-miscelanea-cultural.html` -> **HTTP 200** (89.683 chars).
+- **Listado:** `GET /api/destinos?categoria=sitio` -> el slug aparece (77 items), **1 sola fila** (idempotencia verificada, cero duplicados).
+- **Sitemap:** `GET /sitemap.xml` -> **HTTP 200** con `<loc>...la-redada-miscelanea-cultural.html</loc>`.
+- **Escudo GOLD PASS:** `node --check` **3/3**, ASCII-safety **0 bytes >127** y **0 backticks** en los 3 `.js`, balance de divs **226/226**. Smoke **20/20 PASS** (re-medido en este pase: `node scripts/smoke_test_la_redada_miscelanea_cultural.js` -> **20 PASS / 0 FAIL, exit 0**).
+- `node scripts/validate_ficha.js ficha/ficha-la-redada-miscelanea-cultural.md` -> **PASS** (re-medido en este pase, exit 0).
+- **ADR-009 respetado:** sin rating ni contador hardcodeado (la pagina nace en **0**).
+- **Cero fotos por decision del operador:** `foto_hero` vacio y `destinos_fotos` vacia. Las fotos las sube el operador al final; la pagina muestra el fallback Unsplash de categoria del motor.
+
+**Decision de diseno (PURO DATO, sin tocar el motor):** `subcategoria: 'cultura'` activa el gating **ADR-016**, que oculta `tours`, `itinerario`, `equipamiento`, `regulaciones` y `temporada_matriz`. El contenido se remapeo a las claves que `cultura` si renderiza: tour e hitos -> `recorridos`; agenda -> `programacion`; `dificultad_tags` -> `accesibilidad`; norma de convivencia + efectivo/Nequi + programacion anual -> `contexto`; horario -> `horarios_zona`; tienda autonoma -> `colecciones`. **El motor NO se modifico.**
+
+**Dominio canonico confirmado por el operador:** `https://latawel.com` (el `sitemap.xml` es **correcto** al emitir `latawel.com`; `exploraco.vercel.app` es **alias de Vercel**). Verificado con HEAD reales: `https://latawel.com/la-redada-miscelanea-cultural.html` -> **200** y `https://latawel.com/sitemap.xml` -> **200**. **NO es un pendiente ni un bug.**
+
+**Pendientes que esta tarea NO resuelve (seguimiento en NEXT.md):**
+1. **BUG CONFIRMADO EN EL MOTOR - `money()` (`api/pagina-destino.js:130-142`):** hace `String(n).replace(/[^0-9]/g,'')` en L132, asi que un **RANGO** de precios **concatena los digitos** (`'$10.000 - $30.000'` -> **`$1.000.030.000`**; `'$20.000 - $80.000 COP'` -> **`$2.000.080.000`**). Afecta a **>=2 paginas publicadas**; aqui se neutralizo **por dato** (`precio: '$10.000'` y el rango movido al texto de `incluye`; `precio_desde: 'Entradas desde $0 (aportes voluntarios)'`), pero `scripts/seed-centro-cultural-delia-zapata-olivella.js:84` **sigue con el rango**. El fix real del motor es gate de `@renderer-dev` y **NO esta autorizado**: registrado como **BUG-124** y pendiente.
+2. **Fotos reales:** pendientes de que el operador las suba al final (`foto_hero` + `destinos_fotos` vacias hoy).
+
+**Check de smoke nuevo y reutilizable (patron a conservar):** validar que la tabla de entradas **no contenga `NaN` ni cifras > $1.000.000** (protege contra la concatenacion de rangos de `money()`).
+
 ## TSK-212 - Rediseño del formulario publico "Publica tu lugar": geografia derivada `ciudad -> departamento -> zona` con catalogo unico de 1.122 municipios, mapa Leaflet con pin y envio de dos niveles (ADR-097) - 2026-10-15 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
 
 **Estado: IMPLEMENTADO Y VERIFICADO LOCAL, SIN COMMIT Y SIN DESPLEGAR.** Abre **ADR-097** (`DECISIONS.md`), que es donde vive **una sola vez** el argumento de la decision (ADR-084 D1); aqui solo el cierre, las medidas y las deudas. **8/8 endpoints INTACTO**: `api/` sigue con **8 ficheros**, **cero endpoint nuevo**, cero migraciones nuevas (las 027 y 028 son preexistentes de TSK-144/TSK-145). Codigo en working tree.
