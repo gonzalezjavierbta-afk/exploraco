@@ -1,7 +1,7 @@
 // api/publicar-lugar.js
 // Schema real confirmado por diagnostico:
 //   categoria_slug (varchar), lead, descripcion, highlight, foto_hero,
-//   region, booking, hostelworld, airbnb, tipo, tags (jsonb), creado_en
+//   region, zona, booking, hostelworld, airbnb, tipo, tags (jsonb), creado_en
 //
 // BLOG (Sprint Inspirate): las 5 categorias de tema del modal
 // "Comparte tu experiencia" (aventura/gastro/cultura/naturaleza/tips)
@@ -31,6 +31,156 @@ const SUBCAT_LISTA = {
   comida: ['restaurante','cafe','gastrobar','comida-rapida','dulces'],
   evento: ['concierto','festival','teatro','exposicion','deporte','cine','fiesta'],
 };
+
+// ---------------------------------------------------------------------------
+// ZONA (columna destinos.zona, migracion 028)
+// ---------------------------------------------------------------------------
+// Lista CERRADA de 5 regiones naturales. Es la MISMA lista que acepta la
+// constraint CHECK destinos_zona_chk en Neon; esa CHECK admite SOLO estos
+// valores o NULL. De ahi la regla que gobierna toda esta seccion: NUNCA se
+// persiste lo que el cliente mando sin validarlo contra la lista. Una cadena
+// vacia o un valor inventado revientan la INSERT con 500 (mismo motivo por el
+// que api/admin-destinos.js normaliza a NULL en vez de persistir la cadena).
+//
+// PATRON COPIADO de api/admin-destinos.js (linea 297): el ternario
+// b.zona ? String(b.zona).trim() : null -- ternario sobre el valor crudo
+// con .trim() al lado del truthy. Aqui se le antepone la validacion contra
+// la lista cerrada y la re-derivacion por departamento, que ese endpoint
+// no necesita porque solo lo consume el admin.
+//
+// ASCII-SAFE (ADR-002): las claves del mapa van sin tildes y SIN
+// PUNTUACION, y se comparan contra normTexto(), que normaliza NFD, borra
+// los diacriticos y borra la puntuacion. Asi el cliente puede mandar
+// "Bogot\u00e1, D.C." o "C\u00f3rdoba" y el match funciona sin escribir un
+// solo byte > 127 en el codigo.
+var ZONAS = ['andina', 'amazonica', 'caribe', 'pacifico', 'llanos'];
+
+// ===========================================================================
+// COPIA (SINCRONIZADA A MANO) de ZONA_POR_DEPARTAMENTO
+// de scripts/generar-geo-ciudades.js -- LEER ANTES DE TOCAR
+// ===========================================================================
+// ORIGEN DE VERDAD: el mapa departamento -> zona vive EXCLUSIVAMENTE en
+// scripts/generar-geo-ciudades.js (ADR-097 D2: "el navegador no lo deduce").
+// Lo que sigue NO es una segunda fuente de verdad: es una COPIA, y el unico
+// motivo de que exista aqui es que este archivo corre en Vercel como funcion
+// serverless, donde no puede importar un .js estatico de scripts/ (~67 KB)
+// sin arrastrarlo entero al bundle de despliegue. Copiar 33 lineas es un
+// riesgo de despliegue cero; importar un modulo de 67 KB para leer una
+// constante es un riesgo real. La duplicacion queda ACOTADA por el smoke de
+// paridad (scripts/, ver "CONTRATO CON EL SMOKE" mas abajo).
+//
+// REGLAS DE ESTA TABLA (no negociables):
+//   1. Deben ser EXACTAMENTE las mismas 33 claves y valores que
+//      ZONA_POR_DEPARTAMENTO, en el mismo orden, para que el diff sea legible.
+//   2. Los valores van YA traducidos al vocabulario de la columna
+//      destinos.zona (andina/amazonica/caribe/pacifico/llanos), NO a los
+//      slugs de zonas_geograficas (andes/amazonia/...): la conversion es la
+//      constante ZONAS_ZG_A_DESTINOS del generador, y aqui ya esta aplicada.
+//      CESAR y SUCRE son 'andina' por esta razon; la auditoria reporto que
+//      esta tabla decia 'caribe' y esa era la version equivocada.
+//   3. Las claves son SIN PUNTUACION porque son las departamento_normalizado
+//      del seed (db/seeds/geo_ciudades_seed.json), que ya viene normalizado:
+//      "BOGOTA, D.C." -> "bogota d c", y el departamento de San Andres ->
+//      "archipielago de san andres providencia y santa catalina". Por eso
+//      normTexto() borra la puntuacion antes de comparar (ver mas abajo).
+//
+// CONTRATO CON EL SMOKE DE PARIDAD (scripts/,otro agente):
+//   Bloque delimitado por 'var DEPTO_ZONA = {' y el primer '};' posterior.
+//   UNA entrada por linea con el patron exacto:  'clave': 'valor',
+//   con clave y valor ASCII puro entre comillas simples. Extraer el bloque
+//   entero y aplicar /'([^']+)':\s*'([^']+)'/g sobre el; comparar contra
+//   ZONAS_ZG_A_DESTINOS[ZONA_POR_DEPARTAMENTO[d]] del generador.
+var DEPTO_ZONA = {
+  'amazonas': 'amazonica',
+  'antioquia': 'andina',
+  'arauca': 'llanos',
+  'archipielago de san andres providencia y santa catalina': 'caribe',
+  'atlantico': 'caribe',
+  'bogota d c': 'andina',
+  'bolivar': 'caribe',
+  'boyaca': 'andina',
+  'caldas': 'andina',
+  'caqueta': 'amazonica',
+  'casanare': 'llanos',
+  'cauca': 'pacifico',
+  'cesar': 'andina',
+  'choco': 'pacifico',
+  'cordoba': 'andina',
+  'cundinamarca': 'andina',
+  'guainia': 'amazonica',
+  'guaviare': 'amazonica',
+  'huila': 'andina',
+  'la guajira': 'caribe',
+  'magdalena': 'caribe',
+  'meta': 'llanos',
+  'narino': 'andina',
+  'norte de santander': 'andina',
+  'putumayo': 'amazonica',
+  'quindio': 'andina',
+  'risaralda': 'andina',
+  'santander': 'andina',
+  'sucre': 'andina',
+  'tolima': 'andina',
+  'valle del cauca': 'pacifico',
+  'vaupes': 'amazonica',
+  'vichada': 'llanos'
+};
+
+// Alias que el cliente o el propio formulario suelen mandar en vez del nombre
+// oficial del departamento. Se resuelven ANTES de buscar en DEPTO_ZONA, y sus
+// CLAVES estan tambien en forma canonica (ya normalizadas), porque la
+// comparacion ocurre sobre normTexto() y no sobre el texto crudo.
+var DEPTO_ALIAS = {
+  'bogota': 'bogota d c',
+  'd c': 'bogota d c',
+  'dc': 'bogota d c',
+  'norte santander': 'norte de santander',
+  'san andres': 'archipielago de san andres providencia y santa catalina',
+  'san andres y providencia': 'archipielago de san andres providencia y santa catalina',
+  'archipielago de san andres': 'archipielago de san andres providencia y santa catalina'
+};
+
+// Normaliza un valor de texto para comparar contra DEPTO_ZONA y
+// DEPTO_ALIAS. Tres pasos, en este orden:
+//   1. TILDES: NFD + borrado del bloque combinante U+0300-U+036F. Sin esto
+//      "Bogot\u00e1" nunca matchearia la clave ASCII 'bogota d c'.
+//   2. PUNTUACION: se borra (y se colapsa el espacio que deja). Sin este
+//      paso "Bogot\u00e1, D.C." daba 'bogota, d.c.' y "San Andr\u00e9s,
+//      Providencia y Santa Catalina" daba un texto CON comas: ninguna de las
+//      dos formas alcanzaba su clave, que esta sin puntuacion porque sale
+//      del seed ya normalizado. Con la puntuacion fuera, la forma larga y la
+//      forma corta de San Andres colapsan a la MISMA clave y "Bogot\u00e1,
+//      D.C." resuelve igual que "Bogota D.C.".
+//   3. minusculas + colapso de espacios + trim.
+function normTexto(v) {
+  if (v === undefined || v === null) return '';
+  return String(v)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[,;:.()[\]{}\/!?<>@#$%^&*+=~|'"-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Resuelve la zona que se va a persistir. Prioridad:
+//   1) body.zona, solo si es EXACTAMENTE uno de los 5 valores de la lista
+//      cerrada (match ya normalizado: sin tildes, sin mayusculas, sin
+//      espacios sobrantes, sin puntuacion).
+//   2) Si no hay zona valida, se RE-DERIVA desde el departamento con el
+//      mapa interno. Es el punto de seguridad de contrato: el cliente no
+//      decide la zona, la zona se valida o se deduce.
+//   3) El bucle de alias es deliberado: resuelve en cadena (un alias puede
+//      apuntar a otro alias) y ademas es el unico punto donde se puede
+//      enganchar una normalizacion extra sin tocar el mapa.
+//   4) Si tampoco hay departamento reconocible, NULL. Nunca '' -- la CHECK
+//      no lo admite y la INSERT moriria con 500.
+function resolverZona(zonaRaw, deptoRaw) {
+  var z = normTexto(zonaRaw);
+  if (ZONAS.indexOf(z) !== -1) return z;
+  var d = normTexto(deptoRaw);
+  for (var i = 0; i < 5 && DEPTO_ALIAS[d]; i++) d = DEPTO_ALIAS[d];
+  return DEPTO_ZONA[d] || null;
+}
 
 // Dominios permitidos para video_url -- solo se persiste si el host
 // coincide (defensa adicional; el saneo real hacia <iframe> ocurre en
@@ -147,9 +297,19 @@ module.exports = async function handler(req, res) {
   // titulo, ciudad=destino, descripcion_corta=resumen) pero pide email
   // en vez de whatsapp -- el modal "Comparte tu experiencia" no
   // recolecta whatsapp (ver index.html #blog-modal).
+  //
+  // ENVIO BASICO SIN WHATSAPP: whatsapp deja de ser requerido. La regla
+  // minima del envio es nombre, categoria, ciudad, descripcion_corta y
+  // foto_principal.
+  //
+  // NO se exige NINGUN contacto (ni whatsapp, ni email, ni sesion JWT): un
+  // envio sin via de contacto se acepta igual y el destino queda con el
+  // autor sin forma de ser located -- el aviso al usuario es trabajo del
+  // frontend, no un 400 del backend. Solo el camino de blog sigue
+  // exigiendo email, porque su modal no recolecta whatsapp.
   var reqs = esBlog
     ? ['nombre','categoria','ciudad','descripcion_corta','email']
-    : ['nombre','categoria','ciudad','descripcion_corta','whatsapp'];
+    : ['nombre','categoria','ciudad','descripcion_corta','foto_principal'];
   for (var i = 0; i < reqs.length; i++) {
     if (!body[reqs[i]] || !String(body[reqs[i]]).trim())
       return res.status(400).json({ error: 'Campo requerido: ' + reqs[i] });
@@ -160,6 +320,11 @@ module.exports = async function handler(req, res) {
 
     var catSlug = esBlog ? 'blog' : (CAT_MAP[(body.categoria||'').toLowerCase()] || 'sitio');
     var nuevoSlug = slug(body.nombre, body.ciudad);
+
+    // Zona (columna zona, migracion 028). Lista cerrada de 5 valores o
+    // NULL: se valida lo que llega y, si no es valido, se re-deriva del
+    // departamento. Ver resolverZona(). Nunca sale '' de aqui.
+    var zonaFinal = resolverZona(body.zona, body.departamento);
 
     // precio_desde es VARCHAR en la tabla -- formatear como texto
     var precio = null;
@@ -248,7 +413,7 @@ module.exports = async function handler(req, res) {
       'INSERT INTO destinos ( '
       + 'slug, nombre, categoria_slug, '
       + 'lead, descripcion, highlight, '
-      + 'ciudad, region, barrio, '
+      + 'ciudad, region, barrio, zona, '
       + 'lat, lng, '
       + 'whatsapp, telefono, email, web, instagram, '
       + 'precio_desde, horario, '
@@ -260,13 +425,13 @@ module.exports = async function handler(req, res) {
       + ') VALUES ( '
       + '$1,$2,$3, '
       + '$4,$5,$6, '
-      + '$7,$8,$9, '
-      + '$10,$11, '
-      + '$12,$13,$14,$15,$16, '
-      + '$17,$18, '
-      + '$19, '
-      + '$20,$21,$22, '
-      + '$23,$24, $25, '
+      + '$7,$8,$9,$10, '
+      + '$11,$12, '
+      + '$13,$14,$15,$16,$17, '
+      + '$18,$19, '
+      + '$20, '
+      + '$21,$22,$23, '
+      + '$24,$25, $26, '
       + "'draft',false,false, "
       + 'NOW(),NOW() '
       + ') RETURNING id, slug',
@@ -280,6 +445,7 @@ module.exports = async function handler(req, res) {
         String(body.ciudad).trim(),
         body.departamento       || null,                 // region
         body.barrio             || null,
+        zonaFinal,                                        // zona ($10)
         body.latitud  ? parseFloat(body.latitud)  || null : null,
         body.longitud ? parseFloat(body.longitud) || null : null,
         body.whatsapp           || null,
