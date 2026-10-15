@@ -5472,9 +5472,9 @@ Guardia de **slot vacio** en el inyector de botones -- la unica de las **4 super
 
 Codigo: `dictado-voz.js` (logica del consumo), `dictado-voz.css` (vision), `publicar.html` (inyeccion) y **NUEVO** `scripts/smoke_dictado_voz.js`. Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md` (estado + deudas), `BUGS_HISTORICOS.md` (**BUG-126**). `DECISIONS.md` **NO se toco** (sin ADR); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
 
-## TSK-214 - Subida a Vercel Blob desde `publicar.html` con sesion iniciada: el cliente pedia el prefijo `publico/` y el servidor autorizaba `usuarios/<sub>/` (contrato de prefijo unico, ADR-098) - 2026-10-15 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
+## TSK-214 - Subida a Vercel Blob desde `publicar.html` con sesion iniciada: el cliente pedia el prefijo `publico/` y el servidor autorizaba `usuarios/<sub>/` (contrato de prefijo unico, ADR-098) - 2026-10-15 - IMPLEMENTADO Y VERIFICADO LOCAL - COMMITEADO EN LOCAL (`f56373c`), SIN DESPLEGAR
 
-**Estado: IMPLEMENTADO Y VERIFICADO LOCAL** con veredicto **APTO para produccion** del gate de `@qa-auditor`; **SIN COMMIT y SIN DESPLEGAR**. Es **correccion de un bug** mas un **contrato nuevo en el cliente compartido**, no un cambio de arquitectura del sistema. El detalle tecnico -- causa raiz, evidencia medida contra produccion y los 4 puntos del fix -- vive **una sola vez** en `BUGS_HISTORICOS.md` **BUG-127**; el contrato de prefijo vive **una sola vez** en `DECISIONS.md` **ADR-098** (aqui solo se apunta; **NO se repite su argumento**, ADR-084 D1). `api/` **8/8 INTACTO**, **cero migraciones**, **cero endpoint nuevo**.
+**Estado: IMPLEMENTADO, VERIFICADO LOCAL Y COMMITEADO EN LOCAL (`f56373c`)** con veredicto **APTO para produccion** del gate de `@qa-auditor`; **SIN DESPLEGAR** (falta el `push` y el build de Vercel, asi que **en produccion el bug sigue vivo** hasta entonces). Es **correccion de un bug** mas un **contrato nuevo en el cliente compartido**, no un cambio de arquitectura del sistema. El detalle tecnico -- causa raiz, evidencia medida contra produccion y los 4 puntos del fix -- vive **una sola vez** en `BUGS_HISTORICOS.md` **BUG-127**; el contrato de prefijo vive **una sola vez** en `DECISIONS.md` **ADR-098** (aqui solo se apunta; **NO se repite su argumento**, ADR-084 D1). `api/` **8/8 INTACTO**, **cero migraciones**, **cero endpoint nuevo**.
 
 ### Que cambia el producto
 
@@ -5498,6 +5498,8 @@ El cliente (`media-upload.js`) y el servidor (`api/utilidades.js?tipo=blob_uploa
 
 `api/utilidades.js` expone **45 caracteres de `DATABASE_URL`** en el campo `db_url` de la rama `?tipo=diagnostico` (`api/utilidades.js:883`, `(process.env.DATABASE_URL||'').slice(0,45)`). Es **preexistente** a esta tanda y el endpoint esta **protegido por `ADMIN_SECRET`**; se registra **como pendiente, sin arreglar aqui**, para que no se pierda.
 
+**RESOLUCION (2026-10-15, dentro del mismo commit `f56373c`): CERRADO.** `api/utilidades.js:883` ya **no expone material de la cadena de conexion**: devuelve **`db_url_presente`**, un **booleano de presencia** (`!!(process.env.DATABASE_URL && String(process.env.DATABASE_URL).length > 0)`), con el **mismo estilo** que `blob_token_presente` (`:886`) y `oidc_token_presente` (`:887`). El texto del hallazgo se conserva arriba **sin borrar** y se corrige por **anotacion**, no por supresion (Cero Borrado Logico, Regla de Oro 3): la historia del registro manda.
+
 ### Verificacion medida (ADR-006, contra el archivo real; por `@qa-auditor`)
 
 | Prueba | Resultado |
@@ -5507,7 +5509,16 @@ El cliente (`media-upload.js`) y el servidor (`api/utilidades.js?tipo=blob_uploa
 | Escudo GOLD de `api/utilidades.js` | **PASA** |
 | Balance de divs y bytes no-ASCII de `publicar.html` | **0 bytes > 127 introducidos** |
 | Conteo de ADR en `DECISIONS.md` | **97** con **`ADR-098` unico** |
+| Fuga en `db_url` (cierre del pendiente) | **8/8 prohibiciones ausentes** (`postgres`, `@`, `neon.tech`, usuario, password, `sslmode`) con una `DATABASE_URL` de mentira cargada; JSON con las **8 claves esperadas**; control negativo con env vacio -> **`false`** |
+| Consumidores de `db_url` que lo pinten | **0** (5 coincidencias de `db_url` en el repo: 0 en HTML, 0 en `scripts/`, 0 en `.opencode/`) -> el booleano puro **no rompe ninguna UI** |
 | Veredicto del gate | **APTO para produccion** |
+
+### Estado tras el commit `f56373c` (actualizado 2026-10-15)
+
+- **Commit de la tanda:** `f56373c` -- `fix(blob): coherencia del prefijo cliente-servidor en la subida de fotos (BUG-127, ADR-098, TSK-214)`, **9 archivos, +654 / -51**, arbol limpio despues (`git status` vacio).
+- **Smoke ya VERSIONADO y ENCADENADO:** `scripts/smoke_media_upload_prefijo.js` (**46/46 OK**) entra **al final de la cadena del script `test`** de `package.json:5` y tiene alias propio **`smoke:blob`** (`package.json:25-26`). La deuda de versionado y la de encadenamiento quedan **CERRADAS**; verificado con `JSON.parse` del `package.json`, dos aserciones de pertenencia y la **ejecucion real** del smoke.
+- **Pendiente `db_url`: CERRADO** (ver la resolucion en el hallazgo, arriba).
+- **DESPLIEGUE PENDIENTE:** el commit es **LOCAL**; falta el **`push`** y el **build de Vercel**. **En produccion el bug sigue vivo** hasta que eso ocurra. Lo unico que falta en el repo es `push` + la **prueba end-to-end del dueno**.
 
 ### Pendiente de verificacion funcional (tarea ABIERTA)
 
@@ -5515,14 +5526,15 @@ Falta la **prueba end-to-end del dueno**: en `/publicar.html` **con sesion activ
 
 ### Deudas y riesgos honestos (sin maquillar)
 
-1. **`scripts/smoke_media_upload_prefijo.js` esta SIN TRACKEAR** en git (`git status` = `??`): el gate que prueba el contrato **no viaja en el repo** hasta que el operador lo agregue al control de versiones, y ademas **no esta encadenado** a `npm test` ni a `scripts/session_close.js`.
+1. **`scripts/smoke_media_upload_prefijo.js` [CERRADA]**: estaba **SIN TRACKEAR** (`??`); en el commit `f56373c` entra al control de versiones (**versionado y encadenado** a la cadena de `npm test`, con alias `smoke:blob`). Se conserva el texto original del riesgo como registro historico y se anota su cierre.
 2. **`modo:'publico'` es un pin de criterio:** mientras `publicar.html` lo declare, su prefijo **no** se autodetectara aunque haya sesion. Es lo buscado en el alta publica, pero **si algun dia esa pagina necesitara subir al arbol del usuario, hay que quitar la opcion de forma explicita**.
 3. **El endpoint de diagnostico cambio su forma de respuesta** (dos booleanos mas): cualquier consumidor que asuma la lista exacta de campos debe actualizarse.
-4. **El hallazgo `db_url`** (arriba) sigue vivo en un endpoint protegido por `ADMIN_SECRET`.
+4. **El hallazgo `db_url`** (arriba) sigue vivo en un endpoint protegido por `ADMIN_SECRET`. **[CERRADA en `f56373c`]**: el campo pasa a `db_url_presente` (booleano de presencia) y ya no expone material de la cadena de conexion; el riesgo permanece documentado, no borrado.
+5. **DESPLIEGUE PENDIENTE:** mientras el commit siga **solo en local**, la correccion **no llega a produccion**; el bug sigue **vivo para el usuario real** hasta el `push` + build.
 
 ### Archivos tocados
 
-Codigo: `media-upload.js` (criterio de prefijo, reintento y mensajes), `publicar.html` (carga del nucleo de sesion + `modo:'publico'` en las dos subidas), `api/utilidades.js` (solo `?tipo=diagnostico`) y **NUEVO** `scripts/smoke_media_upload_prefijo.js` (**untracked**). Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md` (relevo + riesgos) y `BUGS_HISTORICOS.md` (**BUG-127**). `DECISIONS.md` lo redacto `@architect` **fuera de este pase** (**ADR-098**, ya presente en el archivo); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
+Codigo: `media-upload.js` (criterio de prefijo, reintento y mensajes), `publicar.html` (carga del nucleo de sesion + `modo:'publico'` en las dos subidas), `api/utilidades.js` (solo `?tipo=diagnostico`) y **NUEVO** `scripts/smoke_media_upload_prefijo.js` (**untracked** al escribir esta seccion; **versionado y encadenado** en el commit `f56373c`). Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md` (relevo + riesgos) y `BUGS_HISTORICOS.md` (**BUG-127**). `DECISIONS.md` lo redacto `@architect` **fuera de este pase** (**ADR-098**, ya presente en el archivo); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
