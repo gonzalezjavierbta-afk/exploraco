@@ -17,6 +17,16 @@
 //   (vii) corte por silencio/navegador: aviso visible sin auto-restart.
 //   (viii) contador de diagnostico DORMIDO salvo ?dvdebug=1.
 //
+// Y el MOTOR DEFECTUOSO DE CHROME ANDROID (que reemite el mismo final varias
+// veces: bug conocido de la implementacion Android del Web Speech API):
+//   (ix)   reemision del mismo final en eventos separados.
+//   (x)    un solo evento con DOS entradas finales identicas.
+//   (xi)   final seguido de otro final que repite solo la ultima palabra.
+//   (xii)  reemision del final despues de un interim del mismo segmento.
+//   (xiii) reemision del final completo tras un corte y reanudacion.
+//   (xiv)  CONTRA-CASO: una repeticion literal del usuario se conserva.
+//   (xv)   version del helper + contador de reemisiones en ?dvdebug=1.
+//
 // Exit 0 = todas las aserciones en verde. Sin dependencias npm.
 
 "use strict";
@@ -416,6 +426,189 @@ check("8.4 el contador reporta resultados recibidos y estado del motor",
   nodo9 ? JSON.stringify(nodo9.textContent) : "sin nodo");
 check("8.5 el contador no altera el texto dictado",
   i9.value === "uno dos", "valor=" + JSON.stringify(i9.value));
+
+/* ---------------------------------------------------------------- */
+/* 9) MOTOR DEFECTUOSO DE CHROME ANDROID: el motor entrega el MISMO */
+/* resultado final mas de una vez (mas de 2-3 veces segun los       */
+/* informes). Estos casos FALLAN con un consumo ingenuo: el motor   */
+/* no reparte el texto en bloques disjuntos y tampoco respeta       */
+/* resultIndex cuando reabre su buffer.                             */
+/* ---------------------------------------------------------------- */
+
+console.log("\n=== 9a) DOS EVENTOS SEPARADOS CON EL MISMO FINAL ===");
+var sA = cargar({});
+var iA = inputFalso();
+var bA = botonFalso();
+sA.DictadoVoz.iniciar(iA, bA, null);
+var mA = ultimoMotor(sA.motor);
+emitir(mA, [resultado("hola mundo ", true)], 0);
+check("a.1 el primer final entra una sola vez", iA.value === "hola mundo",
+  "valor=" + JSON.stringify(iA.value));
+emitir(mA, [resultado("hola mundo ", true)], 0);
+check("a.2 el MISMO final en un evento nuevo no se concatena",
+  iA.value === "hola mundo", "valor=" + JSON.stringify(iA.value));
+check("a.3 el campo no contiene 'hola mundo hola mundo'",
+  iA.value.toLowerCase().indexOf("hola mundo hola mundo") === -1,
+  "valor=" + JSON.stringify(iA.value));
+emitir(mA, [resultado("hola mundo ", true), resultado("hola mundo ", true)], 1);
+check("a.4 el final reemitido como resultado NUEVO tampoco duplica",
+  iA.value === "hola mundo" && ocurrencias(iA.value, "hola mundo") === 1,
+  "valor=" + JSON.stringify(iA.value));
+sA.DictadoVoz.detenerTodo();
+
+console.log("\n=== 9b) UN EVENTO CON DOS ENTRADAS FINALES IDENTICAS ===");
+var sB = cargar({});
+var iB = inputFalso();
+var bB = botonFalso();
+sB.DictadoVoz.iniciar(iB, bB, null);
+var mB = ultimoMotor(sB.motor);
+emitir(mB, [resultado("hola mundo ", true), resultado("hola mundo ", true)], 0);
+check("b.1 dos entradas finales identicas en el MISMO evento no duplican",
+  iB.value === "hola mundo", "valor=" + JSON.stringify(iB.value));
+check("b.2 la frase aparece una sola vez",
+  ocurrencias(iB.value, "hola mundo") === 1, "ocurrencias=" + ocurrencias(iB.value, "hola mundo"));
+check("b.3 el campo no contiene 'hola mundo hola mundo'",
+  iB.value.toLowerCase().indexOf("hola mundo hola mundo") === -1,
+  "valor=" + JSON.stringify(iB.value));
+sB.DictadoVoz.detenerTodo();
+
+console.log("\n=== 9c) FINAL QUE REPITE SOLO LA ULTIMA PALABRA ===");
+var sC = cargar({});
+var iC = inputFalso();
+var bC = botonFalso();
+sC.DictadoVoz.iniciar(iC, bC, null);
+var mC = ultimoMotor(sC.motor);
+emitir(mC, [resultado("hola mundo ", true), resultado("mundo", true)], 0);
+check("c.1 el final que repite la ultima palabra no la concatena",
+  iC.value === "hola mundo", "valor=" + JSON.stringify(iC.value));
+check("c.2 'mundo' aparece una sola vez",
+  ocurrencias(iC.value, "mundo") === 1, "ocurrencias=" + ocurrencias(iC.value, "mundo"));
+check("c.3 el campo no contiene 'mundo mundo'",
+  iC.value.toLowerCase().indexOf("mundo mundo") === -1, "valor=" + JSON.stringify(iC.value));
+
+var sCb = cargar({});
+var iCb = inputFalso();
+var bCb = botonFalso();
+sCb.DictadoVoz.iniciar(iCb, bCb, null);
+var mCb = ultimoMotor(sCb.motor);
+emitir(mCb, [resultado("hola mundo ", true)], 0);
+emitir(mCb, [resultado("hola mundo ", true), resultado("mundo", true)], 1);
+check("c.4 la repeticion de la ultima palabra en un evento nuevo se cose",
+  iCb.value === "hola mundo" && ocurrencias(iCb.value, "mundo") === 1,
+  "valor=" + JSON.stringify(iCb.value));
+var sCc = cargar({});
+var iCc = inputFalso();
+var bCc = botonFalso();
+sCc.DictadoVoz.iniciar(iCc, bCc, null);
+var mCc = ultimoMotor(sCc.motor);
+emitir(mCc, [resultado("la playa grande ", true)], 0);
+emitir(mCc, [resultado("la playa grande ", true), resultado("grande azul", true)], 1);
+check("c.5 el solape legitimo entre segmentos se cose una sola vez",
+  iCc.value === "la playa grande azul", "valor=" + JSON.stringify(iCc.value));
+sCc.DictadoVoz.detenerTodo();
+
+console.log("\n=== 9d) REEMISION DEL FINAL TRAS UN INTERIM DEL MISMO SEGMENTO ===");
+var sD = cargar({});
+var iD = inputFalso();
+var bD = botonFalso();
+sD.DictadoVoz.iniciar(iD, bD, null);
+var mD = ultimoMotor(sD.motor);
+emitir(mD, [resultado("hola mundo ", true)], 0);
+emitir(mD, [resultado("hola mundo ", true), resultado("hola mundo otra", false)], 1);
+check("d.1 el interim del mismo segmento no duplica la frase finalizada",
+  iD.value === "hola mundo otra", "valor=" + JSON.stringify(iD.value));
+emitir(mD, [resultado("hola mundo ", true), resultado("hola mundo otra", true),
+  resultado("hola mundo otra", true)], 1);
+check("d.2 el final reemitido dos veces tras el interim no se suma dos veces",
+  iD.value === "hola mundo otra", "valor=" + JSON.stringify(iD.value));
+check("d.3 la frase final aparece una sola vez",
+  ocurrencias(iD.value, "hola mundo otra") === 1,
+  "ocurrencias=" + ocurrencias(iD.value, "hola mundo otra"));
+check("d.4 el campo no contiene 'hola mundo otra hola mundo otra'",
+  iD.value.toLowerCase().indexOf("hola mundo otra hola mundo otra") === -1,
+  "valor=" + JSON.stringify(iD.value));
+sD.DictadoVoz.detenerTodo();
+
+console.log("\n=== 9e) REEMISION TRAS CORTE Y REANUDACION SOBRE EL MISMO CAMPO ===");
+var sE = cargar({});
+var iE = inputFalso();
+var bE = botonFalso();
+var motivosE = [];
+sE.DictadoVoz.toggle(iE, bE, function (motivo) { motivosE.push(motivo); });
+var mE1 = ultimoMotor(sE.motor);
+emitir(mE1, [resultado("hola mundo ", true)], 0);
+check("e.1 el dictado previo queda escrito", iE.value === "hola mundo",
+  "valor=" + JSON.stringify(iE.value));
+emitirOnend(mE1);
+check("e.2 el corte por navegador cierra la sesion y conserva lo dictado",
+  motivosE.length === 1 && motivosE[0] === "navegador" && iE.value === "hola mundo",
+  "motivos=" + JSON.stringify(motivosE) + " valor=" + JSON.stringify(iE.value));
+sE.DictadoVoz.toggle(iE, bE, function (motivo) { motivosE.push(motivo); });
+check("e.3 la reanudacion abre una sesion nueva sobre el mismo campo",
+  sE.motor.motores.length === 2, "motores=" + sE.motor.motores.length);
+var mE2 = ultimoMotor(sE.motor);
+emitir(mE2, [resultado("hola mundo ", true)], 0);
+check("e.4 la reemision del final tras el corte no duplica lo ya escrito",
+  iE.value === "hola mundo", "valor=" + JSON.stringify(iE.value));
+check("e.5 el campo no contiene 'hola mundo hola mundo'",
+  iE.value.toLowerCase().indexOf("hola mundo hola mundo") === -1,
+  "valor=" + JSON.stringify(iE.value));
+emitir(mE2, [resultado("hola mundo ", true), resultado("hola mundo y buenas tardes ", true)], 1);
+check("e.6 el dictado nuevo entra despues del previo sin repetirlo",
+  iE.value === "hola mundo y buenas tardes", "valor=" + JSON.stringify(iE.value));
+check("e.7 el prefijo dictado antes del corte aparece una sola vez",
+  ocurrencias(iE.value, "hola mundo") === 1, "ocurrencias=" + ocurrencias(iE.value, "hola mundo"));
+sE.DictadoVoz.detenerTodo();
+
+console.log("\n=== 9f) CONTRA-CASO OBLIGATORIO: REPETICION LITERAL DEL USUARIO ===");
+/* SESGO DECLARADO: si el usuario repite de verdad una palabra o una frase, no
+   se pierde una copia, pero si el motor la reemite tampoco se suman dos copias.
+   Ante la duda entre "deduplicar" y "duplicar texto no dicho" el modulo
+   DEDUPLICA: preferimos perder una repeticion literal (el usuario puede
+   reescribirla a mano) a ensuciar el campo con texto que no se ha dicho. */
+var sF = cargar({});
+var iF = inputFalso();
+var bF = botonFalso();
+sF.DictadoVoz.iniciar(iF, bF, null);
+var mF = ultimoMotor(sF.motor);
+emitir(mF, [resultado("hola hola ", true)], 0);
+check("f.1 la repeticion literal del usuario NO se colapsa a una palabra",
+  iF.value === "hola hola", "valor=" + JSON.stringify(iF.value));
+check("f.2 'hola hola' se conserva como una copia entera",
+  ocurrencias(iF.value, "hola hola") === 1, "ocurrencias=" + ocurrencias(iF.value, "hola hola"));
+emitir(mF, [resultado("hola hola ", true), resultado("hola hola ", true)], 1);
+check("f.3 la reemision del motor deja UNA copia (sesgo: deduplicar)",
+  iF.value === "hola hola", "valor=" + JSON.stringify(iF.value));
+check("f.4 el campo no contiene 'hola hola hola hola'",
+  iF.value.toLowerCase().indexOf("hola hola hola hola") === -1,
+  "valor=" + JSON.stringify(iF.value));
+var sF2 = cargar({});
+var iF2 = inputFalso();
+var bF2 = botonFalso();
+sF2.DictadoVoz.iniciar(iF2, bF2, null);
+emitir(ultimoMotor(sF2.motor), [resultado("hola hola hola hola ", true)], 0);
+check("f.5 un enunciado con la palabra repetida se conserva entero",
+  iF2.value === "hola hola hola hola", "valor=" + JSON.stringify(iF2.value));
+sF2.DictadoVoz.detenerTodo();
+
+console.log("\n=== 9g) VERSION DEL HELPER Y REEMISIONES EN ?dvdebug=1 ===");
+var sG = cargar({ search: "?dvdebug=1" });
+var iG = inputFalso();
+var bG = botonFalso();
+sG.DictadoVoz.iniciar(iG, bG, null);
+var mG = ultimoMotor(sG.motor);
+emitir(mG, [resultado("hola mundo ", true)], 0);
+emitir(mG, [resultado("hola mundo ", true), resultado("hola mundo ", true)], 1);
+var nodoG = buscarNodo(sG.doc, function (el) { return el.id === "dv-debug"; });
+check("g.1 el contador identifica la VERSION del helper (dv-2, no cache vieja)",
+  !!nodoG && /dv-2/.test(nodoG.textContent),
+  nodoG ? JSON.stringify(nodoG.textContent) : "sin nodo");
+check("g.2 el contador reporta las reemisiones/fusiones descartadas",
+  !!nodoG && /reemision/i.test(nodoG.textContent) &&
+  /[1-9]/.test((nodoG.textContent.split("reemision")[1] || "")),
+  nodoG ? JSON.stringify(nodoG.textContent) : "sin nodo");
+check("g.3 el contador no altera el texto dictado",
+  iG.value === "hola mundo", "valor=" + JSON.stringify(iG.value));
 
 /* ---------------------------------------------------------------- */
 console.log("\n---------------------------------------------");

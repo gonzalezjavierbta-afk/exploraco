@@ -22,6 +22,20 @@
  * une con fusion por solape: un fragmento que repite y extiende lo ya acumulado
  * lo REEMPLAZA, no se concatena.
  *
+ * DEFENSA CONTRA EL MOTOR QUE REEMITE (segundo reporte, mismo dispositivo)
+ * La implementacion Android del Web Speech API entrega el MISMO resultado final
+ * mas de una vez (2-4 veces segun los informes publicos: Chromium 40484311 y
+ * varias incidencias de react-speech-recognition). Por eso el consumo es
+ * DEFENSIVO en cuatro puntos:
+ *   - la fusion por solape se aplica TAMBIEN dentro del array del evento, no
+ *     solo entre eventos: dos o tres entradas finales iguales producen una;
+ *   - un final que repite la cola del anterior se cose (no se concatena);
+ *   - tras un corte, el texto que dicto la sesion anterior sigue en el campo:
+ *     se memoriza y la reemision del motor se DESCUENTA en vez de sumarse;
+ *   - el sesgo ante la duda es DEDUPLICAR: preferimos perder una repeticion
+ *     literal del usuario (puede reescribirla a mano) a escribir en el campo
+ *     texto que no se ha dicho.
+ *
  * CICLO DE VIDA
  * - finalizar() anula los 4 handlers de la instancia que cierra y la aborta:
  *   ningun motor huerfano sigue escribiendo con el estado ya reseteado.
@@ -29,8 +43,9 @@
  *   arranque asincrono; el estado activo se marca en el onstart REAL.
  * - Si el motor corta por silencio o limite del navegador, NO se relanza solo:
  *   se avisa de que hay que reanudar y de que lo dictado se conserva.
- * - Diagnostico dormido: con ?dvdebug=1 en la URL se dibuja un contador de
- *   resultados recibidos y estado del motor. Sin ese flag no toca el DOM.
+ * - Diagnostico dormido: con ?dvdebug=1 en la URL se dibuja un contador con la
+ *   VERSION del helper, los resultados recibidos, las reemisiones descartadas
+ *   y el estado del motor. Sin ese flag no toca el DOM.
  *
  * USO
  *   window.DictadoVoz.iniciar(inputEl, btn, function (motivo) { ... });
@@ -45,6 +60,10 @@
   var LANG = 'es-CO';
   var CLASE_ACTIVA = 'grabando-activo';
   var MSG_CORTE = 'El dictado se detuvo solo. Pulsa Dictar para reanudar; lo que ya dictaste se conserva.';
+  // Identificador de VERSION del helper. Se muestra en el contador ?dvdebug=1
+  // para que se pueda comprobar de un vistazo que el navegador NO sirve una
+  // copia vieja en cache.
+  var VERSION = 'dv-2';
   // Longitud minima de un solape sufijo/prefijo para considerarlo repeticion.
   var MIN_SOLAPE = 3;
 
@@ -58,14 +77,24 @@
     prefijo: '',
     // Buffer persistente de lo dictado y ya confirmado (resultados finales).
     textoBase: '',
+    // Texto que dicto la sesion ANTERIOR y que sigue en el campo: sirve para
+    // descontar la reemision del motor tras un corte (defecto de Android).
+    dictadoPrevio: '',
     // Ultimo valor que escribio el modulo: sirve para detectar edicion manual.
     ultimoEscrito: null,
     // true entre start() y el onstart real (bloquea la reentrada por toques).
     arrancando: false,
     // Diagnostico (solo se pinta con ?dvdebug=1).
     eventosResultado: 0,
-    resultados: 0
+    resultados: 0,
+    // Resultados descartados por reemision o fusion sin aportar texto nuevo.
+    reemisiones: 0
   };
+
+  // Memoria ENTRE sesiones: ultimo texto dictado que escribio el modulo. No se
+  // limpia en finalizar(): es lo que permite reconocer, en la sesion siguiente,
+  // la reemision del motor sobre un campo que ya tiene lo dictado.
+  var memoriaDictado = '';
 
   // Nodos opcionales creados por el modulo (aviso de corte y contador debug).
   var avisoEl = null;
@@ -122,6 +151,38 @@
       return normalizar(a + ' ' + b.slice(k));
     }
     return normalizar(a + ' ' + b);
+  }
+
+  // true si `texto` termina en `cola` (comparacion sin distinguir mayusculas).
+  function terminaCon(texto, cola) {
+    var t = String(texto || '').toLowerCase();
+    var c = String(cola || '').toLowerCase();
+    if (!c || t.length < c.length) return false;
+    return t.slice(t.length - c.length) === c;
+  }
+
+  /* Descuenta de un fragmento lo que YA estaba dictado antes de esta sesion y
+     devuelve SOLO la parte nueva:
+       - el motor reemite lo previo completo          -> '' (se descarta);
+       - el motor reemite lo previo + texto nuevo     -> solo el texto nuevo;
+       - el motor reemite solo la cola de lo previo   -> '' (corte y reanudacion)
+         y solo mientras la sesion no haya dictado nada nuevo (permitirCola).
+     Sesgo declarado: ante la duda se DEDUPLICA. Preferimos perder una repeticion
+     literal del usuario antes que escribir texto que no se ha dicho. */
+  function descontarPrevio(previo, fragmento, permitirCola) {
+    var p = normalizar(previo);
+    var f = normalizar(fragmento);
+    if (!p || !f) return f;
+    var pl = p.toLowerCase();
+    var fl = f.toLowerCase();
+    if (fl === pl) return '';
+    if (fl.indexOf(pl + ' ') === 0) return normalizar(f.slice(p.length));
+    if (permitirCola && pl.length > fl.length &&
+        pl.charAt(pl.length - fl.length - 1) === ' ' &&
+        pl.slice(pl.length - fl.length) === fl) {
+      return '';
+    }
+    return f;
   }
 
   function avisar(mensaje) {
@@ -190,8 +251,12 @@
 
   function refrescarDebug() {
     if (!depurarActivado() || !nodoDebug) return;
-    nodoDebug.textContent = '[dvdebug eventos=' + estado.eventosResultado +
-      ' resultados=' + estado.resultados + ' motor=' + estadoMotor() + ']';
+    // La VERSION va delante: sirve para descartar una copia servida de cache.
+    nodoDebug.textContent = '[dvdebug ' + VERSION +
+      ' eventos=' + estado.eventosResultado +
+      ' resultados=' + estado.resultados +
+      ' reemisiones=' + estado.reemisiones +
+      ' motor=' + estadoMotor() + ']';
   }
 
   // Dormido salvo ?dvdebug=1: sin el flag no se crea ni se toca ningun nodo.
@@ -289,6 +354,7 @@
     estado.input = null;
     estado.prefijo = '';
     estado.textoBase = '';
+    estado.dictadoPrevio = '';
     estado.ultimoEscrito = null;
     estado.arrancando = false;
     DictadoVoz.grabando = false;
@@ -353,10 +419,22 @@
       // la reanudacion y no se duplica con lo que se dicte a continuacion.
       estado.prefijo = normalizar(inputEl.value);
       estado.textoBase = '';
+      // Si el campo sigue conteniendo lo que dicto la sesion anterior (corte
+      // del navegador y reanudacion), el motor Android suele reemitir ese mismo
+      // final: se memoriza para DESCONTARLO en vez de duplicarlo.
+      estado.dictadoPrevio = '';
+      if (memoriaDictado.length >= 2 && terminaCon(estado.prefijo, memoriaDictado)) {
+        estado.dictadoPrevio = memoriaDictado;
+      } else {
+        // El campo ya no contiene lo dictado antes (se edito o se vacio): la
+        // memoria deja de ser util y no puede absorber texto legitimo.
+        memoriaDictado = '';
+      }
       estado.ultimoEscrito = estado.prefijo;
       estado.arrancando = true;
       estado.eventosResultado = 0;
       estado.resultados = 0;
+      estado.reemisiones = 0;
       limpiarAviso();
 
       rec.onstart = function () {
@@ -382,6 +460,9 @@
           estado.prefijo = normalizar(inputEl.value);
           estado.textoBase = '';
           estado.ultimoEscrito = null;
+          // El campo ya no es lo que dicto el modulo: no hay reemision que
+          // descontar y absorber aqui podria comerse texto legitimo.
+          estado.dictadoPrevio = '';
         }
 
         // Solo lo NUEVO desde event.resultIndex: no se re-suman los bloques ya
@@ -399,18 +480,35 @@
           if (!r || !r[0]) continue;
           var txt = String(r[0].transcript || '');
           if (!txt) continue;
+          // La fusion por solape se aplica TAMBIEN dentro del array del evento:
+          // el motor Android entrega el mismo final 2-3 veces en el MISMO
+          // evento, y un final que repite la cola del anterior se cose.
           if (r.isFinal) {
-            finales = unirTexto(finales, txt);
+            var antesFinal = finales;
+            finales = fusionarSolape(finales, txt);
+            if (antesFinal && finales === antesFinal) estado.reemisiones += 1;
           } else {
-            interims = unirTexto(interims, txt);
+            var antesInterim = interims;
+            interims = fusionarSolape(interims, txt);
+            if (antesInterim && interims === antesInterim) estado.reemisiones += 1;
           }
           estado.resultados += 1;
         }
         estado.eventosResultado += 1;
 
+        // Lo dictado en la sesion anterior (corte + reanudacion) se descuenta:
+        // el motor reemite el mismo final sobre un campo que ya lo contiene.
+        if (finales && estado.dictadoPrevio) {
+          var limpio = descontarPrevio(estado.dictadoPrevio, finales, estado.textoBase === '');
+          if (normalizar(limpio) !== normalizar(finales)) estado.reemisiones += 1;
+          finales = limpio;
+        }
+
         // Los finales nuevos entran al buffer persistente.
         if (finales) {
+          var basePrevia = estado.textoBase;
           estado.textoBase = fusionarSolape(estado.textoBase, finales);
+          if (estado.textoBase === basePrevia) estado.reemisiones += 1;
         }
         // El interim se muestra SOBRE el buffer, con la misma fusion por solape:
         // en Chrome Android el interim del segmento repite lo recien finalizado.
@@ -420,6 +518,9 @@
 
         escribir(inputEl, unirTexto(estado.prefijo, visible));
         estado.ultimoEscrito = normalizar(inputEl.value);
+        // Lo que escribio el modulo (nunca lo tecleado a mano) queda memorizado
+        // para detectar la reemision del motor en la sesion siguiente.
+        memoriaDictado = unirTexto(estado.dictadoPrevio, visible);
         actualizarDebug(btn);
       };
 
