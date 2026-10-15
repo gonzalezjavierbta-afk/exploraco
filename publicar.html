@@ -816,6 +816,7 @@
   </div>
 </div>
 
+<script src="usuario-session.js"></script>
 <script src="media-upload.js?v=1"></script>
 <script src="dictado-voz.js?v=1"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1014,7 +1015,7 @@ function handleFotoFile(input) {
   var txt = drop ? drop.querySelector('p') : null;
   if (txt) txt.textContent = 'Subiendo...';
   window.MediaUpload.subir({
-    file: file, tipo: 'foto', contexto: 'destino',
+    file: file, tipo: 'foto', contexto: 'destino', modo: 'publico',
     onProgress: function (pr) {
       if (txt) txt.textContent = 'Subiendo... ' + Math.round(pr.percentage || 0) + '%';
     }
@@ -1042,7 +1043,7 @@ function subirFotoGaleria() {
     if (!file) return;
     var v = window.MediaUpload.validar(file, 'foto');
     if (!v.ok) { alert(v.error); return; }
-    window.MediaUpload.subir({ file: file, tipo: 'foto', contexto: 'destino' })
+    window.MediaUpload.subir({ file: file, tipo: 'foto', contexto: 'destino', modo: 'publico' })
       .then(function (r) {
         addGaleriaRow(r.url);
         if (window.MediaUpload && typeof window.MediaUpload.confirmacion === 'function') {

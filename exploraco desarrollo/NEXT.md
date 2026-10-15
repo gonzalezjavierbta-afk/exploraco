@@ -244,6 +244,30 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### IMPLEMENTADO Y VERIFICADO LOCAL 2026-10-15 (pase documental unico R2) - TSK-214: la subida de la foto desde `publicar.html` fallaba con sesion iniciada por el criterio del `pathname` (ADR-098 / BUG-127)
+
+**Que se estaba haciendo:** corregir que, al publicar un espacio desde `publicar.html` **con la sesion iniciada**, la subida de la foto fallara con el mensaje del SDK **"Vercel Blob: Failed to retrieve the client token"**. **Causa raiz:** el cliente (`media-upload.js`) y el servidor (`api/utilidades.js?tipo=blob_upload`) elegian el prefijo del `pathname` con **criterios distintos** -- el cliente sacaba el `uid` de `window.ExploraCO.usuario.id`, **ausente en `publicar.html`** (esa pagina **no cargaba** `usuario-session.js`), mientras el `jwt` **si** venia del `localStorage` --, asi que pedia `publico/destino/foto/...` **con un JWT valido** y el servidor autorizaba solo `usuarios/<sub>/foto/...` -> **403 `PATHNAME_NO_AUTORIZADO`**, que el SDK **enmascara**. El argumento y la evidencia viven **una sola vez** en `BUGS_HISTORICOS.md` **BUG-127**, y el contrato de prefijo en `DECISIONS.md` **ADR-098**; aqui solo el relevo, el pendiente y las deudas. **SIN commit, SIN desplegar.** `api/` **8/8 INTACTO**, cero migraciones, cero endpoint nuevo.
+
+**Que se entrego (medido contra el archivo real, ADR-006, por `@qa-auditor`: APTO para produccion):** `media-upload.js` con **modo publico explicito** `modo:'publico'` (`sesionPublica` L284-286, `resolverSesion` L297+; corta **antes** de la autodeteccion), **coherencia prefijo <-> payload** (el `uid` sale del **`sub` del JWT**, nunca de `window.ExploraCO.usuario`), **reintento unico** via `refreshJwt` con JWT caducado (L312-319) y **traduccion del error real del servidor** a mensaje humano (L249-254). `publicar.html` carga **`usuario-session.js`** (`:819`) y pasa `modo:'publico'` en sus **dos** subidas (`:1017-1018` foto principal, `:1046` foto de galeria). `api/utilidades.js` `?tipo=diagnostico` informa **dos booleanos de presencia** (`blob_token_presente` `:886`, `oidc_token_presente` `:887`). **NUEVO** `scripts/smoke_media_upload_prefijo.js`: **46/46 OK**. `node --check media-upload.js` exit 0; Escudo GOLD de `api/utilidades.js`; **0 bytes > 127** introducidos en `publicar.html`; conteo de ADR **97** con **`ADR-098` unico**.
+
+**Cambio de comportamiento registrado (decision del ORQUESTADOR; NO es un ADR):** **`galeria.html` se queda con la autodeteccion** (con sesion -> `usuarios/<sub>/`, sin sesion -> `publico/`), por ser un **recurso propio del usuario** (ADR-068, `urlPerteneceAlUsuario`); **solo** `publicar.html` fija el modo publico. Verificado: `galeria.html:1202` llama `MediaUpload.subir({...})` **sin** `modo`, luego conserva la autodeteccion **por decision expresa, no por olvido**.
+
+**Hallazgo pendiente registrado (NO corregido en esta tanda):** `api/utilidades.js` expone **45 caracteres de `DATABASE_URL`** en el campo `db_url` de la rama `?tipo=diagnostico` (`api/utilidades.js:883`). Es **preexistente**, el endpoint esta **protegido por `ADMIN_SECRET`** y queda anotado con su linea.
+
+**Que sigue (con criterio de verificacion):**
+
+1. **PRUEBA END-TO-END DEL DUENO (la mas importante, y NO hecha).** En `/publicar.html` **con sesion activa**: subir **foto principal** y **foto de galeria** y confirmar que la **URL devuelta queda bajo `publico/destino/foto/`**, mas un **envio de prueba** para validar que la **atribucion / XP del POST sigue funcionando**. **Criterio:** dos URLs con ese prefijo + un registro creado con su XP atribuido.
+2. **Agregar `scripts/smoke_media_upload_prefijo.js` al control de versiones.** Hoy esta **SIN TRACKEAR** (`??`): el gate del contrato **no viaja en el repo**. **Criterio:** el archivo aparece como `A` (o `M`) en `git status`, no como `??`.
+3. **Decidir si el smoke se enchufa a un agregado.** No esta en `npm test` ni en `scripts/session_close.js`. **Criterio:** decision escrita de dejarlo suelto (y correrlo a mano) o su enganche con la cadena en verde.
+4. **El pendiente `db_url`** (`api/utilidades.js:883`): recortar mas, enmascarar o retirar el campo. **Criterio:** el campo no expone material de la cadena de conexion, o decision escrita de mantenerlo.
+
+**Riesgos activos:**
+
+1. **El gate del contrato esta fuera del repo:** mientras el smoke siga `??` y sin encadenar, una regresion del prefijo **no** la vera `npm test`.
+2. **`modo:'publico'` es un pin de criterio:** si algun dia `publicar.html` necesita subir al arbol del usuario, hay que **quitar la opcion de forma explicita**; la autodeteccion no actuara mientras este presente.
+3. **El endpoint de diagnostico cambio su forma de respuesta** (dos booleanos mas): cualquier consumidor que asuma la lista exacta de campos debe actualizarse.
+4. **Sin prueba end-to-end, la entrega no esta probada en el unico entorno donde corre** (navegador con sesion real y store de Blob en produccion).
+
 ### COMMITEADO Y DESPLEGADO 2026-10-15 (pase documental unico R2) - TSK-213: correccion de la duplicacion del dictado por voz (continuacion de TSK-210)
 
 **Que se estaba haciendo:** corregir que el dictado por voz **duplicaba** texto en Chrome Android sobre `publicar.html` (primero la ultima frase; tras el primer fix, palabras del dictado). **Causa raiz doble** en la composicion del valor de `dictado-voz.js`: el **interim del segmento ya contiene lo finalizado de ese mismo segmento** y el **motor Android REEMITE el mismo final**. El argumento completo vive **una sola vez** en `BUGS_HISTORICOS.md` **BUG-126**; aqui solo el estado y las deudas. **SIN ADR.** **COMMITEADO Y DESPLEGADO** en `main`: `d4090c0` (1.er fix) y `bd9256b` (consumo defensivo + marcador `dv-2`). `api/` **8/8 INTACTO**, cero migraciones, cero endpoint nuevo.

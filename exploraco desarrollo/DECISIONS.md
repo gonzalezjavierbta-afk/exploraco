@@ -8627,3 +8627,88 @@ Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Se
 ```
 
 Debe devolver **`## ADR-097:`**, y el conteo de ADR debe subir de 95 a 96. El cierre documental (`TASKS.md`, `NEXT.md`, `BLUEPRINT.md`) corresponde al **pase unico R2** de `@docs-keeper`, no a este ADR.
+
+---
+
+## ADR-098: El prefijo de subida a Vercel Blob tiene **una sola fuente de verdad**: el cliente y `api/utilidades.js` evaluan el **mismo criterio**, y el modo publico existe como opcion **EXPLICITA** del cliente compartido [NO deroga ninguna premisa de ADR previos; acota ADR-068]
+
+**ID:** ADR-098
+**Fecha:** 2026-10-15
+**Autor:** `@architect` (diseño). Gate de riesgo CONFIRMADO por el operador (toca `media-upload.js`, `api/utilidades.js` y los formularios que suben medios).
+**Estado:** **ACEPTADO / PENDIENTE DE IMPLEMENTAR.** El criterio del contrato ya esta fijado por decision del operador; este ADR lo registra, no lo propone.
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-097`** (linea 8549); no existia ningun `ADR-098`. Se escribe como **098**, el siguiente consecutivo libre. Conteo de encabezados `^## ADR-` antes de esta seccion: **96**. Tamano real medido hoy: **1.290,3 KB / 8.629 lineas**.
+
+### Problema
+
+La subida de medios a Vercel Blob **fallaba con 403 en produccion** y el error visible no era el error real. La causa no es de red, ni del store, ni de permisos del token: es que **el cliente y el servidor evaluaban el prefijo del `pathname` con criterios distintos**, y el desacuerdo solo se manifiesta cuando un lado tiene un dato que el otro no tiene.
+
+1. **El cliente elegia el prefijo con `jwt && uid`** (`media-upload.js` `:175-178`): `if (jwt && uid) prefijo = 'usuarios/' + uid + '/' + tipo + '/'; else prefijo = 'publico/destino/' + tipo + '/';`. El `jwt` sale de `jwtActual()` (`:51-57`), que lee `window.ExploraCO.obtenerJwt()` y, si no esta, el `localStorage`. El `uid` sale de `usuarioIdActual()` -> `window.ExploraCO.usuario.id`: **el nucleo de sesion**. En `publicar.html` ese nucleo **no se carga**, asi que `uid` era **`null`** mientras el `jwt` **si** venia del `localStorage`.
+2. **Consecuencia inmediata:** el cliente pedia `publico/destino/<tipo>/...` y a la vez **enviaba el `jwt` valido** en el `clientPayload` (`:181-186`).
+3. **El servidor decide el prefijo por el JWT, no por el pathname** (`api/utilidades.js` `:103-119`): con `blobVerificarJwt(pl.jwt)` valido (`:109`) fija `prefijo = 'usuarios/' + sesion.sub + '/'` (`:112`) y **solo despues** compara (`:123`): `if (String(pathname).indexOf(prefijo + tipo + '/') !== 0) throw blobErrorDe('PATHNAME_NO_AUTORIZADO')` -> **403** (`:137`).
+4. **El 403 llega enmascarado al usuario:** el SDK `@vercel/blob/client` traduce el fallo del token a **`Vercel Blob: Failed to retrieve the client token`**, y el codigo real (`PATHNAME_NO_AUTORIZADO`) **se pierde** en el camino. Ese enmascaramiento es parte del bug: alarga el diagnostico porque apunta a infraestructura cuando el fallo es de autorizacion de ruta.
+5. **Detalle que descarta la hipotesis facil:** `pl.usuario_id` viajaba `null`, y el servidor solo lanza `SESION_INVALIDA` (`:111`) **si llega un `usuario_id` que difiere** de `sesion.sub`. Con `null` no se dispara: el 403 es **de prefijo**, no de sesion.
+
+### Datos medidos (2026-10-15, contra produccion y contra el archivo real)
+
+1. `pathname` **publico** + `clientPayload {tipo:'foto', contexto:'destino'}` -> **200 con `clientToken`**. El camino publico funciona.
+2. `pathname` **`usuarios/<sub-prueba>/foto/x.jpg` SIN `jwt`** -> **403 `PATHNAME_NO_AUTORIZADO`**. La comparacion de `:123` es efectivamente la que dispara.
+3. **El store SI esta configurado:** el fallo **no es un 503** de infraestructura. Es autorizacion de ruta.
+4. **Codigo real citado:** `media-upload.js` `:51-57` (jwt), `:175-186` (prefijo y payload), `:203-211` (invocacion y retorno); `api/utilidades.js` `:48` (`[DEUDA-EXPRESS]`), `:57` (`blobVerificarJwt`), `:105-119` (reparto de prefijos), `:123` (comparacion), `:137` (mapa de codigos -> 403); `api/usuarios.js` `:696-703` (`urlPerteneceAlUsuario`).
+5. **`urlPerteneceAlUsuario` (`api/usuarios.js` `:696-703`) solo reconoce recurso propio con `/usuarios/<uid>/` en la URL** (`:702`: `u.indexOf('/usuarios/' + uid + '/') !== -1`); para admin devuelve `true` (`:697`). Es la funcion que ya usa `:2160` (`album_fotos`).
+
+### Opciones
+
+**A. Arreglar solo el cliente: inyectar el nucleo de sesion en `publicar.html` (o enviar `uid` siempre) para que pida `usuarios/<sub>/`.** Rechazada: deja **la regla duplicada en dos sitios** con dos implementaciones distintas, que es exactamente la causa del bug; el dia que una cambie, el 403 vuelve **enmascarado**. Ademas deja sin respuesta el caso legitimo "hay `jwt` pero el usuario **quiere** publicar al prefijo publico".
+
+**B. Fuente unica declarada: el criterio de prefijo se escribe **una vez** por lado con la **misma forma**, y el cliente gana un **modo publico explicito**.** Elegida.
+
+**C. Servidor tolerante: aceptar el prefijo publico aunque llegue un `jwt` valido.** Rechazada por dos motivos: (i) **relaja la autorizacion de ruta para todos**, incluidos los flujos que hoy si ponen los medios del usuario en su carpeta; (ii) convierte la sesion en un **descartado silencioso** (el usuario con sesion sube a `publico/` sin que nadie lo haya pedido), y la perdida de propiedad del recurso (ver D4) pasaria de **decision** a **accidente**.
+
+**D. Endpoint nuevo de tokens de Blob.** Prohibida por presupuesto: **8/8** funciones serverless (regla 7 de `AGENTS.md`). El contrato se arregla **dentro** de la rama `?tipo=blob_upload` existente.
+
+### Decision
+
+**D1 -- El criterio de prefijo es UNO, evaluado en los dos lados.** Tabla del contrato, que es la fuente unica de verdad:
+
+| Condicion evaluada | Prefijo autorizado = prefijo pedido | `tokenPayload.modo` |
+|---|---|---|
+| `Bearer ADMIN_SECRET` | `admin/<tipo>/` | `admin` |
+| JWT valido y **no caducado** | `usuarios/<sub>/<tipo>/` | `usuario` |
+| **Sin JWT**, `tipo === 'foto'` **y** `contexto === 'destino'` | `publico/destino/<tipo>/` | `publico` |
+
+Regla en una linea: **el prefijo autorizado por el servidor y el prefijo pedido por el cliente son el MISMO criterio con la MISMA forma, evaluado en los dos lados.** El servidor mantiene su comportamiento actual (`:105-119` + `:123`) y este ADR **no lo cambia**: lo **declara**, y obliga al cliente a **calcular el prefijo con esa misma funcion de decision** en vez de con `jwt && uid`. El `contexto` **no** participa en el prefijo (el prefijo publico es siempre `publico/destino/`): participa en la **condicion de autorizacion** del modo publico, y esa condicion se evalua en el servidor (`:115`).
+
+**D2 -- Regla derivada, simetrica y verificable: el cliente NO envia JWT cuando usa el prefijo publico, y NO usa el prefijo de usuario sin un JWT que el servidor vaya a aceptar.** Las dos mitades son necesarias: enviar el `jwt` en modo publico provoca el 403 medido; pedir `usuarios/<sub>/` con un JWT caducado provoca el mismo 403 desde el otro lado. **Debe existir un modo publico EXPLICITO en el cliente compartido** (`window.MediaUpload.subir({ ..., modo: 'publico' })`): el llamador **declara** que quiere el prefijo publico, y con esa declaracion el cliente **fuerza `jwt = null` y `usuario_id = null` en el `clientPayload`**. El default sin `modo` conserva la autodeteccion actual (`jwt && uid` -> usuario; si no -> publico), de modo que los llamadores existentes **no cambian de comportamiento** salvo en el caso roto: `jwt` presente **sin** `uid`, que pasa de "prefijo publico + JWT enviado" (403) a un camino coherente (publico sin JWT, o error explicito en cliente). Regla dura: **nunca se envia una credencial que el servidor no vaya a usar para autorizar el prefijo pedido.**
+
+**D3 -- Decision de producto REGISTRADA: las fotos de un destino/publicacion son PUBLICAS aunque el usuario tenga sesion.** Van al prefijo **publico** (`publico/destino/foto/`). La sesion **no se descarta**: se sigue usando para **atribucion y XP del `POST` de publicacion** (identidad del autor y `calcularTierPublicacion`, ver ADR-097 D4), que es una operacion **distinta** de la subida del binario. Justificacion: el contenido publicado es publico por definicion; guardarlo en la carpeta privada del usuario obligaria a **copiar o mover el objeto** el dia que el destino se aprueba, con dos URLs para el **mismo** recurso y una reconciliacion que nadie pidio. El modo publico **no es un fallback por falta de sesion: es una eleccion de producto**, y por eso es explicito (D2) y no deducido.
+
+**D4 -- Consecuencia conocida y ACEPTADA: una URL bajo el prefijo publico NO sirve como recurso propio del usuario.** `urlPerteneceAlUsuario` (`api/usuarios.js` `:696-703`) exige `/usuarios/<uid>/` en la URL, asi que un archivo subido a `publico/destino/...` **no podra reutilizarse despues como foto de perfil o de album** sin **re-subida**. Se acepta por tres razones: (i) el prefijo publico existe desde ADR-068 con esa semantica y este ADR **no la reescribe**; (ii) la alternativa (aceptar `publico/` como propio en `urlPerteneceAlUsuario`) **convertiria cualquier URL publica en recurso propio de cualquiera** que la copie, que es un agujero de propiedad, no una comodidad; (iii) el coste del caso perdido es **una re-subida del archivo**, no una perdida de dato: la foto publicada sigue existiendo y visible en el destino. El camino correcto para un medio que debe ser **del usuario** es el prefijo de usuario con JWT valido (D1), y ese camino **no se toca**.
+
+**D5 -- Cero endpoints nuevos, cero migraciones, cero cambios en la autorizacion del servidor.** El cambio es **de contrato y de cliente**: `api/utilidades.js` conserva su criterio de `:103-123` y solo puede ganar, si el implementador lo estima util, un **mensaje de error mas explicito**; `media-upload.js` gana el parametro `modo` y **prohibe enviar `jwt`/`usuario_id` en modo publico**. Los formularios que hoy pasan `{ jwt, usuarioId }` explicitamente **siguen funcionando**: la compatibilidad es en el parametro nuevo, no en el existente.
+
+### Consecuencias y deudas
+
+- **Consecuencia buena:** el 403 deja de ser dependiente de si la pagina cargo el nucleo de sesion; el fallo pasa a ser **un camino coherente o un error nombrado en cliente**, no un `PATHNAME_NO_AUTORIZADO` enmascarado como "Failed to retrieve the client token".
+- **Deuda 1 (registrada, NO resuelta aqui):** **duplicacion del verificador JWT `[DEUDA-EXPRESS]`**. `blobVerificarJwt` en `api/utilidades.js` (`:48` lo declara, `:57` lo implementa) **duplica** el verificador de sesion que ya existe en `api/usuarios.js` y en `api/interacciones.js`. Este ADR **no la unifica** (mover el verificador a un modulo compartido toca tres funciones serverless y es un cambio de radio alto para un bug de prefijo). **Condicion de escalada:** si un cambio de firma, de secreto o de expiracion de JWT tiene que aplicarse en tres sitios a la vez **mas de una vez**, la deuda pasa a tarea propia.
+- **Riesgo residual aceptado:** un disparador (trigger u otro automatismo) que suba a `publico/` un archivo que despues deba pasar a la biblioteca del usuario obliga a re-subida manual (D4). Es el precio de tener un solo criterio y una sola semantica por prefijo.
+- **Fuera de alcance:** la UI de publicacion, el `POST` de publicacion y el XP **no se tocan** en este ADR; D3 solo fija a que prefijo van las fotos y declara que la sesion sigue sirviendo para la atribucion.
+
+### Verificacion exigible al implementador
+
+1. `node --check` sobre `media-upload.js` y `api/utilidades.js`, y **ASCII-safety (ADR-002): 0 bytes > 127** en ambos.
+2. Dos `POST` al token de Blob contra produccion con `clientPayload` que **simule exactamente el caso medido** (`tipo:'foto'`, `contexto:'destino'`, `jwt` de un usuario real, `usuario_id:null`): el **prefijo publico** debe devolver **200 con `clientToken`**. Control positivo: `pathname` bajo `usuarios/<sub>/foto/` **con** ese JWT -> **200**; el mismo pathname **sin** JWT -> **403 `PATHNAME_NO_AUTORIZADO`** (comportamiento que NO cambia).
+3. El cliente **en modo publico** envia `clientPayload.jwt === null` **y** `usuario_id === null`: se verifica inspeccionando el `clientPayload` en la llamada (una linea de log temporal o una prueba unitaria del armado del payload), **no** por lectura de codigo.
+4. Un llamador **sin** `modo` y **sin** nucleo de sesion (caso `publicar.html`) sube **sin error** y devuelve `url` con `/publico/destino/` en el `pathname`.
+5. Un llamador **sin** `modo` y **con** `jwt` + `usuario_id` coherentes sigue devolviendo **200** con `pathname` bajo `/usuarios/<sub>/` (no hay regresion en el camino privado).
+6. Presupuesto de Vercel: **8/8** funciones, **sin endpoint nuevo** (`git status` no debe mostrar ninguna carpeta `api/nueva*`).
+
+### Verificacion del propio ADR
+
+Numero correlativo verificado contra el archivo real (ADR-006); secciones de problema / datos medidos / opciones / decision / consecuencias y deudas / verificacion exigible. Los **5 puntos del encargo** estan fijados como decision, no como pregunta abierta: D1 contrato unico de prefijo, D2 regla derivada con modo publico explicito, D3 fotos de destino **publicas** aunque haya sesion, D4 `urlPerteneceAlUsuario` como consecuencia **aceptada**, D5 `[DEUDA-EXPRESS]` registrada. ASCII-safety **no aplica** a este fichero (ADR-002: los `.md` de gobernanza admiten tildes); si aplica a `media-upload.js` y a `api/utilidades.js`. Verificacion de escritura:
+
+```
+Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Select-Object -Last 1
+(Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Measure-Object).Count
+```
+
+Debe devolver **`## ADR-098:`** y el conteo **97**. El cierre documental (`TASKS.md`, `NEXT.md`, `BLUEPRINT.md`) corresponde al **pase unico R2** de `@docs-keeper`, no a este ADR.

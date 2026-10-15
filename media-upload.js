@@ -13,15 +13,26 @@
  *   window.MediaUpload.validar(file, tipo) -> { ok, tipo?, error? }
  *     Valida mime y tamano ANTES de subir (espejo de api/blob-upload.js).
  *
- *   window.MediaUpload.subir({ file, tipo?, contexto?, jwt?, usuarioId?,
+ *   window.MediaUpload.subir({ file, tipo?, contexto?, modo?, jwt?,
  *                              adminToken?, onProgress? })
  *     Devuelve Promise<{ url, pathname, contentType, size }>.
  *     - contexto: 'museo' | 'album' | 'perfil' | 'destino' (default 'museo').
- *     - jwt/usuarioId: se autodetectan via window.ExploraCO.
+ *     - modo: 'publico' fuerza el prefijo publico/destino/<tipo>/ y envia
+ *       jwt: null en el clientPayload, para que el servidor autorice el
+ *       prefijo publico aunque el navegador tenga sesion guardada (caso
+ *       publicar.html). Sin 'modo' se autodetecta.
+ *     - jwt: se autodetecta via window.ExploraCO y localStorage. El
+ *       usuario_id del clientPayload y el prefijo salen del 'sub' del propio
+ *       JWT, nunca de la UI: el prefijo y el clientPayload NUNCA se
+ *       contradicen.
  *     - adminToken: sube como admin (prefijo admin/).
  *     - onProgress({ loaded, total, percentage }).
- *     - Sin sesion solo se permite contexto 'destino' + imagen (lo valida el
- *       servidor).
+ *     - Sin sesion valida solo se permite contexto 'destino' + imagen (lo
+ *       valida el servidor). Con jwt caducado se reintenta UNA vez via
+ *       window.ExploraCO.refreshJwt; si falla se cae a modo publico solo en
+ *       contexto 'destino' y en el resto se rechaza con mensaje claro.
+ *     - Si la subida falla, se repite el evento del protocolo (solo lectura)
+ *       para traducir el error real del servidor a un mensaje humano.
  *
  * Dependencia: @vercel/blob/client via esm.sh, version fija (sin bundler).
  * ASCII-safe (ADR-002): sin bytes > 127 ni backticks.
@@ -45,7 +56,11 @@
 
   function cargarCliente() {
     if (_modulo) { return Promise.resolve(_modulo); }
-    return import(BLOB_CLIENT_URL).then(function (m) { _modulo = m; return m; });
+    try {
+      return Promise.resolve(import(BLOB_CLIENT_URL)).then(function (m) { _modulo = m; return m; });
+    } catch (e) {
+      return Promise.reject(e);
+    }
   }
 
   function jwtActual() {
@@ -59,9 +74,80 @@
     return null;
   }
 
-  function usuarioIdActual() {
-    var u = window.ExploraCO && window.ExploraCO.usuario;
-    return (u && u.id) ? String(u.id) : null;
+  /* ---- Coherencia prefijo <-> clientPayload -----------------------------
+     api/utilidades.js autoriza el prefijo asi:
+       - adminToken valido         -> admin/
+       - jwt valido (firma + exp)  -> usuarios/<sub>/
+       - resto, solo foto+destino  -> publico/destino/
+     y exige que el pathname empiece por "prefijo + tipo + /", y que
+     clientPayload.usuario_id coincida con el 'sub' del jwt (si no, responde
+     SESION_INVALIDA). Por eso el uid SIEMPRE sale del 'sub' del propio JWT
+     (decodificado en local) y el modo publico viaja con jwt:null: el prefijo
+     y el payload no pueden llegar a contradecirse. */
+  var PREFIJO_ADMIN = 'admin/';
+  var PREFIJO_USUARIO = 'usuarios/';
+  var PREFIJO_PUBLICO = 'publico/destino/';
+  var MENSAJE_SESION_REQUERIDA = 'Necesitas iniciar sesion con tu cuenta para subir este archivo. Vuelve a entrar e intenta de nuevo.';
+
+  var B64URL_ALFABETO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+  function b64urlABytes(txt) {
+    var limpio = String(txt || '').replace(/=+$/, '');
+    var out = [];
+    var acc = 0;
+    var bits = 0;
+    for (var i = 0; i < limpio.length; i++) {
+      var ch = limpio.charAt(i);
+      var idx;
+      if (ch === '+') { idx = 62; }
+      else if (ch === '/') { idx = 63; }
+      else { idx = B64URL_ALFABETO.indexOf(ch); }
+      if (idx < 0) { return null; }
+      acc = (acc << 6) | idx;
+      bits += 6;
+      if (bits >= 8) { bits -= 8; out.push((acc >> bits) & 255); }
+    }
+    return out;
+  }
+
+  function utf8DeBytes(bytes) {
+    var out = '';
+    for (var i = 0; i < bytes.length; i++) {
+      var b = bytes[i];
+      if (b < 128) { out += String.fromCharCode(b); }
+      else if (b > 191 && b < 224) { out += String.fromCharCode(((b & 31) << 6) | (bytes[i + 1] & 63)); i += 1; }
+      else if (b > 223 && b < 240) { out += String.fromCharCode(((b & 15) << 12) | ((bytes[i + 1] & 63) << 6) | (bytes[i + 2] & 63)); i += 2; }
+      else { out += String.fromCharCode(((b & 7) << 18) | ((bytes[i + 1] & 63) << 12) | ((bytes[i + 2] & 63) << 6) | (bytes[i + 3] & 63)); i += 3; }
+    }
+    return out;
+  }
+
+  /* El jwt de ExploraCO es de DOS partes: "payloadB64.firma" (payload primero,
+     ver api/utilidades.js blobVerificarJwt). Si llegara un jwt de 3 partes se
+     usa la parte 1, que es el payload estandar. */
+  function leerJwtPayload(token) {
+    if (!token || typeof token !== 'string') { return null; }
+    var partes = token.split('.');
+    if (partes.length < 2) { return null; }
+    var b64 = (partes.length >= 3) ? partes[1] : partes[0];
+    var bytes = b64urlABytes(b64);
+    if (!bytes) { return null; }
+    var datos = null;
+    try { datos = JSON.parse(utf8DeBytes(bytes)); } catch (e) { return null; }
+    if (!datos || typeof datos !== 'object') { return null; }
+    return datos;
+  }
+
+  function estadoJwt(token) {
+    if (!token || typeof token !== 'string') { return { existe: false, valido: false, motivo: 'sin-token' }; }
+    var datos = leerJwtPayload(token);
+    if (!datos || !datos.sub || !datos.exp) { return { existe: true, valido: false, motivo: 'ilegible' }; }
+    if (Number(datos.exp) <= Math.floor(Date.now() / 1000)) { return { existe: true, valido: false, motivo: 'caducado' }; }
+    return { existe: true, valido: true, motivo: 'ok', jwt: token, uid: String(datos.sub) };
+  }
+
+  function refreshDisponible() {
+    return !!(window.ExploraCO && typeof window.ExploraCO.refreshJwt === 'function');
   }
 
   function tipoDeArchivo(file) {
@@ -157,6 +243,105 @@
     }).catch(function () { return file; });
   }
 
+  /* ---- Errores accionables ---------------------------------------------
+     El SDK @vercel/blob/client enmascara el cuerpo del error del servidor
+     ("Vercel Blob: Failed to retrieve the client token"). Solo cuando la
+     subida YA fallo se repite el evento del protocolo para leer el error
+     real y traducirlo. */
+  var ERRORES_HUMANOS = {
+    ALMACENAMIENTO_NO_CONFIGURADO: 'El servicio de archivos no esta configurado. Avisa al equipo de ExploraCO.',
+    SESION_REQUERIDA: 'Necesitas iniciar sesion con tu cuenta para subir este archivo.',
+    SESION_INVALIDA: 'Tu sesion no corresponde a esta cuenta. Vuelve a iniciar sesion e intenta de nuevo.',
+    PATHNAME_NO_AUTORIZADO: 'Tu sesion no puede guardar el archivo en esa carpeta. Vuelve a iniciar sesion e intenta otra vez.',
+    PATHNAME_INVALIDO: 'El nombre del archivo no es valido. Renombralo sin simbolos raros e intenta de nuevo.'
+  };
+
+  function mensajeDeError(codigo, err) {
+    var c = codigo ? String(codigo) : '';
+    if (c && ERRORES_HUMANOS[c]) { return ERRORES_HUMANOS[c]; }
+    if (c) { return 'No se pudo subir el archivo (' + c + '). Intenta de nuevo.'; }
+    var original = (err && err.message) ? String(err.message) : '';
+    if (/client token/i.test(original)) {
+      return 'No se pudo subir el archivo: el servidor no autorizo la subida. Vuelve a iniciar sesion e intenta otra vez.';
+    }
+    if (original) { return 'No se pudo subir el archivo: ' + original; }
+    return 'No se pudo subir el archivo. Intenta de nuevo.';
+  }
+
+  function diagnosticarSubida(pathname, clientPayload, headers) {
+    if (typeof fetch !== 'function') { return Promise.resolve(null); }
+    var cabeceras = { 'content-type': 'application/json' };
+    if (headers && headers.Authorization) { cabeceras.Authorization = headers.Authorization; }
+    var cuerpo = JSON.stringify({
+      type: 'blob.generate-client-token',
+      payload: { pathname: pathname, clientPayload: clientPayload, multipart: false }
+    });
+    return fetch(HANDLE_UPLOAD_URL, { method: 'POST', headers: cabeceras, body: cuerpo })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { return (d && d.error) ? String(d.error) : null; })
+      .catch(function () { return null; });
+  }
+
+  function sesionPublica(tipo) {
+    return { modo: 'publico', prefijo: PREFIJO_PUBLICO + tipo + '/', jwt: null, uid: null, headers: null };
+  }
+
+  function sesionUsuario(jwt, uid, tipo) {
+    return { modo: 'usuario', prefijo: PREFIJO_USUARIO + String(uid) + '/' + tipo + '/', jwt: jwt, uid: String(uid), headers: null };
+  }
+
+  function degradarOError(tipo, contexto) {
+    if (contexto === 'destino') { return sesionPublica(tipo); }
+    return Promise.reject(new Error(MENSAJE_SESION_REQUERIDA));
+  }
+
+  function resolverSesion(opts, tipo, contexto) {
+    if (opts.adminToken) {
+      return Promise.resolve({
+        modo: 'admin',
+        prefijo: PREFIJO_ADMIN + tipo + '/',
+        jwt: null,
+        uid: null,
+        headers: { Authorization: 'Bearer ' + opts.adminToken }
+      });
+    }
+    if (opts.modo === 'publico') { return Promise.resolve(sesionPublica(tipo)); }
+
+    var info = estadoJwt(opts.jwt || jwtActual());
+    if (info.valido) { return Promise.resolve(sesionUsuario(info.jwt, info.uid, tipo)); }
+
+    if (info.existe && info.motivo === 'caducado' && refreshDisponible()) {
+      return Promise.resolve(window.ExploraCO.refreshJwt()).then(function (nuevo) {
+        var info2 = estadoJwt(nuevo || jwtActual());
+        if (info2.valido) { return sesionUsuario(info2.jwt, info2.uid, tipo); }
+        return degradarOError(tipo, contexto);
+      }).catch(function () {
+        return degradarOError(tipo, contexto);
+      });
+    }
+    return Promise.resolve(degradarOError(tipo, contexto));
+  }
+
+  function subirConSDK(archivo, pathname, clientPayload, headers, opts) {
+    return cargarCliente().then(function (m) {
+      var opciones = {
+        access: 'public',
+        handleUploadUrl: HANDLE_UPLOAD_URL,
+        clientPayload: clientPayload,
+        multipart: false
+      };
+      if (headers) { opciones.headers = headers; }
+      if (archivo.type) { opciones.contentType = archivo.type; }
+      if (typeof opts.onProgress === 'function') {
+        opciones.onUploadProgress = function (p) { opts.onProgress(p); };
+      }
+      return m.upload(pathname, archivo, opciones).then(function (result) {
+        result.__sizeSubido = archivo.size;
+        return result;
+      });
+    });
+  }
+
   function subir(opts) {
     opts = opts || {};
     var v = validar(opts.file, opts.tipo);
@@ -165,44 +350,18 @@
     var contexto = opts.contexto || 'museo';
 
     return optimizarImagen(opts.file, contexto).then(function (archivo) {
-      var headers = null;
-      var prefijo;
-
-      if (opts.adminToken) {
-        prefijo = 'admin/' + tipo + '/';
-        headers = { Authorization: 'Bearer ' + opts.adminToken };
-      } else {
-        var jwt = opts.jwt || jwtActual();
-        var uid = opts.usuarioId || usuarioIdActual();
-        if (jwt && uid) { prefijo = 'usuarios/' + uid + '/' + tipo + '/'; }
-        else { prefijo = 'publico/destino/' + tipo + '/'; }
-      }
-
-      var jwtPayload = opts.jwt || (opts.adminToken ? null : jwtActual());
-      var uidPayload = opts.usuarioId || (opts.adminToken ? null : usuarioIdActual());
-      var pathname = prefijo + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '-' + nombreSeguro(archivo.name);
-      var clientPayload = JSON.stringify({
-        jwt: jwtPayload || null,
-        usuario_id: uidPayload || null,
-        tipo: tipo,
-        contexto: contexto
-      });
-
-      return cargarCliente().then(function (m) {
-        var opciones = {
-          access: 'public',
-          handleUploadUrl: HANDLE_UPLOAD_URL,
-          clientPayload: clientPayload,
-          multipart: false
-        };
-        if (headers) { opciones.headers = headers; }
-        if (archivo.type) { opciones.contentType = archivo.type; }
-        if (typeof opts.onProgress === 'function') {
-          opciones.onUploadProgress = function (p) { opts.onProgress(p); };
-        }
-        return m.upload(pathname, archivo, opciones).then(function (result) {
-          result.__sizeSubido = archivo.size;
-          return result;
+      return resolverSesion(opts, tipo, contexto).then(function (sesion) {
+        var pathname = sesion.prefijo + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '-' + nombreSeguro(archivo.name);
+        var clientPayload = JSON.stringify({
+          jwt: sesion.jwt || null,
+          usuario_id: sesion.uid || null,
+          tipo: tipo,
+          contexto: contexto
+        });
+        return subirConSDK(archivo, pathname, clientPayload, sesion.headers, opts).catch(function (err) {
+          return diagnosticarSubida(pathname, clientPayload, sesion.headers).then(function (codigo) {
+            throw new Error(mensajeDeError(codigo, err));
+          });
         });
       });
     }).then(function (result) {

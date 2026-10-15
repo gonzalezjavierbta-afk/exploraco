@@ -5472,5 +5472,57 @@ Guardia de **slot vacio** en el inyector de botones -- la unica de las **4 super
 
 Codigo: `dictado-voz.js` (logica del consumo), `dictado-voz.css` (vision), `publicar.html` (inyeccion) y **NUEVO** `scripts/smoke_dictado_voz.js`. Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md` (estado + deudas), `BUGS_HISTORICOS.md` (**BUG-126**). `DECISIONS.md` **NO se toco** (sin ADR); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
 
+## TSK-214 - Subida a Vercel Blob desde `publicar.html` con sesion iniciada: el cliente pedia el prefijo `publico/` y el servidor autorizaba `usuarios/<sub>/` (contrato de prefijo unico, ADR-098) - 2026-10-15 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL** con veredicto **APTO para produccion** del gate de `@qa-auditor`; **SIN COMMIT y SIN DESPLEGAR**. Es **correccion de un bug** mas un **contrato nuevo en el cliente compartido**, no un cambio de arquitectura del sistema. El detalle tecnico -- causa raiz, evidencia medida contra produccion y los 4 puntos del fix -- vive **una sola vez** en `BUGS_HISTORICOS.md` **BUG-127**; el contrato de prefijo vive **una sola vez** en `DECISIONS.md` **ADR-098** (aqui solo se apunta; **NO se repite su argumento**, ADR-084 D1). `api/` **8/8 INTACTO**, **cero migraciones**, **cero endpoint nuevo**.
+
+### Que cambia el producto
+
+Publicar un espacio desde `publicar.html` **con la sesion iniciada** vuelve a funcionar: antes la subida fallaba con el mensaje del SDK **"Vercel Blob: Failed to retrieve the client token"** y el formulario no se podia enviar. El usuario pasa a recibir, cuando algo falla de verdad, un **mensaje humano** en lugar del texto crudo del SDK.
+
+### Causa raiz (resumen; detalle y evidencia en BUG-127)
+
+El cliente (`media-upload.js`) y el servidor (`api/utilidades.js?tipo=blob_upload`) elegian el prefijo del `pathname` con **criterios distintos**: el cliente deducia el modo "usuario" de **`window.ExploraCO.usuario.id`**, que **no existe en `publicar.html`** (esa pagina **no cargaba** `usuario-session.js`), mientras el `jwt` **si** estaba en el `localStorage`. Asi que pedia `publico/destino/foto/...` **con un JWT valido**, y el servidor autorizaba solo `usuarios/<sub>/foto/...` -> **403 `PATHNAME_NO_AUTORIZADO`**, que el SDK **enmascara** en el mensaje del `clientToken`.
+
+### Fix aplicado
+
+1. **`media-upload.js`:** modo publico **explicito** (`modo:'publico'`, corta **antes** de la autodeteccion), **coherencia prefijo <-> payload** (el `uid` sale del **`sub` del JWT**, nunca de `window.ExploraCO.usuario`), **reintento unico** via `refreshJwt` cuando el JWT esta caducado y **traduccion del error real del servidor** a mensaje humano (`media-upload.js:249-254`).
+2. **`publicar.html`:** carga `usuario-session.js` (`:819`) y pasa `modo:'publico'` en sus **dos** subidas (`:1017-1018` foto principal y `:1046` foto de galeria).
+3. **`api/utilidades.js`:** la rama `?tipo=diagnostico` informa **dos booleanos de presencia** (`blob_token_presente` `:886`, `oidc_token_presente` `:887`) para descartar el 503 **sin exponer valores**.
+
+### Cambio de comportamiento registrado (decision del orquestador; NO es un ADR)
+
+**`galeria.html` se queda con la AUTODETECCION** (con sesion -> `usuarios/<sub>/`, sin sesion -> `publico/`), por ser un **recurso propio del usuario** (ADR-068, `urlPerteneceAlUsuario`); **solo** `publicar.html` fija el modo publico. Verificado en el archivo real: `galeria.html:1202` llama `MediaUpload.subir({...})` **sin** `modo`, luego conserva la autodeteccion por decision expresa y no por olvido.
+
+### Hallazgo pendiente registrado (NO corregido en esta tanda)
+
+`api/utilidades.js` expone **45 caracteres de `DATABASE_URL`** en el campo `db_url` de la rama `?tipo=diagnostico` (`api/utilidades.js:883`, `(process.env.DATABASE_URL||'').slice(0,45)`). Es **preexistente** a esta tanda y el endpoint esta **protegido por `ADMIN_SECRET`**; se registra **como pendiente, sin arreglar aqui**, para que no se pierda.
+
+### Verificacion medida (ADR-006, contra el archivo real; por `@qa-auditor`)
+
+| Prueba | Resultado |
+|---|---|
+| `node scripts/smoke_media_upload_prefijo.js` (**NUEVO**) | **46/46 OK, FAIL 0** |
+| `node --check media-upload.js` | **exit 0** |
+| Escudo GOLD de `api/utilidades.js` | **PASA** |
+| Balance de divs y bytes no-ASCII de `publicar.html` | **0 bytes > 127 introducidos** |
+| Conteo de ADR en `DECISIONS.md` | **97** con **`ADR-098` unico** |
+| Veredicto del gate | **APTO para produccion** |
+
+### Pendiente de verificacion funcional (tarea ABIERTA)
+
+Falta la **prueba end-to-end del dueno**: en `/publicar.html` **con sesion activa**, subir **foto principal** y **foto de galeria** y confirmar que la **URL devuelta queda bajo `publico/destino/foto/`**, mas un **envio de prueba** para validar que la **atribucion / XP del POST sigue funcionando**. Criterio de cierre: dos URLs con el prefijo `publico/destino/foto/` y un registro creado con su XP atribuido.
+
+### Deudas y riesgos honestos (sin maquillar)
+
+1. **`scripts/smoke_media_upload_prefijo.js` esta SIN TRACKEAR** en git (`git status` = `??`): el gate que prueba el contrato **no viaja en el repo** hasta que el operador lo agregue al control de versiones, y ademas **no esta encadenado** a `npm test` ni a `scripts/session_close.js`.
+2. **`modo:'publico'` es un pin de criterio:** mientras `publicar.html` lo declare, su prefijo **no** se autodetectara aunque haya sesion. Es lo buscado en el alta publica, pero **si algun dia esa pagina necesitara subir al arbol del usuario, hay que quitar la opcion de forma explicita**.
+3. **El endpoint de diagnostico cambio su forma de respuesta** (dos booleanos mas): cualquier consumidor que asuma la lista exacta de campos debe actualizarse.
+4. **El hallazgo `db_url`** (arriba) sigue vivo en un endpoint protegido por `ADMIN_SECRET`.
+
+### Archivos tocados
+
+Codigo: `media-upload.js` (criterio de prefijo, reintento y mensajes), `publicar.html` (carga del nucleo de sesion + `modo:'publico'` en las dos subidas), `api/utilidades.js` (solo `?tipo=diagnostico`) y **NUEVO** `scripts/smoke_media_upload_prefijo.js` (**untracked**). Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md` (relevo + riesgos) y `BUGS_HISTORICOS.md` (**BUG-127**). `DECISIONS.md` lo redacto `@architect` **fuera de este pase** (**ADR-098**, ya presente en el archivo); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

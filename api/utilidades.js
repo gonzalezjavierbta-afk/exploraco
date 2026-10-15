@@ -880,9 +880,11 @@ if (tipo === 'blog-lista') {
     var cats = await sql('SELECT id,slug,nombre FROM categorias ORDER BY id');
     return res.status(200).json({
       ok:true, node_version:process.version,
-      db_url:(process.env.DATABASE_URL||'').slice(0,45)+'...',
+      db_url_presente:!!(process.env.DATABASE_URL && String(process.env.DATABASE_URL).length > 0),
       tablas:tbls.map(function(r){ return r.tablename; }),
       columnas:cols, categorias:cats,
+      blob_token_presente:!!(process.env.BLOB_READ_WRITE_TOKEN && String(process.env.BLOB_READ_WRITE_TOKEN).length > 0),
+      oidc_token_presente:!!(process.env.VERCEL_OIDC_TOKEN && String(process.env.VERCEL_OIDC_TOKEN).length > 0),
     });
   }
 

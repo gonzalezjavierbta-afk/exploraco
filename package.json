@@ -2,7 +2,7 @@
   "name": "exploraco",
   "version": "1.0.0",
   "scripts": {
-    "test": "node scripts/ejecucion/verificar-capa-gratis.js && node scripts/smoke_guard_capa_gratis.js && node scripts/smoke_ref_info.js && node scripts/smoke_gamificacion_v6.js && node scripts/smoke_niveles_espejos.js && node scripts/smoke_test_gamificacion_v4.js && node scripts/smoke_038_casas_clases.js && node scripts/smoke_021_xp_decimal_rankings.js && node scripts/smoke_036_compartir.js && node scripts/smoke_visita_geocerca.js && node scripts/smoke_niveles_data.js && node scripts/smoke_029_030_coords_carpetas.js && node scripts/smoke_036_media_unificada.js && node scripts/smoke_032_guardados_album.js && node scripts/smoke_mercado.js && node scripts/smoke_test_consumibles_era.js && node scripts/smoke_058_origen_clasificador.js && node scripts/smoke_gaming_v61.js && node scripts/smoke_mapa_tiles.js && node scripts/smoke_mapa_cultural.js && node scripts/smoke_042_pasaporte_billetera.js && node scripts/smoke_grupos_perfil.js && node scripts/smoke_media_actions_widget.js && node scripts/smoke_zona_paridad.js",
+    "test": "node scripts/ejecucion/verificar-capa-gratis.js && node scripts/smoke_guard_capa_gratis.js && node scripts/smoke_ref_info.js && node scripts/smoke_gamificacion_v6.js && node scripts/smoke_niveles_espejos.js && node scripts/smoke_test_gamificacion_v4.js && node scripts/smoke_038_casas_clases.js && node scripts/smoke_021_xp_decimal_rankings.js && node scripts/smoke_036_compartir.js && node scripts/smoke_visita_geocerca.js && node scripts/smoke_niveles_data.js && node scripts/smoke_029_030_coords_carpetas.js && node scripts/smoke_036_media_unificada.js && node scripts/smoke_032_guardados_album.js && node scripts/smoke_mercado.js && node scripts/smoke_test_consumibles_era.js && node scripts/smoke_058_origen_clasificador.js && node scripts/smoke_gaming_v61.js && node scripts/smoke_mapa_tiles.js && node scripts/smoke_mapa_cultural.js && node scripts/smoke_042_pasaporte_billetera.js && node scripts/smoke_grupos_perfil.js && node scripts/smoke_media_actions_widget.js && node scripts/smoke_zona_paridad.js && node scripts/smoke_media_upload_prefijo.js",
     "coste:gratis": "node scripts/ejecucion/verificar-capa-gratis.js",
     "smoke:capa:gratis": "node scripts/smoke_guard_capa_gratis.js",
     "cuota:tanda": "node scripts/ejecucion/informe-cuota.js --task",
@@ -22,7 +22,8 @@
     "smoke:mercado": "node scripts/smoke_mercado.js",
     "smoke:zona": "node scripts/smoke_zona_paridad.js",
     "smoke:zona:sin-neon": "node scripts/smoke_zona_paridad.js --sin-neon",
-    "docs:evidencia": "node scripts/docs-evidencia.js"
+    "docs:evidencia": "node scripts/docs-evidencia.js",
+    "smoke:blob": "node scripts/smoke_media_upload_prefijo.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.0",
