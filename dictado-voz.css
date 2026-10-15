@@ -3,6 +3,14 @@
    Estilos del boton de dictado por voz. Se carga en varias paginas,
    por eso TODO selector lleva el prefijo `dv-`.
    El helper window.DictadoVoz anade/quita la clase `grabando-activo`.
+   Diseno: el boton es un icono FLOTANTE dentro de la caja de texto
+   (position:absolute anclado a .dv-wrap, que ya es position:relative),
+   asi que no ocupa columna propia ni roba ancho al campo.
+   Campos claros: icono naranja tinta (#B33A00, 5.4:1 sobre blanco).
+   Campos oscuros: silueta blanca, usando el contexto ya existente
+   (.chat-inp de comunidad y los slots de album de mi-perfil).
+   Degradacion sin soporte de :has(): no se reserva el hueco y el boton
+   se solapa levemente con el borde del campo; sigue siendo usable.
    ===================================================================== */
 
 /* --- Contenedor del campo + boton --------------------------------- */
@@ -13,56 +21,120 @@
   gap: .5rem;
 }
 
-/* El campo crece; el boton se queda pegado a el (escritorio). */
+/* El campo crece; el boton se ancla a el (escritorio y movil). */
 .dv-wrap > input,
 .dv-wrap > textarea {
   flex: 1 1 auto;
   min-width: 0;
 }
 
+/* --- Reserva de la esquina del boton ------------------------------- */
+/* El texto NUNCA pasa por debajo del boton: hueco a la derecha en los
+   controles de una linea y banda inferior en las textareas.
+   !important porque el campo lo fija INLINE en las textareas de los
+   modales de mi-perfil y porque el kernel de render emite el campo con
+   su propio padding (skill eficiencia-recursos, "mi CSS no se aplica"). */
+.dv-wrap:has(.dv-btn) > input {
+  padding-right: 3.2rem !important;
+}
+
+.dv-wrap:has(.dv-btn) > textarea {
+  padding-bottom: 3.2rem !important;
+  /* Sin esto una textarea de rows=2 se queda sin linea visible: el
+     hueco reservado (51px) es mayor que su alto util. */
+  min-height: 6rem !important;
+}
+
 /* --- Boton --------------------------------------------------------- */
+/* Icono flotante dentro de la caja de texto. Al ser absoluto queda
+   FUERA del flujo: no es un flex item, asi que no compite por
+   especificidad con el bloque .wr del motor de render. */
 .dv-btn {
-  flex: 0 0 auto;
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: .4rem;
+  bottom: 0;
+  margin: auto 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: .4rem;
-  align-self: flex-start;
+  min-width: 44px;
   min-height: 44px;
-  padding: .55rem .85rem;
+  padding: 0;
   font-family: inherit;
-  font-size: .8125rem;
-  font-weight: 600;
+  /* Area tactil 44x44 real con fondo transparente: la etiqueta "Dictar"
+     del markup se oculta por tamano de fuente, no se borra del DOM. */
+  font-size: 0;
   line-height: 1;
-  white-space: nowrap;
-  color: var(--brand, #FF4A00);
-  background: #fff;
-  border: 1px solid rgba(255, 74, 0, .38);
-  border-radius: 10px;
+  color: #B33A00;
+  background: none;
+  border: 0;
+  border-radius: 999px;
   cursor: pointer;
   transition: background-color .18s ease, color .18s ease,
-              border-color .18s ease, transform .12s ease;
+              transform .12s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Textarea: esquina inferior derecha (el texto fluye de arriba abajo). */
+.dv-wrap:has(> textarea) .dv-btn {
+  top: auto;
+  bottom: .4rem;
+  margin: 0;
+}
+
+/* El slot del boton no aporta caja: lo deja colgado de .dv-wrap y evita
+   el gap fantasma que .wr .dv-slot (0,2,0) dejaria a la derecha del
+   campo en el motor de render. Esta regla es 0,3,0. */
+.dv-wrap:has(.dv-btn) > .dv-slot {
+  display: contents;
+}
+
+/* El motor de render fija min-height/padding al boton dentro del slot
+   (.wr .dv-slot>.dv-btn, 0,3,0); aqui se corrige a 44x44 (0,4,0). */
+.dv-wrap:has(.dv-btn) .dv-slot > .dv-btn {
+  min-height: 44px;
+  padding: 0;
+}
+
+/* Contraste en campos oscuros (contexto ya existente, sin clases nuevas):
+   el emoji nativo es oscuro y se pierde sobre el fondo del campo, por eso
+   ahi se fuerza silueta blanca en vez de tinta naranja. */
+.dv-wrap:has(.chat-inp) .dv-btn,
+.dv-wrap:has([id^="dv-slot-album"]) .dv-btn {
+  color: #FF4A00;
+}
+
+.dv-wrap:has(.chat-inp) .dv-btn .dv-icon,
+.dv-wrap:has([id^="dv-slot-album"]) .dv-btn .dv-icon {
+  filter: brightness(0) invert(1);
+}
+
+.dv-wrap:has(.chat-inp) .dv-btn:hover,
+.dv-wrap:has([id^="dv-slot-album"]) .dv-btn:hover {
+  background: rgba(255, 255, 255, .12);
+}
+
 .dv-btn:hover {
-  background: rgba(255, 74, 0, .07);
-  border-color: rgba(255, 74, 0, .55);
+  background: rgba(255, 74, 0, .09);
 }
 
 .dv-btn:active {
   transform: translateY(1px);
 }
 
-/* Foco visible accesible (tecla), sin penalizar el clic de raton. */
+/* Foco visible accesible (tecla), sin penalizar el clic de raton.
+   currentColor = tinta naranja en claro y naranja marca en oscuro: ambos
+   superan 3:1 sobre el fondo del campo (WCAG 2.4.11). */
 .dv-btn:focus-visible {
-  outline: 3px solid var(--gold, #FF4A00);
+  outline: 3px solid currentColor;
   outline-offset: 2px;
 }
 
 /* Fallback de foco para navegadores sin :focus-visible. */
 .dv-btn:focus {
-  outline: 3px solid var(--gold, #FF4A00);
+  outline: 3px solid currentColor;
   outline-offset: 2px;
 }
 
@@ -78,22 +150,25 @@
 }
 
 /* --- Estado grabando ---------------------------------------------- */
+/* Sigue leyendose bien siendo un icono: disco rojo solido + halo. */
 .dv-btn.grabando-activo,
 .grabando-activo.dv-btn {
   background: #EF4444;
   color: #fff;
-  border-color: #EF4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, .28);
   animation: dv-pulso 1.5s infinite;
 }
 
 .dv-btn.grabando-activo:hover,
 .grabando-activo.dv-btn:hover {
   background: #EF4444;
-  border-color: #EF4444;
 }
 
 .dv-btn.grabando-activo .dv-icon,
 .grabando-activo.dv-btn .dv-icon {
+  /* Sobre el disco rojo la silueta blanca es la que mejor contrasta en
+     los 4 fondos (campo claro y campo oscuro). */
+  filter: brightness(0) invert(1);
   animation: dv-pulso-icon 1.5s infinite;
 }
 
@@ -103,8 +178,8 @@
     box-shadow: 0 0 0 0 rgba(239, 68, 68, .7);
   }
   70% {
-    transform: scale(1.03);
-    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    transform: scale(1.08);
+    box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
   }
   100% {
     transform: scale(1);
@@ -117,7 +192,14 @@
   70% { transform: scale(1.14); }
 }
 
-/* --- Pista de ayuda ------------------------------------------------ */
+/* --- Pista de ayuda y aviso de corte ------------------------------ */
+/* Ambos ocupan una fila propia DEBAJO del campo (flex-wrap), asi que
+   nunca pueden quedar tapados por el boton absoluto. */
+.dv-wrap:has(.dv-aviso),
+.dv-wrap:has(.dv-hint) {
+  flex-wrap: wrap;
+}
+
 .dv-hint {
   flex-basis: 100%;
   margin-top: .3rem;
@@ -125,11 +207,20 @@
   color: var(--muted, #666);
 }
 
+/* Aviso de corte (lo crea dictado-voz.js). Reserva a la derecha la misma
+   banda del boton: su texto termina antes de la esquina donde flota. */
+.dv-wrap .dv-aviso {
+  flex: 1 1 100%;
+  min-width: 0;
+  padding-right: 3.4rem;
+  line-height: 1.3;
+}
+
 /* --- Estado sin soporte (boton deshabilitado, opcional) ----------- */
 .dv-btn.dv-unsupported {
   opacity: .45;
   cursor: not-allowed;
-  border-color: rgba(0, 0, 0, .18);
+  border: 1px solid rgba(0, 0, 0, .18);
   color: var(--muted, #666);
   background: #f4f2ef;
 }
@@ -139,18 +230,9 @@
   border-color: rgba(0, 0, 0, .18);
 }
 
-/* --- Movil: el boton ocupa el ancho completo ----------------------- */
-@media (max-width: 600px) {
-  .dv-wrap {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .dv-btn {
-    width: 100%;
-    align-self: stretch;
-  }
-}
+/* --- Movil -------------------------------------------------------- */
+/* El boton es absoluto, asi que ya no se apila debajo del campo: el
+   area tactil de 44x44 de la base se mantiene tal cual en movil. */
 
 /* --- Respeta la preferencia de movimiento reducido ---------------- */
 @media (prefers-reduced-motion: reduce) {

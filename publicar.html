@@ -250,7 +250,6 @@
         <label>Nombre del lugar <span class="req">*</span></label>
         <div class="dv-wrap">
           <input type="text" id="nombre" placeholder="Ej: Hostal La Candelaria" maxlength="100">
-          <span id="dv-slot-nombre"></span>
         </div>
         <div class="field-error">El nombre es requerido</div>
       </div>
@@ -1479,7 +1478,8 @@ async function submitForm(modo) {
   pares.forEach(function (p) {
     var slot = document.getElementById(p.slot);
     var campo = document.getElementById(p.campo);
-    if (!slot || !campo) return;
+    // slot.firstChild: si ya hay un boton inyectado no se duplica.
+    if (!slot || !campo || slot.firstChild) return;
 
     var btn = document.createElement('button');
     btn.type = 'button';
