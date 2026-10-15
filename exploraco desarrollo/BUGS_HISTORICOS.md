@@ -2191,3 +2191,38 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **LECCION (las 3 juntas):** **la geografia no puede decidirse en dos sitios sin un gate que los compare.** Un mapa duplicado a mano (a), un normalizador que no cubre la forma real de un nombre (b) y un campo derivado editable por el cliente (c) son **tres caras del mismo error de fondo: asumir que una sola regla basta, en lugar de medir que las tres copias dicen lo mismo.** La red que faltaba no era mas codigo, era **un smoke que muere**: `scripts/smoke_zona_paridad.js` es exactamente la asercion que hacia falta, y esta en `npm test` para que la divergencia se vea antes de llegar a produccion.
 
+## BUG-126: el dictado por voz DUPLICABA texto en Chrome Android -- causa raiz DOBLE (interim acumulativo del segmento + reemision del motor Android) -- **CORREGIDO**
+
+**Severidad: MEDIA** (texto duplicado, visible y molesto; **sin perdida de datos**). **Estado: CORREGIDO, verificado en dispositivo real por el operador y DESPLEGADO** en `main` (`d4090c0` primer fix, `bd9256b` consumo defensivo + marcador `dv-2`). Solo se toco `dictado-voz.js` (logica), `dictado-voz.css` (vision) y `publicar.html` (inyeccion). `api/` **8/8 INTACTO**, **cero migraciones**, **cero endpoint nuevo** y **SIN ADR**: fue **correccion de bug**, no un cambio de arquitectura, luego `DECISIONS.md` **NO se toco**. Continuacion de **TSK-210**; tarea de cierre **TSK-213**.
+
+**Sintoma (reportado por el operador en Chrome Android sobre `publicar.html`):** al dictar con el boton encendido, el texto **se duplicaba**. Primero se observo **repeticion de la ULTIMA FRASE** (dictados cortos y largos, en `descripcion_corta` y `descripcion_larga`); tras el primer fix el sintoma **persistio como duplicacion de PALABRAS** del dictado.
+
+**Causa raiz DOBLE, ambas en la composicion del valor de `dictado-voz.js`.** Se descartaron **por observacion del operador** el prefijo y el IME (no eran la causa).
+
+1. **Interim acumulativo del segmento.** El valor se componia como `prefijo + finales + interim`; pero en el motor de Chrome el **interim de un segmento YA CONTIENE lo finalizado de ESE MISMO segmento**, de modo que la ultima frase entraba **dos veces**.
+2. **Reemision del motor Android.** Defecto conocido del motor: **REEMITE el mismo resultado final mas de una vez**. Evidencia publica citada: StackOverflow **"Speech recognition API duplicated phrases on Android"** (*"For each phrase said, it returns two..."*); **react-speech-recognition issue #18** (*"word repeats in mobile chrome... bug in the Android Chrome implementation"*); **Chromium issue 40484311** (*"It repeats the recognized word multiple times, mostly 2-3 times"*).
+
+**Fix aplicado (solo `dictado-voz.js`):**
+
+1. Consumo por **`event.resultIndex`** + buffer persistente de estado (**`estado.textoBase`**) en lugar de sumar bloques.
+2. Fusion **por solape dentro** del mismo array de resultados, no solo en la frontera.
+3. **Descuento del texto dictado previamente presente en el campo** (`dictadoPrevio`) y memoria entre sesiones.
+4. **Blindaje de ciclo de vida:** al finalizar se anulan los **CUATRO** handlers (`onresult`/`onerror`/`onend`/`onstart`) y se **aborta** el motor: **ningun motor huerfano escribe**.
+5. **`estado.arrancando` deja de ser codigo muerto:** guarda la reentrada por toques repetidos; el estado activo se marca en el **`onstart` real**.
+6. Aviso de corte de sesion **SIN auto-restart**, con el silo `dv-` y fallback a `toast`.
+7. **Diagnostico DORMIDO** por `?dvdebug=1`: contador de eventos/resultados/estado del motor, marcador de **VERSION (`dv-2`)** y contador de **reemisiones descartadas**; **sin el flag no se crea ningun nodo**.
+8. **SESGO declarado:** ante duda **se deduplica** (se prefiere perder una repeticion literal del usuario a duplicar texto no dicho); el caso legitimo **"hola hola"** sigue cubierto por **contra-caso** en el harness.
+
+**Cambios acompanantes (no son el bug; viajaron en el mismo commit):** (a) **`dictado-voz.css`** (silo `dv-`, **172 -> 254 lineas**): el boton pasa a ser **sutil** y a flotar **dentro** de la caja de texto (icono, area tactil 44x44, reserva con `:has()`, contraste en campos claros y oscuros, sin apilado en movil); **3 declaraciones `!important`** justificadas por el inline del motor y de `mi-perfil`. (b) **`publicar.html`** (unico HTML tocado): guardia de **slot vacio** en el inyector de botones (la unica de las **4 superficies** que no la tenia) y retirada del `<span id="dv-slot-nombre">` **huerfano**.
+
+**Verificacion (medida contra el archivo real, ADR-006):**
+
+- `node scripts/smoke_dictado_voz.js` (**NUEVO**, 617 lineas): **78/78 OK, FAIL 0**.
+- **Contraste que prueba el harness:** con el **motor IDEAL** y el codigo de `HEAD` previo al segundo fix -> **47/47**; con el **motor DEFECTUOSO** y el codigo previo al segundo fix -> **63/78 (FAIL 15)**, con los textos `"hola mundo hola mundo"`, `"hola mundo mundo"` y `"hola mundo hola mundo y buenas tardes"`.
+- `node --check` **exit 0** en `dictado-voz.js` (**614 lineas**) y en el smoke; ASCII-safety (ADR-002) = **0 bytes > 127** en los dos.
+- Escudo GOLD en `publicar.html`: div **158/158**, span **72/72**, button **18/18**, textarea **4/4**; diff **2+/2-** y **0 bytes > 127** anadidos.
+- **NO-REGRESION:** `api/pagina-destino.js`, `comunidad.html`, `mi-perfil.html`, `api/*.js`, `admin.html` e `index.html` **SIN diff**. El gate de `@renderer-dev` **NO fue necesario**.
+- **PRUEBA FUNCIONAL DEL OPERADOR** en Chrome Android sobre `publicar.html?dvdebug=1`: **pasa, no duplica** (el marcador `dv-2` confirmo que no era **copia cacheada**).
+
+**LECCION DE PROCESO (lo mas valioso del bug):** **el primer harness modelaba un MOTOR IDEAL y por eso dio verde (47/47) mientras el dispositivo seguia fallando.** El arnes que valida es el que **modela el MOTOR DEFECTUOSO**: un test que solo ejercita el camino feliz **no es una red, es una suposicion con forma de test**. Corolario, gemelo de BUG-123: **un smoke debe haber visto su propio defecto en rojo alguna vez**; aqui se demostro reproduciendo el fallo con el harness y el codigo previos (63/78) antes de dar por bueno el fix.
+

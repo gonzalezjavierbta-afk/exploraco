@@ -5414,5 +5414,63 @@ El paso 1 del alta publica deja de ser un `<select>` de **21 ciudades** y pasa a
 
 Codigo (working tree, **SIN commit; NO desplegado**): `api/publicar-lugar.js` (+186) + `publicar.html` (+827) + `package.json` (2 scripts + enganche a `npm test`) + **NUEVOS** `scripts/generar-geo-ciudades.js`, `scripts/smoke_zona_paridad.js`, `geo-ciudades.js`. `api/` **8/8 INTACTO**, cero endpoint nuevo, cero migracion nueva. Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md` (cierre de la deuda de `publicar-lugar.js` + 2 pendientes nuevos), `BUGS_HISTORICOS.md` (**BUG-125**, los 3 fallos de la tanda). **`DECISIONS.md` NO se toco** (ADR-097 ya existia de esta misma tanda); **`PROJECT.md` NO se toco**: el alcance del proyecto no cambia.
 
+## TSK-213 - Correccion de la duplicacion del dictado por voz en Chrome Android (doble causa: interim acumulativo del segmento + reemision del motor) + boton sutil dentro de la caja - 2026-10-15 - IMPLEMENTADO, VERIFICADO EN DISPOSITIVO Y DESPLEGADO (`d4090c0`, `bd9256b`)
+
+**Estado: IMPLEMENTADO, VERIFICADO EN DISPOSITIVO REAL POR EL OPERADOR Y DESPLEGADO** en `main`. Es **continuacion de TSK-210** (dictado por voz, Web Speech API) y **correccion de un bug**, no un cambio de arquitectura: **SIN ADR** (`DECISIONS.md` NO se toco). El detalle tecnico -- causa raiz doble, evidencia publica y los 8 puntos del fix -- vive **una sola vez** en `BUGS_HISTORICOS.md` **BUG-126** (ADR-084 D1); aqui solo el resumen, la verificacion y las deudas. `api/` **8/8 INTACTO**, **cero migraciones**, **cero endpoint nuevo**.
+
+### Que cambia el producto
+
+El dictado por voz deja de **duplicar** texto en Chrome Android. El sintoma original era **repeticion de la ultima frase**; tras el primer fix se manifesto como **duplicacion de palabras**. Ademas el boton de dictado pasa a ser **sutil y a flotar dentro de la caja de texto**, en lugar de ocupar una franja propia.
+
+### Causa raiz (resumen; detalle en BUG-126)
+
+**Doble, ambas en la composicion del valor de `dictado-voz.js`** (se descartaron, por observacion del operador, el prefijo y el IME): (1) en el motor de Chrome el **interim de un segmento YA CONTIENE lo finalizado de ESE MISMO segmento**, luego la ultima frase entraba dos veces; (2) **defecto conocido del motor Android, que REEMITE el mismo resultado final** mas de una vez (3 citas publicas en BUG-126).
+
+### Fix aplicado (solo `dictado-voz.js`)
+
+1. Consumo por **`event.resultIndex`** + buffer persistente de estado (`estado.textoBase`) en vez de sumar bloques.
+2. Fusion **por solape dentro** del mismo array de resultados, no solo en la frontera.
+3. **Descuento del texto previo del campo** (`dictadoPrevio`) y memoria entre sesiones.
+4. **Blindaje de ciclo de vida:** al finalizar se anulan los **CUATRO** handlers (`onresult`/`onerror`/`onend`/`onstart`) y se **aborta** el motor; ningun motor huerfano escribe.
+5. `estado.arrancando` **deja de ser codigo muerto** (guarda la reentrada; el estado activo se marca en el `onstart` real).
+6. Aviso de corte **SIN auto-restart**, silo `dv-` con fallback a `toast`.
+7. **Diagnostico DORMIDO** por `?dvdebug=1` (contadores + **VERSION `dv-2`** + reemisiones descartadas); **sin el flag no se crea ningun nodo**.
+8. **SESGO declarado:** ante duda **se deduplica**; el caso legitimo "hola hola" se cubre por **contra-caso** en el harness.
+
+### Cambio visual (`dictado-voz.css`, silo `dv-`, 172 -> 254 lineas)
+
+Boton **sutil** dentro de la caja (icono, area tactil **44x44**, reserva con `:has()`, contraste en campos claros y oscuros, sin apilado en movil); **3 `!important`** justificados por el inline del motor y de `mi-perfil`.
+
+### Inyeccion (`publicar.html`, unico HTML tocado)
+
+Guardia de **slot vacio** en el inyector de botones -- la unica de las **4 superficies** que no la tenia -- y retirada del `<span id="dv-slot-nombre">` **huerfano**.
+
+### Verificacion medida (ADR-006, contra el archivo real)
+
+| Prueba | Resultado |
+|---|---|
+| `node scripts/smoke_dictado_voz.js` (**NUEVO**, 617 lineas) | **78/78 OK, FAIL 0** |
+| Contraste: motor IDEAL + codigo previo al 2.o fix | **47/47** (el harness pasaba y el dispositivo fallaba) |
+| Contraste: motor DEFECTUOSO + codigo previo al 2.o fix | **63/78 (FAIL 15)** con `"hola mundo hola mundo"`, `"hola mundo mundo"`, `"hola mundo hola mundo y buenas tardes"` |
+| `node --check` de `dictado-voz.js` (614 lineas) y del smoke | **exit 0** |
+| ASCII-safety ADR-002 en los 2 `.js` | **0 bytes > 127** |
+| Escudo GOLD `publicar.html` | div **158/158**, span **72/72**, button **18/18**, textarea **4/4**; diff **2+/2-**, **0 bytes > 127** anadidos |
+| NO-REGRESION | `api/pagina-destino.js`, `comunidad.html`, `mi-perfil.html`, `api/*.js`, `admin.html`, `index.html` **SIN diff** (gate de `@renderer-dev` **NO necesario**) |
+| Prueba funcional del OPERADOR (Chrome Android, `publicar.html?dvdebug=1`) | **pasa, no duplica**; el marcador `dv-2` confirma que no era copia cacheada |
+| Commits | `d4090c0` (1.er fix) y `bd9256b` (consumo defensivo + `dv-2`), en `main` y desplegados |
+
+### Deudas y riesgos honestos (sin maquillar)
+
+1. **Cache del CDN:** los **4 HTML/render** referencian `dictado-voz.js?v=1` y `dictado-voz.css?v=1`. Si reaparece el comportamiento viejo por cache, subir a **`?v=2`**; en la ficha eso **toca el motor** y exige **gate de `@renderer-dev`**.
+2. **`scripts/smoke_dictado_voz.js` queda como script SUELTO:** no esta enchufado a `scripts/session_close.js` ni a ningun agregado (decision de **alcance minimo**). Una regresion del dictado no la vera `npm test`.
+3. **`.dv-debug`** (contador de `?dvdebug=1`) es funcional pero **NO tiene estilos propios**.
+4. **Sin soporte de `:has()` no hay reserva de espacio:** solape leve, documentado en el propio CSS.
+5. **La textarea corta de `publicar.html` crece ~35 px** para conservar linea visible bajo la banda reservada.
+6. **La etiqueta visible "Dictar" desaparece** en favor del icono: accesibilidad cubierta por `aria-label` y `title` en las **4 superficies**.
+
+### Archivos tocados
+
+Codigo: `dictado-voz.js` (logica del consumo), `dictado-voz.css` (vision), `publicar.html` (inyeccion) y **NUEVO** `scripts/smoke_dictado_voz.js`. Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md` (estado + deudas), `BUGS_HISTORICOS.md` (**BUG-126**). `DECISIONS.md` **NO se toco** (sin ADR); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

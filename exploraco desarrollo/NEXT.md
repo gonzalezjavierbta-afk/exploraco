@@ -244,6 +244,29 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### COMMITEADO Y DESPLEGADO 2026-10-15 (pase documental unico R2) - TSK-213: correccion de la duplicacion del dictado por voz (continuacion de TSK-210)
+
+**Que se estaba haciendo:** corregir que el dictado por voz **duplicaba** texto en Chrome Android sobre `publicar.html` (primero la ultima frase; tras el primer fix, palabras del dictado). **Causa raiz doble** en la composicion del valor de `dictado-voz.js`: el **interim del segmento ya contiene lo finalizado de ese mismo segmento** y el **motor Android REEMITE el mismo final**. El argumento completo vive **una sola vez** en `BUGS_HISTORICOS.md` **BUG-126**; aqui solo el estado y las deudas. **SIN ADR.** **COMMITEADO Y DESPLEGADO** en `main`: `d4090c0` (1.er fix) y `bd9256b` (consumo defensivo + marcador `dv-2`). `api/` **8/8 INTACTO**, cero migraciones, cero endpoint nuevo.
+
+**Que se entrego (medido contra el archivo real, ADR-006):** fix de logica en `dictado-voz.js` (consumo por `event.resultIndex` + buffer persistente, fusion por solape, descuento del texto previo, blindaje de los 4 handlers + `abort()`, `estado.arrancando` vivo, diagnostico dormido `?dvdebug=1` con version `dv-2`); `dictado-voz.css` (**172 -> 254 lineas**: boton sutil dentro de la caja); `publicar.html` (guardia de slot + retirada del `span` huerfano). **NUEVO** `scripts/smoke_dictado_voz.js` (617 lineas): **78/78 OK, FAIL 0**, que reproduce el fallo (**63/78**) con el motor defectuoso y el codigo previo. `node --check` exit 0, ASCII **0 bytes > 127**, Escudo GOLD `publicar.html` **div 158/158 / span 72/72 / button 18/18 / textarea 4/4**. **Prueba funcional del operador en Chrome Android: pasa, no duplica.**
+
+**LECCION DE PROCESO:** el primer harness modelaba un **motor IDEAL** y dio verde (**47/47**) mientras el dispositivo seguia fallando; **el harness valido es el que modela el MOTOR DEFECTUOSO**.
+
+**Que sigue (con criterio de verificacion):**
+
+1. **Bump de cache `?v=1` -> `?v=2` solo si reaparece el comportamiento viejo.** Los **4 HTML/render** referencian `dictado-voz.js?v=1` y `dictado-voz.css?v=1`; si el **CDN** sirve la version cacheada, subir el numero. En la ficha eso **toca el motor** y exige **gate de `@renderer-dev`**. **Criterio:** el texto no se duplica en un dispositivo con cache ya poblada, o el `?v` subido.
+2. **Enchufar `scripts/smoke_dictado_voz.js` a un agregado.** Hoy es un script **SUELTO**: no esta en `scripts/session_close.js` ni en `npm test` (decision de **alcance minimo**). **Criterio:** decision escrita de dejarlo suelto o su enganche con el resto en verde.
+3. **CSS propio para `.dv-debug`.** El contador de `?dvdebug=1` es funcional pero **NO tiene estilos propios**. **Criterio:** `.dv-debug` con reglas bajo el silo `dv-` o decision escrita de dejarlo sin estilos.
+4. **Solape leve sin `:has()`.** Sin soporte de `:has()` no hay reserva de espacio y el texto puede quedar bajo la banda: esta **documentado en el propio CSS**. **Criterio:** fallback aceptado por escrito o solucion sin `:has()`.
+5. **La textarea corta de `publicar.html` crece ~35 px** para conservar linea visible bajo la banda reservada. **Criterio:** altura aceptada visualmente en movil.
+6. **La etiqueta visible "Dictar" desaparece** en favor del icono; accesibilidad cubierta por `aria-label` y `title` en las **4 superficies**. **Criterio:** el microfono sigue siendo identificable y accesible por lector de pantalla.
+
+**Riesgos activos:**
+
+1. **Cache del CDN:** si `dictado-voz.js?v=1` se sirve cacheado, el comportamiento viejo puede reaparecer; el bump toca los **4 HTML/render** y en la ficha exige **gate de `@renderer-dev`**.
+2. **El smoke no esta en ningun agregado:** una regresion del dictado **no** la vera `npm test`, solo quien corra el script a mano (hoy el unico con evidencia de haber fallado en rojo util).
+3. **El diagnostico dormido viaja en el bundle:** solo se activa con `?dvdebug=1`, pero es **codigo de produccion** que debe seguir **sin crear nodos** sin el flag.
+
 ### IMPLEMENTADO EN WORKING TREE 2026-10-15 (pase documental unico R2) - TSK-212: geografia derivada del envio publico "Publica tu lugar" (ADR-097)
 
 **Que se estaba haciendo:** rediseñar el formulario publico de alta con una **cadena derivada** `ciudad -> departamento -> zona` sobre un catalogo de **1.122 municipios**, mapa Leaflet con pin, y envio de **dos niveles (basico y completo)** sobre la misma cola `draft`. El argumento vive **una sola vez** en `DECISIONS.md` **ADR-097**; aqui solo el relevo y las deudas. **SIN commit, SIN desplegar.** `api/` **8/8 INTACTO**, **cero endpoint nuevo**, **cero migracion nueva**.
