@@ -8543,3 +8543,87 @@ Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Se
 ```
 
 Debe devolver **`## ADR-096:`**, y el conteo de ADR debe subir de 95 a 96. El cierre documental (`TASKS.md`, `NEXT.md`, `AGENTS.md` §0) corresponde al **pase único R2** de `@docs-keeper`, no a este ADR.
+
+---
+
+## ADR-097: La geografia del envio publico pasa a ser una **cadena derivada** `ciudad -> departamento -> zona` con **catalogo unico servido como `.js` estatico** y zona **PRECALCULADA en el script generador**, mas el envio publico de **dos niveles (basico y completo) sobre la MISMA cola `draft`** [NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-097
+**Fecha:** 2026-10-15
+**Autor:** `@architect` (diseño). Gate de riesgo CONFIRMADO por el operador (toca `api/publicar-lugar.js`, `publicar.html` y el generador del catalogo).
+**Estado:** **ACEPTADO / PENDIENTE DE IMPLEMENTAR.** Fijadas por decision del operador: (1) el envio basico y el completo crean la misma fila `status='draft'`, (2) `whatsapp` pasa a condicional y la foto a obligatoria en modo basico, (3) cero endpoints nuevos y cero migraciones nuevas, (4) `dictado-voz.js` y `map-picker.js` no se tocan.
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-096`** (linea 8352); no existia ningun `ADR-097`. Se escribe como **097**, el siguiente consecutivo libre. Tamano real medido hoy: **1.275,7 KB / 8.545 lineas**.
+
+### Problema
+
+El formulario publico tiene **tres** defectos de geografia que se refuerzan entre si, y **uno** de flujo que no es de geografia:
+
+1. **Ciudad es una lista a mano de 21 entradas** (`publicar.html`, `#ciudad`, mas un `<option value="__otra__">`), escrita a mano y desincronizada del catalogo real.
+2. **`departamento` es TEXTO LIBRE** en el envio, y `api/publicar-lugar.js` lo mapea tal cual a la columna `region` (`:281`, `body.departamento || null, // region`). El resultado son tantas regiones como personas escriban "Antioquia", "ANTIOQUIA" o "antioguia".
+3. **No existe campo `zona` en el envio.** `publicar-lugar.js` **nunca escribe `destinos.zona`**, pese a que la columna **ya existe en Neon** (migracion `028_destinos_zona.sql`, `TEXT NULL`, `CHECK destinos_zona_chk`, lista cerrada `andina|amazonica|caribe|pacifico|llanos`) y `api/admin-destinos.js` **ya la gestiona** (`:220` la selecciona, `:263` la lista entre las columnas, `:297` la escribe, `:388` la devuelve).
+4. **El envio minimo esta bloqueado por un solo campo**: `publicar-lugar.js` `:150-156` exige `whatsapp` para toda publicacion que no sea blog. La foto, en cambio, es **opcional** (`foto_principal` solo suma `extras` en `calcularTierPublicacion`, `:201`). El resultado es un formulario que **exige el dato de contacto y tolera la foto**, exactamente al reves de lo que el contenido necesita para ser moderado.
+
+### Datos medidos (2026-10-15, verificados contra el archivo real y contra Neon)
+
+1. **`destinos.zona` YA ESTA APLICADA en produccion.** Consulta de solo lectura a Neon (`scripts/neon_select.js`, regla `SELECT/WITH`): `information_schema.columns` -> **1** fila; `pg_constraint conname='destinos_zona_chk'` -> **1** fila; **`destinos` con `zona IS NOT NULL` -> 5 filas**. Consecuencia directa: **no hace falta migracion ninguna**, pero el `INSERT` que escriba `zona` **debe** pasar por la lista cerrada, porque la CHECK rechaza `''` con error de约束 y el `INSERT` muere con **500**.
+2. **Catalogo fuente:** `db/seeds/geo_ciudades_seed.json`, **280.587 bytes**, **1.122 filas**, con `nombre`, `nombre_normalizado`, `departamento`, `departamento_normalizado`, `cod_dpto`, `cod_mpio`, `tipo`, `lat`, `lng`. Composicion por `tipo`: **1.103 Municipio**, **18 Area no municipalizada**, **1 Isla**. Departamentos distintos: **33** (32 + Bogota D.C., incluyendo `ARCHIPIElAGO DE SAN ANDRES, PROVIDENCIA Y SANTA CATALINA` como entrada propia).
+3. **Ese seed NO tiene columna `zona`**, y `scripts/seed_geo.js` (`COLS_CIUDADES`, ~`:48-51`) tampoco la lista: la tabla `geo_ciudades` queda **igual**. Por eso la zona se tiene que calcular **afuera**, en el generador del catalogo, y no se puede leer de la DB en el navegador.
+4. **El catalogo compilado NO existe todavia**: no hay ningun `geo-ciudades.js` en el repo (verificado con `glob **/geo-ciudades*`: 0 resultados). Es decir, **el artefacto que este ADR diseña se crea aqui**, y su unica fuente es el seed del punto 2.
+5. **El `.js` estatico en la raiz es la unica via de entrega posible**: el presupuesto de Vercel esta **8/8** funciones serverless (regla 7 de `AGENTS.md`), asi que servir el catalogo por una funcion nueva esta **prohibido** aunque se quisiera. La via correcta es un `.js` generado por script, cacheado en `window`.
+6. **`dictado-voz.js` y `map-picker.js` existen y son compartidos / atados**: `map-picker.js` (`:167`, `:233`, `:258`) usa `L.marker([lat,lng], {draggable:true})` y `map.on('click', ...)`, y `mapa-tiles.js` expone `window.MapaTiles.aplicar(map, opts)` con conmutacion a proveedor alterno si los tiles fallan. **El patron del pin ya esta probado y se replica, no se re-inventa.**
+7. **`calcularTierPublicacion` (`publicar-lugar.js` `:115-130`) ya existe y ya produce `basico|intermedio|completo`, guardado en `tags.pub_tier` (`:233`).** O sea: **el nivel de envio ya es un dato**. Hoy ese dato **solo alimenta XP** y **no cambia ni el estado de la fila ni la cola**.
+
+### Opciones
+
+**A. La geografia como texto libre (situacion actual), mas zona opcional.** Rechazada: la region es dato **derivado** del municipio, no una opinion del usuario; el texto libre garantiza filas no agrupables y no comparables con `cod_dpto`.
+
+**B. Cadena `ciudad -> departamento -> zona` con la zona PRECALCULADA en el catalogo servido.** El generador calcula la zona por municipio una sola vez, la escribe en el `.js`, y el cliente la lee. Elegida.
+
+**C. La cadena igual que B, pero el navegador DEDUCE la zona en runtime a partir del departamento.** Descartada por dos razones medidas: (i) obligaria a **duplicar el mapa `departamento -> zona` en JS de cliente**, es decir una segunda fuente de verdad fuera del script, sin ninguna forma de testearla sin navegador; (ii) la derivacion en **un solo sitio** (el script) es testeable desde `node` con un simple `for` sobre las 1.122 filas, mientras la version de runtime solo se detecta en produccion.
+
+**D. Fuente de catalogo desde la tabla `geo_ciudades` de Neon.** Rechazada: implicaria endpoint (8/8) y, ademas, `geo_ciudades` **no tiene `zona`** (dato 3). El seed es la fuente.
+
+### Decision
+
+**D1 -- La region (departamento) es DATO DERIVADO, nunca texto libre.** El cliente elige **municipio** de un catalogo; de ahi salen `departamento`, `cod_dpto`, `cod_mpio` y `zona`. `departamento` **deja de ser un input** del formulario publico y se conserva como **columna `region` ya derivada** en el `INSERT`.
+
+**D2 -- El punto abierto del catalogo se resuelve como PRECALCULADO, y la regla es una sola: el mapa `departamento -> zona` vive EXCLUSIVAMENTE en el script generador, y el navegador no lo deduce.** Regla operativa en una linea: **`geo-ciudades.js` se genera desde `db/seeds/geo_ciudades_seed.json` con `zona` ya resuelta por municipio; el cliente lee el valor y no lo calcula.** Justificacion de coste: anadir `zona` al `.js` cuesta del orden de **~14 bytes por municipio** (clave corta + valor de la lista cerrada, mas una coma), es decir del orden de **15 KB sin comprimir sobre 1.122 entradas**, muy por debajo del presupuesto de una pagina y **sin peticion extra**; a cambio el cliente carga un unico `.js` estatico y no una funcion serverless. Justificacion de testeabilidad: la derivacion en el generador se verifica con un `for` de 1.122 filas en `node` (**33 departamentos, cada municipio con zona no nula, cada zona dentro de la lista cerrada**) y con un unico `SELECT` de contraste sobre Neon; la variante runtime **no tiene ninguna de las dos verificaciones**. El mapa son **33 entradas**, no 1.122: se aplica por `departamento_normalizado`, de modo que la salida es identica para todos los municipios de un departamento y el `.js` se puede comprimir sin miedo.
+
+**D3 -- `zona` NUNCA se confia en el cliente.** El frontend la calcula **para mostrar** (etiqueta de la region natural bajo el select de ciudad) y la envia por comodidad, pero la **fuente de verdad es el backend**: `api/publicar-lugar.js` **re-deriva** la zona desde el municipio cuando no le llega, y la **normaliza a `NULL`** cuando llega vacia o fuera de la lista cerrada. Motivo ya documentado y ahora verificado: la `CHECK destinos_zona_chk` **rechaza `''`**, y un `''` que llega a la columna provoca `500` en el `INSERT`, no un `400` util. La funcion de normalizacion es de **cinco lineas** (`ZONAS = ['andina','amazonica','caribe','pacifico','llanos']`) y es **ASCII-safe** (sin tildes: `amazonica`, no `amazónica`), coherente con el nombre real de la columna.
+
+**D4 -- Dos niveles de envio sobre la MISMA cola.** El **basico** (nombre + categoria + ciudad + `descripcion_corta` de >= 30 caracteres + **foto**) y el **completo** (todo lo de la categoria exacta) crean **exactamente el mismo tipo de fila**: `status='draft'`, la revisa y completa el admin desde `admin.html`, y el **XP se acredita al aprobar** via `api/admin.js?publicar_lugar_otorgar`. **El envio basico NO es una via que salta la moderacion: es la misma moderacion con menos campos.** El nivel ya existe como dato (`calcularTierPublicacion` -> `basico|intermedio|completo` en `tags.pub_tier`) y hoy **solo alimenta XP**; este ADR no lo re-define, solo deja de tratarlo como si fuera una via distinta. No hay **dos** endpoints ni **dos** colas: hay **un** endpoint que acepta dos niveles de completitud.
+
+**D5 -- `whatsapp` pasa a CONDICIONAL en modo basico y la FOTO pasa a OBLIGATORIA en modo basico.** Es el unico cambio de validacion del envio, y esta justificado por `publicar-lugar.js` `:150-156`. **Regla de contacto minimo, en una sola linea: en modo basico el contacto es OPCIONAL; lo que es obligatorio es la identidad minima del contenido -- nombre, categoria, ciudad, `descripcion_corta` >= 30 y foto.** Si el usuario no da ningun medio de contacto, la fila entra igual a `draft` y el admin puede completarla al revisar; el formulario **debe** avisar de que sin contacto la publicacion puede no contactarse. El blog conserva su excepcion actual (`email` en vez de `whatsapp`, `:151`): este ADR **no toca** la rama de blog.
+
+**D6 -- Cero endpoints nuevos, cero migraciones nuevas.** El catalogo viaja como **`.js` estatico en la raiz**, generado por script y cacheado en `window` (una lectura por carga de pagina, no una peticion por municipio). **Ninguna migracion:** la `028` **ya esta aplicada y verificada en Neon** (dato 1). Se deja constancia del modo de fallo por si alguien despliega sobre otro entorno: si la `028` **no** estuviera aplicada, el `INSERT` que escriba `zona` falla con **`42703` (column does not exist)**. El orden correcto es **aplicar 028 antes del deploy**, y como aqui ya esta aplicada, el orden es un no-op.
+
+**D7 -- No se tocan `dictado-voz.js` ni `map-picker.js`.** `dictado-voz.js` es **compartido** (lo usan varios formularios) y tocarlo para publicar el formulario es un radio de impacto injustificado. `map-picker.js` esta **atado a ids del admin**, asi que **no se reutiliza ni se extiende**. El pin embebido en `publicar.html` **se replica** siguiendo el patron **ya probado** de `map-picker.js`: `L.marker([lat, lng], {draggable: true}).addTo(mapa)` mas `mapa.on('click', ...)` para reposicionar, apoyandose en `mapa-tiles.js` (`window.MapaTiles.aplicar`) para la cadena de tiles con su **fallback** ya implementado. Replicar un patron probado en vez de reutilizar un modulo atado a ids ajenos: el coste es ~15 lineas duplicadas, el beneficio es **cero acoplamiento** con el panel admin.
+
+### Consecuencias y deudas
+
+- **Consecuencia buena:** `destinos.region` deja de ser basura libre y pasa a ser comparable con `cod_dpto`; `destinos.zona` pasa de tener **5 filas**ACIERTADAS de un total desconocido a llenarse **sola** con cada envio publico.
+- **Deuda 1 (FUERA DE ALCANCE de este ADR, registrada aqui):** **~103 de los 111 `scripts/load-*-api.js`** y **`scripts/upload-eventos.js`** **tampoco envian `zona`**, por el mismo motivo que `publicar-lugar.js`: no lo hicieron nunca. Sus destinos quedan con `zona = NULL`, que la CHECK **acepta** (dato 1: la columna es nullable **a proposito**, exactamente para no romper seeds). Este ADR **no los toca**; su remediacion es un ADR posterior, y su condicion de entrada es **esta** decision ya tomada.
+- **Deuda 2:** la `028` avisa en su propio bloque de nomenclatura que `zonas_geograficas` (creada en la `027`) usa los slugs **`andes` y `amazonia`**, mientras `destinos.zona` usa **`andina` y `amazonica`**. **No hay FK entre las dos**, asi que no hay conflicto hoy; el dia que se enlacen habra que unificar o mapear. Deuda consciente, no se resuelve aqui.
+- **Deuda 3:** los 18 `Area no municipalizada` del seed entran al catalogo con `tipo` distinto de `Municipio`. Si el select publico solo ofrece municipios, esos 18 quedan fuera de la UI sin dejar de estar en el `.js`: es aceptable, pero **debe ser una decision consciente** y no un olvido silencioso.
+- **Deuda 4:** `region` sigue siendo `TEXT` en la tabla. While este ADR la deriva correctamente, **no la tipa**: cambiarla es migracion, y este ADR no propone migraciones (D6).
+- **Riesgo residual aceptado:** el envio basico sin contacto entra a `draft` y depende de que el admin lo vea. Es el precio de no bloquear el envio minimo, y es el mismo mecanismo de moderacion que ya existe.
+
+### Verificacion exigible al implementador
+
+1. `node --check` sobre `api/publicar-lugar.js` y sobre el generador del catalogo, y **ASCII-safety (ADR-002): 0 bytes > 127 en ambos**. Recordatorio: `amazonica` y `pacifico` **sin tilde**, tambien en la UI.
+2. El generador produce `geo-ciudades.js` y el smoke comprueba, sobre las **1.122** entradas: (a) `departamento` no vacio en todas; (b) `zona` **no nula** en todas; (c) `zona` dentro de `['andina','amazonica','caribe','pacifico','llanos']` en todas; (d) **33** departamentos distintos presentes.
+3. El `INSERT` de `publicar-lugar.js` escribe `region` desde el municipio elegido y `zona` **normalizada**; un `POST` de prueba con `zona: ''` y otro con `zona: 'inventada'` deben terminar en **`NULL`**, **no** en `500` ni en una fila invalida.
+4. Un `POST` minimo (nombre + categoria + ciudad + `descripcion_corta` >= 30 + foto, **sin `whatsapp`**) devuelve **201** y deja la fila en `status='draft'`; el mismo `POST` sin foto devuelve **400** con un mensaje que nombre la foto.
+5. Los **~103 `load-*-api.js`** y `upload-eventos.js` siguen funcionando **sin tocar una linea**: `zona` ausente es `NULL` y la CHECK lo acepta (deuda 1).
+6. `map-picker.js`, `dictado-voz.js` y `mapa-tiles.js` quedan **sin diff**.
+7. Presupuesto de Vercel: **8/8** funciones, **sin endpoint nuevo** (`git status` no debe mostrar ninguna carpeta `api/nueva*`).
+
+### Verificacion del propio ADR
+
+Numero correlativo verificado contra el archivo real (ADR-006); secciones de problema / datos medidos / opciones / decision / consecuencias y deudas / verificacion exigible. Los **7 puntos** del encargo del operador estan fijados con decision, no como pregunta abierta: D1 cadena derivada, D2 **catalogo con zona PRECALCULADA** (el punto abierto, resuelto), D3 zona re-derivada en backend, D4 dos niveles sobre la misma cola, D5 contacto minimo con foto obligatoria, D6 cero endpoints y cero migraciones, D7 sin tocar los dos modulos compartidos. ASCII-safety **no aplica** a este fichero (ADR-002: los `.md` de gobernanza admiten tildes); si aplica a `api/publicar-lugar.js`, a `publicar.html` y al generador. Verificacion de escritura:
+
+```
+Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Select-Object -Last 1
+```
+
+Debe devolver **`## ADR-097:`**, y el conteo de ADR debe subir de 95 a 96. El cierre documental (`TASKS.md`, `NEXT.md`, `BLUEPRINT.md`) corresponde al **pase unico R2** de `@docs-keeper`, no a este ADR.

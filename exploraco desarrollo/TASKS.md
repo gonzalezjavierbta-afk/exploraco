@@ -5316,5 +5316,71 @@ La variable de entorno `alert()` del diseno original fue **descartada**: el repo
 
 **El guard mide cadenas, no arranque.** Verifica pines, allowlists y `coste:`, pero **ninguno de los 6 checks lanza un subagente**: puede dar `OK` con la delegacion caida, porque el fallo de subagente ocurre **antes de persistir** en `opencode.db` y **no deja fila que leer**. Mitigacion actual: comando `sesion-cero` + `--preflight` + lectura de la cabecera del runtime del propio agente.
 
+## TSK-212 - Rediseño del formulario publico "Publica tu lugar": geografia derivada `ciudad -> departamento -> zona` con catalogo unico de 1.122 municipios, mapa Leaflet con pin y envio de dos niveles (ADR-097) - 2026-10-15 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL, SIN COMMIT Y SIN DESPLEGAR.** Abre **ADR-097** (`DECISIONS.md`), que es donde vive **una sola vez** el argumento de la decision (ADR-084 D1); aqui solo el cierre, las medidas y las deudas. **8/8 endpoints INTACTO**: `api/` sigue con **8 ficheros**, **cero endpoint nuevo**, cero migraciones nuevas (las 027 y 028 son preexistentes de TSK-144/TSK-145). Codigo en working tree.
+
+### Que cambia el producto
+
+El paso 1 del alta publica deja de ser un `<select>` de **21 ciudades** y pasa a ser una **cadena derivada** `ciudad -> departamento -> zona` sobre un catalogo de **1.122 municipios**, con mapa embebido; el paso 4 gana **dos caminos de envio** (basico y completo) sobre la **misma cola `draft`**.
+
+### Backend (`api/publicar-lugar.js`, +186 lineas segun `git diff --stat`)
+
+1. **Acepta y persiste la columna `zona`.** Normalizada a **`NULL`** si no esta en la lista cerrada, **nunca cadena vacia**: la migracion **028** impone una `CHECK` que la rechazaria. La zona la fija **`resolverZona(body.zona, body.departamento)`** (`:327`), que **re-deriva** desde el departamento cuando el cliente no manda zona o manda una inventada. **El backend nunca persiste lo que le mando el cliente**: lo que llega es una peticion, la verdad es la derivacion.
+2. **INSERT: 31 columnas = 26 placeholders + 5 literales.** Verificado en `:413-437`: columnas `slug, nombre, categoria_slug, lead, descripcion, highlight, ciudad, region, barrio, **zona**, lat, lng, whatsapp, telefono, email, web, instagram, precio_desde, horario, foto_hero, booking, hostelworld, airbnb, tipo, tags, sintro, status, destacado, verificado, creado_en, actualizado_en`. Placeholders `$1..$26`; literales `'draft'`, `false`, `false`, `NOW()`, `NOW()`. **`zona` es la columna 10, ligada a `$10`** (`:448`).
+3. **Requeridos revisados:** `whatsapp` deja de ser requerido y **`foto_principal` pasa a serlo** (`:312`: `['nombre','categoria','ciudad','descripcion_corta','foto_principal']`).
+4. **INTACTO:** `status='draft'` (literal, no placeholder), `calcularTierPublicacion` (`:265`, que ya bonificaba por `foto_principal`), `pub_geo` (radio 300 m), el registro de autor via `publicar_lugar_registrar`, la notificacion al admin y `SUBCAT_LISTA` (`:29`). `node --check` PASS, **0 bytes > 127**, **0 backticks**.
+
+**El mapa `ZONA_POR_DEPARTAMENTO` esta DUPLICADO** en el backend (`:59`: "COPIA (SINCRONIZADA A MANO)"), y el propio codigo lo declara. Es la deuda que justifies el smoke de paridad siguiente: una copia a mano es una segunda fuente de verdad esperando a divergir.
+
+### Catalogo geografico (2 ficheros NUEVOS)
+
+- **NUEVO `scripts/generar-geo-ciudades.js`** (209 lineas, 8.428 bytes): genera el artefacto desde el seed. Fuente de verdad de la zona = **`zonas_geograficas`** + la constante **`ZONA_POR_DEPARTAMENTO`** del propio generador (`:69`), con el mapeo de nomenclatura `andes -> 'andina'`, `amazonia -> 'amazonica'`, `caribe -> 'caribe'` (`:61-63`), porque **`destinos.zona` usa la forma larga y la 027 usa la corta**.
+- **NUEVO `geo-ciudades.js`** (artefacto GENERADO, 69.074 bytes, 1.133 lineas): emite `window.GEO_CIUDADES = {version, items:[[nombre,departamento,zona,lat,lng],...]}`. **0 bytes > 127** (ASCII-safe con escapes `\uXXXX`, ADR-002), **sin modulos** (se carga por `<script>` en `publicar.html:824`, no como ESM).
+- **1.122 entradas. Reparto real medido desescapando los `\uXXXX`: andina 774, caribe 116, pacifico 115, llanos 59, amazonica 58.** **33 departamentos, ninguno sin zona.**
+- **Idempotente:** dos ejecuciones producen **hash identico** (comprobado).
+
+### Smoke de paridad (1 fichero NUEVO) - la red que faltaba
+
+**NUEVO `scripts/smoke_zona_paridad.js`** (542 lineas, 23.530 bytes): compara el mapa del **generador** contra la **copia del backend**, y ademas valida el mapeo `andes/amazonia -> andina/amazonica` contra las **migraciones 027 y 028**, contra el **seed** y contra el **artefacto**. **46 comprobaciones.**
+
+**Medido en este pase (no citado de memoria):** `node scripts/smoke_zona_paridad.js --sin-neon` -> **`46 PASS / 0 FAIL`, exit 0**. Flag `--sin-neon` para correr sin red (los bloques A-D siguen comprobando contra disco).
+
+**El gate esta DEMOSTRADO QUE MUERE, no solo escrito:** con **4 rupturas inyectadas** en una copia temporal, el smoke sale con **exit 1 nombrando la entrada divergente**. Un gate que nunca se ha visto en rojo no es un gate.
+
+**Enganchado:** ultimo de la cadena de **`npm test`** (**24 smokes**, exit 0) y con scripts cortos **`smoke:zona`** / **`smoke:zona:sin-neon`** en `package.json`.
+
+### Frontend (`publicar.html`, +827 lineas segun `git diff --stat`)
+
+1. **Se retira el boton Dictar del campo Nombre**; **se conserva en las dos descripciones**. `dictado-voz.js` **NO se toca**: es compartido con `comunidad.html`, `mi-perfil.html` y el motor.
+2. **Paso 1:** el `<select>` de 21 ciudades se sustituye por un **combobox con buscador** sobre los 1.122 municipios, con **navegacion por teclado** y **roles ARIA** (`role="combobox"`, `aria-expanded`, `aria-autocomplete`, `aria-controls`, `aria-activedescendant`; `:344`, `:1625`). `#departamento` autocompletado; **`#zona` de solo lectura + `#zona-select` de correccion** (`:403`). **Mapa Leaflet embebido** (`leaflet@1.9.4`, CSS `:195` / JS `:822`) con **pin arrastrable y clic-para-mover**, centrado en la **geolocalizacion del dispositivo**.
+3. **Paso 4:** **dos caminos de envio** (basico y completo) que comparten **UN solo `fetch`**; el resumen muestra **region, zona y coordenadas**.
+
+### Verificacion medida (ADR-006, contra el archivo real)
+
+| Prueba | Resultado |
+|---|---|
+| `npm test` | **exit 0, 24 smokes** |
+| `node scripts/smoke_zona_paridad.js --sin-neon` | **46 PASS / 0 FAIL, exit 0** (re-medido en este pase) |
+| `smoke_zona_paridad` con 4 rupturas inyectadas | **exit 1**, nombra la entrada divergente (gate demostrado) |
+| Escudo GOLD `publicar.html` | divs **158/158**, `<script>` **8/8**, `<style>` **1/1** |
+| `node --check` de los **3** bloques `<script>` inline de `publicar.html` | **PASS** |
+| Bytes > 127 en las lineas nuevas de `publicar.html` | **0** |
+| `node --check api/publicar-lugar.js` | **PASS**; **0** bytes > 127, **0** backticks |
+| `api/*.js` | **8 ficheros** (presupuesto de Vercel INTACTO) |
+| `geo-ciudades.js` | **0** bytes > 127; reparto 774/116/115/59/58 = **1.122** |
+
+### Deuda y riesgos honestos (sin maquillar)
+
+1. **Backfill NO hecho, y no se hizo a proposito: 216 de las 221 filas de `destinos` tienen `zona` a `NULL`.** Escribir la zona de las 221 filas es una migracion de datos de masa (gate de `@data-migration`) y no se autorizo. El filtro por zona, mientras tanto, **solo alcanza a los destinos nuevos**.
+2. **Nombres del `<select>` viejo que NO estan en el catalogo DANE:** `BAHIA SOLANO`, `NUQUI`, `TAYRONA` y `PALOMINO` **desaparecen del combobox**. Solo entran por el camino **"No aparece mi ciudad"** o por el `<select>` de respaldo. **Ademas hay renombres:** `CALI` aparece como `SANTIAGO DE CALI` y `MOMPOX` como `SANTA CRUZ DE MOMPOX` -- **lo que se busca "Cali" hay que seguir escribiendolo completo.**
+3. **Envio sin whatsapp, sin email y sin sesion deja al autor sin via de contacto.** Hoy **se acepta**, con aviso inline al usuario. Se deja constancia de que un **backstop** (exigir email en ese caso) **requeriria gate**: es una regla de validacion nueva en el endpoint, no un ajuste de copy.
+4. **Los ~103 `scripts/load-*-api.js` y `scripts/upload-eventos.js` siguen sin enviar `zona`.** El backend ya la re-deriva, pero mientras esos scripts no la manden, sus destinos nacen con `zona` a `NULL` igual que el backfill.
+5. **La verificacion en vivo en navegador NO se ha hecho.** Todo lo anterior es estatico/local. El recorrido real -- buscar municipio, ver la zona autocompletarse, arrastrar el pin, enviar por los dos caminos y comprobar que el borrador sale con la zona correcta -- **esta sin ejecutar**.
+
+### Archivos tocados
+
+Codigo (working tree, **SIN commit; NO desplegado**): `api/publicar-lugar.js` (+186) + `publicar.html` (+827) + `package.json` (2 scripts + enganche a `npm test`) + **NUEVOS** `scripts/generar-geo-ciudades.js`, `scripts/smoke_zona_paridad.js`, `geo-ciudades.js`. `api/` **8/8 INTACTO**, cero endpoint nuevo, cero migracion nueva. Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md` (cierre de la deuda de `publicar-lugar.js` + 2 pendientes nuevos), `BUGS_HISTORICOS.md` (**BUG-125**, los 3 fallos de la tanda). **`DECISIONS.md` NO se toco** (ADR-097 ya existia de esta misma tanda); **`PROJECT.md` NO se toco**: el alcance del proyecto no cambia.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

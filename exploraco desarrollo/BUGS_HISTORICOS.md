@@ -2142,3 +2142,36 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 4. **El widget nunca pinta el promedio de la comunidad, solo la nota propia** (`media-actions.js:333-345`). **Decisión de producto, no defecto** (ADR-089).
 
 **LECCIÓN (patrón nuevo, gemela de BUG-098):** **un `opacity` en el grupo y otro en el hijo se multiplican, y el color heredado del contenedor multiplica otra vez.** El alfa efectivo de un glifo **no es el número que está en su regla**: es el producto de todas las dimensiones de alfa que le llegan. Con tres multiplicadores, un valor "razonable" (.2) se convierte en invisible (.124) sin que ningún número del CSS parezca anómalo. **Corolario de verificación:** todo smoke de contraste debe resolver la cascada real (herencia + multiplicación + desempate por línea), no leer el `opacity` de la regla; y **debe haber visto su propio bug en rojo alguna vez** -- aquí se demostró reinyectando el original. **Y el aviso previo era exacto:** un red de seguridad estática documenta que no renderiza, y el defecto que se coló por ahí estaba **anunciado por escrito**.
+
+## BUG-125: tres fallos de la geografia derivada `ciudad -> departamento -> zona` durante TSK-212 / ADR-097 -- **CORREGIDOS**
+
+**Severidad: MEDIA.** **Estado: los 3 CORREGIDOS y verificados** en el working tree de TSK-212 (sin commit, sin desplegar). Ninguno rompio produccion: los tres se detectaron **durante** la construccion de la cadena geografica, antes de que existiera el `INSERT` con `zona`. Se registran juntos porque comparten causa de fondo: **la geografia se estaba decidiendo en mas de un sitio y nadie lo contrastaba**.
+
+### (a) El backend mapeaba `cesar` y `sucre` a `caribe`; el generador emitia `andina` -- **DOS FUENTES DE VERDAD DIVERGENTES**
+
+**Causa raiz:** `ZONA_POR_DEPARTAMENTO` existia **duplicada a mano** en dos ficheros (el generador y la copia del backend, que lo declara en su propio comentario: *"COPIA (SINCRONIZADA A MANO)"*). Cada copia se corrigio por separado y **divergieron**: Cesar y Sucre caian en **`caribe`** en una y en **`andina`** en la otra. Ningun gate lo detectaba, porque no habia **ningun** smoke que las comparase.
+
+**Por que es la peor forma de divergencia:** el generador produce el artefacto que ve el cliente y el backend persiste lo que re-deriva; si divergen, **la zona que se muestra en pantalla y la que se guarda son distintas**, y el usuario no ve ningun error -- solo un filtro que no filtra.
+
+**CORREGIDO:** la fuente de verdad es **`zonas_geograficas` + la constante `ZONA_POR_DEPARTAMENTO` del generador**, y **ambos dan `andina`** para `cesar` y `sucre`. La divergencia ya no es corregible en silencio: **`scripts/smoke_zona_paridad.js`** compara las dos copias y ademas valida el mapeo `andes/amazonia -> andina/amazonica` contra las migraciones 027 y 028, contra el seed y contra el artefacto (**46 checks**, ultimo de la cadena de `npm test`). **El gate esta demostrado que MUERE:** con 4 rupturas inyectadas en una copia temporal sale con **exit 1 nombrando la entrada divergente**.
+
+**Como evitar que vuelva:** **no editar la copia del backend a mano.** El unico contrato valido es "el generador manda y el smoke lo comprueba". Si someday se decide que el backend deje de duplicar el mapa, este bug deja de ser posible por construccion (hoy esta mitigado, no eliminado).
+
+### (b) "San Andres" con comas y puntos no resolvia y caia a `NULL` -- el normalizador no quitaba puntuacion
+
+**Causa raiz:** el departamento se normalizaba para compararlo contra las claves del mapa, pero la normalizacion **no eliminaba la puntuacion**. El nombre oficial del departamento es **"Archipelago de San Andres, Providencia y Santa Catalina"**, con **comas y punto final**; la clave del mapa no los tiene, luego la busqueda fallaba, la zona **no se derivaba** y el resultado caia a **`NULL`**. Un `NULL` es un fallo **silencioso por construccion**: la zona es nullable por diseno (la 028 no la exige), asi que un departamento mal escrito y uno que no existe **se ven igual**.
+
+**Por que solo lo pillo el smoke:** ningun caso de prueba usaba un departamento con puntuacion. Los 33 del catalogo son "limpios" salvo este.
+
+**CORREGIDO:** el normalizador quita la puntuacion antes de comparar. **Regla que deja el bug:** *un normalizador de nombres geograficos debe tratar mayusculas, acentos, puntuacion y espacios multiples como la misma cosa; y un `NULL` derivado no debe confundirse con un `NULL` ausente.* El smoke cubre el caso para que no vuelva.
+
+### (c) El cliente NO sincronizaba la zona al editar el departamento a mano; el backend SI re-derivaba -- **zona en pantalla distinta de la guardada**
+
+**Causa raiz, y es la mas peligrosa de las tres:** el **backend re-deriva** la zona desde el departamento cuando el cliente no la manda o manda una inventada (es exactamente lo que garantiza ADR-097: *"el backend nunca persiste lo que le mando el cliente"*). Pero el **cliente solo autocompletaba la zona al elegir la ciudad del combobox**: si el usuario **cambiaba el departamento a mano**, el `#zona` de la pantalla **se quedaba con el valor viejo** y **se enviaba**. El backend la re-derivaba correctamente y **la guardaba bien**, luego la fila en Neon era correcta y **la pantalla mentia**.
+
+**Por que no lo detectaba nada:** la base de datos **estaba bien**. Solo la divergencia entre lo que el usuario ve y lo que se guarda la hace invisible a cualquier verificacion de backend, y por eso el error de (a) -- que si tocaba la base -- habria sido mas facil de ver que este.
+
+**CORREGIDO:** el cliente re-sincroniza la zona tambien cuando el departamento cambia a mano. **El detalle que importa:** la zona es **derivada, no editable**; por eso `#zona` es de **solo lectura** y la correccion va por **`#zona-select`** aparte. Un campo derivado que se puede escribir a mano es la causa raiz de la clase.
+
+**LECCION (las 3 juntas):** **la geografia no puede decidirse en dos sitios sin un gate que los compare.** Un mapa duplicado a mano (a), un normalizador que no cubre la forma real de un nombre (b) y un campo derivado editable por el cliente (c) son **tres caras del mismo error de fondo: asumir que una sola regla basta, en lugar de medir que las tres copias dicen lo mismo.** La red que faltaba no era mas codigo, era **un smoke que muere**: `scripts/smoke_zona_paridad.js` es exactamente la asercion que hacia falta, y esta en `npm test` para que la divergencia se vea antes de llegar a produccion.
+
