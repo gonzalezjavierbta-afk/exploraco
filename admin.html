@@ -523,6 +523,10 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="snav-item" onclick="showScreen('marcas')" id="snav-marcas">
     <span class="snav-icon">&#127991;</span>Marcas y Spots
   </div>
+  <!-- Hero del index: 6 slots fijos de foto (home_hero_fotos via /api/utilidades?tipo=hero_home) -->
+  <div class="snav-item" onclick="showScreen('hero')" id="snav-hero">
+    <span class="snav-icon">&#128247;</span>Hero del index
+  </div>
 </nav>
 
 <!-- ─── WORKSPACE ───────────────────────────────── -->
@@ -2400,6 +2404,149 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   </div>
 </div>
 
+<!-- ==== HERO DEL INDEX: 6 slots fijos de foto (api/utilidades?tipo=hero_home) ==== -->
+<div class="ws-screen" id="screen-hero">
+  <style>
+      #screen-hero .hero-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+      @media(max-width:1100px){#screen-hero .hero-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+      @media(max-width:760px){#screen-hero .hero-grid{grid-template-columns:1fr}}
+      #screen-hero .hero-slot{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+      #screen-hero .hero-slot-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+      #screen-hero .hero-slot-prev{height:96px;border-radius:8px;background:var(--bg2);overflow:hidden;display:flex;align-items:center;justify-content:center}
+      #screen-hero .hero-slot-prev img{width:100%;height:100%;object-fit:cover;display:none}
+  </style>
+  <div class="ws-header">
+    <div>
+      <div class="ws-title">HERO DEL INDEX</div>
+      <div class="ws-subtitle">6 slots fijos de foto para el hero de la home: URL o subida, leyenda y activacion por slot</div>
+    </div>
+    <div class="ws-actions">
+      <button class="btn btn-ghost btn-sm" onclick="cargarHeroHome()" id="hero-btn-recargar">&#8635; Recargar</button>
+      <button class="btn btn-gold btn-sm" onclick="guardarHeroHome()" id="hero-btn-guardar">Guardar 6 slots</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
+    <div class="form-hint" id="hero-precedencia">Precedencia del hero: si hay fotos activas aqui manda este modulo; si no hay ninguna activa, el hero usa las fotos de comunidad mas votadas; si tampoco hay, las de destinos destacados.</div>
+    <div class="form-hint" id="hero-aviso-estado" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 14px"></div>
+    <div class="hero-grid" id="hero-slots">
+      <div class="hero-slot" id="hero-slot-1">
+        <div class="hero-slot-head">
+          <div class="form-label">Slot 1</div>
+          <label class="form-hint" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="f-hero-act-1"> Activa
+          </label>
+        </div>
+        <div class="hero-slot-prev" id="f-hero-prev-1">
+          <img id="f-hero-img-1" alt="Slot 1" style="display:none" onerror="this.style.display='none'">
+        </div>
+        <input class="form-input" type="url" id="f-hero-url-1" placeholder="https://... o /ruta.jpg" oninput="heroPrevisualizarSlot(1)">
+        <div>
+          <div class="form-label" style="margin-bottom:4px">Leyenda</div>
+          <input class="form-input" id="f-hero-cap-1" maxlength="300" placeholder="Leyenda de la foto (opcional)">
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="heroSubirSlot(1)">Subir</button>
+        </div>
+      </div>
+      <div class="hero-slot" id="hero-slot-2">
+        <div class="hero-slot-head">
+          <div class="form-label">Slot 2</div>
+          <label class="form-hint" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="f-hero-act-2"> Activa
+          </label>
+        </div>
+        <div class="hero-slot-prev" id="f-hero-prev-2">
+          <img id="f-hero-img-2" alt="Slot 2" style="display:none" onerror="this.style.display='none'">
+        </div>
+        <input class="form-input" type="url" id="f-hero-url-2" placeholder="https://... o /ruta.jpg" oninput="heroPrevisualizarSlot(2)">
+        <div>
+          <div class="form-label" style="margin-bottom:4px">Leyenda</div>
+          <input class="form-input" id="f-hero-cap-2" maxlength="300" placeholder="Leyenda de la foto (opcional)">
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="heroSubirSlot(2)">Subir</button>
+        </div>
+      </div>
+      <div class="hero-slot" id="hero-slot-3">
+        <div class="hero-slot-head">
+          <div class="form-label">Slot 3</div>
+          <label class="form-hint" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="f-hero-act-3"> Activa
+          </label>
+        </div>
+        <div class="hero-slot-prev" id="f-hero-prev-3">
+          <img id="f-hero-img-3" alt="Slot 3" style="display:none" onerror="this.style.display='none'">
+        </div>
+        <input class="form-input" type="url" id="f-hero-url-3" placeholder="https://... o /ruta.jpg" oninput="heroPrevisualizarSlot(3)">
+        <div>
+          <div class="form-label" style="margin-bottom:4px">Leyenda</div>
+          <input class="form-input" id="f-hero-cap-3" maxlength="300" placeholder="Leyenda de la foto (opcional)">
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="heroSubirSlot(3)">Subir</button>
+        </div>
+      </div>
+      <div class="hero-slot" id="hero-slot-4">
+        <div class="hero-slot-head">
+          <div class="form-label">Slot 4</div>
+          <label class="form-hint" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="f-hero-act-4"> Activa
+          </label>
+        </div>
+        <div class="hero-slot-prev" id="f-hero-prev-4">
+          <img id="f-hero-img-4" alt="Slot 4" style="display:none" onerror="this.style.display='none'">
+        </div>
+        <input class="form-input" type="url" id="f-hero-url-4" placeholder="https://... o /ruta.jpg" oninput="heroPrevisualizarSlot(4)">
+        <div>
+          <div class="form-label" style="margin-bottom:4px">Leyenda</div>
+          <input class="form-input" id="f-hero-cap-4" maxlength="300" placeholder="Leyenda de la foto (opcional)">
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="heroSubirSlot(4)">Subir</button>
+        </div>
+      </div>
+      <div class="hero-slot" id="hero-slot-5">
+        <div class="hero-slot-head">
+          <div class="form-label">Slot 5</div>
+          <label class="form-hint" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="f-hero-act-5"> Activa
+          </label>
+        </div>
+        <div class="hero-slot-prev" id="f-hero-prev-5">
+          <img id="f-hero-img-5" alt="Slot 5" style="display:none" onerror="this.style.display='none'">
+        </div>
+        <input class="form-input" type="url" id="f-hero-url-5" placeholder="https://... o /ruta.jpg" oninput="heroPrevisualizarSlot(5)">
+        <div>
+          <div class="form-label" style="margin-bottom:4px">Leyenda</div>
+          <input class="form-input" id="f-hero-cap-5" maxlength="300" placeholder="Leyenda de la foto (opcional)">
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="heroSubirSlot(5)">Subir</button>
+        </div>
+      </div>
+      <div class="hero-slot" id="hero-slot-6">
+        <div class="hero-slot-head">
+          <div class="form-label">Slot 6</div>
+          <label class="form-hint" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="f-hero-act-6"> Activa
+          </label>
+        </div>
+        <div class="hero-slot-prev" id="f-hero-prev-6">
+          <img id="f-hero-img-6" alt="Slot 6" style="display:none" onerror="this.style.display='none'">
+        </div>
+        <input class="form-input" type="url" id="f-hero-url-6" placeholder="https://... o /ruta.jpg" oninput="heroPrevisualizarSlot(6)">
+        <div>
+          <div class="form-label" style="margin-bottom:4px">Leyenda</div>
+          <input class="form-input" id="f-hero-cap-6" maxlength="300" placeholder="Leyenda de la foto (opcional)">
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="heroSubirSlot(6)">Subir</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ==== MARCAS Y SPOTS (Gaming v6.1 / ADR-064) ==== -->
 <div class="ws-screen" id="screen-marcas">
   <div class="ws-header">
@@ -2714,6 +2861,7 @@ function showScreen(name) {
   if(name === 'cartas') loadCartas();
   if(name === 'gobernanza') cargarGobernanza();
   if(name === 'marcas') cargarMarcasSpots();
+  if(name === 'hero') cargarHeroHome();
   if(name === 'editor-nuevo') {
     currentId = null; newPlace(); showScreen_inner('editor');
     return;
@@ -9754,6 +9902,175 @@ function saludGamingCard(d) {
   }
   console.groupEnd();
 })();
+
+/* ===== HERO DEL INDEX: 6 slots fijos de foto (home_hero_fotos) =====
+   GET  /api/utilidades?tipo=hero_home             -> {ok,total,data:[{posicion,url,caption,activa}]} (sin auth)
+   POST /api/utilidades?tipo=hero_home {fotos:[]}  -> auth con _adminHeaders()
+   Degradacion (patron BUG-021): el GET puede responder 200 {ok:true,degradado:true}
+   cuando la tabla no existe -> se muestra aviso y se DESHABILITA el guardado;
+   el POST degrada a 503 SCHEMA_NOT_MIGRATED. Nunca se rompe la pantalla.
+   Prefijo "hero" en todas las funciones (Reglas de Oro v5 / BUG-006/018/019).
+   ADR-003: los 6 slots son nodos ESTATICOS del DOM; aqui se rellenan, jamas
+   se borran ni se vacia su contenedor. */
+var _heroHomeCache = [];
+var _heroHomeDegradado = false;
+
+function heroEstado(msg, esAviso) {
+  var el = document.getElementById('hero-aviso-estado');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.borderColor = esAviso ? 'var(--gold)' : 'var(--border)';
+  el.style.background = esAviso ? '#FFF4E5' : 'var(--bg2)';
+}
+
+function heroDeshabilitarGuardado(off) {
+  var btn = document.getElementById('hero-btn-guardar');
+  if (!btn) return;
+  btn.disabled = !!off;
+  btn.style.opacity = off ? '.5' : '1';
+  btn.style.cursor = off ? 'not-allowed' : 'pointer';
+}
+
+function heroPrevisualizarSlot(pos) {
+  var urlEl = document.getElementById('f-hero-url-' + pos);
+  var img = document.getElementById('f-hero-img-' + pos);
+  if (!img) return;
+  var url = urlEl ? String(urlEl.value || '').trim() : '';
+  if (!url) { img.style.display = 'none'; img.removeAttribute('src'); return; }
+  img.onerror = function () { this.style.display = 'none'; };
+  img.src = url;
+  img.style.display = 'block';
+}
+
+function heroPintarSlots(rows) {
+  var mapa = {};
+  var lista = Array.isArray(rows) ? rows : [];
+  for (var i = 0; i < lista.length; i++) {
+    var it = lista[i] || {};
+    if (it.posicion === undefined || it.posicion === null) continue;
+    mapa[String(it.posicion)] = it;
+  }
+  for (var p = 1; p <= 6; p++) {
+    var row = mapa[String(p)] || null;
+    var urlEl = document.getElementById('f-hero-url-' + p);
+    var capEl = document.getElementById('f-hero-cap-' + p);
+    var actEl = document.getElementById('f-hero-act-' + p);
+    if (urlEl) urlEl.value = (row && row.url) ? String(row.url) : '';
+    if (capEl) capEl.value = (row && row.caption) ? String(row.caption) : '';
+    if (actEl) actEl.checked = !!(row && row.activa === true);
+    heroPrevisualizarSlot(p);
+  }
+}
+
+function cargarHeroHome() {
+  if (!document.getElementById('hero-slots')) return;
+  _heroHomeDegradado = false;
+  heroEstado('Cargando slots del hero...', false);
+  fetch('/api/utilidades?tipo=hero_home', { method: 'GET' })
+    .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); })
+    .then(function (br) {
+      var d = br.body || {};
+      if (br.status >= 400 || !d.ok) {
+        heroEstado('No se pudo leer el hero (HTTP ' + br.status + (d.error ? ': ' + String(d.error) : '') + ').', true);
+        showAdminToast('Error al cargar el hero', 'error');
+        return;
+      }
+      if (d.degradado) {
+        _heroHomeDegradado = true;
+        heroDeshabilitarGuardado(true);
+        heroPintarSlots([]);
+        _heroHomeCache = [];
+        heroEstado('Modulo no disponible: falta la tabla home_hero_fotos en Neon (' + String(d.motivo || 'SCHEMA_NOT_MIGRATED') + '). El guardado esta deshabilitado hasta aplicar la migracion.', true);
+        return;
+      }
+      heroDeshabilitarGuardado(false);
+      _heroHomeCache = Array.isArray(d.data) ? d.data : [];
+      heroPintarSlots(_heroHomeCache);
+      heroEstado('Slots cargados: ' + _heroHomeCache.length + ' fila(s) en home_hero_fotos.', false);
+    })
+    .catch(function (err) {
+      heroEstado('Error de red al consultar el hero' + (err && err.message ? ': ' + String(err.message) : '') + '.', true);
+      showAdminToast('Error de red al cargar el hero', 'error');
+    });
+}
+
+function heroLeerSlots() {
+  var out = [];
+  for (var p = 1; p <= 6; p++) {
+    var urlEl = document.getElementById('f-hero-url-' + p);
+    var capEl = document.getElementById('f-hero-cap-' + p);
+    var actEl = document.getElementById('f-hero-act-' + p);
+    out.push({
+      posicion: p,
+      url: urlEl ? String(urlEl.value || '').trim() : '',
+      caption: capEl ? String(capEl.value || '').trim().slice(0, 300) : '',
+      activa: !!(actEl && actEl.checked === true)
+    });
+  }
+  return out;
+}
+
+function guardarHeroHome() {
+  if (_heroHomeDegradado) { showAdminToast('Modulo no disponible: guardado deshabilitado', 'error'); return; }
+  var fotos = heroLeerSlots();
+  var error = '';
+  for (var i = 0; i < fotos.length; i++) {
+    if (fotos[i].activa !== true) continue;
+    var u = fotos[i].url;
+    if (!u) { error = 'El slot ' + fotos[i].posicion + ' esta activo y no tiene URL'; break; }
+    if (!(u.indexOf('http://') === 0 || u.indexOf('https://') === 0 || u.charAt(0) === '/')) {
+      error = 'La URL del slot ' + fotos[i].posicion + ' debe empezar por http://, https:// o /';
+      break;
+    }
+  }
+  if (error) { showAdminToast(error, 'error'); return; }
+  var btn = document.getElementById('hero-btn-guardar');
+  if (btn) btn.disabled = true;
+  showAdminToast('Guardando hero...');
+  fetch('/api/utilidades?tipo=hero_home', {
+    method: 'POST',
+    headers: _adminHeaders(),
+    body: JSON.stringify({ fotos: fotos })
+  })
+    .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); })
+    .then(function (br) {
+      var d = br.body || {};
+      if (btn) btn.disabled = false;
+      if (br.status === 401 || br.status === 403) {
+        showAdminToast('Sesion admin no autorizada (' + br.status + '). Revisa admin_secret.', 'error');
+        return;
+      }
+      if (br.status === 503 && d.error === 'SCHEMA_NOT_MIGRATED') {
+        _heroHomeDegradado = true;
+        heroDeshabilitarGuardado(true);
+        heroEstado('No se pudo guardar: falta la tabla home_hero_fotos en Neon'
+          + (d.detalle ? ' (' + String(d.detalle) + ')' : '') + '. El guardado queda deshabilitado.', true);
+        showAdminToast('Esquema no migrado (503)', 'error');
+        return;
+      }
+      if (br.status === 400) {
+        showAdminToast('Validacion: ' + (d.error ? String(d.error) : 'datos invalidos'), 'error');
+        return;
+      }
+      if (br.status >= 400 || !d.ok) {
+        showAdminToast('Error al guardar' + (d.error ? ': ' + String(d.error) : ' (HTTP ' + br.status + ')'), 'error');
+        return;
+      }
+      _heroHomeCache = Array.isArray(d.data) ? d.data : [];
+      heroPintarSlots(_heroHomeCache);
+      heroEstado('Guardado. Filas del hero: ' + _heroHomeCache.length + '.', false);
+      showAdminToast('Hero guardado', 'success');
+    })
+    .catch(function (err) {
+      if (btn) btn.disabled = false;
+      showAdminToast('Error de red al guardar el hero' + (err && err.message ? ': ' + String(err.message) : ''), 'error');
+    });
+}
+
+function heroSubirSlot(pos) {
+  adminSubirImagen('f-hero-url-' + pos, function () { heroPrevisualizarSlot(pos); });
+}
 
 /* ---- SUBIDA DE IMAGENES (Vercel Blob, admin) ----
    adminSubirImagen(campoId, onDone): abre el picker, sube con la sesion

@@ -7,8 +7,9 @@
 // Contrato congelado (ya implementado, NO se redisenia aqui):
 //   cargar(cb) entrega SIEMPRE una sola vez un array de { url, nombre, votos }
 //   con maximo 6 items, sin URLs repetidas y solo imagenes.
-//   Precedencia: comunidad (votos > 0, votos DESC) -> destacados (rating DESC,
-//   nombre ASC, votos 0) -> [] (la home conserva su gradiente).
+//   Precedencia: modulo manual (slots activa === true, posicion ASC, votos 0,
+//   CORTO-CIRCUITA y no mezcla) -> comunidad (votos > 0, votos DESC) ->
+//   destacados (rating DESC, nombre ASC, votos 0) -> [] (gradiente).
 //
 // Cero red, cero base de datos: el conector se evalua en un sandbox vm con
 // fetch simulado, window/document/localStorage minimos y console silenciosa
@@ -89,16 +90,34 @@ function crearEntorno(op) {
   var temporizadores = [];
   var modo = op.fetch || 'ok';
   var datos = (op.datos === undefined) ? { ok: true, data: [] } : op.datos;
+  // TRAMO 1 (modulo manual). Por defecto responde degradado:true, es decir
+  // "no hay modulo", que es lo que hacian los casos A..H antes de existir.
+  var modulo = (op.heroModulo === undefined)
+    ? { ok: true, degradado: true, total: 0, data: [] }
+    : op.heroModulo;
 
-  function fetchStub(url, cfg) {
-    peticiones.push({ url: String(url), cfg: cfg || null });
-    if (modo === 'rechaza') return Promise.reject(new Error('red caida simulada'));
-    if (modo === 'lanza') throw new Error('fetch no disponible simulado');
+  function esModulo(url) {
+    return String(url).indexOf('tipo=hero_home') !== -1;
+  }
+
+  function respuesta(d) {
     return Promise.resolve({
       ok: true,
       status: 200,
-      json: function () { return Promise.resolve(datos); }
+      json: function () { return Promise.resolve(d); }
     });
+  }
+
+  function fetchStub(url, cfg) {
+    peticiones.push({ url: String(url), cfg: cfg || null, modulo: esModulo(url) });
+    if (esModulo(url)) {
+      if (op.fetchModulo === 'rechaza') return Promise.reject(new Error('red caida modulo simulada'));
+      if (op.fetchModulo === 'lanza') throw new Error('fetch modulo no disponible simulado');
+      return respuesta(modulo);
+    }
+    if (modo === 'rechaza') return Promise.reject(new Error('red caida simulada'));
+    if (modo === 'lanza') throw new Error('fetch no disponible simulado');
+    return respuesta(datos);
   }
 
   var sandbox = {
@@ -207,6 +226,25 @@ function urls(arr) {
   return out;
 }
 
+// Peticiones por tramo. El conector pide primero el modulo manual
+// (tipo=hero_home) y solo si este no aporta nada pide la comunidad.
+function peticionesDe(env, aguja) {
+  var out = [];
+  var i;
+  for (i = 0; i < env.peticiones.length; i++) {
+    if (env.peticiones[i].url.indexOf(aguja) !== -1) out.push(env.peticiones[i]);
+  }
+  return out;
+}
+
+function comunitarias(env) {
+  return peticionesDe(env, 'tipo=multimedia_mapa');
+}
+
+function modulares(env) {
+  return peticionesDe(env, 'tipo=hero_home');
+}
+
 function iguales(a, b) {
   if (a.length !== b.length) return false;
   var i;
@@ -309,8 +347,12 @@ correr('A primaria: maximo 6, votos DESC, sin video/audio ni duplicados', functi
     ok(crudo.indexOf('curada.jpg') === -1, 'fila fuente curada (respaldo) entro a la primaria: ' + crudo);
     ok(crudo.indexOf('com-a7') === -1, 'foto con votos 0 entro al hero: ' + crudo);
     ok(sinDuplicados(urls(arr)), 'URLs repetidas: ' + urls(arr).join(','));
-    ok(env.peticiones.length === 1, 'peticiones=' + env.peticiones.length + ' esperado=1');
-    var u = env.peticiones.length ? env.peticiones[0].url : '';
+    // Precedencia actual: 1) modulo manual (aqui degradado:true = sin modulo),
+    // 2) comunidad. Dos peticiones por ciclo; el resultado es el de antes.
+    ok(env.peticiones.length === 2, 'peticiones=' + env.peticiones.length + ' esperado=2 (modulo + comunidad)');
+    var com = comunitarias(env);
+    ok(com.length === 1, 'peticiones a multimedia_mapa=' + com.length + ' esperado=1');
+    var u = com.length ? com[0].url : '';
     ok(u.indexOf('tipo=multimedia_mapa') !== -1, 'endpoint inesperado: ' + u);
     ok(u.indexOf('tipo_media=foto') !== -1, 'falta tipo_media=foto: ' + u);
   });
@@ -401,7 +443,10 @@ correr('E error de red: callback una vez con [] y sin lanzar', function (ok) {
     ok(res.llamadas.length === 1, 'callback llamado ' + res.llamadas.length + ' veces, esperado 1');
     var arr = res.llamadas[0];
     ok(Array.isArray(arr) && arr.length === 0, 'contenido=' + JSON.stringify(arr));
-    ok(env.peticiones.length === 1, 'peticiones=' + env.peticiones.length + ' esperado=1');
+    // Con la precedencia nueva caen los DOS tramos (modulo y comunidad), pero
+    // el contrato es el mismo: un callback, [] y sin lanzar.
+    ok(env.peticiones.length === 2, 'peticiones=' + env.peticiones.length + ' esperado=2 (ambos tramos fallan)');
+    ok(env.peticiones[0].modulo === true, 'la primera peticion no fue el modulo: ' + env.peticiones[0].url);
   });
 });
 
@@ -415,13 +460,13 @@ correr('F anti-martilleo: dos llamadas, una peticion, mismo array', function (ok
   var env = crearEntorno({ datos: { ok: true, data: FILAS_F } });
   return llamar(env, 2).then(function (res) {
     ok(res.llamadas.length === 2, 'callbacks=' + res.llamadas.length + ' esperado=2');
-    ok(env.peticiones.length === 1, 'peticiones=' + env.peticiones.length + ' esperado=1 (cache en vuelo)');
+    ok(env.peticiones.length === 2, 'peticiones=' + env.peticiones.length + ' esperado=2 (modulo + comunidad, una sola vez)');
     var a = res.llamadas[0] || [];
     var b = res.llamadas[1] || [];
     ok(iguales(urls(a), urls(b)), 'arrays distintos: ' + urls(a).join(',') + ' vs ' + urls(b).join(','));
     ok(a.length === 2, 'items=' + a.length + ' esperado=2');
     return llamar(env, 1).then(function (tercero) {
-      ok(env.peticiones.length === 1, 'peticiones tras tercera llamada=' + env.peticiones.length + ' esperado=1 (cache)');
+      ok(env.peticiones.length === 2, 'peticiones tras tercera llamada=' + env.peticiones.length + ' esperado=2 (cache)');
       ok(iguales(urls(tercero.llamadas[0] || []), urls(a)), 'la tercera entrega difiere: ' + urls(tercero.llamadas[0] || []).join(','));
     });
   });
@@ -474,6 +519,190 @@ correr('H formato: url no vacia, nombre string, votos number', function (ok) {
     respaldo.fijarDestacados(DESTACADOS_C);
     return llamar(respaldo).then(function (res2) {
       revisarFormato(ok, 'respaldo', res2.llamadas[0]);
+    });
+  });
+});
+
+// ------------------------------------------------- MODULO MANUAL (tramo 1)
+// I) El modulo manda: 2 activas (una de CDN SIN extension) + 3 inactivas +
+//    comunidad disponible -> SOLO las 2 activas, orden por posicion, votos 0 y
+//    CORTO-CIRCUITO: no se pide comunidad (una unica peticion).
+var MODULO_I = {
+  ok: true,
+  total: 5,
+  data: [
+    { posicion: 3, url: 'https://cdn.test/mod-c.jpg', caption: 'Slot C', activa: true },
+    { posicion: 1, url: 'https://res.cloudinary.com/demo/image/upload/w_1200/hero-home', caption: 'Slot A', activa: true },
+    { posicion: 2, url: 'https://cdn.test/mod-x.jpg', caption: 'Slot X', activa: false },
+    { posicion: 4, url: 'https://cdn.test/mod-y.jpg', caption: '', activa: false },
+    { posicion: 5, url: '', caption: 'Sin url', activa: true }
+  ]
+};
+
+correr('I modulo: solo las activas, orden posicion, votos 0 y corto-circuito', function (ok) {
+  var env = crearEntorno({ datos: { ok: true, data: FILAS_A }, heroModulo: MODULO_I });
+  var antes = env.estado();
+  return llamar(env).then(function (res) {
+    ok(res.lanzo === null, 'cargar lanzo: ' + (res.lanzo && res.lanzo.message));
+    ok(res.llamadas.length === 1, 'callback llamado ' + res.llamadas.length + ' veces, esperado 1');
+    var arr = res.llamadas[0] || [];
+    var esperado = [
+      'https://res.cloudinary.com/demo/image/upload/w_1200/hero-home',
+      'https://cdn.test/mod-c.jpg'
+    ];
+    ok(arr.length === 2, 'items=' + arr.length + ' esperado=2 (solo las activas)');
+    ok(iguales(urls(arr), esperado), 'orden=' + urls(arr).join(' | ') + ' esperado=' + esperado.join(' | '));
+    ok(arr.length === 2 && arr[0].nombre === 'Slot A', 'nombre0=' + (arr.length ? JSON.stringify(arr[0].nombre) : 'n/a'));
+    ok(arr.length === 2 && arr[1].nombre === 'Slot C', 'nombre1=' + (arr.length > 1 ? JSON.stringify(arr[1].nombre) : 'n/a'));
+    var i;
+    for (i = 0; i < arr.length; i++) {
+      ok(arr[i].votos === 0, 'item ' + i + ' votos=' + arr[i].votos + ' esperado=0');
+    }
+    var crudo = urls(arr).join(' ');
+    ok(crudo.indexOf('mod-x') === -1 && crudo.indexOf('mod-y') === -1, 'slot inactivo entro al hero: ' + crudo);
+    ok(crudo.indexOf('com-a') === -1, 'foto de comunidad se mezclo con el modulo: ' + crudo);
+    ok(sinDuplicados(urls(arr)), 'URLs repetidas: ' + urls(arr).join(','));
+    revisarFormato(ok, 'modulo', arr);
+    // Corto-circuito medido: una sola peticion en todo el ciclo.
+    ok(env.peticiones.length === 1, 'peticiones=' + env.peticiones.length + ' esperado=1 (corto-circuito)');
+    ok(modulares(env).length === 1, 'peticiones tipo=hero_home=' + modulares(env).length + ' esperado=1');
+    ok(comunitarias(env).length === 0, 'se pidio comunidad con modulo activo: ' + comunitarias(env).length);
+    var despues = env.estado();
+    ok(despues.MEDIA_LISTO === antes.MEDIA_LISTO && despues.MEDIA_PIDIDA === antes.MEDIA_PIDIDA
+      && despues.MEDIA_TOKEN === antes.MEDIA_TOKEN, 'el modulo toco el estado MEDIA_*');
+  });
+});
+
+// J) 6 slots, uno apagado EN MEDIO y el payload desordenado -> 5 en orden de
+//    posicion, sin huecos y sin volver a comunidad.
+var MODULO_J = {
+  ok: true,
+  total: 6,
+  data: [
+    { posicion: 6, url: 'https://cdn.test/j6.jpg', caption: 'J6', activa: true },
+    { posicion: 2, url: 'https://cdn.test/j2.jpg', caption: 'J2', activa: true },
+    { posicion: 4, url: 'https://cdn.test/j4.jpg', caption: 'J4', activa: true },
+    { posicion: 3, url: 'https://cdn.test/j3-apagada.jpg', caption: 'J3', activa: false },
+    { posicion: 1, url: 'https://cdn.test/j1.jpg', caption: 'J1', activa: true },
+    { posicion: 5, url: 'https://cdn.test/j5.jpg', caption: 'J5', activa: true }
+  ]
+};
+
+correr('J modulo: hueco intermedio, 5 activas en orden de posicion', function (ok) {
+  var env = crearEntorno({ datos: { ok: true, data: FILAS_A }, heroModulo: MODULO_J });
+  return llamar(env).then(function (res) {
+    ok(res.llamadas.length === 1, 'callback llamado ' + res.llamadas.length + ' veces, esperado 1');
+    var arr = res.llamadas[0] || [];
+    var esperado = [
+      'https://cdn.test/j1.jpg',
+      'https://cdn.test/j2.jpg',
+      'https://cdn.test/j4.jpg',
+      'https://cdn.test/j5.jpg',
+      'https://cdn.test/j6.jpg'
+    ];
+    ok(arr.length === 5, 'items=' + arr.length + ' esperado=5');
+    ok(iguales(urls(arr), esperado), 'orden=' + urls(arr).join(' | ') + ' esperado=' + esperado.join(' | '));
+    ok(urls(arr).join(' ').indexOf('j3-apagada') === -1, 'slot apagado intermedio entro al hero');
+    ok(env.peticiones.length === 1, 'peticiones=' + env.peticiones.length + ' esperado=1');
+    ok(comunitarias(env).length === 0, 'se pidio comunidad teniendo 5 slots activos');
+    ok(sinDuplicados(urls(arr)), 'URLs repetidas: ' + urls(arr).join(','));
+  });
+});
+
+// K) Modulo con 0 activas -> cae a comunidad (mismo resultado que el caso A).
+var MODULO_K = {
+  ok: true,
+  total: 2,
+  data: [
+    { posicion: 1, url: 'https://cdn.test/k1.jpg', caption: 'K1', activa: false },
+    { posicion: 2, url: 'https://cdn.test/k2.jpg', caption: 'K2', activa: false }
+  ]
+};
+
+correr('K modulo vacio: 0 activas -> comunidad intacta', function (ok) {
+  var env = crearEntorno({ datos: { ok: true, data: FILAS_A }, heroModulo: MODULO_K });
+  return llamar(env).then(function (res) {
+    ok(res.llamadas.length === 1, 'callback llamado ' + res.llamadas.length + ' veces, esperado 1');
+    var arr = res.llamadas[0] || [];
+    ok(arr.length === HERO_MAX, 'items=' + arr.length + ' esperado=' + HERO_MAX);
+    ok(iguales(urls(arr), ESPERADO_A), 'orden=' + urls(arr).join(' | ') + ' esperado=' + ESPERADO_A.join(' | '));
+    ok(votosDescendentes(arr), 'votos no descendentes: ' + arr.map(function (x) { return x.votos; }).join(','));
+    ok(urls(arr).join(' ').indexOf('k1.jpg') === -1, 'slot apagado entro al hero como si fuera modulo');
+    ok(modulares(env).length === 1, 'peticiones al modulo=' + modulares(env).length + ' esperado=1');
+    ok(comunitarias(env).length === 1, 'peticiones a comunidad=' + comunitarias(env).length + ' esperado=1');
+  });
+});
+
+// L) Modulo degradado:true, error HTTP (ok:false) o red caida -> comunidad,
+//    sin lanzar y con UNA sola invocacion del callback por ciclo.
+correr('L modulo degradado o caido: comunidad, una sola invocacion', function (ok) {
+  var degradado = crearEntorno({
+    datos: { ok: true, data: FILAS_A },
+    heroModulo: { ok: true, degradado: true, total: 0, data: [] }
+  });
+  return llamar(degradado).then(function (res) {
+    ok(res.lanzo === null, 'degradado: lanzo ' + (res.lanzo && res.lanzo.message));
+    ok(res.llamadas.length === 1, 'degradado: callback ' + res.llamadas.length + ' veces, esperado 1');
+    ok(iguales(urls(res.llamadas[0] || []), ESPERADO_A), 'degradado: orden=' + urls(res.llamadas[0] || []).join(' | '));
+    ok(modulares(degradado).length === 1, 'degradado: peticiones al modulo=' + modulares(degradado).length);
+    ok(comunitarias(degradado).length === 1, 'degradado: peticiones a comunidad=' + comunitarias(degradado).length + ' esperado=1');
+    var conError = crearEntorno({
+      datos: { ok: true, data: FILAS_A },
+      heroModulo: { ok: false, error: 'hero_home no disponible' }
+    });
+    return llamar(conError).then(function (res2) {
+      ok(res2.llamadas.length === 1, 'ok:false -> callback ' + res2.llamadas.length + ' veces, esperado 1');
+      ok(iguales(urls(res2.llamadas[0] || []), ESPERADO_A), 'ok:false -> orden=' + urls(res2.llamadas[0] || []).join(' | '));
+      ok(comunitarias(conError).length === 1, 'ok:false -> peticiones a comunidad=' + comunitarias(conError).length);
+      var sinRed = crearEntorno({ datos: { ok: true, data: FILAS_A }, fetchModulo: 'rechaza' });
+      return llamar(sinRed).then(function (res3) {
+        ok(res3.lanzo === null, 'red caida: lanzo ' + (res3.lanzo && res3.lanzo.message));
+        ok(res3.llamadas.length === 1, 'red caida: callback ' + res3.llamadas.length + ' veces, esperado 1');
+        ok(iguales(urls(res3.llamadas[0] || []), ESPERADO_A), 'red caida -> orden=' + urls(res3.llamadas[0] || []).join(' | '));
+        ok(comunitarias(sinRed).length === 1, 'red caida -> peticiones a comunidad=' + comunitarias(sinRed).length);
+      });
+    });
+  });
+});
+
+// M) Formato del modulo: un slot .mp4 se descarta. Con un unico slot activo
+//    no utilizable, el tramo 1 da 0 y decide la comunidad.
+var MODULO_M = {
+  ok: true,
+  total: 2,
+  data: [
+    { posicion: 1, url: 'https://cdn.test/m-clip.mp4', caption: 'Video', activa: true },
+    { posicion: 2, url: 'https://cdn.test/m-apagada.jpg', caption: 'Apagada', activa: false }
+  ]
+};
+
+correr('M modulo: slot .mp4 descartado y, si queda 0, comunidad', function (ok) {
+  var env = crearEntorno({ datos: { ok: true, data: FILAS_A }, heroModulo: MODULO_M });
+  return llamar(env).then(function (res) {
+    ok(res.llamadas.length === 1, 'callback llamado ' + res.llamadas.length + ' veces, esperado 1');
+    var arr = res.llamadas[0] || [];
+    ok(urls(arr).join(' ').indexOf('.mp4') === -1, 'el .mp4 del modulo entro al hero: ' + urls(arr).join(','));
+    ok(iguales(urls(arr), ESPERADO_A), 'orden=' + urls(arr).join(' | ') + ' esperado= ' + ESPERADO_A.join(' | '));
+    ok(comunitarias(env).length === 1, 'peticiones a comunidad=' + comunitarias(env).length + ' esperado=1');
+    // Mismo slot .mp4 acompanado de una imagen valida: se queda SOLO la imagen
+    // y no hay peticion a comunidad (el tramo 1 aporta algo).
+    var mixto = crearEntorno({
+      datos: { ok: true, data: FILAS_A },
+      heroModulo: {
+        ok: true,
+        total: 2,
+        data: [
+          { posicion: 1, url: 'https://cdn.test/mixto.mp4', caption: 'Video', activa: true },
+          { posicion: 2, url: 'https://cdn.test/mixto-foto.jpg', caption: 'Foto', activa: true }
+        ]
+      }
+    });
+    return llamar(mixto).then(function (res2) {
+      var arr2 = res2.llamadas[0] || [];
+      ok(arr2.length === 1, 'mixto: items=' + arr2.length + ' esperado=1');
+      ok(urls(arr2)[0] === 'https://cdn.test/mixto-foto.jpg', 'mixto: url=' + urls(arr2)[0]);
+      ok(arr2.length === 1 && arr2[0].nombre === 'Foto', 'mixto: nombre=' + (arr2.length ? JSON.stringify(arr2[0].nombre) : 'n/a'));
+      ok(comunitarias(mixto).length === 0, 'mixto: se pidio comunidad teniendo una imagen valida');
     });
   });
 });

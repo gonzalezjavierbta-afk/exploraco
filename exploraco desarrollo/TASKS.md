@@ -5690,5 +5690,88 @@ IIFE nuevo **dentro** del `<script>` inline existente (**no** se anadio ningun `
 
 Codigo (working tree, **sin commit; NO desplegado**): `index.html` (IIFE del slideshow + cache-buster `?v=5`) e `index-api-connector.js` (contrato `ExploraCOHero`, +237 aditivas). Documentacion (este pase, unico): `TASKS.md` (esta seccion) y `NEXT.md` (relevo + pendientes). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**: feature de presentacion dentro de la home existente); `BUGS_HISTORICOS.md` **NO se toco** (**no hay bug nuevo**); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron**.
 
+## TSK-218 - Hero del index: modulo de 6 slots manuales (URL o subida) con activar/desactivar y precedencia modulo -> comunidad -> destacados
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)** -- 2026-10-24 (pase documental unico R2). **Sin ADR** (es configuracion de presentacion dentro de la home existente, encima de TSK-217) y **sin bug nuevo**. Alcance: **1 migracion nueva + 4 ficheros modificados + 1 smoke**.
+
+### Motivo
+
+El operador quiere poder cargar **6 fotos (URL o subida) para el hero de la home** y **activar/desactivar cada una**, para poder prescindir del sistema de votacion de comunidad. Antes de esta tanda el hero automatico era solo **comunidad votada -> destacados**, sin ningun control manual.
+
+### 1. Esquema (migracion 056, APLICADA en Neon)
+
+- `db/migrations/056_home_hero_fotos.sql` (**nueva**). Numero **056** por ser el siguiente libre en disco **y** en el ledger (la 055 era la ultima aplicada; la 052 esta en `db/migrations/documental/`, fuera del scan).
+- Tabla `home_hero_fotos`: `id bigserial` PK (fallback pactado: `destinos_fotos.id` es integer serial y `album_fotos.id` es uuid, **no coinciden**, asi que se eligio `bigserial`), `posicion` smallint UNIQUE con CHECK **1..6** (clave funcional: son **6 slots fijos**), `url` text default `''`, `caption` text default `''` (leyenda del hero), `activa` boolean default `false`, `actualizado_en` timestamptz default `NOW()`.
+- **Sin RLS y sin GRANT**: medido **antes** de escribir, `public` tiene **0 tablas** con `relrowsecurity = true` y ninguna migracion contiene `ENABLE ROW LEVEL SECURITY` / `CREATE POLICY` / `GRANT`. **No se inventaron politicas.**
+- Sin indice extra por `posicion`: el UNIQUE ya aporta el B-tree (evita indice redundante).
+- Seed idempotente de **6 filas** (posicion 1..6, url y caption vacios, `activa=false`) con `ON CONFLICT (posicion) DO NOTHING`.
+- Aplicada con `node scripts/apply_sql_file.js` (fail-closed): ledger `schema_migrations` fila **056** `aplicada`, sha `e6a3c70c7c23` **verificado igual al sha256 del disco**, 52/52 predecesores con fila. Reejecucion idempotente sin tocar checksum ni datos.
+- Estado verificado con SELECT de solo lectura: **6 filas**, posiciones 1..6, `activa=0` en las 6, `url` vacia en las 6.
+
+### 2. Backend `api/utilidades.js` (cabecera `v2` -> `v3`, +126/-1, aditivo)
+
+- Nueva rama `tipo === 'hero_home'`, copiando el patron de `tipo === 'fotos'`.
+- **GET publico (sin auth)**: `SELECT posicion, url, caption, activa FROM home_hero_fotos ORDER BY posicion` -> `{ ok, total, data }`.
+- **La home NUNCA recibe 500**: fallo de esquema (`42P01`/`42703`, reutiliza `esFalloEsquema()` de `lib/score.js`) o cualquier error de lectura degrada a **200** con `{ degradado: true, motivo: 'SCHEMA_NOT_MIGRATED' | 'READ_ERROR' }` y `data: []`.
+- **POST con auth**: reutiliza el helper **unico** `auth()` del fichero (el mismo de `tipo=fotos`), cero validacion de token duplicada. Valida `posicion` entero 1..6 **sin repetir**, exige `url` que empiece por `http://`, `https://` o `/` cuando `activa:true`, maximo **6** items; cualquier fallo -> **400** con el campo. Body sin `fotos` o vacio -> **400**.
+- Escritura: **upsert atomico en UNA sola sentencia** (`INSERT ... ON CONFLICT (posicion) DO UPDATE`), `DELETE` **cero** (ADR-003: los slots no enviados no se borran). Tabla ausente en POST -> **503** `SCHEMA_NOT_MIGRATED` (precedente `gamificacion_config` de `api/admin.js`).
+- Parametrizacion: placeholders `$n` **generados numericamente**, cero valores del cliente en el texto SQL. Sin backticks ni template literals. **`/api/` sigue en 8 ficheros**: cero endpoint nuevo.
+
+### 3. Panel `admin.html` (520 KB, +317 lineas, 0 borradas)
+
+- Item de sidebar `snav-hero` ("Hero del index") siguiendo el patron `.snav-item` existente.
+- Pantalla `#screen-hero`: **CSS scoped** bajo `#screen-hero` (rejilla 3/2/1 columnas, 7 reglas, **cero CSS global**), aviso de precedencia en una linea y **6 slots estaticos** con: numero de slot, `input type=url`, boton **Subir** que reutiliza `adminSubirImagen()`, preview con `onerror` (ADR-008), leyenda (`maxlength 300`) y **toggle activa**.
+- Hook en `showScreen()`: al abrir la pantalla hace el GET y pinta los 6 slots. Botones **Guardar** (POST con los **6** slots y `_adminHeaders()`) y **Recargar** (GET).
+- Con `degradado:true` la pantalla muestra aviso y **deshabilita el guardado** (no rompe, no hace POST).
+- **ADR-003 verificado**: en el bloque hero **no** hay `innerHTML=''`, `.remove()`, `removeChild`, `delete`, `outerHTML` ni `document.write`. Los 28 nodos de los slots sobreviven a guardar/recargar.
+
+### 4. Home `index-api-connector.js` (+89/-7, cambios funcionales solo en `cargarHero`)
+
+- **Precedencia nueva, en orden estricto**: (1) **MODULO**: slots con `activa === true` y `url` valida, ordenados por `posicion`, maximo 6; con **>=1 activa corto-circuita** (no pide comunidad); (2) **COMUNIDAD** (logica anterior intacta: `multimedia_mapa`, `votos > 0`, votos DESC, max 6); (3) **DESTACADOS** (respaldo anterior, rating DESC + nombre ASC); (4) `[]` -> la home conserva el gradiente.
+- Contrato publico **sin cambios**: `cb([{url, nombre, votos}])`, max 6, sin URLs repetidas, solo imagenes, **una sola invocacion**, nunca lanza. En el modulo `nombre` = `caption` del slot y `votos` = 0.
+- Mismo guard de formato que la comunidad (fuera `video`/`audio`; **CDN sin extension se conserva**).
+- Aislamiento intacto: estado propio `HERO_*`, cero escrituras en `MEDIA_*`/`MAPA_MEDIA`/`refreshMapaMarkers`. **Sin mezcla**: si el modulo aporta, no se completa con comunidad (decision del operador).
+
+### 5. Smoke `scripts/smoke_hero_home_connector.js`: de 8 a 13 casos (A-M)
+
+Nuevos: **I** modulo con 2 activas + 3 inactivas y comunidad disponible -> solo las 2 activas, en orden de `posicion`, `nombre`=caption, `votos` 0, **1 sola peticion** (corto-circuito medido); **J** 6 slots con uno inactivo en medio -> 5, sin huecos; **K** 0 activas -> cae a comunidad; **L** `degradado:true` o GET caido -> cae a comunidad, 1 callback; **M** slot activo `.mp4` -> se descarta. **Control negativo verificado**: forzando `heroDesdeModulo` a `[]` el smoke da **10/13 con exit 1** (fallan I y J). Los 8 casos previos se adaptaron **solo** en el conteo de peticiones (ahora el ciclo puede llevar modulo + comunidad); ninguna asercion de resultado, orden, umbral, formato, aislamiento o anti-martilleo se relajo.
+
+### 6. Verificacion medida (ADR-006, contra el archivo real)
+
+| Prueba | Resultado |
+|---|---|
+| `node --check` `api/utilidades.js`, `index-api-connector.js`, `scripts/smoke_hero_home_connector.js` | **PASS 3/3** |
+| JS inline de `admin.html` (1 bloque extraido a temporal, nunca sobre el `.html`) | **PASS** |
+| `express_check.js` `admin.html` | divs **1164/1164** (antes 1111: **+53** por la pantalla nueva, balanceada) |
+| `express_check.js` `index.html` (control) | divs **375/375**, sin regresion |
+| ASCII-safety (bytes > 127) | `api/utilidades.js` **0**, conector **0**, smoke **0**; `admin.html` **delta 0** (7.770 preexistentes) |
+| `<script` en `admin.html` | **6 = 6** respecto a `HEAD` |
+| `smoke_hero_home_connector.js` | **13/13** |
+| `smoke_hero_fallback.js` | **11/11** (motor de la ficha intacto) |
+| Contrato alineado en las **3** piezas | backend emite `posicion,url,caption,activa`; panel envia `posicion:number` y `activa:boolean`; conector consume `activa`/`caption`/`posicion`; `activa` viaja como booleano extremo a extremo |
+| Ledger de la 056 | fila `aplicada`, sha **e6a3c70c7c23** igual al sha256 del disco, 52/52 predecesores con fila |
+| Presupuesto serverless | `/api/` sigue en **8** ficheros |
+| Veredicto del gate | **certificado como desplegable** por `@qa-auditor` (**11/11** controles, ledger verificado contra el sha del disco) |
+
+### 7. Decisiones cerradas y limites conocidos (NO son bugs)
+
+- **Precedencia**: si hay **>=1 slot activo**, el hero usa **solo** el modulo. Con **0 activas** cae a comunidad, luego a destacados. **Sin mezcla** (no se completan huecos con comunidad).
+- **Orden fijo 1..6**: no hay UI de reordenar; para cambiar el orden se intercambian las URLs. Arrastrar/reordenar es ticket aparte.
+- **Leyenda opcional**: el backend no la exige; vacia deja solo el pin del CSS.
+- **El panel envia siempre los 6 slots**, asi que el upsert refresca `actualizado_en` tambien en los no editados.
+- **Limite conocido**: un slot puede guardarse con URL `.mp4` (el backend no mira la extension y responde 200); el conector la **descarta** en la entrega y el hero cae a comunidad. El panel no avisa de extension no-imagen. **No es un bug, es una validacion que no se implemento.**
+- **Cache**: `HERO_CACHE` es por carga de pagina; tras guardar en el panel hace falta **recargar la home** para verlo. No hay TTL ni invalidacion por version (fuera de alcance).
+
+### 8. Pendientes abiertos
+
+1. **Deploy** (`commit` + `push` + build de Vercel). Ojo: esta tanda incluye una **migracion ya aplicada en Neon (056)**, asi que la tabla existe en produccion aunque el codigo no este desplegado: el `GET hero_home` respondera con 6 slots vacios y el hero seguira en comunidad hasta el deploy.
+2. **Revision visual en navegador**: cargar 2-3 fotos reales en el panel, activarlas y comprobar que la home las rota y que el logo sigue legible.
+3. **`TSK-216`** (selector de hero por radio en el panel de fotos de un destino) sigue pendiente y **es otra cosa**: aqui es el hero de la **home**, no el de la **ficha**.
+4. **Opcional**: aviso en el panel si la URL del slot no parece imagen; y reordenar slots.
+
+### Archivos tocados
+
+Codigo (working tree, **sin commit; NO desplegado**): `db/migrations/056_home_hero_fotos.sql` (nueva, **ya aplicada en Neon**), `api/utilidades.js` (`v2` -> `v3`, +126/-1), `admin.html` (+317, 0 borradas), `index-api-connector.js` (+89/-7) y `scripts/smoke_hero_home_connector.js` (8 -> 13 casos). Documentacion (este pase, unico): `TASKS.md` (esta seccion) y `NEXT.md` (relevo + pendientes + riesgos). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**: el modulo es configuracion de presentacion); `BUGS_HISTORICOS.md` **NO se toco** (**no hay bug nuevo**); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron**.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

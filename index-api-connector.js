@@ -500,15 +500,21 @@
   // Contrato publico: window.ExploraCOHero.cargar(cb). cb recibe UN array de
   // { url, nombre, votos } (maximo 6, sin URLs repetidas, solo imagenes) y se
   // llama SIEMPRE una vez: exito, vacio o error. Nunca lanza.
-  // Precedencia decidida por el usuario:
-  //   1) COMUNIDAD (primaria): fotos de album de usuario con votos > 0,
-  //      globales (sin ciudad ni destino), votos DESC. Fuente: el endpoint
-  //      EXISTENTE GET /api/interacciones?tipo=multimedia_mapa&tipo_media=foto
-  //      (capa publica, mismo patron de authHeaders que cargarMapaMedia).
-  //   2) RESPALDO: foto hero de los destinos destacado === true que ya trae
+  // Precedencia decidida por el usuario (orden ESTRICTO, sin mezclar tramos):
+  //   1) MODULO MANUAL: slots activa === true del panel, en orden de posicion
+  //      ASC (maximo 6). Fuente: GET /api/utilidades?tipo=hero_home, PUBLICA
+  //      (sin auth), que devuelve {posicion, url, caption, activa}. Si aporta
+  //      1 o mas slots, se entregan SOLO esos y se CORTO-CIRCUITA (no se pide
+  //      comunidad ni se consulta el respaldo). degradado:true, total 0, error
+  //      HTTP o red => "sin modulo" y se sigue por el tramo 2. Nunca lanza.
+  //   2) COMUNIDAD: fotos de album de usuario con votos > 0, globales (sin
+  //      ciudad ni destino), votos DESC. Fuente: el endpoint EXISTENTE
+  //      GET /api/interacciones?tipo=multimedia_mapa&tipo_media=foto (capa
+  //      publica, mismo patron de authHeaders que cargarMapaMedia).
+  //   3) RESPALDO: foto hero de los destinos destacado === true que ya trae
   //      /api/destinos?limit=500 (la lista que alimenta las tarjetas).
   //      rating DESC y luego nombre ASC; votos = 0.
-  //   3) Si no hay ninguna: [] (la home conserva su gradiente).
+  //   4) Si no hay ninguna: [] (la home conserva su gradiente).
   // Estado PROPIO (HERO_*) y peticion PROPIA: cero efectos sobre MEDIA_*,
   // MAPA_MEDIA, los tokens anti-respuesta-obsoleta ni los markers del mapa.
   var HERO_MAX = 6;
@@ -519,6 +525,7 @@
   var HERO_ESPERA = null;     // callbacks pendientes de esa peticion
   var HERO_ULTIMO = 0;        // ms de la ultima respuesta VACIA (anti-martilleo)
   var HERO_DESTACADOS = [];   // respaldo: [{url, nombre, rating}]
+  var HERO_MODULO_QS = '/api/utilidades?tipo=hero_home'; // tramo 1, publico
 
   // Entrega defensiva: un callback roto del consumidor nunca rompe el conector.
   function heroEntregar(cb, arr) {
@@ -670,6 +677,50 @@
     HERO_DESTACADOS = out;
   }
 
+  // -- TRAMO 1: MODULO MANUAL (6 slots del panel, orden de posicion) --------
+  // posicion valida => numero; ausente o basura => al final (no rompe el orden
+  // de las que SI tienen posicion). El indice de llegada desempata.
+  function heroPosicion(v) {
+    var n = (v == null) ? NaN : Number(v);
+    return isFinite(n) ? n : 1e9;
+  }
+
+  // Slots utiles: activa === true, url no vacia e imagen (mismo guard que la
+  // comunidad: fuera video/audio por extension; las URLs de CDN sin extension
+  // se conservan). Orden: posicion ASC.
+  function heroSlotsModulo(d) {
+    if (!d || d.ok !== true || d.degradado === true) return [];
+    var filas = Array.isArray(d.data) ? d.data : [];
+    var pool = [];
+    for (var i = 0; i < filas.length; i++) {
+      var it = filas[i];
+      if (!it || typeof it !== 'object') continue;
+      if (it.activa !== true) continue;
+      var u = (it.url == null) ? '' : String(it.url).trim();
+      if (!u || !heroEsImagen(u)) continue;
+      pool.push({
+        url: u,
+        nombre: (it.caption == null) ? '' : String(it.caption).trim(),
+        pos: heroPosicion(it.posicion),
+        orden: i
+      });
+    }
+    pool.sort(function (a, b) {
+      if (a.pos !== b.pos) return a.pos - b.pos;
+      return a.orden - b.orden;
+    });
+    return pool;
+  }
+
+  // Entrega del tramo 1: { url, nombre, votos: 0 }, sin repetidas, maximo 6.
+  function heroDesdeModulo(d) {
+    var pool = heroSlotsModulo(d);
+    if (!pool.length) return [];
+    return heroUnicos(pool.map(function (p) {
+      return { url: p.url, nombre: p.nombre, votos: 0 };
+    }));
+  }
+
   // Primaria -> respaldo -> [] (en ese orden y solo si la anterior da 0).
   function heroComponer(primaria) {
     if (primaria && primaria.length) return primaria;
@@ -700,6 +751,12 @@
     }
     HERO_ESPERA = [cb];
     HERO_PIDIDA = true;
+    heroPedirModulo();
+  }
+
+  // TRAMO 2 (comunidad) + TRAMO 3 (destacados). Comportamiento intacto: es la
+  // peticion de siempre, con su authHeaders y su heroComponer.
+  function heroPedirComunidad() {
     // tipo_media=foto es un parametro EXISTENTE del mismo endpoint (filtra
     // af.foto_type); no abre ninguna ruta nueva ni toca api/.
     var url = '/api/interacciones?tipo=multimedia_mapa&tipo_media=foto&_t=' + Date.now();
@@ -722,6 +779,31 @@
     } catch (e) {
       console.warn('[index-api] hero: fetch no disponible', e && e.message);
       heroCerrar(heroComponer([]));
+    }
+  }
+
+  // TRAMO 1 en vuelo. Una sola peticion por ciclo: si el modulo aporta algo,
+  // heroCerrar corta aqui y NO se pide comunidad. Cualquier fallo degrada a
+  // comunidad sin lanzar y sin dejar el callback sin llamar.
+  function heroPedirModulo() {
+    try {
+      fetch(HERO_MODULO_QS + '&_t=' + Date.now())
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var lista = heroDesdeModulo(d);
+          if (lista.length) { heroCerrar(lista); return; }
+          if (!d || d.degradado === true || !(d && d.ok === true)) {
+            console.warn('[index-api] hero: modulo manual sin slots', (d && d.error) || 'degradado');
+          }
+          heroPedirComunidad();
+        })
+        .catch(function (e) {
+          console.warn('[index-api] hero: fallo modulo manual', e && e.message);
+          heroPedirComunidad();
+        });
+    } catch (e) {
+      console.warn('[index-api] hero: fetch no disponible (modulo)', e && e.message);
+      heroPedirComunidad();
     }
   }
 

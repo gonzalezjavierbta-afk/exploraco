@@ -1,8 +1,9 @@
-// api/utilidades.js  v2 - sitemap + visitas + diagnostico + fotos (Paso 17)
+// api/utilidades.js  v3 - sitemap + visitas + diagnostico + fotos + hero_home
 // ?tipo=sitemap     -> genera sitemap.xml dinamico (sin auth)
 // ?tipo=visitas     -> tracking visitas (POST sin auth, GET con auth)
 // ?tipo=diagnostico -> info sistema (auth)
 // ?tipo=fotos       -> CRUD galeria destinos_fotos (GET sin auth, resto con auth)
+// ?tipo=hero_home   -> slots del hero del index en home_hero_fotos (GET sin auth, POST con auth)
 // ?tipo=buscar      -> pagina SSR de resultados indexable (GET sin auth, TASK-008)
 // ?tipo=blob_upload -> emite tokens de Vercel Blob (client upload de medios)
 
@@ -418,6 +419,130 @@ module.exports = async function handler(req, res) {
       }
       return res.status(200).json({ ok:true, mensaje:'Foto eliminada' });
     }
+  }
+
+  // == HERO DEL INDEX (home_hero_fotos) ==============================
+  // Modulo "Hero del index" del panel. Tabla home_hero_fotos:
+  // posicion smallint 1..6 UNIQUE, url text, caption text, activa boolean,
+  // actualizado_en timestamptz.
+  // GET  ?tipo=hero_home -> lista los slots 1..6 (sin auth, como tipo=fotos)
+  // POST ?tipo=hero_home -> upsert por posicion (auth, helper auth() de arriba)
+  // ADR-003 (Cero Borrado Logico): NUNCA se borran filas; los slots que no
+  // vengan en el body se dejan como estan.
+  // Degradacion obligatoria: la tabla puede no existir todavia. El GET responde
+  // SIEMPRE 200 (data vacia + degradado:true) porque la home no debe caer en
+  // 500: el conector cae a comunidad y luego a destacados. El POST degrada a
+  // 503 SCHEMA_NOT_MIGRATED (precedente: gamificacion_config de api/admin.js).
+  if (tipo === 'hero_home') {
+
+    if (req.method === 'GET') {
+      try {
+        var heroRows = await sql(
+          'SELECT posicion, url, caption, activa '
+          + 'FROM home_hero_fotos ORDER BY posicion ASC'
+        );
+        return res.status(200).json({ ok:true, total:heroRows.length, data:heroRows });
+      } catch (eHeroGet) {
+        if (esFalloEsquema(eHeroGet)) {
+          return res.status(200).json({
+            ok:true, total:0, data:[], degradado:true, motivo:'SCHEMA_NOT_MIGRATED'
+          });
+        }
+        console.warn('[utilidades hero_home GET] error: '
+          + (eHeroGet && eHeroGet.code) + ' ' + (eHeroGet && eHeroGet.message));
+        return res.status(200).json({
+          ok:true, total:0, data:[], degradado:true, motivo:'READ_ERROR'
+        });
+      }
+    }
+
+    if (req.method === 'POST') {
+      if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+      var bHero = req.body || {};
+      var heroIn = Array.isArray(bHero.fotos) ? bHero.fotos : [];
+      if (!heroIn.length) {
+        return res.status(400).json({ ok:false, error:'fotos[] requerido y no puede venir vacio' });
+      }
+      if (heroIn.length > 6) {
+        return res.status(400).json({ ok:false, error:'fotos[] admite como maximo 6 slots' });
+      }
+      var heroVistos = {};
+      var heroLimpio = [];
+      for (var hIdx = 0; hIdx < heroIn.length; hIdx++) {
+        var hIt = heroIn[hIdx] || {};
+        var hPos = hIt.posicion;
+        if (typeof hPos !== 'number' || Math.floor(hPos) !== hPos || hPos < 1 || hPos > 6) {
+          return res.status(400).json({
+            ok:false, error:'posicion invalida en fotos[' + hIdx + ']: se espera entero 1..6'
+          });
+        }
+        if (heroVistos[hPos]) {
+          return res.status(400).json({ ok:false, error:'posicion repetida en fotos[]: ' + hPos });
+        }
+        heroVistos[hPos] = true;
+        var hUrl = (hIt.url === undefined || hIt.url === null) ? '' : String(hIt.url).trim();
+        var hCap = (hIt.caption === undefined || hIt.caption === null)
+          ? '' : String(hIt.caption).trim().slice(0, 300);
+        var hAct = hIt.activa === true;
+        if (hAct) {
+          if (!hUrl) {
+            return res.status(400).json({
+              ok:false, error:'url obligatoria en posicion ' + hPos + ' cuando activa=true'
+            });
+          }
+          if (!(hUrl.indexOf('http://') === 0 || hUrl.indexOf('https://') === 0
+              || hUrl.charAt(0) === '/')) {
+            return res.status(400).json({
+              ok:false, error:'url invalida en posicion ' + hPos
+                + ': debe empezar por http://, https:// o /'
+            });
+          }
+        }
+        heroLimpio.push({ posicion:hPos, url:hUrl, caption:hCap, activa:hAct });
+      }
+      try {
+        // Upsert por posicion en UNA sola sentencia (atomica). Solo se
+        // construyen placeholders ($n), nunca valores del cliente.
+        var heroPh = [];
+        var heroVals = [];
+        for (var hK = 0; hK < heroLimpio.length; hK++) {
+          var hRow = heroLimpio[hK];
+          var hBase = hK * 4;
+          heroPh.push('($' + (hBase + 1) + ',$' + (hBase + 2) + ',$' + (hBase + 3)
+            + ',$' + (hBase + 4) + ',NOW())');
+          heroVals.push(hRow.posicion, hRow.url, hRow.caption, hRow.activa);
+        }
+        await sql(
+          'INSERT INTO home_hero_fotos (posicion,url,caption,activa,actualizado_en) '
+          + 'VALUES ' + heroPh.join(',') + ' '
+          + 'ON CONFLICT (posicion) DO UPDATE SET '
+          + 'url=EXCLUDED.url, caption=EXCLUDED.caption, '
+          + 'activa=EXCLUDED.activa, actualizado_en=NOW()',
+          heroVals
+        );
+        var heroFinal = await sql(
+          'SELECT posicion, url, caption, activa '
+          + 'FROM home_hero_fotos ORDER BY posicion ASC'
+        );
+        return res.status(200).json({
+          ok:true, total:heroFinal.length, guardados:heroLimpio.length, data:heroFinal
+        });
+      } catch (eHeroPost) {
+        if (esFalloEsquema(eHeroPost)) {
+          return res.status(503).json({
+            ok:false, error:'SCHEMA_NOT_MIGRATED',
+            detalle:'Aplica la migracion de home_hero_fotos en Neon antes de guardar el hero.'
+          });
+        }
+        console.warn('[utilidades hero_home POST] error: '
+          + (eHeroPost && eHeroPost.code) + ' ' + (eHeroPost && eHeroPost.message));
+        return res.status(500).json({ ok:false, error:'Error interno' });
+      }
+    }
+
+    return res.status(405).json({
+      ok:false, error:'Metodo no soportado para hero_home (GET | POST)'
+    });
   }
 
   // == DIAGNOSTICO ==================================================
