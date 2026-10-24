@@ -5536,9 +5536,9 @@ Falta la **prueba end-to-end del dueno**: en `/publicar.html` **con sesion activ
 
 Codigo: `media-upload.js` (criterio de prefijo, reintento y mensajes), `publicar.html` (carga del nucleo de sesion + `modo:'publico'` en las dos subidas), `api/utilidades.js` (solo `?tipo=diagnostico`) y **NUEVO** `scripts/smoke_media_upload_prefijo.js` (**untracked** al escribir esta seccion; **versionado y encadenado** en el commit `f56373c`). Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md` (relevo + riesgos) y `BUGS_HISTORICOS.md` (**BUG-127**). `DECISIONS.md` lo redacto `@architect` **fuera de este pase** (**ADR-098**, ya presente en el archivo); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
 
-## TSK-215 - Hero Mosaico (1 principal + 3 miniaturas): cascada nueva de la foto principal y de las miniaturas (comunidad SOLO con `votos > 0`, relleno curado) + BUG-079b (el panel destruia `orden`/`es_hero` al abrir y guardar) + smoke `smoke_hero_fallback.js` - 2026-10-24 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
+## TSK-215 - Hero Mosaico (1 principal + 3 miniaturas): cascada nueva de la foto principal y de las miniaturas (comunidad SOLO con `votos > 0`, relleno curado) + BUG-079b (el panel destruia `orden`/`es_hero` al abrir y guardar) + smoke `smoke_hero_fallback.js` - 2026-10-24 - IMPLEMENTADO Y VERIFICADO LOCAL - COMMITEADA EN LOCAL (`dbcb056`), SIN DESPLEGAR
 
-**Estado: IMPLEMENTADO Y VERIFICADO LOCAL; SIN COMMIT Y SIN DESPLEGAR** (certificado como desplegable por el gate de `@qa-auditor`, falta `push` + build). Es un **ajuste dentro de la logica del Hero Mosaico que ya existia (ADR-034)**, no arquitectura nueva: **NO se crea ADR** (decision expresa del operador; ADR-084 D1). El detalle del defecto del panel vive **una sola vez** en `BUGS_HISTORICOS.md` **BUG-079b** y aqui solo se apunta. `api/` sigue con **8/8 ficheros**, **cero endpoint nuevo**, **cero migraciones**. Alcance real medido: **2 ficheros modificados (+163/-53) + 1 fichero nuevo**.
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL; COMMITEADA EN LOCAL EN `dbcb056` Y SIN DESPLEGAR** (certificado como desplegable por el gate de `@qa-auditor`; falta `push` + build). El commit `dbcb056` es el que reporta `git status` del 2026-10-24 para esta tanda (TSK-215 / BUG-079b). Es un **ajuste dentro de la logica del Hero Mosaico que ya existia (ADR-034)**, no arquitectura nueva: **NO se crea ADR** (decision expresa del operador; ADR-084 D1). El detalle del defecto del panel vive **una sola vez** en `BUGS_HISTORICOS.md` **BUG-079b** y aqui solo se apunta. `api/` sigue con **8/8 ficheros**, **cero endpoint nuevo**, **cero migraciones**. Alcance real medido: **2 ficheros modificados (+163/-53) + 1 fichero nuevo**.
 
 ### Que cambia el producto
 
@@ -5601,13 +5601,13 @@ El **guard de formato** del hero (`mediaTipoItem` / `mediaUrlNoEsVisual` / `medi
 ### Pendientes registrados (NO forman parte de esta tanda)
 
 1. ~~**`og:image` / `heroPropio`** sin el guard de formato~~: **CERRADO** en esta misma tanda (ver "Cierre SEO" arriba) con gate `@seo-dev`.
-2. **`scripts/smoke_hero_fallback.js`**: creado en esta tanda y **dejado en el indice de git** (`git add`, sin commit). El **commit y el push** los decide el operador.
+2. **`scripts/smoke_hero_fallback.js`**: creado en esta tanda y ya **versionado** en el commit **`dbcb056`** (`git status` del 2026-10-24). El **`push`** sigue siendo decision del operador.
 3. **Ticket de UI**: **TSK-216** (selector de hero por radio en el panel + orden visible alineado con `orden`).
-4. **Despliegue pendiente:** el cambio esta **certificado como desplegable** por `@qa-auditor` pero **no desplegado** (falta `commit` + `push` + build de Vercel).
+4. **Despliegue pendiente:** el cambio esta **certificado como desplegable** por `@qa-auditor` pero **no desplegado** (el `commit` ya existe en local, **`dbcb056`**; falta `push` + build de Vercel).
 
 ### Archivos tocados
 
-Codigo: `api/pagina-destino.js` (cascada del hero + `df.id`/`df.orden`/`df.es_hero` en los dos `SELECT` de curadas), `admin.html` (4 bloques del parche BUG-079b) y **NUEVO** `scripts/smoke_hero_fallback.js` (**untracked**). Documentacion (este pase, unico): `TASKS.md` (esta seccion), `BUGS_HISTORICOS.md` (**BUG-079b**) y `NEXT.md` (relevo + pendientes). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**: ajuste dentro de ADR-034); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
+Codigo: `api/pagina-destino.js` (cascada del hero + `df.id`/`df.orden`/`df.es_hero` en los dos `SELECT` de curadas), `admin.html` (4 bloques del parche BUG-079b) y **NUEVO** `scripts/smoke_hero_fallback.js` (versionado en `dbcb056`). Documentacion (este pase, unico): `TASKS.md` (esta seccion), `BUGS_HISTORICOS.md` (**BUG-079b**) y `NEXT.md` (relevo + pendientes). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**: ajuste dentro de ADR-034); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
 
 ## TSK-216 - Selector de hero por radio en el panel de fotos y orden visible alineado con `orden` (BUG-079b completo) - 2026-10-24 - PENDIENTE (sin prioridad asignada)
 
@@ -5628,6 +5628,67 @@ Tras **BUG-079b** el panel ya **conserva** `destinos_fotos.orden` y `es_hero` al
 ### Estado
 
 **Pendiente.** No forma parte de la tanda de TSK-215 (que cierra el fallback del hero y la persistencia de datos).
+
+## TSK-217 - Hero de la home con slideshow de fotos: opcion C como principal y opcion A como respaldo (contrato publico `window.ExploraCOHero`) - 2026-10-24 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL; SIN COMMIT Y SIN DESPLEGAR** (certificado como desplegable por el gate de `@qa-auditor`, **10/10** controles; falta `commit` + `push` + build). Es una **feature de presentacion dentro de la home existente**: **NO se crea ADR** (no hay decision de arquitectura nueva, ADR-084 D1) y **NO hay bug nuevo** (`BUGS_HISTORICOS.md` **no se toco**). `api/` sigue con **8/8 ficheros**, **cero endpoint nuevo**, **cero migraciones**. Alcance real medido: **2 ficheros** -- `index.html` (**1 linea borrada**: el cache-buster `?v=4`) + `index-api-connector.js` (**+237 lineas, 0 borrados**, puramente aditivo).
+
+### Diagnostico de partida
+
+El hero de la home **no tenia fotos**: `index.html` ~1082 traia un unico `.slide` con **gradiente estatico**; `#hdots` (~1118) y `#hcap` (~1119) estaban **vacios** y **ningun script los rellenaba**; el CSS del carrusel (`.slide`, `.slide.active`, Ken Burns `kb1..kb6`, ~207-217) seguia ahi como **CSS muerto**. El slideshow se habia **desconectado** al realinear la home a logo + buscador (**TSK-176**).
+
+### Precedencia de fotos (decidida por el operador)
+
+- **PRIMARIA = opcion C**: fotos de **comunidad mas votadas** del sitio (global), `votos > 0`, orden `votos DESC`, maximo **6**.
+- **RESPALDO = opcion A**: fotos **curadas** de destinos con `destacado === true` (las que el admin ya selecciona como "Foto hero principal"), orden `rating DESC` + **nombre ASC**.
+- **Sin material**: array vacio y la home **conserva el gradiente**.
+
+### `index-api-connector.js` (~499-729, +237 lineas aditivas)
+
+Nuevo contrato publico **`window.ExploraCOHero = { cargar: function (cb) }`** y hook de respaldo en `applyData` (~297-300). Peticion propia a un endpoint **YA existente**: `GET /api/interacciones?tipo=multimedia_mapa&tipo_media=foto`. Estado propio `HERO_*` (cache, flag de peticion en curso, **ventana anti-martilleo de 30 s**) y **cero escrituras** en `MEDIA_*`, `MAPA_MEDIA` o `refreshMapaMarkers` (aislamiento verificado). El callback se invoca **siempre una vez** y **nunca lanza**. Dedupe por **URL normalizada** y filtro de `video`/`audio`.
+
+**Campo de votos verificado, no supuesto:** el payload de `multimedia_mapa` SI emite `votos` (via `sqlEstadisticasItem`, `api/interacciones.js` ~5590, usado ~8246 y ~8265). Si no lo emitiera, la instruccion era **bloquear** en vez de ordenar por otra cosa y llamarlo "mas votadas".
+
+### `index.html` (~4771-4897)
+
+IIFE nuevo **dentro** del `<script>` inline existente (**no** se anadio ningun `<script>` nuevo). Sale **en silencio** si `ExploraCOHero.cargar` no existe; valida cada URL con `Image()` y **solo pinta las que responden** (**ADR-008 real**, no decorativo); crea `.slide` con `animationName` inline `kb1..kb6` (el div del gradiente original **sigue en el DOM** y solo pierde `active`: **ADR-003**); rellena `#hdots` con `button.hdot` + `aria-label` + `aria-current`, y `#hcap` con el nombre; rotacion **9000 ms**; **pausa** con `document.hidden`; con `prefers-reduced-motion: reduce` deja la **primera foto fija**. **Sin cambios** en CSS, `.hvig` (velo que mantiene legibles logo y buscador), `.hstrip`, buscador ni pastillas.
+
+**Cache-buster:** `index.html:4680` sube de `?v=4` a **`?v=5`** porque el conector cambio de API; sin eso los visitantes recurrentes se quedan con el JS viejo y el hero en gradiente. Esa es la **unica linea borrada** del alcance.
+
+### Verificacion medida (ADR-006, contra el archivo real)
+
+| Prueba | Resultado |
+|---|---|
+| `node --check index-api-connector.js` | **exit 0** |
+| JS inline de `index.html` extraido a temporales | **2/2 bloques PASS** (nunca `node --check` sobre el `.html`) |
+| `express_check.js index.html` | divs **375/375 PASS** |
+| `express_check.js admin.html` (control) | divs **1111/1111**, sin regresion ajena |
+| ASCII-safety (bytes > 127) | conector **0**; `index.html` **delta 0** (3.028 preexistentes sin cambio) |
+| `<script` | **13 antes y 13 despues**; bloques inline **2** |
+| Aislamiento | **cero** referencias a `MEDIA_LISTO`/`MEDIA_PIDIDA`/`MEDIA_TOKEN`/`MAPA_MEDIA`/`refreshMapaMarkers` en el bloque nuevo fuera de comentarios |
+| Contrato de punta a punta | define `window.ExploraCOHero` (~729) y se consume con **el mismo nombre y firma** (~4779-4780, ~4892); el `<script src>` (~4680) **no** lleva `defer/async`, luego evalua antes del inline |
+| Pruebas de ejecucion del conector | **16/16 PASS** (primaria votos DESC, respaldo rating/nombre, todo video/audio -> vacio, dedupe, red caida -> `[]` en 1 llamada, cache -> 1 sola peticion) |
+| Pruebas de ejecucion de la home | **5/5** (3 fotos -> 3 slides + 3 puntos + caption; `[]` -> 0 slides y gradiente activo; `onerror` descarta; clic en punto 3 cambia caption y `aria-current`; `hidden` detiene timers; `reduced-motion` sin rotacion) |
+| Presupuesto serverless | `/api/` sigue en **8 ficheros** |
+| Veredicto del gate | **certificado como desplegable** por `@qa-auditor` (**10/10** controles) |
+
+### Notas y decisiones menores
+
+- El **caption** del slideshow usa el `nombre` que entrega el conector, que en las filas de album es el **titulo del album** (es el unico texto que trae la fila); se acepta como rotulo. Si el operador quiere **destino/ciudad**, es un ticket aparte.
+- **Smoke NUEVO `scripts/smoke_hero_home_connector.js` (8/8 PASS, 21.049 B, 0 bytes > 127):** congela el contrato `ExploraCOHero` sin red ni BD (`vm` + `fetch` stub). Casos: **A** primaria (max 6, `votos DESC` con desempate `media_id ASC`, exclusion de `.mp4`/`.mp3`/`foto_type:video`/`media_type:audio`/`origen:destino_album`/`fuente:curada`, dedupe de URL y tope que descarta la 7a valida), **B** umbral `votos > 0`, **C** respaldo (`foto`/`foto_hero`, rating DESC + nombre ASC, `votos: 0`, ignora `destacado:false` y sin foto), **D** vacio `[]`, **E** red rechazada (1 callback, `[]`, sin lanzar), **F** anti-martilleo (2 llamadas = 1 peticion + cache en la 3a), **G** aislamiento (`MEDIA_LISTO`/`MEDIA_PIDIDA`/`MEDIA_TOKEN` y `MAPA_MEDIA` identicos antes/despues) y **H** formato de entrega. **Control negativo verificado**: mutando `heroOrdenComunidad` a devolver 0, el **caso A falla** (`votos no descendentes: 5,12,9,9,2,1`, exit 1). Inyecta una sonda de solo lectura (`__heroEstado`) y **aborta con exit 2** si cambia el cierre del IIFE, para no pasar en falso.
+- **Cobertura cruzada:** `scripts/smoke_hero_fallback.js` (**11/11**) cubre el motor de la ficha (`buildHTML`); `scripts/smoke_hero_home_connector.js` (**8/8**) cubre el contrato de la home. Son complementarios: ninguno sustituye al otro. Comando de cierre: `node scripts/smoke_hero_home_connector.js` (y el de la ficha) antes de desplegar `index-api-connector.js`.
+- **Deuda menor declarada:** `heroFijarDestacados` cachea los destacados con foto **sin filtrar formato**; el `.mp4`/audio se descarta al **entregar**, no al cachear. Sin efecto visible (el filtro de entrega es efectivo), pero si se quiere filtrar en origen es decision de arquitectura, no del smoke.
+
+### Pendientes registrados (NO forman parte de esta tanda)
+
+1. **Deploy** (`commit` + `push` + build de Vercel). Hasta entonces **produccion muestra el hero en gradiente**.
+2. **Revision visual en navegador real:** recorte / relacion de aspecto de las 6 fotos y legibilidad del logo sobre zonas claras (el velo `.hvig` existe, pero no se probo con material real).
+3. **`TSK-216`** (selector de hero por radio en el panel) sigue **pendiente** y es el **control fino del respaldo** de esta feature.
+4. **Opcional:** rotulo del slideshow por **destino/ciudad** en lugar de titulo de album.
+
+### Archivos tocados
+
+Codigo (working tree, **sin commit; NO desplegado**): `index.html` (IIFE del slideshow + cache-buster `?v=5`) e `index-api-connector.js` (contrato `ExploraCOHero`, +237 aditivas). Documentacion (este pase, unico): `TASKS.md` (esta seccion) y `NEXT.md` (relevo + pendientes). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**: feature de presentacion dentro de la home existente); `BUGS_HISTORICOS.md` **NO se toco** (**no hay bug nuevo**); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron**.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

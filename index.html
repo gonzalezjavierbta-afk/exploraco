@@ -4677,7 +4677,7 @@ function submitBlog() {
 <button id="btt-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba"
   style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:2px solid var(--gold);color:var(--gold);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.4)">↑</button>
 
-  <script src="index-api-connector.js?v=4"></script>
+  <script src="index-api-connector.js?v=5"></script>
   <script src="usuario-session.js"></script>
   <script src="album-comments.js?v=2"></script>
 <script>
@@ -4767,6 +4767,133 @@ function submitBlog() {
   if (window.ExploraCO && typeof window.ExploraCO === 'object') {
     window.ExploraCO.abrirBienvenida = abrirBienvenida;
   }
+})();
+
+/* hero-slides: puebla #slides/#hdots/#hcap con fotos de window.ExploraCOHero.
+   ADR-003: reutiliza los nodos existentes, no borra el gradiente base.
+   ADR-008: toda foto nueva se prueba antes de pintarse; si falla, se descarta. */
+(function () {
+  'use strict';
+  var ROT = 9000;
+  var MAX = 6;
+  var api = window.ExploraCOHero;
+  if (!api || typeof api.cargar !== 'function') return;
+
+  var cont = document.getElementById('slides');
+  var dots = document.getElementById('hdots');
+  var caps = document.getElementById('hcap');
+  if (!cont || !dots || !caps) return;
+
+  var base = cont.firstElementChild;
+  var fotos = [];
+  var idx = 0;
+  var timer = null;
+  var pintado = false;
+  var reducido = false;
+  try {
+    reducido = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch (e) { reducido = false; }
+
+  function okUrl(u) {
+    return typeof u === 'string' && u.length > 4 && !/^\s*(javascript|data):/i.test(u);
+  }
+
+  function parar() {
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  function arrancar() {
+    parar();
+    if (reducido || fotos.length < 2 || document.hidden) return;
+    timer = setInterval(function () { ir(idx + 1); }, ROT);
+  }
+
+  function vis() {
+    if (document.hidden) parar();
+    else arrancar();
+  }
+
+  function ir(n) {
+    if (!fotos.length) return;
+    idx = ((n % fotos.length) + fotos.length) % fotos.length;
+    var i;
+    for (i = 0; i < fotos.length; i++) {
+      var on = i === idx;
+      if (fotos[i].el) fotos[i].el.classList[on ? 'add' : 'remove']('active');
+      if (fotos[i].dot) {
+        fotos[i].dot.classList[on ? 'add' : 'remove']('on');
+        fotos[i].dot.setAttribute('aria-current', on ? 'true' : 'false');
+      }
+    }
+    caps.textContent = fotos[idx].nombre || '';
+    arrancar();
+  }
+
+  function pintar(lista) {
+    if (pintado || !lista.length) return;
+    pintado = true;
+    if (base) base.classList.remove('active');
+    var i;
+    for (i = 0; i < lista.length; i++) {
+      var f = lista[i];
+      var sl = document.createElement('div');
+      sl.className = 'slide';
+      sl.style.backgroundImage = 'url("' + String(f.url).replace(/"/g, '%22') + '")';
+      if (reducido) sl.style.animation = 'none';
+      else sl.style.animationName = 'kb' + ((i % MAX) + 1);
+      cont.appendChild(sl);
+      var bt = document.createElement('button');
+      bt.type = 'button';
+      bt.className = 'hdot';
+      bt.setAttribute('aria-label', f.nombre ? String(f.nombre) : ('Foto ' + (i + 1)));
+      bt.setAttribute('aria-current', 'false');
+      bt.addEventListener('click', function (k) {
+        return function () { ir(k); };
+      }(i));
+      dots.appendChild(bt);
+      fotos.push({ el: sl, dot: bt, nombre: f.nombre ? String(f.nombre) : '' });
+    }
+    document.addEventListener('visibilitychange', vis);
+    ir(0);
+  }
+
+  /* Prueba cada url con Image() y pinta solo las que responden. */
+  function precargar(lista) {
+    var slots = [];
+    var pend = 0;
+    var fin = false;
+
+    function cerrar() {
+      if (fin || pend > 0) return;
+      fin = true;
+      var ok = [];
+      var i;
+      for (i = 0; i < slots.length; i++) { if (slots[i]) ok.push(slots[i]); }
+      pintar(ok);
+    }
+
+    var i;
+    for (i = 0; i < lista.length && i < MAX; i++) {
+      var f = lista[i];
+      slots[i] = null;
+      if (!f || !okUrl(f.url)) continue;
+      pend++;
+      (function (k, item) {
+        var im = new Image();
+        im.onload = function () { slots[k] = item; pend--; cerrar(); };
+        im.onerror = function () { pend--; cerrar(); };
+        im.src = item.url;
+      })(i, f);
+    }
+    cerrar();
+  }
+
+  try {
+    api.cargar(function (lista) {
+      try { precargar(Array.isArray(lista) ? lista : []); }
+      catch (e) {}
+    });
+  } catch (e) {}
 })();
 </script>
 </body>

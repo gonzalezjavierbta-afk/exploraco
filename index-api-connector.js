@@ -294,6 +294,11 @@
     }
     if (typeof DEST_FEATURED_IDS !== 'undefined') replArr(DEST_FEATURED_IDS, featIds);
 
+    // 4b. HERO del home: respaldo del slideshow (window.ExploraCOHero) con la
+    //     foto hero de los destinos destacado === true. Solo en la carga
+    //     COMPLETA: una busqueda trae un subconjunto y no debe encogerlo.
+    if (!q) heroFijarDestacados(apiData);
+
     // 5. AGENDA_EVENTS[] -- SOLO eventos reales de la API (DB).
     //    Orden: mas recientes primero (creado_en DESC) para que los eventos
     //    recien cargados aparezcan arriba de la agenda del home.
@@ -490,6 +495,238 @@
 
   // Expuesto al index.html (inline): el IIFE oculta el resto del modulo.
   window.cargarAlbumOficialDestino = cargarAlbumOficialDestino;
+
+  // -- HERO DEL HOME: slideshow de fotos mas votadas ---------------------
+  // Contrato publico: window.ExploraCOHero.cargar(cb). cb recibe UN array de
+  // { url, nombre, votos } (maximo 6, sin URLs repetidas, solo imagenes) y se
+  // llama SIEMPRE una vez: exito, vacio o error. Nunca lanza.
+  // Precedencia decidida por el usuario:
+  //   1) COMUNIDAD (primaria): fotos de album de usuario con votos > 0,
+  //      globales (sin ciudad ni destino), votos DESC. Fuente: el endpoint
+  //      EXISTENTE GET /api/interacciones?tipo=multimedia_mapa&tipo_media=foto
+  //      (capa publica, mismo patron de authHeaders que cargarMapaMedia).
+  //   2) RESPALDO: foto hero de los destinos destacado === true que ya trae
+  //      /api/destinos?limit=500 (la lista que alimenta las tarjetas).
+  //      rating DESC y luego nombre ASC; votos = 0.
+  //   3) Si no hay ninguna: [] (la home conserva su gradiente).
+  // Estado PROPIO (HERO_*) y peticion PROPIA: cero efectos sobre MEDIA_*,
+  // MAPA_MEDIA, los tokens anti-respuesta-obsoleta ni los markers del mapa.
+  var HERO_MAX = 6;
+  var HERO_REINTENTO_MS = 30000;
+  var HERO_MEDIA_NO_IMG = /\.(mp4|webm|mov|m4v|avi|mp3|wav|m4a|ogg|oga|aac|flac)(\?|#|$)/i;
+  var HERO_CACHE = null;      // ultimo array NO vacio ya entregado
+  var HERO_PIDIDA = false;    // hay una peticion en vuelo
+  var HERO_ESPERA = null;     // callbacks pendientes de esa peticion
+  var HERO_ULTIMO = 0;        // ms de la ultima respuesta VACIA (anti-martilleo)
+  var HERO_DESTACADOS = [];   // respaldo: [{url, nombre, rating}]
+
+  // Entrega defensiva: un callback roto del consumidor nunca rompe el conector.
+  function heroEntregar(cb, arr) {
+    try { cb(Array.isArray(arr) ? arr : []); }
+    catch (e) { console.warn('[index-api] hero cb:', e && e.message); }
+  }
+
+  // Solo imagenes: fuera los data: que no sean imagen y las extensiones
+  // evidentes de video/audio (la lista pedida, ampliada con equivalentes).
+  function heroEsImagen(url) {
+    var u = (url == null) ? '' : String(url).trim();
+    if (!u) return false;
+    if (u.indexOf('data:image/') === 0) return true;
+    if (u.indexOf('data:') === 0) return false;
+    return !HERO_MEDIA_NO_IMG.test(u);
+  }
+
+  // Tipo declarado del recurso: media_type/foto_type video|audio descarta.
+  function heroTipoNoImagen(m) {
+    var claves = [m.media_type, m.foto_type, m.tipo_media, m.media_kind];
+    for (var i = 0; i < claves.length; i++) {
+      var t = (claves[i] == null) ? '' : String(claves[i]).toLowerCase();
+      if (t === 'video' || t === 'audio') return true;
+    }
+    return false;
+  }
+
+  // Votos por item. El handler SI emite el campo: api/interacciones.js:8246
+  // (rama album_foto) y :8265 (rama curada) via sqlEstadisticasItem(...,'votos'),
+  // y las filas agregadas del pin lo fijan a 0 en :8337. Sin numero valido => 0.
+  function heroVotos(m) {
+    var n = parseInt(m && m.votos, 10);
+    if (!isFinite(n) || n < 0) n = 0;
+    return n;
+  }
+
+  // Etiqueta visible. En las filas de destino album_titulo ES el nombre del
+  // destino; en las de comunidad es el titulo del album (el unico texto que
+  // esa fila trae). Sin texto => cadena vacia, como pide el contrato.
+  function heroNombre(m) {
+    var n = (m && (m.album_titulo || m.media_title)) || '';
+    return String(n).replace(/\s+/g, ' ').trim();
+  }
+
+  // Fila util de la PRIMARIA: foto de album de usuario, imagen y >= 1 voto.
+  // Fuera las filas AGREGADAS del pin (destino_album / album_grupo) y la rama
+  // curada de destinos_fotos, que es la fuente del RESPALDO.
+  function heroFilaComunidad(m) {
+    if (!m || typeof m !== 'object') return false;
+    if (!heroEsImagen(m.media_url)) return false;
+    if (heroTipoNoImagen(m)) return false;
+    var origen = String(m.origen || '').toLowerCase();
+    if (origen === 'destino_album' || origen === 'album_grupo') return false;
+    var fuente = (m.fuente == null) ? '' : String(m.fuente).toLowerCase();
+    if (fuente !== 'album_foto') return false;
+    return heroVotos(m) > 0;
+  }
+
+  // Orden de la primaria: votos DESC. Desempate: creado_en DESC si el payload
+  // lo trae (esta rama NO lo selecciona), luego rating_promedio DESC (si viene
+  // de media_estadisticas) y media_id ASC, para que el resultado sea estable.
+  function heroOrdenComunidad(a, b) {
+    var va = heroVotos(a), vb = heroVotos(b);
+    if (va !== vb) return vb - va;
+    var ca = (a.creado_en == null) ? '' : String(a.creado_en);
+    var cb = (b.creado_en == null) ? '' : String(b.creado_en);
+    if (ca !== cb) return (ca < cb) ? 1 : -1;
+    var ra = Number(a.rating_promedio), rb = Number(b.rating_promedio);
+    if (isFinite(ra) && isFinite(rb) && ra !== rb) return rb - ra;
+    var ia = (a.media_id == null) ? '' : String(a.media_id);
+    var ib = (b.media_id == null) ? '' : String(b.media_id);
+    return (ia < ib) ? -1 : (ia > ib ? 1 : 0);
+  }
+
+  // Sin URLs repetidas (clave normalizada) y tope duro de elementos.
+  function heroUnicos(lista, tope) {
+    var vistos = {}, out = [];
+    var max = tope || HERO_MAX;
+    (lista || []).forEach(function (it) {
+      if (!it || !it.url) return;
+      var clave = String(it.url).trim().toLowerCase();
+      if (!clave || vistos[clave]) return;
+      vistos[clave] = true;
+      out.push(it);
+    });
+    return out.slice(0, max);
+  }
+
+  // PRIMARIA: ordena y filtra las filas de multimedia_mapa.
+  function heroDesdeComunidad(filas) {
+    var pool = [];
+    (filas || []).forEach(function (m) {
+      if (!heroFilaComunidad(m)) return;
+      pool.push({ fila: m, url: String(m.media_url).trim() });
+    });
+    pool.sort(function (a, b) { return heroOrdenComunidad(a.fila, b.fila); });
+    return heroUnicos(pool.map(function (p) {
+      return { url: p.url, nombre: heroNombre(p.fila), votos: heroVotos(p.fila) };
+    }));
+  }
+
+  // RESPALDO: destacados con foto hero, rating DESC y nombre ASC, votos = 0.
+  function heroDesdeDestacados(filas) {
+    var pool = [];
+    (filas || []).forEach(function (it) {
+      if (!it || !heroEsImagen(it.url)) return;
+      pool.push({
+        url: String(it.url).trim(),
+        nombre: String(it.nombre || '').replace(/\s+/g, ' ').trim(),
+        rating: Number(it.rating) || 0
+      });
+    });
+    pool.sort(function (a, b) {
+      if (a.rating !== b.rating) return b.rating - a.rating;
+      return (a.nombre < b.nombre) ? -1 : (a.nombre > b.nombre ? 1 : 0);
+    });
+    return heroUnicos(pool.map(function (p) {
+      return { url: p.url, nombre: p.nombre, votos: 0 };
+    }));
+  }
+
+  // Destacados disponibles AHORA: cache poblado por applyData (carga completa)
+  // o, si aun no llego, la lista PL que ya alimenta las tarjetas.
+  function heroDestacadosActuales() {
+    if (HERO_DESTACADOS && HERO_DESTACADOS.length) return HERO_DESTACADOS.slice();
+    var out = [];
+    try {
+      if (typeof PL !== 'undefined' && PL && PL.length) {
+        PL.forEach(function (p) {
+          if (!p || p.destacado !== true) return;
+          var u = (p.photos && p.photos[0] && p.photos[0].url) ? p.photos[0].url : '';
+          out.push({ url: u, nombre: p.name || '', rating: Number(p.rating) || 0 });
+        });
+      }
+    } catch (e) { console.warn('[index-api] hero respaldo PL:', e && e.message); }
+    return out;
+  }
+
+  // Cache del respaldo. Se recompone en cada carga COMPLETA de destinos, asi
+  // el hero sigue lo que marque el admin sin una peticion extra.
+  function heroFijarDestacados(filas) {
+    var out = [];
+    (filas || []).forEach(function (it) {
+      if (!it || it.destacado !== true) return;
+      var u = it.foto_hero || it.foto || '';
+      if (!u) return;
+      out.push({ url: u, nombre: it.name || '', rating: Number(it.rating) || 0 });
+    });
+    HERO_DESTACADOS = out;
+  }
+
+  // Primaria -> respaldo -> [] (en ese orden y solo si la anterior da 0).
+  function heroComponer(primaria) {
+    if (primaria && primaria.length) return primaria;
+    return heroDesdeDestacados(heroDestacadosActuales());
+  }
+
+  // Cierra la peticion en vuelo: cachea si hay algo y responde a TODOS los
+  // callbacks pendientes. Un resultado vacio no se cachea (permite reintento
+  // cuando lleguen los destacados) pero si arranca la ventana anti-martilleo.
+  function heroCerrar(arr) {
+    var cola = HERO_ESPERA || [];
+    var lista = Array.isArray(arr) ? arr : [];
+    HERO_ESPERA = null;
+    HERO_PIDIDA = false;
+    if (lista.length) HERO_CACHE = lista.slice();
+    else HERO_ULTIMO = Date.now();
+    cola.forEach(function (cb) { heroEntregar(cb, lista.slice()); });
+  }
+
+  function cargarHero(cb) {
+    if (typeof cb !== 'function') return;
+    if (HERO_CACHE && HERO_CACHE.length) { heroEntregar(cb, HERO_CACHE.slice()); return; }
+    if (HERO_ESPERA) { HERO_ESPERA.push(cb); return; }
+    if (HERO_ULTIMO && (Date.now() - HERO_ULTIMO) < HERO_REINTENTO_MS) {
+      // Ya se pregunto hace poco y no habia nada: no se martillea el endpoint.
+      heroEntregar(cb, []);
+      return;
+    }
+    HERO_ESPERA = [cb];
+    HERO_PIDIDA = true;
+    // tipo_media=foto es un parametro EXISTENTE del mismo endpoint (filtra
+    // af.foto_type); no abre ninguna ruta nueva ni toca api/.
+    var url = '/api/interacciones?tipo=multimedia_mapa&tipo_media=foto&_t=' + Date.now();
+    var authHeaders = (window.ExploraCO && typeof window.ExploraCO.authHeaders === 'function')
+      ? (window.ExploraCO.authHeaders() || {})
+      : {};
+    try {
+      fetch(url, { headers: authHeaders })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var filas = (d && d.ok === true && Array.isArray(d.data)) ? d.data : [];
+          if (!filas.length) console.warn('[index-api] hero: multimedia_mapa sin filas', (d && d.error) || 'vacio');
+          heroCerrar(heroComponer(heroDesdeComunidad(filas)));
+        })
+        .catch(function (e) {
+          // Red caida: la primaria dio 0 utilizables, asi que decide el respaldo.
+          console.warn('[index-api] hero: fallo multimedia_mapa', e && e.message);
+          heroCerrar(heroComponer([]));
+        });
+    } catch (e) {
+      console.warn('[index-api] hero: fetch no disponible', e && e.message);
+      heroCerrar(heroComponer([]));
+    }
+  }
+
+  // Contrato publico del slideshow del hero: solo la clave cargar.
+  window.ExploraCOHero = { cargar: cargarHero };
 
   // Toggle "Solo mio": delega el estado en el MOTOR (que ademas aplica el
   // gate de sesion) y recarga la capa solo si el valor EFECTIVO cambio.
