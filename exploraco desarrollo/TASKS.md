@@ -5536,5 +5536,98 @@ Falta la **prueba end-to-end del dueno**: en `/publicar.html` **con sesion activ
 
 Codigo: `media-upload.js` (criterio de prefijo, reintento y mensajes), `publicar.html` (carga del nucleo de sesion + `modo:'publico'` en las dos subidas), `api/utilidades.js` (solo `?tipo=diagnostico`) y **NUEVO** `scripts/smoke_media_upload_prefijo.js` (**untracked** al escribir esta seccion; **versionado y encadenado** en el commit `f56373c`). Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md` (relevo + riesgos) y `BUGS_HISTORICOS.md` (**BUG-127**). `DECISIONS.md` lo redacto `@architect` **fuera de este pase** (**ADR-098**, ya presente en el archivo); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
 
+## TSK-215 - Hero Mosaico (1 principal + 3 miniaturas): cascada nueva de la foto principal y de las miniaturas (comunidad SOLO con `votos > 0`, relleno curado) + BUG-079b (el panel destruia `orden`/`es_hero` al abrir y guardar) + smoke `smoke_hero_fallback.js` - 2026-10-24 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL; SIN COMMIT Y SIN DESPLEGAR** (certificado como desplegable por el gate de `@qa-auditor`, falta `push` + build). Es un **ajuste dentro de la logica del Hero Mosaico que ya existia (ADR-034)**, no arquitectura nueva: **NO se crea ADR** (decision expresa del operador; ADR-084 D1). El detalle del defecto del panel vive **una sola vez** en `BUGS_HISTORICOS.md` **BUG-079b** y aqui solo se apunta. `api/` sigue con **8/8 ficheros**, **cero endpoint nuevo**, **cero migraciones**. Alcance real medido: **2 ficheros modificados (+163/-53) + 1 fichero nuevo**.
+
+### Que cambia el producto
+
+El hero de la ficha de destino deja de caer a una imagen Unsplash generica en cuanto falta `foto_hero`, y las 3 miniaturas dejan de ser un relleno arbitrario: pasan a ser **material real y votado** de la comunidad cuando existe, y **curado ordenado** cuando no.
+
+### Cascada nueva de la FOTO PRINCIPAL (`api/pagina-destino.js`), en orden estricto
+
+1. `destinos.foto_hero`.
+2. `d.foto`.
+3. Primera foto **curada** por `es_hero DESC, orden ASC`.
+4. Imagen **Unsplash generica por categoria**.
+
+Antes el paso 4 era el **fallback inmediato** al faltar `foto_hero`; ahora es el **ultimo recurso**.
+
+### Cascada nueva de las MINIATURAS
+
+- **PASO A:** fotos de **comunidad** (viajeros + albumes) con **`votos > 0`** y tipo foto, en **votos DESC**, hasta 3 slots.
+- **PASO B:** si faltan slots, relleno con fotos **CURADAS** ordenadas **en memoria** por `es_hero DESC, luego orden ASC`.
+- **NO hay PASO C:** una foto de comunidad con **0 votos NUNCA entra al hero** (umbral estricto decidido por el operador). Si no hay material, el mosaico **rinde menos de 3 miniaturas**, **sin div vacio y sin placeholder**.
+
+### Guard de formato, deduplicacion e intactos
+
+- **Guard de formato:** se excluyen `video`/`audio` por `foto_type`/`media_type` y por **extension evidente** (`.mp4 .webm .mov .mp3 .wav .m4a`). Una URL de **CDN sin extension SI se conserva** (no se descarta por no tener extension).
+- **Deduplicacion** por URL normalizada **contra la principal y entre miniaturas**.
+- **Se conservan sin cambios:** `HERO_THUMBS_MAX = 3`, el markup `pth` y el deep-link `HERO_FOTOS[k]` a `/galeria.html`.
+- **`SELECT` de fotos curadas (y su gemelo del bloque `catch`)**: ahora traen tambien `df.id`, `df.orden` y `df.es_hero` (sin ellos no se puede ordenar `es_hero DESC, orden ASC` en memoria). El **`ORDER BY` de la galeria NO se modifico** (byte-identico): la galeria conserva su orden.
+
+### BUG-079b: el panel destruia `orden`/`es_hero` (continuacion de BUG-079)
+
+El backend **ya** persistia `destinos_fotos.orden` y `es_hero` correctamente; era **`admin.html`** quien los destruia en el ciclo **abrir-editar-guardar**: `_photoToObj` **no transportaba** `orden` y `_cargarFotosDeNeon` **no copiaba** `nf.orden` al fusionar por URL, de modo que `_placeToAPI` **re-derivaba el orden por indice del array local** y el `es_hero` de Neon se pisaba con "la primera fila es hero". **Parche minimo en 4 bloques** (`admin.html` ~`3694-3702`, ~`5045-5080`, ~`6494-6526`, ~`6682-6694`) con un **registro en memoria del orden real por destino+url**. **Sin UI nueva:** sigue **sin** selector de hero por radio (la primera fila sigue siendo el hero **como fallback**) y el **orden visible del panel no refleja el orden del sitio**; **ambas cosas son INTENCIONALES** y quedan como ticket de UI aparte (ver pendientes).
+
+### Test NUEVO: `scripts/smoke_hero_fallback.js`
+
+**11 casos (A-I + J1/J2)**, **sin red y sin base de datos** (runtime `vm` + stub de `require`). Congela: comunidad **votos DESC**, curadas por **es_hero/orden**, **mezcla**, **umbral estricto votos 0**, **guard de formato**, **principal curada antes de Unsplash**, **dedupe**, **sin fotos -> Unsplash y 0 miniaturas**, y **compatibilidad** con items `string` legacy y con firmas de menos argumentos. Tiene **CONTROL NEGATIVO verificado**: mutando la condicion `votos > 0` el **caso D falla con exit 1** (la prueba no es vacua).
+
+### Verificacion medida (ADR-006, contra el archivo real)
+
+| Prueba | Resultado |
+|---|---|
+| `node --check` (motor, admin-destinos, utilidades, smoke) | **PASS 4/4** |
+| ASCII-safety (bytes > 127) | motor **0**, admin-destinos **0**, smoke **0**; `admin.html` **delta 0** (7.770 preexistentes sin cambios) |
+| `express_check.js admin.html` | divs **1111/1111**, diff **0** |
+| `check_buildHTML_inline.js` | **TODO OK** (divs **365/365**) |
+| `node scripts/smoke_hero_fallback.js` | **11/11 PASS** (9 del hero + **J1/J2** del guard en metas) |
+| Muestra de smokes de categoria | **4/4 en verde** (hostal, comida, evento, blog) = **45 asserts PASS / 0 FAIL** |
+| Presupuesto serverless | `/api/` sigue con **8 ficheros**, **sin endpoint nuevo** |
+| Veredicto del gate | **certificado como desplegable** por `@qa-auditor` |
+
+### Cierre SEO del guard de formato (misma tanda, gate `@seo-dev` abierto)
+
+El **guard de formato** del hero (`mediaTipoItem` / `mediaUrlNoEsVisual` / `mediaEsFotoValida`) se subio a **ambito de modulo** como **fuente unica** (sin copia) y se aplica ahora a las **tres emisiones de imagen** de la ficha:
+
+- **`og:image`** y **`twitter:image`**: comparten **el mismo valor** resuelto por la cascada del hero (`foto_hero` -> `d.foto` -> primera curada valida -> Unsplash por categoria). No se anadieron etiquetas nuevas (no existian `og:image:url` ni `og:image:secure_url` y **no se inventaron**).
+- **JSON-LD `image`**: `schemaLD(d, cat, autor, img)` recibe un **4o argumento opcional** con la URL ya resuelta y la **revalida** con el guard. Las llamadas **sin** el argumento siguen funcionando (fallback interno `foto_hero` -> `foto` validados).
+- **Tarjetas de destinos relacionados** (`rHero`): tambien pasan el guard; sin imagen valida degradan al **degradado + emoji** existente.
+- **Prueba funcional (4 escenarios en sandbox `vm`)**: `.mp4` + foto valida -> emite **la valida** en og/twitter/JSON-LD; CDN **sin extension conservada**; todo video/audio -> **Unsplash de categoria**; en los cuatro casos **`og == twitter == JSON-LD`**.
+- **Decisiones cerradas en este cierre**: (a) un destino **sin ninguna foto** publica el **Unsplash de su categoria**, NO la tarjeta de marca `latawel-og-1200x630.png` (esa queda como ultimo recurso del sistema, no por destino); (b) el `image` del JSON-LD **respeta el valor relativo** tal como venga del dato, **no se absolutiza** contra el dominio canonico en esta tanda.
+- **Verificacion**: `node --check` PASS · `check_buildHTML_inline.js` **11/11** + divs **365/365** diff 0 · `smoke_hero_fallback.js` **11/11 PASS** con los casos **J1/J2** nuevos · ASCII **0** bytes > 127 · **11/11** tras anadir J.
+
+### Pendientes registrados (NO forman parte de esta tanda)
+
+1. ~~**`og:image` / `heroPropio`** sin el guard de formato~~: **CERRADO** en esta misma tanda (ver "Cierre SEO" arriba) con gate `@seo-dev`.
+2. **`scripts/smoke_hero_fallback.js`**: creado en esta tanda y **dejado en el indice de git** (`git add`, sin commit). El **commit y el push** los decide el operador.
+3. **Ticket de UI**: **TSK-216** (selector de hero por radio en el panel + orden visible alineado con `orden`).
+4. **Despliegue pendiente:** el cambio esta **certificado como desplegable** por `@qa-auditor` pero **no desplegado** (falta `commit` + `push` + build de Vercel).
+
+### Archivos tocados
+
+Codigo: `api/pagina-destino.js` (cascada del hero + `df.id`/`df.orden`/`df.es_hero` en los dos `SELECT` de curadas), `admin.html` (4 bloques del parche BUG-079b) y **NUEVO** `scripts/smoke_hero_fallback.js` (**untracked**). Documentacion (este pase, unico): `TASKS.md` (esta seccion), `BUGS_HISTORICOS.md` (**BUG-079b**) y `NEXT.md` (relevo + pendientes). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**: ajuste dentro de ADR-034); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron** (no cambia el alcance ni la estructura del sistema).
+
+## TSK-216 - Selector de hero por radio en el panel de fotos y orden visible alineado con `orden` (BUG-079b completo) - 2026-10-24 - PENDIENTE (sin prioridad asignada)
+
+### Motivo
+
+Tras **BUG-079b** el panel ya **conserva** `destinos_fotos.orden` y `es_hero` al abrir y guardar, pero **sigue sin poder elegirse el hero**: `es_hero` se **deriva de la posicion** (`admin.html` ~6470, `i === 0`) y `renderPhotoList` pinta `photos.slice(1)`, de modo que la **primera fila nunca aparece como foto** y **no hay forma de marcar otra** como principal sin reordenar el array a mano. Ademas, el **orden visible** del panel no refleja el `orden` del sitio (**intencional** en la tanda anterior, **no** un bug).
+
+### Alcance propuesto
+
+1. **UI**: seleccion por **radio** por fila (incluida la primera) para marcar la foto hero, sin botones de reordenar salvo que se decida lo contrario.
+2. **Persistencia**: `es_hero` **sin depender del indice**; el fallback "primera fila es hero" queda **solo** para destinos sin ninguna marca explicita.
+3. **Coherencia**: reflejar el `orden` del sitio en el panel (o justificar por escrito que la diferencia es deliberada).
+
+### Dominio y controles
+
+`@admin-dev` (**gate** de confirmacion explicita) con **Escudo GOLD** sobre `admin.html` (520 KB): ASCII-safe con **delta 0**, `node --check` del JS inline y **balance de divs** (`express_check.js`). Sin endpoint nuevo (`/api/` sigue en **8**).
+
+### Estado
+
+**Pendiente.** No forma parte de la tanda de TSK-215 (que cierra el fallback del hero y la persistencia de datos).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

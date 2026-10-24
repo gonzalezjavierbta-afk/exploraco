@@ -152,13 +152,52 @@ function dominioWeb(u) {
   return h;
 }
 
-function schemaLD(d, cat, autor) {
+// -- Guard de formato (foto vs video/audio) ---------------------------
+// Un background-image no puede pintar un video ni un audio. Se descarta
+// solo lo que esta ETIQUETADO como tal (foto_type/media_type) o lo que
+// termina en una extension evidente de video/audio. Una URL sin
+// extension (CDN con query string, etc.) NUNCA se descarta.
+// FUENTE UNICA (module scope): la consumen el hero, las tarjetas de
+// relacionados, el JSON-LD (schemaLD) y og:image/twitter:image.
+function mediaTipoItem(x) {
+  if (!x || typeof x !== 'object') return '';
+  return String(x.foto_type || x.media_type || '').trim().toLowerCase();
+}
+function mediaUrlNoEsVisual(u) {
+  var s = String(u || '').trim().toLowerCase();
+  if (!s) return true;
+  var q = s.indexOf('?');
+  if (q !== -1) s = s.slice(0, q);
+  var h = s.indexOf('#');
+  if (h !== -1) s = s.slice(0, h);
+  var exts = ['.mp4', '.webm', '.mov', '.mp3', '.wav', '.m4a'];
+  for (var i = 0; i < exts.length; i++) {
+    var e = exts[i];
+    if (s.length > e.length && s.slice(s.length - e.length) === e) return true;
+  }
+  return false;
+}
+function mediaEsFotoValida(u, tipo) {
+  if (!u) return false;
+  var t = String(tipo || '').trim().toLowerCase();
+  if (t && t !== 'foto' && t !== 'imagen' && t !== 'image' && t !== 'photo') return false;
+  if (mediaUrlNoEsVisual(u)) return false;
+  return true;
+}
+
+// img (4o argumento, opcional): URL YA resuelta por la cascada del hero
+// (foto_hero -> foto -> primera curada valida -> Unsplash por categoria).
+// Se revalida aqui para las llamadas sin ese argumento.
+function schemaLD(d, cat, autor, img) {
   var tipos = { hostal:'LodgingBusiness', comida:'FoodEstablishment', sitio:'TouristAttraction', evento:'Event', blog:'BlogPosting' };
   var schema = {
     '@context':'https://schema.org', '@type':tipos[cat]||'TouristAttraction',
     'name': d.nombre||'', 'description': d.lead||'', 'url': BASE+'/'+(d.slug||'')+'.html'
   };
-  if (d.foto_hero) schema['image'] = d.foto_hero;
+  var schemaHero = (img && mediaEsFotoValida(img, '')) ? String(img).trim() : '';
+  if (!schemaHero && d.foto_hero && mediaEsFotoValida(d.foto_hero, '')) schemaHero = String(d.foto_hero).trim();
+  if (!schemaHero && d.foto && mediaEsFotoValida(d.foto, '')) schemaHero = String(d.foto).trim();
+  if (schemaHero) schema['image'] = schemaHero;
   if (cat === 'blog') {
     // BlogPosting: E-E-A-T se apoya en autor, fecha y extension real
     // del articulo -- no en address/geo/aggregateRating, que son de
@@ -638,9 +677,48 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var label = CAT_LABEL[cat] || 'Destino';
   var dir   = CAT_DIR[cat]   || 'index.html';
   var grad  = d.hero_bg || CAT_GRAD[cat] || CAT_GRAD.sitio;
-  // foto_hero puede venir como foto_hero, foto, o photos[0]
-  var hero = d.foto_hero || d.foto || '';
-  // Si no hay foto, usar un Unsplash generico por categoria
+  // -- TAREA 4: guard de formato (foto vs video/audio) -----------------
+  // mediaTipoItem / mediaUrlNoEsVisual / mediaEsFotoValida viven en el
+  // ambito de modulo (antes de schemaLD) para que el hero, los
+  // relacionados, el JSON-LD y las metas OG compartan el MISMO guard.
+  // Aqui solo se consumen; no se redefinen.
+  // Curadas ordenadas EN MEMORIA por es_hero DESC, luego orden ASC. El
+  // desempate es estable por el orden de llegada de la query. Se toleran
+  // items string legacy, igual que hacia curadasTodas.
+  var curadasHeroList = [];
+  (fotos || []).forEach(function(f, fidx) {
+    var u = (f && f.url) ? String(f.url).trim()
+          : (typeof f === 'string' ? String(f).trim() : '');
+    if (!u) return;
+    var tipoC = mediaTipoItem(f);
+    if (!mediaEsFotoValida(u, tipoC)) return;
+    var esHeroC = 0;
+    var ordenC = 999999;
+    if (f && typeof f === 'object') {
+      var vh = f.es_hero;
+      if (vh === true || vh === 1 || vh === '1' || vh === 'true' || vh === 't') esHeroC = 1;
+      var oC = parseInt(f.orden, 10);
+      if (!isNaN(oC)) ordenC = oC;
+    }
+    curadasHeroList.push({ url: u, esHero: esHeroC, orden: ordenC, idx: fidx });
+  });
+  curadasHeroList.sort(function(a, b) {
+    if (b.esHero !== a.esHero) return b.esHero - a.esHero;
+    if (a.orden !== b.orden) return a.orden - b.orden;
+    return a.idx - b.idx;
+  });
+  // -- Foto principal: cascada determinista ----------------------------
+  // Orden estricto: destinos.foto_hero -> destinos.foto -> primera curada
+  // (es_hero DESC, orden ASC, solo imagenes) -> Unsplash por categoria.
+  // El Unsplash es el ULTIMO recurso, no el primero tras fallar foto_hero.
+  var hero = '';
+  var heroCand = String(d.foto_hero || '').trim();
+  if (heroCand && mediaEsFotoValida(heroCand, '')) hero = heroCand;
+  if (!hero) {
+    var heroCand2 = String(d.foto || '').trim();
+    if (heroCand2 && mediaEsFotoValida(heroCand2, '')) hero = heroCand2;
+  }
+  if (!hero && curadasHeroList.length) hero = curadasHeroList[0].url;
   var heroFallbacks = {
     hostal: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&q=80',
     comida: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80',
@@ -893,22 +971,18 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
 
   // -- HERO: imagen principal + 3 miniaturas ---------------------------
   // La imagen PRINCIPAL es la que selecciono el usuario/espacio
-  // (foto_hero editorial): los votos NO la desplazan. Las 3 miniaturas se
-  // componen por puntaje: (1) la mejor foto del ESPACIO (curada) por
-  // votos y (2-3) las 2 mejores fotos de la COMUNIDAD (viajeros +
-  // albumes) por votos. Si no hay votos, el ranking cae al orden de
-  // insercion (2a curada, viajero mas reciente, album), preservando la
-  // composicion historica; el relleno evita dejar huecos.
+  // (foto_hero editorial): los votos NO la desplazan. Las miniaturas se
+  // componen con una cascada determinista de 2 pasos:
+  //   PASO A: fotos de COMUNIDAD (viajeros + albumes) con votos > 0 y tipo
+  //           foto, en orden de votos DESC.
+  //   PASO B: si faltan slots, relleno con CURADAS ordenadas en memoria
+  //           por es_hero DESC y luego orden ASC.
+  // No hay PASO C: una foto de comunidad con 0 votos NUNCA entra al hero
+  // (umbral estricto). Si no hay material suficiente el mosaico rinde
+  // menos de 3 miniaturas: es correcto, no se emite placeholder ni div
+  // vacio. La dedupe por URL normalizada la hace addHeroThumb().
   var HERO_THUMBS_MAX = 3;
   var heroMainStyle = hero ? "background-image:url('"+esc(hero)+"')" : "background:"+grad;
-  var curadasTodas = [];
-  (fotos || []).forEach(function(f){
-    var u = (f && f.url) ? String(f.url).trim() : (typeof f === 'string' ? String(f).trim() : '');
-    if (!u) return;
-    if (curadasTodas.indexOf(u) !== -1) return;
-    curadasTodas.push(u);
-  });
-  var curadasOrden = curadasTodas.filter(function(u){ return u !== hero; });
   var heroThumbsList = [];
   function addHeroThumb(u) {
     if (!u) return;
@@ -916,33 +990,21 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     if (!u || u === hero) return;
     if (heroThumbsList.indexOf(u) !== -1) return;
     if (heroThumbsList.length >= HERO_THUMBS_MAX) return;
+    if (!mediaEsFotoValida(u, '')) return;
     heroThumbsList.push(u);
   }
-  // (1) mejor foto del espacio (curada) por votos, sin repetir la principal.
-  var heroCuradaTop = '';
-  for (var hci = 0; hci < mediaRank.length; hci++) {
-    var mrc = mediaRank[hci];
-    if (mrc.fuente === 'espacio' && mrc.tipo === 'foto' && mrc.url !== hero) {
-      heroCuradaTop = mrc.url;
-      break;
-    }
-  }
-  addHeroThumb(heroCuradaTop || (curadasOrden.length ? curadasOrden[0] : ''));
-  // (2-3) las 2 mejores fotos de la comunidad por votos.
-  var comAgregadas = 0;
-  for (var hvi = 0; hvi < mediaRank.length && comAgregadas < 2; hvi++) {
+  // PASO A: comunidad con votos > 0 (mediaRank ya viene votos DESC).
+  for (var hvi = 0; hvi < mediaRank.length && heroThumbsList.length < HERO_THUMBS_MAX; hvi++) {
     var mrv = mediaRank[hvi];
-    if (mrv.fuente !== 'comunidad' || mrv.tipo !== 'foto' || mrv.url === hero) continue;
-    var antes = heroThumbsList.length;
+    if (mrv.fuente !== 'comunidad') continue;
+    if (String(mrv.tipo || '').toLowerCase() !== 'foto') continue;
+    if ((parseInt(mrv.votos, 10) || 0) <= 0) continue;
     addHeroThumb(mrv.url);
-    if (heroThumbsList.length > antes) comAgregadas++;
   }
-  // Relleno: resto de curadas y comunidad (solo FOTOS) para completar las
-  // 3 miniaturas. Nunca un video/audio (la miniatura es background-image).
-  curadasOrden.forEach(addHeroThumb);
-  mediaRank.forEach(function(x){
-    if (x.fuente === 'comunidad' && x.tipo === 'foto') addHeroThumb(x.url);
-  });
+  // PASO B: relleno con curadas (es_hero DESC, orden ASC, solo imagenes).
+  for (var hci = 0; hci < curadasHeroList.length && heroThumbsList.length < HERO_THUMBS_MAX; hci++) {
+    addHeroThumb(curadasHeroList[hci].url);
+  }
   // TSK-111 (CAMBIO 6B): cada miniatura del hero abre el visor de
   // /galeria.html por deep-link. Se pasa HERO_FOTOS[k] (array emitido en
   // el script de la pagina) en vez de la URL cruda, para no inyectar datos
@@ -2279,7 +2341,15 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var secRelacionados = '';
   if (relacionados.length && cat !== 'blog') {
     var rcCards = relacionados.map(function(r){
-      var rHero = r.foto_hero || r.foto || '';
+      // Guard de formato: un foto_hero de video/audio cae a r.foto y, si
+      // tampoco es imagen valida, al degradado con emoji de la categoria.
+      var rHero = '';
+      var rCand = String(r.foto_hero || '').trim();
+      if (rCand && mediaEsFotoValida(rCand, '')) rHero = rCand;
+      if (!rHero) {
+        var rCand2 = String(r.foto || '').trim();
+        if (rCand2 && mediaEsFotoValida(rCand2, '')) rHero = rCand2;
+      }
       var rImg = rHero
         ? '<div class="rcimg" style="background-image:url(\''+esc(rHero)+'\')"></div>'
         : '<div class="rcimg" style="'+grad+'"><span class="rcemoji">'+esc(r.emoji||'')+'</span></div>';
@@ -2474,10 +2544,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // .gsrecl (ver bloque GSTRIP). Se MUEVE, no se elimina: id, onclick y
   // initReclamo() se conservan, y la clase pd-recl desaparece con el boton
   // porque solo existia para poder ocultarlo sin tocar .hobtn.
-  // Rebranding LATAWEL: og:image absoluta. Si el destino tiene hero propio se
-  // respeta (absolutizandolo contra BASE); si no, se usa la imagen OG oficial.
-  // Se mira la foto REAL (d.foto_hero/d.foto), no el fallback Unsplash.
-  var heroPropio = d.foto_hero || d.foto || '';
+  // Rebranding LATAWEL: og:image absoluta. Se reutiliza el MISMO valor ya
+  // resuelto por la cascada del hero (foto_hero -> foto -> primera curada
+  // valida -> Unsplash por categoria), de modo que un foto_hero de video o
+  // audio NUNCA se publica como imagen social.
+  var heroPropio = hero || '';
   var ogHeroAbs = heroPropio ? (String(heroPropio).indexOf('http') === 0 ? String(heroPropio) : BASE + (String(heroPropio).charAt(0) === '/' ? '' : '/') + String(heroPropio)) : '';
   var ogImage = ogHeroAbs || 'https://latawel.com/assets/brand/og/latawel-og-1200x630.png';
   return '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
@@ -2500,7 +2571,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<meta name="twitter:image" content="'+esc(ogImage)+'">\n'
     + '<meta name="theme-color" content="#FF4A00">\n'
     + '<link rel="canonical" href="'+BASE+'/'+esc(d.slug)+'.html">\n'
-    + schemaLD(d, cat, autor) + '\n'
+    + schemaLD(d, cat, autor, hero) + '\n'
     + '<link rel="stylesheet" href="dictado-voz.css?v=1">\n'
     + '<style>'+CSS+'</style>\n</head>\n<body'+(cat==='blog'?' class="blog"':'')+'>\n\n'
 
@@ -3047,7 +3118,7 @@ module.exports = async function handler(req, res) {
     var fotosRows = [];
     try {
       fotosRows = await sql(
-        'SELECT df.url, df.caption,'
+        'SELECT df.id, df.url, df.caption, df.orden, df.es_hero,'
         + ' e.votos AS votos, e.promedio AS rating_promedio'
         + ' FROM destinos_fotos df'
         + mediaEstadJoin('curada', 'df.id::text')
@@ -3058,7 +3129,7 @@ module.exports = async function handler(req, res) {
     } catch (eFotos) {
       console.warn('[pagina-destino] fotos curadas con votos fallo (migracion pendiente?): ' + eFotos.message);
       fotosRows = await sql(
-        'SELECT url,caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC NULLS LAST, es_hero DESC LIMIT 200',
+        'SELECT id, url, caption, orden, es_hero FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC NULLS LAST, es_hero DESC LIMIT 200',
         [d.id]
       );
     }

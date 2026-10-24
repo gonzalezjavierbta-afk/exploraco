@@ -3692,6 +3692,13 @@ function loadForm(p) {
   if(cbVer) cbVer.checked = !!(p.verificado);
   currentTags=(p.tags||[]).slice(); renderTagPills();
   renderPhotoList(p.photos||[]);
+  /* BUG-079b: registra el orden real de cada foto de este destino
+     (venga de localStorage o de _cargarFotosDeNeon) por id+url, para que
+     _placeToAPI() conserve destinos_fotos.orden al guardar. */
+  for (var _fi = 0; _fi < (p.photos||[]).length; _fi++) {
+    var _fo = _photoToObj(p.photos[_fi]);
+    _fotoOrdenSet(currentId, _fo.url, _fo.orden);
+  }
   setStatus(p.status||'published');
   updateSlugPreview();
   if(p.lat&&p.lng) setTimeout(function(){updateMiniMap();},300);
@@ -5034,19 +5041,42 @@ function updateSlugPreview() {
 /* ── PHOTO MANAGER ── */
 /* BUG-079: normaliza cualquier item del array local de fotos (string
    legacy u objeto {url,cap/caption,id_neon,es_hero}) a objeto
-   {url,cap,id_neon,es_hero}. Unico punto de normalizacion usado por
+   {url,cap,id_neon,es_hero,orden}. Unico punto de normalizacion usado por
    renderPhotoList/getPhotos/_placeToAPI/_cargarFotosDeNeon. */
+/* BUG-079b: registro en memoria del orden REAL de destinos_fotos.orden
+   por destino + url. Lo llenan loadForm() (orden que ya trae el objeto
+   local) y _cargarFotosDeNeon() (orden que devuelve la API de fotos),
+   y lo consume _placeToAPI() para no reescribir orden con el indice del
+   DOM (getPhotos() arma p.photos por posicion visible). */
+var _fotoOrdenNeon = {};
+function _fotoOrdenNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = parseInt(v, 10);
+  return isFinite(n) ? n : null;
+}
+function _fotoOrdenKey(id, url) { return String(id) + '|' + String(url || ''); }
+function _fotoOrdenSet(id, url, orden) {
+  var n = _fotoOrdenNum(orden);
+  if (id === null || id === undefined || !url || n === null) return;
+  _fotoOrdenNeon[_fotoOrdenKey(id, url)] = n;
+}
+function _fotoOrdenGet(id, url) {
+  if (id === null || id === undefined || !url) return null;
+  var v = _fotoOrdenNeon[_fotoOrdenKey(id, url)];
+  return (typeof v === 'number' && isFinite(v)) ? v : null;
+}
 function _photoToObj(f) {
-  if (typeof f === 'string') return { url: f, cap: '', id_neon: null, es_hero: false };
+  if (typeof f === 'string') return { url: f, cap: '', id_neon: null, es_hero: false, orden: null };
   if (f && typeof f === 'object') {
     return {
       url:     f.url || '',
       cap:     f.cap || f.caption || '',
       id_neon: f.id_neon || f.id || null,
-      es_hero: !!(f.es_hero)
+      es_hero: !!(f.es_hero),
+      orden:   _fotoOrdenNum(f.orden)
     };
   }
-  return { url: '', cap: '', id_neon: null, es_hero: false };
+  return { url: '', cap: '', id_neon: null, es_hero: false, orden: null };
 }
 function renderPhotoList(photos) {
   var list = document.getElementById('photo-list');
@@ -6461,15 +6491,39 @@ function _placeToAPI(p) {
      por url). Con una sola foto la lista no queda vacia y no se dispara el
      guard anti-perdida (400) del backend. */
   var galeriaUrls = [];
+  /* BUG-079b: getPhotos() arma p.photos por POSICION VISIBLE, asi que
+     el orden que trae cada foto aqui es el indice del DOM, no el de
+     destinos_fotos. Se recupera el orden real por id+url desde el
+     registro (loadForm / _cargarFotosDeNeon) y las fotos nuevas
+     (o con url editada) toman el siguiente orden libre. */
+  var _ordsNeon = [];
+  var _maxOrden  = -1;
+  for (var _k = 0; _k < (p.photos||[]).length; _k++) {
+    var _fk = _photoToObj(p.photos[_k]);
+    var _ok = _fotoOrdenGet(p.id, _fk.url);
+    _ordsNeon.push(_ok);
+    if (_ok !== null && _ok > _maxOrden) _maxOrden = _ok;
+  }
+  /* BUG-079c: si alguna foto llega con es_hero desde Neon, ese flag no
+     se puede perder por el indice local. La primera fila solo actua
+     como hero de FALLBACK cuando ninguna foto trae el flag. */
+  var _hayHero = false;
+  for (var _h = 0; _h < (p.photos||[]).length; _h++) {
+    if (_photoToObj(p.photos[_h]).es_hero) { _hayHero = true; break; }
+  }
   for (var i = 0; i < (p.photos||[]).length; i++) {
     var foto = _photoToObj(p.photos[i]);
-    if (foto.url) galeriaUrls.push({
-      id:      (foto.id_neon || null),
-      url:     foto.url,
-      caption: (foto.cap || foto.caption || ''),
-      es_hero: (i === 0 ? true : (foto.es_hero || false)),
-      orden:   i
-    });
+    if (foto.url) {
+      var _ord = _ordsNeon[i];
+      if (_ord === null) { _maxOrden = _maxOrden + 1; _ord = _maxOrden; }
+      galeriaUrls.push({
+        id:      (foto.id_neon || null),
+        url:     foto.url,
+        caption: (foto.cap || foto.caption || ''),
+        es_hero: (foto.es_hero ? true : (_hayHero ? false : (i === 0))),
+        orden:   _ord
+      });
+    }
   }
 
   // Tags JSONB — datos específicos por categoría
@@ -6625,8 +6679,16 @@ async function _cargarFotosDeNeon(destinoUUID, localId) {
         if (!ex.id_neon && nf.id) ex.id_neon = nf.id;
         if (nf.es_hero) ex.es_hero = true;
         if (!ex.cap && nf.caption) ex.cap = nf.caption;
+        /* BUG-079b: el orden manda desde Neon (es la fuente de verdad de
+           destinos_fotos.orden), tanto en el objeto local como en el
+           registro que consume _placeToAPI(). */
+        var nOrdEx = _fotoOrdenNum(nf.orden);
+        if (nOrdEx !== null) ex.orden = nOrdEx;
+        _fotoOrdenSet(localId, nf.url, nOrdEx);
       } else {
-        var nuevo = { url: nf.url, cap: nf.caption || '', id_neon: nf.id || null, es_hero: !!nf.es_hero };
+        var nOrd = _fotoOrdenNum(nf.orden);
+        var nuevo = { url: nf.url, cap: nf.caption || '', id_neon: nf.id || null, es_hero: !!nf.es_hero, orden: nOrd };
+        _fotoOrdenSet(localId, nf.url, nOrd);
         locales.push(nuevo);
         porUrl[nf.url] = nuevo;
       }
