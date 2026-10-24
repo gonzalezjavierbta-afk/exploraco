@@ -5720,21 +5720,29 @@ El operador quiere poder cargar **6 fotos (URL o subida) para el hero de la home
 ### 3. Panel `admin.html` (520 KB, +317 lineas, 0 borradas)
 
 - Item de sidebar `snav-hero` ("Hero del index") siguiendo el patron `.snav-item` existente.
-- Pantalla `#screen-hero`: **CSS scoped** bajo `#screen-hero` (rejilla 3/2/1 columnas, 7 reglas, **cero CSS global**), aviso de precedencia en una linea y **6 slots estaticos** con: numero de slot, `input type=url`, boton **Subir** que reutiliza `adminSubirImagen()`, preview con `onerror` (ADR-008), leyenda (`maxlength 300`) y **toggle activa**.
+- Pantalla `#screen-hero`: **CSS scoped** bajo `#screen-hero` (rejilla 3/2/1 columnas, 7 reglas, **cero CSS global**), aviso de precedencia en una linea (texto vigente en `admin.html:2429`, delta de mezcla, fuera de cualquier `<script>`: slots 1 -> 6 primero, relleno con comunidad solo con votos, luego destacados, sin repetir foto y maximo 6) y **6 slots estaticos** con: numero de slot, `input type=url`, boton **Subir** que reutiliza `adminSubirImagen()`, preview con `onerror` (ADR-008), leyenda (`maxlength 300`) y **toggle activa**.
 - Hook en `showScreen()`: al abrir la pantalla hace el GET y pinta los 6 slots. Botones **Guardar** (POST con los **6** slots y `_adminHeaders()`) y **Recargar** (GET).
 - Con `degradado:true` la pantalla muestra aviso y **deshabilita el guardado** (no rompe, no hace POST).
 - **ADR-003 verificado**: en el bloque hero **no** hay `innerHTML=''`, `.remove()`, `removeChild`, `delete`, `outerHTML` ni `document.write`. Los 28 nodos de los slots sobreviven a guardar/recargar.
 
-### 4. Home `index-api-connector.js` (+89/-7, cambios funcionales solo en `cargarHero`)
+### 4. Home `index-api-connector.js` (+89/-7 + delta de mezcla, cambios funcionales solo en `cargarHero`)
 
-- **Precedencia nueva, en orden estricto**: (1) **MODULO**: slots con `activa === true` y `url` valida, ordenados por `posicion`, maximo 6; con **>=1 activa corto-circuita** (no pide comunidad); (2) **COMUNIDAD** (logica anterior intacta: `multimedia_mapa`, `votos > 0`, votos DESC, max 6); (3) **DESTACADOS** (respaldo anterior, rating DESC + nombre ASC); (4) `[]` -> la home conserva el gradiente.
+- **Precedencia vigente: MEZCLA POR RELLENO, hasta 6** (sustituye al cortocircuito de la primera version):
+  1. **MODULO primero**: slots con `activa === true` y `url` valida, en orden de `posicion` ASC.
+  2. **COMUNIDAD**: los huecos restantes se rellenan con las fotos de comunidad mas votadas (`votos > 0`, votos DESC) -- logica intacta.
+  3. **DESTACADOS**: si aun faltan huecos, se completa con las fotos de destinos `destacado` (rating DESC + nombre ASC).
+  4. Maximo **6**, **sin URLs repetidas entre fuentes**: dedupe por URL normalizada a minusculas; si la misma URL viene del modulo y de comunidad, **prevalece la del modulo** con su `caption` y `votos: 0`.
+  5. **Cortocircuito solo si el modulo ya llena los 6**: en ese caso no se pide comunidad.
+  6. `[]` -> la home conserva el gradiente.
+- **Ejemplo canonico**: con **1 slot activo** el hero muestra **esa foto + 5 de comunidad**.
 - Contrato publico **sin cambios**: `cb([{url, nombre, votos}])`, max 6, sin URLs repetidas, solo imagenes, **una sola invocacion**, nunca lanza. En el modulo `nombre` = `caption` del slot y `votos` = 0.
 - Mismo guard de formato que la comunidad (fuera `video`/`audio`; **CDN sin extension se conserva**).
-- Aislamiento intacto: estado propio `HERO_*`, cero escrituras en `MEDIA_*`/`MAPA_MEDIA`/`refreshMapaMarkers`. **Sin mezcla**: si el modulo aporta, no se completa con comunidad (decision del operador).
+- Aislamiento intacto: estado propio `HERO_*`, cero escrituras en `MEDIA_*`/`MAPA_MEDIA`/`refreshMapaMarkers`. Dedupe en `heroMezclar`, que normaliza `trim().toLowerCase()` y recorre los tramos en orden `[modulo, comunidad]` (por eso prevalece el modulo).
+- **Cache-buster**: `index.html:4680` pasa de `?v=6` a **`?v=7`** en el delta de mezcla (el conector volvio a cambiar de comportamiento).
 
-### 5. Smoke `scripts/smoke_hero_home_connector.js`: de 8 a 13 casos (A-M)
+### 5. Smoke `scripts/smoke_hero_home_connector.js`: de 8 a 17 casos (A-Q)
 
-Nuevos: **I** modulo con 2 activas + 3 inactivas y comunidad disponible -> solo las 2 activas, en orden de `posicion`, `nombre`=caption, `votos` 0, **1 sola peticion** (corto-circuito medido); **J** 6 slots con uno inactivo en medio -> 5, sin huecos; **K** 0 activas -> cae a comunidad; **L** `degradado:true` o GET caido -> cae a comunidad, 1 callback; **M** slot activo `.mp4` -> se descarta. **Control negativo verificado**: forzando `heroDesdeModulo` a `[]` el smoke da **10/13 con exit 1** (fallan I y J). Los 8 casos previos se adaptaron **solo** en el conteo de peticiones (ahora el ciclo puede llevar modulo + comunidad); ninguna asercion de resultado, orden, umbral, formato, aislamiento o anti-martilleo se relajo.
+Nuevos del delta de mezcla: **N** 1 activa + comunidad -> **6 items** (el del modulo primero y 5 de comunidad por votos DESC); **O** URL repetida modulo/comunidad -> aparece **una sola vez**, gana el modulo y el hueco se rellena; **P** 6 activas -> **1 sola peticion** (no se pide comunidad); **Q** 2 activas + 1 comunidad + relleno con destacados. Adaptados **I** (modulo con 2 activas + 3 inactivas y comunidad disponible -> 2 activas por `posicion` + 4 de comunidad), **J** (5 activas + 1 comunidad, sin huecos) y el subtramo mixto de **M** (slot activo `.mp4` descartado, el hueco lo rellena comunidad). **K/L siguen midiendo el fallback puro** (K 0 activas -> comunidad; L `degradado:true` o GET caido -> comunidad, 1 callback). Resultado: **17/17 PASS con exit 0**. **Control negativo verificado**: restaurando el cortocircuito viejo el smoke da **11/17 con exit 1** (fallan N, I, J, M-mixto, O y Q), asi que la prueba no es vacua. Los 8 casos previos se adaptaron **solo** en el conteo de peticiones; ninguna asercion de resultado, orden, umbral, formato, aislamiento o anti-martilleo se relajo.
 
 ### 6. Verificacion medida (ADR-006, contra el archivo real)
 
@@ -5746,16 +5754,23 @@ Nuevos: **I** modulo con 2 activas + 3 inactivas y comunidad disponible -> solo 
 | `express_check.js` `index.html` (control) | divs **375/375**, sin regresion |
 | ASCII-safety (bytes > 127) | `api/utilidades.js` **0**, conector **0**, smoke **0**; `admin.html` **delta 0** (7.770 preexistentes) |
 | `<script` en `admin.html` | **6 = 6** respecto a `HEAD` |
-| `smoke_hero_home_connector.js` | **13/13** |
+| `smoke_hero_home_connector.js` | **17/17 PASS** (exit 0; 13 previos + **N, O, P, Q** del delta de mezcla) |
 | `smoke_hero_fallback.js` | **11/11** (motor de la ficha intacto) |
+| Control negativo del smoke (cortocircuito viejo restaurado) | **11/17 con exit 1**: fallan N, I, J, M-mixto, O y Q (**la prueba no es vacua**) |
+| Peticiones medidas por escenario (delta de mezcla) | 1 activa -> **2** (modulo + comunidad); 6 activas -> **1** (solo modulo); 0 activas -> **2** (comportamiento previo intacto) |
+| Conteo de items del hero | **maximo 6** en los tres escenarios |
+| `node --check` conector y smoke en el delta | **PASS 2/2**; ASCII **0** en ambos |
+| `express_check.js` en el delta | `admin.html` **1164/1164** (sin cambio) e `index.html` **375/375** |
+| Aislamiento del bloque hero | **cero** ocurrencias de `MEDIA_LISTO`, `MEDIA_PIDIDA`, `MEDIA_TOKEN`, `MAPA_MEDIA` y `refreshMapaMarkers`; estado `HERO_*` propio |
+| ADR-003 en el bloque hero del panel | **sin** `innerHTML=''`, `.remove()`, `removeChild` ni `delete` |
 | Contrato alineado en las **3** piezas | backend emite `posicion,url,caption,activa`; panel envia `posicion:number` y `activa:boolean`; conector consume `activa`/`caption`/`posicion`; `activa` viaja como booleano extremo a extremo |
 | Ledger de la 056 | fila `aplicada`, sha **e6a3c70c7c23** igual al sha256 del disco, 52/52 predecesores con fila |
 | Presupuesto serverless | `/api/` sigue en **8** ficheros |
-| Veredicto del gate | **certificado como desplegable** por `@qa-auditor` (**11/11** controles, ledger verificado contra el sha del disco) |
+| Veredicto del gate | **certificado como desplegable** por `@qa-auditor` (**11/11** controles, ledger verificado contra el sha del disco); **delta de mezcla: 10/10** controles |
 
 ### 7. Decisiones cerradas y limites conocidos (NO son bugs)
 
-- **Precedencia**: si hay **>=1 slot activo**, el hero usa **solo** el modulo. Con **0 activas** cae a comunidad, luego a destacados. **Sin mezcla** (no se completan huecos con comunidad).
+- **Precedencia = mezcla por relleno, hasta 6**: MODULO (activas por `posicion`) -> COMUNIDAD (votos DESC) -> DESTACADOS (rating DESC + nombre ASC), con dedupe por URL y maximo 6; cortocircuito **solo** si el modulo llena los 6. **Criterio corregido tras uso real**: la primera version hacia cortocircuito con **>=1 activa**, y al guardar **un unico slot** el hero mostro **una sola foto** (incompleto). Ahora con **1 slot activo** se ven **esa foto + 5 de comunidad**.
 - **Orden fijo 1..6**: no hay UI de reordenar; para cambiar el orden se intercambian las URLs. Arrastrar/reordenar es ticket aparte.
 - **Leyenda opcional**: el backend no la exige; vacia deja solo el pin del CSS.
 - **El panel envia siempre los 6 slots**, asi que el upsert refresca `actualizado_en` tambien en los no editados.
@@ -5765,13 +5780,13 @@ Nuevos: **I** modulo con 2 activas + 3 inactivas y comunidad disponible -> solo 
 ### 8. Pendientes abiertos
 
 1. **Deploy** (`commit` + `push` + build de Vercel). Ojo: esta tanda incluye una **migracion ya aplicada en Neon (056)**, asi que la tabla existe en produccion aunque el codigo no este desplegado: el `GET hero_home` respondera con 6 slots vacios y el hero seguira en comunidad hasta el deploy.
-2. **Revision visual en navegador**: cargar 2-3 fotos reales en el panel, activarlas y comprobar que la home las rota y que el logo sigue legible.
+2. **Revision visual en navegador**: cargar 2-3 fotos reales en el panel, activarlas y comprobar que la home las rota, que rellena los huecos con comunidad por votos (con 1 activa deben verse 6 items) y que el logo sigue legible.
 3. **`TSK-216`** (selector de hero por radio en el panel de fotos de un destino) sigue pendiente y **es otra cosa**: aqui es el hero de la **home**, no el de la **ficha**.
 4. **Opcional**: aviso en el panel si la URL del slot no parece imagen; y reordenar slots.
 
 ### Archivos tocados
 
-Codigo (working tree, **sin commit; NO desplegado**): `db/migrations/056_home_hero_fotos.sql` (nueva, **ya aplicada en Neon**), `api/utilidades.js` (`v2` -> `v3`, +126/-1), `admin.html` (+317, 0 borradas), `index-api-connector.js` (+89/-7) y `scripts/smoke_hero_home_connector.js` (8 -> 13 casos). Documentacion (este pase, unico): `TASKS.md` (esta seccion) y `NEXT.md` (relevo + pendientes + riesgos). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**: el modulo es configuracion de presentacion); `BUGS_HISTORICOS.md` **NO se toco** (**no hay bug nuevo**); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron**.
+Codigo (working tree, **sin commit; NO desplegado**): `db/migrations/056_home_hero_fotos.sql` (nueva, **ya aplicada en Neon**), `api/utilidades.js` (`v2` -> `v3`, +126/-1), `admin.html` (+317, 0 borradas; y en el delta de mezcla **1 linea de texto visible** en `admin.html:2429`, fuera de cualquier `<script>`), `index-api-connector.js` (+89/-7 + delta de mezcla en `heroMezclar`), `scripts/smoke_hero_home_connector.js` (8 -> 17 casos) e `index.html` (**unica linea funcional del delta**: cache-buster `?v=6` -> `?v=7`). Documentacion (este pase, unico): `TASKS.md` (esta seccion) y `NEXT.md` (relevo + pendientes + riesgos). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**: el modulo es configuracion de presentacion); `BUGS_HISTORICOS.md` **NO se toco** (**no hay bug nuevo**); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron**.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

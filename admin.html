@@ -2426,7 +2426,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
     </div>
   </div>
   <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
-    <div class="form-hint" id="hero-precedencia">Precedencia del hero: si hay fotos activas aqui manda este modulo; si no hay ninguna activa, el hero usa las fotos de comunidad mas votadas; si tampoco hay, las de destinos destacados.</div>
+    <div class="form-hint" id="hero-precedencia">Precedencia del hero (mezcla por relleno): las fotos activas de estos 6 slots van primero, en orden de slot (1 -> 6); si hay menos de 6 activas, los huecos se rellenan con las fotos de comunidad mas votadas (solo cuentan las que tienen votos); si aun faltan, se completan con las de destinos destacados. El hero nunca repite la misma foto y muestra como maximo 6: con 1 slot activo veras esa foto y 5 fotos de comunidad.</div>
     <div class="form-hint" id="hero-aviso-estado" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 14px"></div>
     <div class="hero-grid" id="hero-slots">
       <div class="hero-slot" id="hero-slot-1">

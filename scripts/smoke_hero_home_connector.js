@@ -7,9 +7,12 @@
 // Contrato congelado (ya implementado, NO se redisenia aqui):
 //   cargar(cb) entrega SIEMPRE una sola vez un array de { url, nombre, votos }
 //   con maximo 6 items, sin URLs repetidas y solo imagenes.
-//   Precedencia: modulo manual (slots activa === true, posicion ASC, votos 0,
-//   CORTO-CIRCUITA y no mezcla) -> comunidad (votos > 0, votos DESC) ->
-//   destacados (rating DESC, nombre ASC, votos 0) -> [] (gradiente).
+//   Precedencia (MEZCLA por orden, relleno hasta 6): modulo manual (slots
+//   activa === true, posicion ASC, votos 0) -> comunidad (votos > 0, votos
+//   DESC) -> destacados (rating DESC, nombre ASC, votos 0) -> [] (gradiente).
+//   El modulo va PRIMERO y solo CORTO-CIRCUITA si ya llena los 6 (entonces no
+//   se pide comunidad). Sin modulo el resultado es el de siempre:
+//   comunidad -> destacados -> vacio.
 //
 // Cero red, cero base de datos: el conector se evalua en un sandbox vm con
 // fetch simulado, window/document/localStorage minimos y console silenciosa
@@ -227,7 +230,7 @@ function urls(arr) {
 }
 
 // Peticiones por tramo. El conector pide primero el modulo manual
-// (tipo=hero_home) y solo si este no aporta nada pide la comunidad.
+// (tipo=hero_home) y, si ese modulo no llena los 6 slots, pide la comunidad.
 function peticionesDe(env, aguja) {
   var out = [];
   var i;
@@ -524,9 +527,9 @@ correr('H formato: url no vacia, nombre string, votos number', function (ok) {
 });
 
 // ------------------------------------------------- MODULO MANUAL (tramo 1)
-// I) El modulo manda: 2 activas (una de CDN SIN extension) + 3 inactivas +
-//    comunidad disponible -> SOLO las 2 activas, orden por posicion, votos 0 y
-//    CORTO-CIRCUITO: no se pide comunidad (una unica peticion).
+// I) El modulo va PRIMERO y RELLENA: 2 activas (una de CDN SIN extension) + 3
+//    inactivas + comunidad disponible -> 2 del modulo en orden de posicion y 4
+//    de comunidad por votos DESC, hasta 6. Ya no hay corto-circuito.
 var MODULO_I = {
   ok: true,
   total: 5,
@@ -539,7 +542,7 @@ var MODULO_I = {
   ]
 };
 
-correr('I modulo: solo las activas, orden posicion, votos 0 y corto-circuito', function (ok) {
+correr('I modulo: activas primero por posicion y comunidad rellena hasta 6', function (ok) {
   var env = crearEntorno({ datos: { ok: true, data: FILAS_A }, heroModulo: MODULO_I });
   var antes = env.estado();
   return llamar(env).then(function (res) {
@@ -548,33 +551,41 @@ correr('I modulo: solo las activas, orden posicion, votos 0 y corto-circuito', f
     var arr = res.llamadas[0] || [];
     var esperado = [
       'https://res.cloudinary.com/demo/image/upload/w_1200/hero-home',
-      'https://cdn.test/mod-c.jpg'
+      'https://cdn.test/mod-c.jpg',
+      'https://cdn.test/com-a1.jpg',
+      'https://cdn.test/com-a3.jpg',
+      'https://cdn.test/com-a2.jpg',
+      'https://cdn.test/com-a4.jpg'
     ];
-    ok(arr.length === 2, 'items=' + arr.length + ' esperado=2 (solo las activas)');
+    ok(arr.length === HERO_MAX, 'items=' + arr.length + ' esperado=' + HERO_MAX);
     ok(iguales(urls(arr), esperado), 'orden=' + urls(arr).join(' | ') + ' esperado=' + esperado.join(' | '));
-    ok(arr.length === 2 && arr[0].nombre === 'Slot A', 'nombre0=' + (arr.length ? JSON.stringify(arr[0].nombre) : 'n/a'));
-    ok(arr.length === 2 && arr[1].nombre === 'Slot C', 'nombre1=' + (arr.length > 1 ? JSON.stringify(arr[1].nombre) : 'n/a'));
+    ok(arr.length === HERO_MAX && arr[0].nombre === 'Slot A', 'nombre0=' + (arr.length ? JSON.stringify(arr[0].nombre) : 'n/a'));
+    ok(arr.length === HERO_MAX && arr[1].nombre === 'Slot C', 'nombre1=' + (arr.length > 1 ? JSON.stringify(arr[1].nombre) : 'n/a'));
+    // El modulo entrega votos 0; la cola de comunidad sigue siendo votos DESC.
     var i;
-    for (i = 0; i < arr.length; i++) {
-      ok(arr[i].votos === 0, 'item ' + i + ' votos=' + arr[i].votos + ' esperado=0');
+    for (i = 0; i < 2 && i < arr.length; i++) {
+      ok(arr[i].votos === 0, 'item modulo ' + i + ' votos=' + arr[i].votos + ' esperado=0');
     }
+    ok(votosDescendentes(arr.slice(2)), 'cola de comunidad no descendente: '
+      + arr.slice(2).map(function (x) { return x.votos; }).join(','));
     var crudo = urls(arr).join(' ');
     ok(crudo.indexOf('mod-x') === -1 && crudo.indexOf('mod-y') === -1, 'slot inactivo entro al hero: ' + crudo);
-    ok(crudo.indexOf('com-a') === -1, 'foto de comunidad se mezclo con el modulo: ' + crudo);
+    ok(crudo.indexOf('com-a7') === -1, 'foto con votos 0 de comunidad entro: ' + crudo);
     ok(sinDuplicados(urls(arr)), 'URLs repetidas: ' + urls(arr).join(','));
     revisarFormato(ok, 'modulo', arr);
-    // Corto-circuito medido: una sola peticion en todo el ciclo.
-    ok(env.peticiones.length === 1, 'peticiones=' + env.peticiones.length + ' esperado=1 (corto-circuito)');
+    // Relleno medido: se pide el modulo y despues la comunidad.
+    ok(env.peticiones.length === 2, 'peticiones=' + env.peticiones.length + ' esperado=2 (modulo + comunidad)');
     ok(modulares(env).length === 1, 'peticiones tipo=hero_home=' + modulares(env).length + ' esperado=1');
-    ok(comunitarias(env).length === 0, 'se pidio comunidad con modulo activo: ' + comunitarias(env).length);
+    ok(comunitarias(env).length === 1, 'se esperaba 1 peticion a comunidad: ' + comunitarias(env).length);
+    ok(env.peticiones[0].modulo === true, 'la primera peticion no fue el modulo: ' + env.peticiones[0].url);
     var despues = env.estado();
     ok(despues.MEDIA_LISTO === antes.MEDIA_LISTO && despues.MEDIA_PIDIDA === antes.MEDIA_PIDIDA
       && despues.MEDIA_TOKEN === antes.MEDIA_TOKEN, 'el modulo toco el estado MEDIA_*');
   });
 });
 
-// J) 6 slots, uno apagado EN MEDIO y el payload desordenado -> 5 en orden de
-//    posicion, sin huecos y sin volver a comunidad.
+// J) 6 slots, uno apagado EN MEDIO y el payload desordenado -> 5 del modulo en
+//    orden de posicion y el ultimo hueco lo rellena la comunidad.
 var MODULO_J = {
   ok: true,
   total: 6,
@@ -588,7 +599,7 @@ var MODULO_J = {
   ]
 };
 
-correr('J modulo: hueco intermedio, 5 activas en orden de posicion', function (ok) {
+correr('J modulo: hueco intermedio, 5 activas y 1 de comunidad al final', function (ok) {
   var env = crearEntorno({ datos: { ok: true, data: FILAS_A }, heroModulo: MODULO_J });
   return llamar(env).then(function (res) {
     ok(res.llamadas.length === 1, 'callback llamado ' + res.llamadas.length + ' veces, esperado 1');
@@ -598,13 +609,16 @@ correr('J modulo: hueco intermedio, 5 activas en orden de posicion', function (o
       'https://cdn.test/j2.jpg',
       'https://cdn.test/j4.jpg',
       'https://cdn.test/j5.jpg',
-      'https://cdn.test/j6.jpg'
+      'https://cdn.test/j6.jpg',
+      'https://cdn.test/com-a1.jpg'
     ];
-    ok(arr.length === 5, 'items=' + arr.length + ' esperado=5');
+    ok(arr.length === HERO_MAX, 'items=' + arr.length + ' esperado=' + HERO_MAX);
     ok(iguales(urls(arr), esperado), 'orden=' + urls(arr).join(' | ') + ' esperado=' + esperado.join(' | '));
     ok(urls(arr).join(' ').indexOf('j3-apagada') === -1, 'slot apagado intermedio entro al hero');
-    ok(env.peticiones.length === 1, 'peticiones=' + env.peticiones.length + ' esperado=1');
-    ok(comunitarias(env).length === 0, 'se pidio comunidad teniendo 5 slots activos');
+    ok(env.peticiones.length === 2, 'peticiones=' + env.peticiones.length + ' esperado=2 (hueco -> comunidad)');
+    ok(comunitarias(env).length === 1, 'peticiones a comunidad=' + comunitarias(env).length + ' esperado=1');
+    ok(arr.length === HERO_MAX && arr[HERO_MAX - 1].votos > 0,
+      'el ultimo hueco no lo relleno la comunidad: ' + (arr.length ? JSON.stringify(arr[arr.length - 1]) : 'n/a'));
     ok(sinDuplicados(urls(arr)), 'URLs repetidas: ' + urls(arr).join(','));
   });
 });
@@ -684,8 +698,8 @@ correr('M modulo: slot .mp4 descartado y, si queda 0, comunidad', function (ok) 
     ok(urls(arr).join(' ').indexOf('.mp4') === -1, 'el .mp4 del modulo entro al hero: ' + urls(arr).join(','));
     ok(iguales(urls(arr), ESPERADO_A), 'orden=' + urls(arr).join(' | ') + ' esperado= ' + ESPERADO_A.join(' | '));
     ok(comunitarias(env).length === 1, 'peticiones a comunidad=' + comunitarias(env).length + ' esperado=1');
-    // Mismo slot .mp4 acompanado de una imagen valida: se queda SOLO la imagen
-    // y no hay peticion a comunidad (el tramo 1 aporta algo).
+    // Mismo slot .mp4 acompanado de una imagen valida: se queda la imagen
+    // PRIMERO y la comunidad rellena los 5 huecos restantes.
     var mixto = crearEntorno({
       datos: { ok: true, data: FILAS_A },
       heroModulo: {
@@ -699,11 +713,194 @@ correr('M modulo: slot .mp4 descartado y, si queda 0, comunidad', function (ok) 
     });
     return llamar(mixto).then(function (res2) {
       var arr2 = res2.llamadas[0] || [];
-      ok(arr2.length === 1, 'mixto: items=' + arr2.length + ' esperado=1');
-      ok(urls(arr2)[0] === 'https://cdn.test/mixto-foto.jpg', 'mixto: url=' + urls(arr2)[0]);
-      ok(arr2.length === 1 && arr2[0].nombre === 'Foto', 'mixto: nombre=' + (arr2.length ? JSON.stringify(arr2[0].nombre) : 'n/a'));
-      ok(comunitarias(mixto).length === 0, 'mixto: se pidio comunidad teniendo una imagen valida');
+      var esperado2 = [
+        'https://cdn.test/mixto-foto.jpg',
+        'https://cdn.test/com-a1.jpg',
+        'https://cdn.test/com-a3.jpg',
+        'https://cdn.test/com-a2.jpg',
+        'https://cdn.test/com-a4.jpg',
+        'https://cdn.test/com-a5.jpg'
+      ];
+      ok(arr2.length === HERO_MAX, 'mixto: items=' + arr2.length + ' esperado=' + HERO_MAX);
+      ok(iguales(urls(arr2), esperado2), 'mixto: orden=' + urls(arr2).join(' | ') + ' esperado=' + esperado2.join(' | '));
+      ok(arr2.length && arr2[0].nombre === 'Foto', 'mixto: nombre=' + (arr2.length ? JSON.stringify(arr2[0].nombre) : 'n/a'));
+      ok(arr2.length && arr2[0].votos === 0, 'mixto: votos0=' + (arr2.length ? arr2[0].votos : 'n/a'));
+      ok(urls(arr2).join(' ').indexOf('mixto.mp4') === -1, 'mixto: el .mp4 entro al hero');
+      ok(comunitarias(mixto).length === 1, 'mixto: peticiones a comunidad=' + comunitarias(mixto).length + ' esperado=1');
     });
+  });
+});
+
+// ------------------------------------------- MEZCLA: casos del operador (N-Q)
+// N) El caso reportado: UN solo slot activo en el panel + comunidad llena ->
+//    el hero NO se queda con una foto: 1 del modulo PRIMERO (con su caption y
+//    votos 0) y 5 de comunidad por votos DESC.
+var MODULO_N = {
+  ok: true,
+  total: 1,
+  data: [
+    { posicion: 1, url: 'https://cdn.test/mod-n.jpg', caption: 'Portada N', activa: true }
+  ]
+};
+
+correr('N mezcla: 1 slot del modulo + 5 de comunidad (no se queda en 1 foto)', function (ok) {
+  var env = crearEntorno({ datos: { ok: true, data: FILAS_A }, heroModulo: MODULO_N });
+  return llamar(env).then(function (res) {
+    ok(res.lanzo === null, 'cargar lanzo: ' + (res.lanzo && res.lanzo.message));
+    ok(res.llamadas.length === 1, 'callback llamado ' + res.llamadas.length + ' veces, esperado 1');
+    var arr = res.llamadas[0] || [];
+    var esperado = [
+      'https://cdn.test/mod-n.jpg',
+      'https://cdn.test/com-a1.jpg',
+      'https://cdn.test/com-a3.jpg',
+      'https://cdn.test/com-a2.jpg',
+      'https://cdn.test/com-a4.jpg',
+      'https://cdn.test/com-a5.jpg'
+    ];
+    ok(arr.length === HERO_MAX, 'items=' + arr.length + ' esperado=' + HERO_MAX);
+    ok(iguales(urls(arr), esperado), 'orden=' + urls(arr).join(' | ') + ' esperado=' + esperado.join(' | '));
+    ok(arr.length > 0 && arr[0].url === 'https://cdn.test/mod-n.jpg', 'el slot del modulo no va primero: ' + (arr[0] && arr[0].url));
+    ok(arr.length > 0 && arr[0].nombre === 'Portada N', 'nombre0=' + (arr.length ? JSON.stringify(arr[0].nombre) : 'n/a'));
+    ok(arr.length > 0 && arr[0].votos === 0, 'votos0=' + (arr.length ? arr[0].votos : 'n/a') + ' esperado=0');
+    ok(votosDescendentes(arr.slice(1)), 'cola de comunidad no descendente: '
+      + arr.slice(1).map(function (x) { return x.votos; }).join(','));
+    ok(sinDuplicados(urls(arr)), 'URLs repetidas: ' + urls(arr).join(','));
+    revisarFormato(ok, 'mezcla-n', arr);
+    // Con 1 activa se piden DOS tramos: modulo y comunidad.
+    ok(env.peticiones.length === 2, 'peticiones=' + env.peticiones.length + ' esperado=2 (modulo + comunidad)');
+    ok(modulares(env).length === 1 && comunitarias(env).length === 1,
+      'reparto de peticiones modulo=' + modulares(env).length + ' comunidad=' + comunitarias(env).length);
+  });
+});
+
+// O) DEDUPE ENTRE FUENTES: la misma URL esta en el modulo y en comunidad ->
+//    aparece UNA sola vez, con la del modulo (caption y votos 0), y el hueco se
+//    rellena con la siguiente de comunidad.
+var MODULO_O = {
+  ok: true,
+  total: 1,
+  data: [
+    { posicion: 1, url: 'https://cdn.test/com-a3.jpg', caption: 'Slot Doblado', activa: true }
+  ]
+};
+
+correr('O dedupe: modulo y comunidad con la misma URL -> gana el modulo', function (ok) {
+  var env = crearEntorno({ datos: { ok: true, data: FILAS_A }, heroModulo: MODULO_O });
+  return llamar(env).then(function (res) {
+    ok(res.llamadas.length === 1, 'callback llamado ' + res.llamadas.length + ' veces, esperado 1');
+    var arr = res.llamadas[0] || [];
+    var esperado = [
+      'https://cdn.test/com-a3.jpg',
+      'https://cdn.test/com-a1.jpg',
+      'https://cdn.test/com-a2.jpg',
+      'https://cdn.test/com-a4.jpg',
+      'https://cdn.test/com-a5.jpg',
+      'https://cdn.test/com-a8.jpg'
+    ];
+    ok(arr.length === HERO_MAX, 'items=' + arr.length + ' esperado=' + HERO_MAX);
+    ok(iguales(urls(arr), esperado), 'orden=' + urls(arr).join(' | ') + ' esperado=' + esperado.join(' | '));
+    var repetidas = 0;
+    var i;
+    for (i = 0; i < arr.length; i++) {
+      if (String(arr[i].url).indexOf('com-a3.jpg') !== -1) repetidas++;
+    }
+    ok(repetidas === 1, 'la URL compartida aparece ' + repetidas + ' veces, esperado 1');
+    ok(arr.length > 0 && arr[0].nombre === 'Slot Doblado',
+      'no gano el nombre del modulo: ' + (arr.length ? JSON.stringify(arr[0].nombre) : 'n/a'));
+    ok(arr.length > 0 && arr[0].votos === 0, 'la del modulo debe traer votos 0, trae ' + (arr.length ? arr[0].votos : 'n/a'));
+    ok(sinDuplicados(urls(arr)), 'URLs repetidas: ' + urls(arr).join(','));
+    ok(env.peticiones.length === 2, 'peticiones=' + env.peticiones.length + ' esperado=2 (modulo + comunidad)');
+  });
+});
+
+// P) CORTO-CIRCUITO: el modulo ya llena los 6 -> NO se pide comunidad (ni se
+//    consulta el respaldo): una unica peticion en todo el ciclo.
+var MODULO_P = {
+  ok: true,
+  total: 6,
+  data: [
+    { posicion: 6, url: 'https://cdn.test/p6.jpg', caption: 'P6', activa: true },
+    { posicion: 1, url: 'https://cdn.test/p1.jpg', caption: 'P1', activa: true },
+    { posicion: 4, url: 'https://cdn.test/p4.jpg', caption: 'P4', activa: true },
+    { posicion: 2, url: 'https://cdn.test/p2.jpg', caption: 'P2', activa: true },
+    { posicion: 5, url: 'https://cdn.test/p5.jpg', caption: 'P5', activa: true },
+    { posicion: 3, url: 'https://cdn.test/p3.jpg', caption: 'P3', activa: true }
+  ]
+};
+
+correr('P corto-circuito: modulo con 6 activas -> no se pide comunidad', function (ok) {
+  var env = crearEntorno({ datos: { ok: true, data: FILAS_A }, heroModulo: MODULO_P });
+  return llamar(env).then(function (res) {
+    ok(res.llamadas.length === 1, 'callback llamado ' + res.llamadas.length + ' veces, esperado 1');
+    var arr = res.llamadas[0] || [];
+    var esperado = [
+      'https://cdn.test/p1.jpg',
+      'https://cdn.test/p2.jpg',
+      'https://cdn.test/p3.jpg',
+      'https://cdn.test/p4.jpg',
+      'https://cdn.test/p5.jpg',
+      'https://cdn.test/p6.jpg'
+    ];
+    ok(arr.length === HERO_MAX, 'items=' + arr.length + ' esperado=' + HERO_MAX);
+    ok(iguales(urls(arr), esperado), 'orden=' + urls(arr).join(' | ') + ' esperado=' + esperado.join(' | '));
+    var i;
+    for (i = 0; i < arr.length; i++) {
+      ok(arr[i].votos === 0, 'item ' + i + ' votos=' + arr[i].votos + ' esperado=0');
+    }
+    ok(env.peticiones.length === 1, 'peticiones=' + env.peticiones.length + ' esperado=1 (solo modulo)');
+    ok(modulares(env).length === 1, 'peticiones tipo=hero_home=' + modulares(env).length + ' esperado=1');
+    ok(comunitarias(env).length === 0, 'se pidio comunidad con los 6 slots llenos: ' + comunitarias(env).length);
+    ok(sinDuplicados(urls(arr)), 'URLs repetidas: ' + urls(arr).join(','));
+  });
+});
+
+// Q) RELLENO FINAL CON DESTACADOS: 2 del modulo + 1 de comunidad + sin mas
+//    comunidad -> 3 items y el resto lo pone el respaldo (rating DESC).
+var MODULO_Q = {
+  ok: true,
+  total: 2,
+  data: [
+    { posicion: 2, url: 'https://cdn.test/q2.jpg', caption: 'Q2', activa: true },
+    { posicion: 1, url: 'https://cdn.test/q1.jpg', caption: 'Q1', activa: true }
+  ]
+};
+
+var FILAS_Q = [
+  foto('https://cdn.test/com-q1.jpg', 5, { album_titulo: 'Comunidad Q' }),
+  foto('https://cdn.test/com-q-cero.jpg', 0, { album_titulo: 'Sin votos' })
+];
+
+correr('Q relleno: modulo + comunidad + destacados hasta los 6', function (ok) {
+  var env = crearEntorno({ datos: { ok: true, data: FILAS_Q }, heroModulo: MODULO_Q });
+  env.fijarDestacados(DESTACADOS_C);
+  return llamar(env).then(function (res) {
+    ok(res.llamadas.length === 1, 'callback llamado ' + res.llamadas.length + ' veces, esperado 1');
+    var arr = res.llamadas[0] || [];
+    var esperado = [
+      'https://cdn.test/q1.jpg',
+      'https://cdn.test/q2.jpg',
+      'https://cdn.test/com-q1.jpg',
+      'https://cdn.test/d-a.jpg',
+      'https://cdn.test/d-b.jpg',
+      'https://cdn.test/d-z.jpg'
+    ];
+    ok(arr.length === HERO_MAX, 'items=' + arr.length + ' esperado=' + HERO_MAX);
+    ok(iguales(urls(arr), esperado), 'orden=' + urls(arr).join(' | ') + ' esperado=' + esperado.join(' | '));
+    ok(arr.length > 2 && arr[2].nombre === 'Comunidad Q', 'nombre2=' + (arr.length > 2 ? JSON.stringify(arr[2].nombre) : 'n/a'));
+    ok(arr.length > 2 && arr[2].votos === 5, 'votos2=' + (arr.length > 2 ? arr[2].votos : 'n/a') + ' esperado=5');
+    var i;
+    for (i = 3; i < arr.length; i++) {
+      ok(arr[i].votos === 0, 'relleno ' + i + ' votos=' + arr[i].votos + ' esperado=0');
+    }
+    ok(arr.length > 4 && arr[3].nombre === 'Alfa' && arr[4].nombre === 'Beta',
+      'orden del respaldo roto: ' + [arr[3] && arr[3].nombre, arr[4] && arr[4].nombre].join(','));
+    ok(urls(arr).join(' ').indexOf('com-q-cero') === -1, 'foto con votos 0 de comunidad entro: ' + urls(arr).join(','));
+    ok(urls(arr).join(' ').indexOf('d-d.jpg') === -1, 'destacado false entro al relleno');
+    ok(urls(arr).join(' ').indexOf('.mp4') === -1, 'video entro al relleno');
+    ok(sinDuplicados(urls(arr)), 'URLs repetidas: ' + urls(arr).join(','));
+    revisarFormato(ok, 'mezcla-q', arr);
+    ok(env.peticiones.length === 2, 'peticiones=' + env.peticiones.length + ' esperado=2 (modulo + comunidad)');
+    ok(comunitarias(env).length === 1, 'peticiones a comunidad=' + comunitarias(env).length + ' esperado=1');
   });
 });
 

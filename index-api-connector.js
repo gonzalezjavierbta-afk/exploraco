@@ -500,21 +500,25 @@
   // Contrato publico: window.ExploraCOHero.cargar(cb). cb recibe UN array de
   // { url, nombre, votos } (maximo 6, sin URLs repetidas, solo imagenes) y se
   // llama SIEMPRE una vez: exito, vacio o error. Nunca lanza.
-  // Precedencia decidida por el usuario (orden ESTRICTO, sin mezclar tramos):
+  // Precedencia decidida por el usuario (MEZCLA por orden, hasta 6):
   //   1) MODULO MANUAL: slots activa === true del panel, en orden de posicion
   //      ASC (maximo 6). Fuente: GET /api/utilidades?tipo=hero_home, PUBLICA
-  //      (sin auth), que devuelve {posicion, url, caption, activa}. Si aporta
-  //      1 o mas slots, se entregan SOLO esos y se CORTO-CIRCUITA (no se pide
-  //      comunidad ni se consulta el respaldo). degradado:true, total 0, error
-  //      HTTP o red => "sin modulo" y se sigue por el tramo 2. Nunca lanza.
-  //   2) COMUNIDAD: fotos de album de usuario con votos > 0, globales (sin
-  //      ciudad ni destino), votos DESC. Fuente: el endpoint EXISTENTE
+  //      (sin auth), que devuelve {posicion, url, caption, activa}. Van
+  //      PRIMERO, siempre. degradado:true, total 0, error HTTP o red =>
+  //      "sin modulo" y decide el tramo 2. Nunca lanza.
+  //   2) COMUNIDAD: rellena los huecos que deje el modulo. Fotos de album de
+  //      usuario con votos > 0, globales (sin ciudad ni destino), votos DESC.
+  //      Fuente: el endpoint EXISTENTE
   //      GET /api/interacciones?tipo=multimedia_mapa&tipo_media=foto (capa
   //      publica, mismo patron de authHeaders que cargarMapaMedia).
-  //   3) RESPALDO: foto hero de los destinos destacado === true que ya trae
-  //      /api/destinos?limit=500 (la lista que alimenta las tarjetas).
-  //      rating DESC y luego nombre ASC; votos = 0.
+  //   3) RESPALDO: si aun quedan huecos, foto hero de los destinos
+  //      destacado === true que ya trae /api/destinos?limit=500 (la lista que
+  //      alimenta las tarjetas). rating DESC y luego nombre ASC; votos = 0.
   //   4) Si no hay ninguna: [] (la home conserva su gradiente).
+  // Total siempre <= 6 y sin URLs repetidas entre tramos: manda el tramo
+  // anterior (si la misma URL viene del modulo, se queda su nombre y votos 0).
+  // El CORTO-CIRCUITO solo se aplica si el modulo ya llena los 6 slots: en ese
+  // caso no se pide comunidad ni se consulta el respaldo.
   // Estado PROPIO (HERO_*) y peticion PROPIA: cero efectos sobre MEDIA_*,
   // MAPA_MEDIA, los tokens anti-respuesta-obsoleta ni los markers del mapa.
   var HERO_MAX = 6;
@@ -721,10 +725,41 @@
     }));
   }
 
-  // Primaria -> respaldo -> [] (en ese orden y solo si la anterior da 0).
-  function heroComponer(primaria) {
-    if (primaria && primaria.length) return primaria;
-    return heroDesdeDestacados(heroDestacadosActuales());
+  // MEZCLA de tramos: los recorre EN ORDEN y rellena hasta HERO_MAX. El dedupe
+  // es por URL normalizada y gana la PRIMERA aparicion, asi que un slot del
+  // modulo conserva su nombre (caption) y sus votos 0 aunque la misma foto
+  // venga tambien de comunidad o de destacados.
+  function heroMezclar(tramos) {
+    var out = [];
+    var vistos = {};
+    var t, i, it, clave, votos;
+    for (t = 0; t < (tramos || []).length; t++) {
+      var lista = tramos[t] || [];
+      for (i = 0; i < lista.length; i++) {
+        it = lista[i];
+        if (!it || !it.url) continue;
+        clave = String(it.url).trim().toLowerCase();
+        if (!clave || vistos[clave]) continue;
+        vistos[clave] = true;
+        votos = Number(it.votos);
+        out.push({
+          url: String(it.url).trim(),
+          nombre: (it.nombre == null) ? '' : String(it.nombre),
+          votos: (isFinite(votos) && votos >= 0) ? votos : 0
+        });
+        if (out.length >= HERO_MAX) return out;
+      }
+    }
+    return out;
+  }
+
+  // MEZCLA con relleno: modulo (ya filtrado y ordenado) -> comunidad ->
+  // destacados. Los destacados SOLO se consultan si quedan huecos, para no
+  // pagar trabajo de mas.
+  function heroComponerMezcla(modulo, comunidad) {
+    var base = heroMezclar([modulo, comunidad]);
+    if (base.length >= HERO_MAX) return base;
+    return heroMezclar([base, heroDesdeDestacados(heroDestacadosActuales())]);
   }
 
   // Cierra la peticion en vuelo: cachea si hay algo y responde a TODOS los
@@ -754,9 +789,11 @@
     heroPedirModulo();
   }
 
-  // TRAMO 2 (comunidad) + TRAMO 3 (destacados). Comportamiento intacto: es la
-  // peticion de siempre, con su authHeaders y su heroComponer.
-  function heroPedirComunidad() {
+  // TRAMO 2 (comunidad) + TRAMO 3 (destacados). La logica de comunidad es la
+  // de siempre (authHeaders, votos DESC, umbral); lo unico nuevo es que rellena
+  // los huecos que deja el modulo y que la entrega pasa por la mezcla.
+  function heroPedirComunidad(modulo) {
+    var previo = Array.isArray(modulo) ? modulo : [];
     // tipo_media=foto es un parametro EXISTENTE del mismo endpoint (filtra
     // af.foto_type); no abre ninguna ruta nueva ni toca api/.
     var url = '/api/interacciones?tipo=multimedia_mapa&tipo_media=foto&_t=' + Date.now();
@@ -769,41 +806,44 @@
         .then(function (d) {
           var filas = (d && d.ok === true && Array.isArray(d.data)) ? d.data : [];
           if (!filas.length) console.warn('[index-api] hero: multimedia_mapa sin filas', (d && d.error) || 'vacio');
-          heroCerrar(heroComponer(heroDesdeComunidad(filas)));
+          heroCerrar(heroComponerMezcla(previo, heroDesdeComunidad(filas)));
         })
         .catch(function (e) {
-          // Red caida: la primaria dio 0 utilizables, asi que decide el respaldo.
+          // Red caida: el tramo 2 aporta 0, asi que rellena el respaldo (o el
+          // propio modulo si ya traia algo).
           console.warn('[index-api] hero: fallo multimedia_mapa', e && e.message);
-          heroCerrar(heroComponer([]));
+          heroCerrar(heroComponerMezcla(previo, []));
         });
     } catch (e) {
       console.warn('[index-api] hero: fetch no disponible', e && e.message);
-      heroCerrar(heroComponer([]));
+      heroCerrar(heroComponerMezcla(previo, []));
     }
   }
 
-  // TRAMO 1 en vuelo. Una sola peticion por ciclo: si el modulo aporta algo,
-  // heroCerrar corta aqui y NO se pide comunidad. Cualquier fallo degrada a
-  // comunidad sin lanzar y sin dejar el callback sin llamar.
+  // TRAMO 1 en vuelo. Corto-circuito SOLO si el modulo ya llena los 6: en ese
+  // caso no se pide comunidad ni se consulta el respaldo. Si aporta menos, se
+  // pide comunidad para rellenar; si no aporta nada, el ciclo sigue igual que
+  // antes (comunidad -> destacados -> []). Ningun fallo deja el callback sin
+  // llamar.
   function heroPedirModulo() {
     try {
       fetch(HERO_MODULO_QS + '&_t=' + Date.now())
         .then(function (r) { return r.json(); })
         .then(function (d) {
           var lista = heroDesdeModulo(d);
-          if (lista.length) { heroCerrar(lista); return; }
-          if (!d || d.degradado === true || !(d && d.ok === true)) {
+          if (lista.length >= HERO_MAX) { heroCerrar(lista); return; }
+          if (!lista.length && (!d || d.degradado === true || d.ok !== true)) {
             console.warn('[index-api] hero: modulo manual sin slots', (d && d.error) || 'degradado');
           }
-          heroPedirComunidad();
+          heroPedirComunidad(lista);
         })
         .catch(function (e) {
           console.warn('[index-api] hero: fallo modulo manual', e && e.message);
-          heroPedirComunidad();
+          heroPedirComunidad([]);
         });
     } catch (e) {
       console.warn('[index-api] hero: fetch no disponible (modulo)', e && e.message);
-      heroPedirComunidad();
+      heroPedirComunidad([]);
     }
   }
 
