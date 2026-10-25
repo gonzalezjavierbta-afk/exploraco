@@ -520,8 +520,10 @@ async function escribirFicha(sql, f) {
   var fila = filas[0];
 
   if (f.faqs.length) {
+    // destinos_detalles NO tiene creado_en (medido contra information_schema
+    // de produccion): mismo patron que scripts/seed-medellin.js:305-315.
     await sql(
-      'INSERT INTO destinos_detalles (destino_id, faqs, creado_en) VALUES ($1,$2,NOW()) '
+      'INSERT INTO destinos_detalles (destino_id, faqs) VALUES ($1,$2) '
       + 'ON CONFLICT (destino_id) DO UPDATE SET faqs=EXCLUDED.faqs',
       [fila.id, JSON.stringify(f.faqs)]
     );
@@ -536,9 +538,12 @@ async function escribirFicha(sql, f) {
       [fila.id, p.url]
     );
     if (ya.length) {
+      // UPDATE medido en produccion: la 2a pasada fallaba con
+      // "could not determine data type of parameter $1" porque $1 viajaba en
+      // el array sin aparecer en el SQL. Renumerado a $1..$4.
       await sql(
-        'UPDATE destinos_fotos SET caption=$2, orden=$3, es_hero=$4 WHERE id=$5',
-        [fila.id, p.caption, p.orden, p.es_hero, ya[0].id]
+        'UPDATE destinos_fotos SET caption=$1, orden=$2, es_hero=$3 WHERE id=$4',
+        [p.caption, p.orden, p.es_hero, ya[0].id]
       );
     } else {
       await sql(

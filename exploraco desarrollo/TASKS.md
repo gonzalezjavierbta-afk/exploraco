@@ -5958,5 +5958,96 @@ Las **4 draft** son las cuatro fichas de **evento** cuya `fecha_fin` ya paso **y
 
 **Nuevos:** `ficha/ficha-<slug>.json` y `.md` (**36 pares**), `scripts/seed-medellin-lote1..6.js` (**6**), `scripts/load-medellin-lote1..6-api.js` (**6**), `scripts/smoke_test_<slug>.js` (**36**), `scripts/ejecucion/indexar-prompt-medellin.js`, `scripts/ejecucion/verificar-fotos-fichas.js`, `scripts/ejecucion/informe-fichas-medellin.js`, `scripts/ejecucion/test-paginas-medellin.js`, `scripts/ejecucion/wikimedia-url.js`. **Modificado:** `package.json` (script `test:paginas:medellin`). **Sin commit y sin desplegar.** Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md`, `BUGS_HISTORICOS.md` (**BUG-132** y **BUG-133**). **`PROJECT.md` y `BLUEPRINT.md` NO se tocan:** al no haber carga a produccion no cambia ninguna cifra ni afirmacion vigente de alcance ni de contrato.
 
+## TSK-222 - Presentacion de ciudad `medellin` PUBLICADA en produccion + capacidad nueva del motor `tags.sin_foto_hero` (corte CONDICIONAL del fallback de imagen) + bandera opt-in `--sin-fotos` en `validate_ficha.js` - 2026-10-25 - CERRADO / DESPLEGADO (`42e8169`)
+
+**Estado: CERRADO Y EN PRODUCCION** -- 2026-10-25 (pase documental unico R2). Despliegue: commit **`42e8169`** en `main`, push a `origin`, Vercel desplegado. Decision: `DECISIONS.md` **ADR-100** (la excepcion de admision D2; el argumento **no se repite aqui**, ADR-084 D1).
+
+### 1. Fila publicada (medida en Neon)
+
+| Campo | Valor |
+|---|---|
+| `slug` | `medellin` |
+| `categoria_slug` | `sitio` |
+| `status` | `published` |
+| `id` | `e1f695f5-eeab-4dec-9266-e5d0799f7d9d` |
+| `zona` / `region` / `ciudad` | `andina` / `Antioquia` / `Medellín` (con tilde) |
+| `foto_hero` | **`NULL`** (a proposito) |
+| `destinos_fotos` | **0 filas** |
+| `destinos_detalles` | **5 FAQs** |
+
+**Completitud calculada OFFLINE con `lib/completitud.js`: 64 / tier intermedio.** Faltantes declarados por la fuente unica: `subcategoria,foto,fotos_3,video,amenidades,habitaciones`.
+
+**Excepcion de admision ADR-100 D2, documentada y trazada:** la fila se publico **sin `foto_hero`** con la bandera `--publicar-sin-foto`, **autorizada explicitamente por el operador**. La traza vive en `tags.excepcion_admision = {tipo:'sin_foto_hero', autorizada_operador:true, fecha:'2026-10-25'}`. No es un fallo ni una omision: es una excepcion con autor y fecha.
+
+### 2. Artefactos nuevos
+
+1. `ficha/ficha-medellin.md` (**766 lineas**, formato espejo de `ficha-bogota.md`) + `ficha/ficha-medellin.json`.
+2. `scripts/seed-medellin.js` -- upsert con la condicion de admision de ADR-100: completitud **offline**, `region`/`zona` derivadas de `geo-ciudades.js`, **5 claves `pub_*`**, **cero** claves de XP/autor, **cero `DELETE`**, `--dry` por defecto.
+3. `scripts/smoke_test_medellin.js` (**48 asserts**).
+4. `scripts/smoke_sin_foto_hero.js` (**7 casos**).
+
+**Contenido a paridad con Bogota:** 8 entradas, 5 tours, **13 paradas de itinerario en 3 dias**, 6 secretos, 6 `fauna_flora`, 7 equipamiento, 5 `dificultad_tags` (**3 con `apto:false`**), 12 meses de `temporada_matriz`, 5 FAQs. Fuente: `prompt.txt` (raiz) + las **36 fichas locales** de Medellin.
+
+**`prompt.txt` fue RESTAURADO a HEAD `a839bd7`:** su version en working tree habia reemplazado el **JSON array de 36 fichas** que consume `scripts/ejecucion/indexar-prompt-medellin.js`. El contenido de ciudad vive ahora en `ficha/ficha-medellin.md`, no en `prompt.txt`.
+
+### 3. Capacidad nueva del motor de render (no es fix, es capacidad)
+
+`api/pagina-destino.js`: corte **CONDICIONAL** del fallback de imagen Unsplash por **flag de fila** `tags.sin_foto_hero` (acepta `true`, `'true'`, `'1'`), en un **UNICO punto de decision**.
+
+| Situacion | Hero | `og:image` / `twitter:image` | `image` del JSON-LD |
+|---|---|---|---|
+| Flag activo **y** sin foto real | `hero_bg` **solido + emoji** | **omitidos** | **omitida** |
+| Sin flag | cascada `foto_hero -> foto -> curada -> Unsplash por categoria` **EXACTAMENTE igual** | presentes | presente |
+
+`scripts/validate_ficha.js`: bandera **opt-in `--sin-fotos`**; el comportamiento **por defecto** (minimo **5 fotos** y **1 `es_hero`**) queda **intacto**.
+
+**Regresion medida (5 suites):** `smoke_sin_foto_hero` **7/7**, `smoke_hero_fallback` **11/11**, `smoke_test_plaza-botero-medellin` **24/24**, `smoke_test_comuna-13-san-javier-medellin` **22/22**, `smoke_test_medellin` **48/48**.
+
+### 4. Verificacion en produccion
+
+`https://latawel.com/medellin.html` (dominio canonico): HTTP **200**; `images.unsplash.com` = **0**; `og:image` = **0**; `#1b4d3e` **presente**; **el sitemap la incluye**; `/api/destinos` la lista como **`published`**. **8/8** funciones serverless intactas: **cero endpoint nuevo**.
+
+## TSK-223 - Publicacion real de los 36 POIs de Medellin/Envigado en Neon (32 `published` / 4 `draft`, 181 fotos, 252 FAQs) + cierre de BUG-134 (`destinos_detalles` sin `creado_en`) y BUG-135 (parametro fantasma `$1`, seeds no idempotentes) - 2026-10-25 - CERRADO / DESPLEGADO (`42e8169`)
+
+**Estado: CERRADO Y EN PRODUCCION** -- 2026-10-25 (pase documental unico R2). Esta tarea **ejecuta** lo que TSK-221 dejo preparado en local; el argumento de la condicion de admision sigue **solo** en `DECISIONS.md` **ADR-100**.
+
+### 1. Carga ejecutada
+
+**6 seeds de lote ejecutados con `--write`:** **32 `published` / 4 `draft`**, **181 fotos**, **252 FAQs**.
+
+Los **4 `draft`** son los **eventos caducados**, por la regla D6 de ADR-100 y sin excepciones: `feria-de-las-flores-medellin`, `festival-internacional-de-poesia-medellin`, `desfile-de-autos-clasicos-y-antiguos-medellin`, `festival-nacional-de-la-trova-medellin`.
+
+### 2. Correccion del criterio 2 de ADR-100 (31/5 -> 32/4)
+
+El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 eventos**, de los cuales **4 estan caducados** y **2 son futuros** (`alumbrados-navidenos-medellin` 2026-12-01 -> 2027-01-11 y otro), luego el reparto correcto es **32/4**. La cifra quedo corregida **en el propio ADR-100** (criterio de verificacion 2) con la nota de la medicion; **no se reescribio el resto del ADR**.
+
+### 3. HTTP verificado (dominio canonico `https://latawel.com`)
+
+**200** en `/plaza-botero-medellin.html`, `/comuna-13-san-javier-medellin.html`, `/parque-explora-medellin.html`, `/mercado-del-rio-medellin.html`.
+
+### 4. Dos bugs reales encontrados y cerrados en la misma tanda
+
+1. **BUG-134 -- `destinos_detalles` no tiene columna `creado_en`.** Los **6 seeds de lote** y el patron heredado de `seed-bogota.js` insertaban `(destino_id, faqs, creado_en)` y **fallaban SIEMPRE** al persistir FAQs; en Bogota el fallo era **invisible** por un `.catch(function(){})` silencioso. Corregido a `(destino_id, faqs)` conservando `ON CONFLICT (destino_id) DO UPDATE SET faqs=EXCLUDED.faqs`. **Verificado: 37/37 filas nuevas con FAQs persistidas.**
+2. **BUG-135 -- parametro fantasma `$1` en `UPDATE destinos_fotos`.** Los 6 seeds enviaban **5 parametros para 4 placeholders**; fallaba **solo en la 2a pasada** (`could not determine data type of parameter $1`), es decir **los seeds NO eran idempotentes**. Corregido a `SET caption=$1, orden=$2, es_hero=$3 WHERE id=$4`.
+
+**Idempotencia probada en real:** `lote1` y `lote6` pasan `--write` **dos veces seguidas** con **exit 0** y **sin duplicar**. Conteos estables entre pasadas: `destinos` = **258**, Medellin/Envigado = **48**, `interacciones` = **919**, `destinos_fotos` = **205**, `destinos_detalles` = **48**.
+
+### 5. Deuda legacy observada (NO de esta tanda, NO tocada)
+
+- **11 filas** de Medellin/Envigado con `zona IS NULL` (anteriores a ADR-100).
+- **57 eventos caducados** publicados a nivel **global** (**delta 0** en esta carga: no se anadio ninguno).
+
+## TSK-224 - [TAREA ABIERTA] B2: `#relacionados` de `/medellin.html` cruza de ciudad y enlaza 3 destinos de BOGOTA con 0 POIs de Medellin - 2026-10-25 - ABIERTA / REQUIERE `@renderer-dev` (GATE)
+
+**Estado: ABIERTA -- NO SE TOCO EL MOTOR EN ESTA TANDA.**
+
+**Sintoma medido:** `/medellin.html` enlaza en su bloque `#relacionados` a **3 destinos de Bogota** (`taller-de-las-moscas`, `centro-cultural-delia-zapata-olivella`, `cinemateca-de-bogota`) y a **0 POIs de Medellin**, aunque los **36 POIs ya estan publicados** (TSK-223).
+
+**Causa:** el criterio de relacionados **no prioriza la misma `ciudad`**.
+
+**Por que no se cerro:** es motor de render (`api/pagina-destino.js`) -> **gate de §2** + Escudo GOLD, y esta tanda era de documentacion y cierre.
+
+**Criterio de cierre propuesto:** el bloque de una fila con `ciudad` poblada prioriza candidatos de **la misma ciudad** y solo cae al criterio global si no hay ninguno; verificable con un smoke que compare el `ciudad` de cada enlace contra el de la fila.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

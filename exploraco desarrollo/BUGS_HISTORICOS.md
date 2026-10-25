@@ -2356,4 +2356,32 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **Correccion aplicada:** en los **6** seeds la fuente **primaria** es ahora la propia ficha (`FOTOS_SUGERIDAS` + `urlMiniatura()` a 1280 px); `ficha/_informe-fotos.json` queda como **override OPCIONAL** y, si **no existe, es ilegible o no indexa el slug**, las URLs se recomponen y la ficha **nunca** queda en 0 fotos (`scripts/seed-medellin-lote1.js:155-196`). El `--dry` imprime `fotos_resueltas` y `fuente` (**`informe`** / **`wikimedia`**) como **control visible**: si `fotos_resueltas=0` salta a la vista antes de escribir. Cero Borrado: ninguna ficha se borro, se regeneraron las URLs.
 
+## BUG-134: los seeds insertaban `creado_en` en `destinos_detalles`, **columna que no existe**, luego las FAQ **nunca se persistian** y el fallo era **invisible** por un `.catch` vacio -- **CERRADO (2026-10-25)**
+
+**Severidad: ALTA mientras duro (0 FAQs persistidas en cualquier carga de lote; en Bogota paso desapercibido). Estado: CERRADO el 2026-10-25.**
+
+**Sintoma:** el seed terminaba con exit 0 y resumen correcto, pero `destinos_detalles` no recibia ninguna fila de FAQ. Ningun error visible: la promesa se rechazaba y un `.catch(function(){})` **se tragaba** el rechazo.
+
+**Causa:** el `INSERT` iba con `(destino_id, faqs, creado_en)` y **`destinos_detalles` no tiene columna `creado_en`**. El patron estaba **heredado de `seed-bogota.js`**, o sea el defecto era **anterior a esta tanda** y afectaba a los **6 seeds de lote** y al seed de Bogota por igual.
+
+**Patron de falla (el que hay que recordar):** **un `catch` mudo convierte un fallo de escritura en un exito aparente.** Un seed que no **cuenta y reporta** las filas persistidas no prueba nada: el exit code 0 solo dice que el proceso termino.
+
+**Correccion aplicada:** `INSERT INTO destinos_detalles (destino_id, faqs)` en `scripts/seed-medellin.js` y en `scripts/seed-medellin-lote{1..6}.js`, conservando `ON CONFLICT (destino_id) DO UPDATE SET faqs=EXCLUDED.faqs` (el upsert sigue siendo idempotente y no borra, ADR-003).
+
+**Verificacion:** **37/37** filas nuevas con **FAQs persistidas** (`destinos_detalles` = **48** filas para Medellin/Envigado, estable entre pasadas).
+
+## BUG-135: parametro fantasma `$1` en el `UPDATE destinos_fotos` de los seeds -- los seeds **no eran idempotentes** y fallaban **solo en la 2a pasada** -- **CERRADO (2026-10-25)**
+
+**Severidad: ALTA (rompia la idempotencia, que es la propiedad en la que se apoya todo el camino de escritura de ADR-100 D5). Estado: CERRADO el 2026-10-25.**
+
+**Sintoma:** la **primera** pasada del seed funcionaba; la **segunda** fallaba con `could not determine data type of parameter $1`. Un seed que solo pasa una vez **no es idempotente**, y el reintento es justo el escenario normal de una carga por lotes.
+
+**Causa:** el `UPDATE destinos_fotos` enviaba **5 parametros para 4 placeholders**; el parametro sobrante es el `$1` que el motor no puede tipar. El desajuste **no se ve en la primera pasada** porque la ruta de insercion no ejecuta esa sentencia con los mismos valores.
+
+**Patron de falla (el que hay que recordar):** **la idempotencia no se declara, se ejecuta dos veces.** Un seed con `ON CONFLICT` puede seguir sin ser idempotente si alguna de sus sentencias no soporta la segunda pasada.
+
+**Correccion aplicada:** `SET caption=$1, orden=$2, es_hero=$3 WHERE id=$4` en los **6** seeds de lote: **4 placeholders, 4 parametros**.
+
+**Verificacion (en real, no en `--dry`):** `lote1` y `lote6` pasan `--write` **dos veces seguidas** con **exit 0** y **sin duplicar**. Conteos estables entre pasadas: `destinos` = **258**, Medellin/Envigado = **48**, `interacciones` = **919**, `destinos_fotos` = **205**, `destinos_detalles` = **48**.
+
 

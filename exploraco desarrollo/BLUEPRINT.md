@@ -294,6 +294,23 @@ El renderer gatea las secciones de sitio por subcategoria via `subcatActiva()` (
 
 **Motor de interacciones y presencia fisica (ADR-024, 2026-09-12):** ademas del motor de tags, `api/interacciones.js` resuelve la geocerca de `tipo=visita` con `haversineMetros` y `resolverRadioM`, que leen `destinos.tags.subcategoria`/`tipo_actividad`/`nombre` y `destinos.lat/lng`. La evidencia viaja en `interacciones.dims.geo` (JSONB). El esquema y el detalle completo viven en la seccion 3 (tabla `interacciones`) y en DECISIONS.md ADR-024.
 
+### Flag de fila `tags.sin_foto_hero` y bandera `--sin-fotos` (capacidades existentes, 2026-10-25)
+
+Dos capacidades **existentes y en produccion** permiten publicar una ficha **sin fotos reales** sin inventar material ni degradar el resto del directorio. **No son un modo por defecto: son opt-in explicito.**
+
+**1. `tags.sin_foto_hero` (flag de fila, lo lee el motor de render).** Marca que la fila **no debe** caer al fallback de imagen. Acepta `true`, `'true'` y `'1'` (los tres valores, porque el flag llega tanto del admin como de un seed). El motor lo evalua en **un unico punto de decision** y su efecto es **condicional**:
+
+| Estado | Hero | `og:image` / `twitter:image` | `image` del JSON-LD |
+|---|---|---|---|
+| Flag activo **y** sin foto real | `hero_bg` **solido + emoji** | **omitidos** | **omitida** |
+| Sin flag | cascada `foto_hero -> foto -> curada -> Unsplash por categoria` **sin cambios** | presentes | presente |
+
+La clave es la **condicionalidad**: sin el flag, la cascada de ADR-030 / TSK-215 queda **byte-identica**. El flag **no** sustituye la cascada, la **desactiva solo para esa fila**.
+
+**2. `--sin-fotos` (bandera de `scripts/validate_ficha.js`).** Relaja **solo** la comprobacion de fotos al validar una ficha. El comportamiento **por defecto queda intacto**: minimo **5 fotos** y **1 `es_hero`**. Es una bandera **opt-in** para fichas cuya ausencia de fotos es **una decision** (por ejemplo, una presentacion de ciudad que espera material propio del operador).
+
+**Motivo de que existan las dos juntas:** el flag resuelve el **render** y la bandera resuelve el **contrato de validacion**; sin la bandera la ficha no pasaria `validate_ficha.js` y sin el flag el motor la publicaria con una imagen de Unsplash que no es del lugar. La autorizacion de publicar asi **no la da ninguna de las dos**: la da el **operador**, y la traza va en la fila (`tags.excepcion_admision`, ver ADR-100 D2).
+
 ### Protocolo de persistencia: MERGE obligatorio (ver DECISIONS.md ADR-003)
 
 Los endpoints de actualizacion (admin-destinos.js) nunca reemplazan el campo tags completo. Siempre hacen merge a nivel SQL:
