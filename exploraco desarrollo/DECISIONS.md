@@ -9420,3 +9420,53 @@ Esto elimina el duplicado de indexacion **sin** tocar el metodo HTTP, **sin** ro
 | 9 | *(no tocar)* `scripts/load-*.js:16` | Deuda 3 | **NULO** — herramienta interna; si se cambia, que sea con el operador. |
 
 **Reparto sugerido:** `@seo-dev` (1, 5, 6 — es su dominio y ya tiene el gate), `@admin-dev` (3, 4) y `@backend-dev` (2 si se prefiere por `api/`), o un unico `@backend-dev` con el brief completo si el operador quiere un solo pase. **Cierre documental** (`NEXT.md`/`TASKS.md`) en un unico pase de `@docs-keeper` (R2): este ADR es el **unico** sitio donde vive el argumento (ADR-084 D1); los demas ficheros solo lo apuntan por ID.
+
+## ADR-103: La clave de `TAGS.cuando_ir` es **`nota`** y la fija el **renderer** (`api/pagina-destino.js:2006`), no `estado_nota`; `validate_ficha --estricto` ya exige ese nombre, asi que cuando validador y motor discrepan **gana el consumidor** y el productor (ficha/seed) se adapta [no deroga ningun ADR previo; **cierra** el unico FAIL de contrato que dejo el alta de `salento` (TSK-236)]
+
+**ID:** ADR-103
+**Fecha:** 2026-10-25
+**Autor:** `@docs-keeper` (documenta una decision de implementacion ya ejecutada y medida en TSK-236; sin gate de riesgo, el dominio es documental).
+**Estado:** **ACEPTADO / YA APLICADO** en `scripts/seed-salento.js`. Es un ADR **retrospectivo**: no propone codigo nuevo, **no** toca `api/pagina-destino.js`, **no** cambia `scripts/validate_ficha.js`, **no** toca base de datos y **no** crea endpoint (Vercel Hobby **8/8**).
+
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor encabezado del fichero era **`ADR-102`** (linea **9305**). Apariciones previas de la cadena `ADR-103`: **0** (conteo por `Select-String`). Tamano real medido hoy: **1.460.580 bytes / 9.422 lineas**.
+
+### Problema
+
+El alta de `salento` (TSK-236) paso **el contrato legado** de `scripts/validate_ficha.js` (`PASS`) y **fallo el contrato v2** (`FAIL` con `--estricto`) por una unica clave: `TAGS.cuando_ir` no traia **`nota`**. La ficha de origen hablaba de `estado_nota`, y ese nombre **no existe en el motor**: `estado_nota` tenia **0** coincidencias en `api/pagina-destino.js`, mientras que el renderer lee **`ci.nota`** (`api/pagina-destino.js:2006`: `esc(ci.nota || ci.descripcion || '')`).
+
+Es un desacuerdo de **nombres**, no de contenido, con dos consecuencias opuestas: una ficha puede estar **editorialmente completa y suspender el validador**, o **pasar el validador con un nombre que el motor nunca pinta** (texto perdido en silencio, el tipo de fallo que ADR-099 T3 persigue). El validador, por su parte, ya traia el nombre correcto: `scripts/validate_ficha.js:198` -> `cuando_ir: ['periodo', 'estado', 'nota']`, con `estado` restringido a `['ideal','posible','no']` (`:225`) y validado aparte en `:329-332`.
+
+### Opciones evaluadas
+
+1. **A. Renombrar a `estado_nota` y ensenarselo al motor.** Descartada: obliga a editar `api/pagina-destino.js` (dominio de **`@renderer-dev`**, gate propio), cambia el HTML de **todas** las fichas de `sitio` a la vez y hace por una sola pagina lo que ninguna otra necesitaba. Ademas deja dos nombres vivos para el mismo dato, que es el defecto, no la cura.
+2. **B. Emitir `nota` en el seed, admitiendo `estado_nota` como alias de entrada (ELEGIDA).** El productor se adapta al consumidor. Cero cambios de motor y cero cambios de validador: el contrato ya estaba bien escrito y lo que estaba mal era el dato que se le entrego.
+3. **C. Relajar `validate_ficha --estricto` para que `nota` deje de ser obligatoria.** Descartada: debilita el contrato v2 **en el unico punto donde el motor tiene opinion**, y el FAIL habria sido correcto. El validador no era el problema.
+4. **D. No tocar nada y publicar con el FAIL.** Descartada: el `FAIL` es la unica senal que distingue "falta el dato" de "el dato esta con otro nombre", y publicar por encima de el convierte una discrepancia de esquema en deuda invisible.
+
+### Decision
+
+**D1. `nota` es el nombre normativo del campo de texto libre de `TAGS.cuando_ir[]`, fijado por quien lo consume.** Fuente de verdad: `api/pagina-destino.js:2006`. `scripts/validate_ficha.js:198` ya lo exige con ese nombre; por tanto **no se cambia ninguno de los dos**.
+
+**D2. El productor adapta el dato, no el contrato.** Toda ficha o seed que use otro nombre (`estado_nota` incluido) debe **mapearlo a `nota` antes de sembrar**. Aplicado en `scripts/seed-salento.js:357-361` (`cuando_ir[{ "periodo": ..., "estado": "ideal", "nota": ... }]`) y documentado en el propio seed (`scripts/seed-salento.js:80-81`).
+
+**D3. Regla general de desempate, para futuros desacuerdos de nombre de clave.** Ante discrepancia entre **validador** y **renderer**, la clave la decide el que la **lee en produccion**; el que escribe se adapta. Solo si el nombre del motor es un error semantico demostrable se abre un ADR de motor con **`@renderer-dev`** y **gate**.
+
+**D4. `estado` y `nota` son campos distintos y no se sustituyen.** `estado` es la temporada cerrada (`ideal`/`posible`/`no`, `scripts/validate_ficha.js:225`) y `nota` es la frase que explica la temporada; el motor solo pinta `nota`. Perder `estado` para satisfacer la vista rompe el contrato v2 sin mejorar el HTML.
+
+### Justificacion
+
+El desacuerdo no estaba en el esquema: estaba en haber entregado el dato con un nombre que **solo existia en la conversacion**. Elegir B cuesta **0 lineas de codigo de motor** y **0 lineas de validador**, mientras A cuesta un gate de `api/*.js` y una regresion potencial en todas las fichas de `sitio`; y C, ademas de costar, elimina la unica alarma que detecto el problema. La regla D3 se fija ahora porque el patron —el mismo dato con dos nombres, uno en el contrato y otro en el motor— es el que produjo el FAIL y volvera a aparecer en la siguiente ingesta si no hay criterio escrito.
+
+### Impacto
+
+- **Codigo:** **ninguno** en `api/*.js` ni en `scripts/validate_ficha.js`. El unico artefacto que materializa la decision es `scripts/seed-salento.js` (**ya escrito**, TSK-236).
+- **Datos:** `TAGS.cuando_ir[]` de `salento` en Neon lleva `nota`; el resto de fichas de `sitio` **no se tocan** (no se re-migra nada).
+- **Documental:** `TASKS.md` (TSK-236) y `NEXT.md` apuntan aqui por ID; **el argumento vive solo en este ADR** (ADR-084 D1).
+- **Riesgo residual:** una ficha futura puede volver a entrar con `estado_nota`. **No hay guard automatico**: la deteccion es `validate_ficha --estricto` antes de sembrar, que es exactamente lo que fallo a tiempo en TSK-236.
+
+### Criterio de verificacion
+
+1. **V1** `node scripts/validate_ficha.js <ficha> --estricto` -> **PASS** con `TAGS.cuando_ir[]` que contenga `periodo`, `estado` (en `['ideal','posible','no']`) y `nota`, para una ficha de `subcategoria` `ciudad`.
+2. **V2** `estado_nota` **0** coincidencias en `api/pagina-destino.js` (conteo por `Select-String`); si algun dia aparece, este ADR queda superado y hay que abrir el ADR de motor de D3.
+3. **V3** En el HTML servido de la pagina, la frase de `nota` **aparece** en el bloque de `cuando_ir` (`esc(ci.nota || ci.descripcion || '')`, `api/pagina-destino.js:2006`); el fallback a `descripcion` no debe estar tapando el campo.
+4. **V4** `scripts/seed-salento.js` sin bytes > 127 (ADR-002) y con `ON CONFLICT (slug) DO UPDATE` (`L415`) para no duplicar al reintentar.

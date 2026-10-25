@@ -6260,5 +6260,36 @@ El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 evento
 
 **Traza 2026-10-25 (auditoria posterior, MISMA tarea, no una tarea nueva):** al auditar el resto de paginas tras esta, se midio que **81** seeds con fotos de Commons **no** escriben `tags.creditos_fotos` -> registrado como **BUG-139** (ABIERTO); `barranquilla` queda como **excepcion**, no como patron cumplido. Ademas, el **DELETE+POST** del loader invierte el id en cada republicacion: inocuo hoy por `rating=0` y **sin resenas**, riesgo de FK si la pagina acumula actividad; **que sigue:** evaluar upsert por `slug`, anotado en `NEXT.md`. Ningun cambio de codigo en este pase.
 
+## TSK-236 - Pagina nueva `salento` (categoria `sitio`, subcategoria `ciudad`, zona `andina`, Quindio): quinta del repo con el contrato de 12 secciones de ciudad, de los **15** nombres Wikimedia de la ficha solo **2** existian (2/15) y los 3 temas 404 se sustituyeron por archivos REALES verificados HEAD 200, seed idempotente (2a corrida = UPDATE mismo id, sin fila nueva), loader -> id `f5ed96e1-812b-4b4c-ad46-aea23b2bd289`, `/salento.html` HTTP 200, `/api/destinos?categoria=sitio` total **106** con el slug presente, sitemap dinamico ya con la URL (lastmod 2026-10-25), Escudo GOLD **8/8** - 2026-10-25 - COMPLETADA
+
+**Estado: COMPLETADA** -- 2026-10-25 (pase documental unico R2). Quinta pagina del contrato de **12 secciones** de `ciudad` (precedentes **TSK-231** `cartagena-de-indias`, **TSK-232** `santiago-de-cali`, **TSK-233** `santa-marta` y **TSK-235** `barranquilla`). Alcance ejecutado: **cero cambios en `api/*.js`** (incluido `api/pagina-destino.js`), **cero** migracion, **cero** endpoint nuevo (Vercel **8/8** intacto) y **cero** edicion manual de `sitemap.xml` (se sirve dinamico: `/sitemap.xml` -> `/api/utilidades?tipo=sitemap`, y ya lista la pagina).
+
+**Ficha y datos:** slug `salento`, `categoria_slug` `sitio`, `subcategoria` `ciudad`, `zona` `andina`, Quindio, `lat` **4.637157** / `lng` **-75.570844** (alineado con `geo-ciudades.js:905`), `status` `published`, `destacado` **true**. `highlight` final: **"4.8/5 - Cuna de la Palma de Cera - Paisaje Cultural Cafetero"**.
+
+**Contrato de ficha (origen de ADR-103):** `node scripts/validate_ficha.js tmp/ficha-salento.json` -> **PASS** en **modo legado**. Con **`--estricto`** -> **FAIL por la clave `nota`** de `TAGS.cuando_ir`. Se resolvio **emitiendo `nota` en el seed**, porque **el renderer consume `nota`** (`api/pagina-destino.js:2006`, `esc(ci.nota || ci.descripcion || '')`) y `estado_nota` tenia **0** coincidencias en el renderer; el validador ya exige ese nombre (`scripts/validate_ficha.js:198` -> `cuando_ir: ['periodo','estado','nota']`). La decision se registra en **ADR-103** (el argumento vive alli, ADR-084 D1).
+
+**Archivos (medidos contra el repositorio real, ADR-006; los 3 son NUEVOS y NINGUNO lleva bytes > 127):**
+
+1. `scripts/seed-salento.js` (**507** lineas, **19.091** bytes) -- upsert **`ON CONFLICT (slug) DO UPDATE`** (`L415`), re-ejecutable sin duplicar.
+2. `scripts/load-salento-api.js` (**109** lineas, **3.421** bytes) -- loader por **`POST /api/admin-destinos`** (`BASE_URL` por argv, default host de despliegue).
+3. `scripts/smoke_test_salento.js` (**104** lineas, **4.925** bytes) -- secciones de `ciudad` + balance de divs + hero real.
+
+**Verificacion medida (Escudo GOLD + smoke + produccion + Neon + API + sitemap):**
+
+- **Escudo GOLD 8/8** en auditoria independiente: `node --check` **3/3** exit 0; ASCII-safety **0/0/0** bytes > 127; balance de divs **306/306** en smoke y **356/356** en vivo (**diff 0**); **ADR-009** pass (`rating` **""** y sin resenas, nunca hardcodeado); **ADR-003** pass (ids del DOM preservados); **idempotencia** pass; **ADR-008** **12/14** imagenes con `onerror` (las **2** sin `onerror` son el **logo estatico de marca** en header y footer, **no** son dinamicas).
+- **Idempotencia:** **2a corrida del seed = UPDATE** sobre el **mismo id** (prefijo `1860eab1`), **sin fila nueva**.
+- **Produccion:** loader -> id **`f5ed96e1-812b-4b4c-ad46-aea23b2bd289`**; `GET https://exploraco.vercel.app/salento.html` -> **HTTP 200**.
+- **API:** `GET /api/destinos?categoria=sitio` -> **total 106** sitios con `salento` presente.
+- **Sitemap:** `sitemap.xml` dinamico ya incluye la URL con **lastmod 2026-10-25**; **no requirio edicion**.
+
+**Hallazgos y notas:**
+
+1. **Fotos: de los 15 nombres Wikimedia propuestos en la ficha solo 2 existian.** Sobrevivieron el **hero panoramico** (**4000x3000**) y **Valle de Cocora**; los temas **Calle Real**, **Jeep Willys** e **Iglesia** daban **404** y se sustituyeron por **3 archivos REALES verificados HEAD 200**: `Callerealsalento.JPG`, `Jeep_Willys_-_Salento_(1).JPG` y `Plaza_Principal_de_Salento_-_Iglesia_al_fondo_-_panoramio.jpg`. Quinta ocurrencia del mismo patron (Bogota/lacandelaria, **TSK-231**, **TSK-232**, **TSK-235**, esta) -> **refuerzo de BUG-022**, **sin BUG nuevo**: mismo tipo de defecto, ya registrado.
+2. **ADR-008 al 12/14, no al 14/14:** el hueco esta acotado al **logo estatico de marca** (header/footer), que no es `<img>` dinamico ni pasa por el motor de fichas. **No** es deuda de esta pagina.
+
+**Deuda editorial ABIERTA (no resuelta en este pase, es dato de contenido y no de motor):** `descripcion` y `hero_bg` quedaron sembrados **sin tildes** (ASCII puro), y `entradas`, `tours`, `itinerario`, `secretos` y `regulaciones` quedan **sembrados pero gated-out** por **ADR-016** (subcategoria `ciudad`). Ninguna de las dos cosas bloquea la pagina: la primera es calidad editorial visible, la segunda es contenido que hoy **no se renderiza** por diseño.
+
+**Deudas de la tanda que siguen abiertas (no de esta pagina):** **BUG-137** (`/api/destinos` no emite el campo `ciudad`, afecta a **todas** las ciudades) y los bloques **(b) D3 diferido**, **(c) URLs no canonicas de `@admin-dev`** y **(d) V4 `SITE_BASE_URL`** de **TSK-234**. **Pendiente de operador:** commit y push de los **3** artefactos nuevos junto con este pase documental.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
