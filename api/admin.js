@@ -362,10 +362,18 @@ module.exports = async function handler(req, res) {
         + 'FROM destinos d '
         + 'LEFT JOIN categorias c ON c.slug = d.categoria_slug '
         + 'WHERE d.status = $1 '
+        // ADR-099 D6.4: la cola lista SOLO lo ENVIADO. Ni la semilla del
+        // teaser ni el borrador reclamado (que aun no se ha enviado) son
+        // solicitudes: no deben ensuciar la bandeja de moderacion.
+        + 'AND COALESCE(d.tags->>\'estado_envio\', \'enviado\') = \'enviado\' '
         + 'ORDER BY d.creado_en DESC LIMIT $2 OFFSET $3',
         [status, limit, offset]
       );
-      var total = await sql('SELECT COUNT(*) AS n FROM destinos WHERE status=$1',[status]);
+      var total = await sql(
+        'SELECT COUNT(*) AS n FROM destinos WHERE status=$1 '
+        + 'AND COALESCE(tags->>\'estado_envio\', \'enviado\') = \'enviado\'',
+        [status]
+      );
       return res.status(200).json({ ok:true, status, total: parseInt((total[0]||{}).n||0), items:rows });
     }
 
@@ -380,10 +388,14 @@ module.exports = async function handler(req, res) {
         [nuevo, Boolean(body.destacado||false), body.id]
       );
       if (!upd.length) return res.status(404).json({ ok:false, error:'No encontrado' });
+      // ADR-099 T3: el POST ESPERA la respuesta del otorgar y la devuelve.
+      // Antes se descartaba y la UI no podia mostrar el numero; ademas un
+      // fallo del otorgar quedaba invisible.
+      var otorgamiento = null;
       if (nuevo === 'published') {
         try {
           var baseUrlAdm = (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://exploraco.vercel.app');
-          await fetch(baseUrlAdm + '/api/interacciones', {
+          var respOtorga = await fetch(baseUrlAdm + '/api/interacciones', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -391,8 +403,18 @@ module.exports = async function handler(req, res) {
             },
             body: JSON.stringify({ tipo: 'publicar_lugar_otorgar', destino_id: body.id })
           });
+          var jsonOtorga = null;
+          try { jsonOtorga = await respOtorga.json(); } catch (eJsonOtorga) { jsonOtorga = null; }
+          var jOt = jsonOtorga || {};
+          otorgamiento = {
+            otorgado: jOt.otorgado === true,
+            xp: (jOt.xp === undefined ? null : jOt.xp),
+            tier: jOt.tier || null,
+            motivo: jOt.motivo || jOt.error || (respOtorga.ok ? null : 'error_otorgar')
+          };
         } catch (eOtorga) {
           console.warn('[admin solicitudes] otorgar XP fallo: ' + (eOtorga && eOtorga.message));
+          otorgamiento = { otorgado:false, xp:null, tier:null, motivo:'error_otorgar' };
         }
       }
       var msgs = { published:'\u2705 Publicado', archived:'\ud83d\uddc4\ufe0f Archivado', draft:'\u23f3 Borrador' };
@@ -400,6 +422,7 @@ module.exports = async function handler(req, res) {
         ok:true, mensaje: msgs[nuevo],
         url: nuevo==='published' ? 'https://exploraco.vercel.app/'+upd[0].slug+'.html' : null,
         destino: upd[0],
+        otorgamiento: otorgamiento,
       });
     }
   }

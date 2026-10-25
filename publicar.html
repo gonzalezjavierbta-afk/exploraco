@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Publica tu lugar en LATAWEL</title>
-  <meta name="description" content="Publica tu hostal, restaurante o sitio turístico en el directorio de Colombia. Gratis, sin comisión, publicación inmediata.">
+  <meta name="description" content="Publica tu hostal, restaurante, sitio o experiencia en el directorio de Colombia. Gratis y sin comisi&oacute;n: cada env&iacute;o pasa por revisi&oacute;n del equipo antes de publicarse.">
   <meta name="theme-color" content="#FF4A00">
   <style>
     :root {
@@ -183,6 +183,42 @@
     .loading-overlay.active { display: flex; }
     .loading-box { background: #fff; border-radius: 16px; padding: 2rem 2.5rem; text-align: center; }
     .loading-box p { margin-top: .5rem; color: var(--muted); font-size: .9rem; }
+
+    /* ADR-099 -- COMPLETITUD EN VIVO, NIVELES, VIDEO Y MIS ENVIOS */
+    .ec-comp { max-width: 680px; margin: 0 auto; padding: .45rem 1rem .7rem; }
+    .ec-comp-top { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+    .ec-comp-pct { font-size: .95rem; font-weight: 800; color: var(--brand-dark); }
+    .ec-comp-pct::after { content: '%'; font-size: .72rem; margin-left: 1px; }
+    .ec-comp-tier { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+    .ec-comp-barra { height: 8px; border-radius: 99px; background: #ece9e4; overflow: hidden; margin: .3rem 0 .35rem; }
+    .ec-comp-fill { display: block; height: 100%; width: 0%; background: var(--brand); border-radius: 99px; transition: width .25s ease; }
+    .ec-comp-faltan { font-size: .78rem; color: var(--text); line-height: 1.35; }
+    .ec-comp-aviso { font-size: .7rem; color: var(--muted); line-height: 1.35; margin-top: .15rem; }
+    /* ADR-099 T4: estimacion de XP. Flujo normal (nunca absoluta): crece hacia
+       abajo y no tapa los CTA. Las cifras las pone el catalogo del motor. */
+    .ec-comp-xp { font-size: .78rem; line-height: 1.4; color: var(--brand-dark); font-weight: 600; margin: .2rem 0 0; }
+    .success-screen p.success-xp { color: var(--brand-dark); font-weight: 600; font-size: .9rem; }
+    @media(max-width:400px){ .ec-comp-xp { font-size: .74rem; } }
+    .nivel-cta { margin-top: 1rem; text-align: center; }
+    .nivel-cta-hint { font-size: .75rem; color: var(--muted); margin-top: .35rem; }
+    .btn-hasta { width: 100%; background: #fff; border: 1.5px dashed var(--brand); color: var(--brand-dark); padding: .75rem 1rem; border-radius: 12px; font-family: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; }
+    .btn-hasta:hover { background: #fff8ec; }
+    .btn-hasta:disabled { opacity: .6; cursor: not-allowed; }
+    .aviso-suave { color: #a35a00; font-weight: 600; }
+    .envio-error { display: none; margin-top: .75rem; font-size: .85rem; color: var(--error); font-weight: 600; text-align: center; }
+    .envio-error.visible { display: block; }
+    .mios-item { border: 1px solid #E5E7EB; border-radius: 12px; padding: .85rem; margin-bottom: .6rem; background: #fff; }
+    .mios-item h3 { font-size: .95rem; font-weight: 700; margin-bottom: .25rem; word-break: break-word; }
+    .mios-meta { display: flex; align-items: center; gap: .5rem; font-size: .75rem; color: var(--muted); margin-bottom: .1rem; }
+    .mios-estado { display: inline-block; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: .15rem .5rem; border-radius: 99px; background: #efe9e1; color: #6b5b45; }
+    .mios-estado.publicado { background: #e8f5e9; color: #1a6b1a; }
+    .mios-estado.revision { background: #fff4e0; color: #a35a00; }
+    .mios-estado.rechazado { background: #fdecea; color: #a3251f; }
+    .mios-acciones { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .55rem; }
+    .mios-acciones a, .mios-acciones button { font-family: inherit; font-size: .8rem; font-weight: 600; padding: .45rem .8rem; border-radius: 10px; border: 1.5px solid var(--brand); background: #fff8ec; color: var(--brand-dark); text-decoration: none; cursor: pointer; }
+    .nav-mios { font-size: .8125rem; color: var(--brand-dark); text-decoration: none; font-weight: 700; margin-right: .75rem; }
+    #mios-login { display: inline-block; margin-top: .6rem; text-align: center; text-decoration: none; }
+    @media(min-width:481px){ .btn-hasta { width: auto; padding: .75rem 1.75rem; } }
   </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -199,7 +235,7 @@
 <!-- NAV -->
 <nav class="nav">
   <a class="nav-logo" href="/index.html"><img class="latawel-logo" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="30"></a>
-  <a class="nav-back" href="/index.html">← Inicio</a>
+  <span class="nav-links"><a class="nav-mios" id="nav-mios" href="?vista=mios">Mis env&iacute;os</a><a class="nav-back" href="/index.html">← Inicio</a></span>
 </nav>
 
 <!-- HERO -->
@@ -220,27 +256,54 @@
   <div class="stepper">
     <div class="step-item active" id="step-indicator-1">
       <div class="step-num"><span>1</span></div>
-      <div class="step-label">Básico</div>
+      <div class="step-label">Identidad</div>
     </div>
     <div class="step-item" id="step-indicator-2">
       <div class="step-num"><span>2</span></div>
-      <div class="step-label">Fotos</div>
+      <div class="step-label">Ubicaci&oacute;n</div>
     </div>
     <div class="step-item" id="step-indicator-3">
       <div class="step-num"><span>3</span></div>
-      <div class="step-label">Detalles</div>
+      <div class="step-label">Fotos y medios</div>
     </div>
     <div class="step-item" id="step-indicator-4">
       <div class="step-num"><span>4</span></div>
-      <div class="step-label">Revisar</div>
+      <div class="step-label">Detalles</div>
     </div>
+  </div>
+
+  <!-- ADR-099 D3 + D12: completitud en vivo. Los puntos, el tier y los
+       faltantes los calcula lib/completitud.js; aqui no hay ningun peso. -->
+  <div class="ec-comp" id="ec-completitud">
+    <div class="ec-comp-top">
+      <span class="ec-comp-pct" id="ec-comp-pct">0</span>
+      <span class="ec-comp-tier" id="ec-comp-tier">Sin evaluar</span>
+    </div>
+    <div class="ec-comp-barra" id="ec-comp-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="ec-comp-fill" id="ec-comp-fill"></span></div>
+    <p class="ec-comp-faltan" id="ec-comp-faltan" aria-live="polite">Completa el formulario para ver tu puntaje.</p>
+    <p class="ec-comp-faltan" id="borrador-aviso" role="status" hidden></p>
+    <p class="ec-comp-xp" id="ec-comp-xp" hidden></p>
+    <p class="ec-comp-aviso" id="ec-comp-aviso">Estimaci&oacute;n: la cifra final la fijan los multiplicadores de nivel y origen y se acredita al aprobar.</p>
   </div>
 </div>
 
 <!-- FORM BODY -->
 <div class="form-wrap">
 
-  <!-- ===== PASO 1: INFORMACIÓN BÁSICA ===== -->
+  <!-- ADR-099 D11: mis envios. Mismo archivo, cero rutas nuevas. -->
+  <section class="vista-mios" id="vista-mios" hidden>
+    <div class="form-card">
+      <div class="form-card-title">Mis env&iacute;os</div>
+      <div id="mios-sin-sesion" hidden>
+        <p class="field-hint">Entra a tu cuenta para ver tus env&iacute;os y continuar un borrador.</p>
+        <a class="btn-next" id="mios-login" href="/index.html">Entrar a mi cuenta</a>
+      </div>
+      <p class="field-hint" id="mios-estado" aria-live="polite"></p>
+      <div id="mios-lista"></div>
+    </div>
+  </section>
+
+  <!-- ===== NIVEL 1: IDENTIDAD (ADR-099 D2) ===== -->
   <div class="form-panel active" id="panel-1">
 
     <div class="form-card">
@@ -268,6 +331,9 @@
           </label>
           <label class="tipo-chip" data-cat="evento">
             <input type="radio" name="categoria" value="evento">🎉 Evento / Festival
+          </label>
+          <label class="tipo-chip" data-cat="blog">
+            <input type="radio" name="categoria" value="blog">Blog / Experiencia
           </label>
         </div>
         <div class="field-error">Selecciona una categoría</div>
@@ -331,7 +397,35 @@
         </select>
       </div>
 
+      <!-- ADR-099 D8.3: blog es una categoria; el tema es su selector -->
+      <div class="field" id="f-tema" style="display:none">
+        <label for="tema">Tema del blog <span class="req">*</span></label>
+        <select id="tema">
+          <option value="">Seleccionar tema...</option>
+          <option value="aventura">Aventura</option>
+          <option value="gastro">Gastronomia y sabores</option>
+          <option value="cultura">Cultura y patrimonio</option>
+          <option value="naturaleza">Naturaleza</option>
+          <option value="tips">Consejos de viaje</option>
+        </select>
+        <div class="field-hint">El blog se publica como experiencia: relato y fotos.</div>
+        <div class="field-error">Elige un tema para el blog</div>
+      </div>
+
     </div>
+
+    <div class="nivel-cta">
+      <button type="button" class="btn-hasta" onclick="submitForm('hasta')">Enviar hasta aqu&iacute;</button>
+      <p class="nivel-cta-hint">Puedes parar en este nivel: se guarda lo que llevas y parar no es un error.</p>
+    </div>
+
+    <div class="form-nav">
+      <button class="btn-next" onclick="goNext(1)">Siguiente: Ubicaci&oacute;n &rarr;</button>
+    </div>
+  </div>
+
+  <!-- ===== NIVEL 2: UBICACION ===== -->
+  <div class="form-panel" id="panel-2">
 
     <div class="form-card">
       <div class="form-card-title">📍 Ubicación</div>
@@ -436,6 +530,112 @@
       <p class="field-hint">Las coordenadas son opcionales: si el mapa no carga, puedes escribirlas aqui.</p>
     </div>
 
+    <div class="nivel-cta">
+      <button type="button" class="btn-hasta" onclick="submitForm('hasta')">Enviar hasta aqu&iacute;</button>
+      <p class="nivel-cta-hint">El pin y las coordenadas suman puntos, pero no son obligatorios.</p>
+    </div>
+
+    <div class="form-nav">
+      <button class="btn-back" onclick="goBack(2)">&larr; Atr&aacute;s</button>
+      <button class="btn-next" onclick="goNext(2)">Siguiente: Fotos y medios &rarr;</button>
+    </div>
+  </div>
+
+  <!-- ===== NIVEL 3: FOTOS Y MEDIOS ===== -->
+  <div class="form-panel" id="panel-3">
+
+    <div class="form-card">
+      <div class="form-card-title">🖼️ Foto principal <span style="font-size:.8rem;font-weight:400;color:var(--muted)">opcional: suma puntos</span></div>
+
+      <div class="foto-upload" id="foto-drop" onclick="document.getElementById('foto-file').click()">
+        <input type="file" id="foto-file" accept="image/*" onchange="handleFotoFile(this)">
+        <div class="foto-upload-icon">📷</div>
+        <p>Toca para subir foto principal</p>
+        <p style="font-size:.75rem;margin-top:4px">JPG / PNG / WebP · máx 5MB</p>
+      </div>
+      <div id="foto-preview-wrap" style="display:none;text-align:center">
+        <div class="foto-preview">
+          <img id="foto-preview-img" src="" alt="preview">
+          <button class="btn-rem-foto" onclick="removeFoto()">×</button>
+        </div>
+      </div>
+
+      <div style="margin-top:.75rem">
+        <span class="foto-url-toggle" onclick="toggleFotoUrl()">O pega una URL de imagen ↓</span>
+        <div id="foto-url-wrap" style="display:none;margin-top:.5rem">
+          <input type="url" id="foto_url" placeholder="https://images.unsplash.com/..." style="width:100%;padding:.625rem .75rem;border:1.5px solid #ddd;border-radius:10px;font-size:.875rem" oninput="previewFromUrl(this.value)">
+          <p class="field-hint">Recomendado: <a href="https://unsplash.com" target="_blank">Unsplash.com</a> — busca tu destino y copia la URL</p>
+        </div>
+      </div>
+      <p class="field-hint aviso-suave" id="aviso-foto" role="status" aria-live="polite" hidden></p>
+    </div>
+
+    <div class="form-card">
+      <div class="form-card-title">🖼️ Galería adicional <span style="font-size:.8rem;font-weight:400;color:var(--muted)">la portada cuenta dentro del tope</span></div>
+
+      <div id="galeria-urls">
+        <div class="field galeria-url-row">
+          <input type="url" placeholder="URL foto 2 (opcional)" class="galeria-url" style="padding:.625rem .75rem;border:1.5px solid #ddd;border-radius:10px;font-size:.875rem;width:100%;margin-bottom:.5rem">
+        </div>
+        <div class="field galeria-url-row">
+          <input type="url" placeholder="URL foto 3 (opcional)" class="galeria-url" style="padding:.625rem .75rem;border:1.5px solid #ddd;border-radius:10px;font-size:.875rem;width:100%;margin-bottom:.5rem">
+        </div>
+      </div>
+      <p class="field-hint" id="galeria-contador" aria-live="polite">0 fotos (portada incluida).</p>
+      <button class="btn-add" onclick="subirFotoGaleria()">⬆️ Subir foto a la galería</button>
+      <button class="btn-add" onclick="addGaleriaRow()">+ Añadir otra foto</button>
+    </div>
+
+    <div class="form-card">
+      <div class="form-card-title">🔗 Redes sociales y web <span style="font-size:.8rem;font-weight:400;color:var(--muted)">opcionales</span></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Instagram</label>
+          <input type="text" id="instagram" placeholder="@tu_cuenta o URL">
+        </div>
+        <div class="field">
+          <label>Sitio web</label>
+          <input type="url" id="sitio_web" placeholder="https://...">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field" id="f-email">
+          <label id="lbl-email">Email <span class="opt-hint">(opcional)</span></label>
+          <input type="email" id="email" placeholder="contacto@...">
+          <div class="field-error">El blog necesita un email de contacto</div>
+        </div>
+        <div class="field">
+          <label>Teléfono fijo</label>
+          <input type="tel" id="telefono" placeholder="6011234567">
+        </div>
+      </div>
+    </div>
+
+    <!-- ADR-099 D9: el video deja de ser exclusivo de blog -->
+    <div class="form-card" id="card-video">
+      <div class="form-card-title">Video <span style="font-size:.8rem;font-weight:400;color:var(--muted)">opcional, en cualquier categor&iacute;a</span></div>
+      <div class="field" id="f-video">
+        <label for="video_url">URL del video</label>
+        <input type="url" id="video_url" placeholder="https://www.youtube.com/watch?v=..." oninput="validarVideoCliente()">
+        <div class="field-hint">YouTube, Vimeo o Spotify. Si el enlace no es de esos dominios, el video no se publica.</div>
+        <div class="field-error" id="err-video">Enlace no v&aacute;lido: usa YouTube, Vimeo o Spotify.</div>
+      </div>
+    </div>
+
+    <div class="nivel-cta">
+      <button type="button" class="btn-hasta" onclick="submitForm('hasta')">Enviar hasta aqu&iacute;</button>
+      <p class="nivel-cta-hint">La galer&iacute;a y el video suman puntos; tambi&eacute;n puedes enviar sin medios.</p>
+    </div>
+
+    <div class="form-nav">
+      <button class="btn-back" onclick="goBack(3)">&larr; Atr&aacute;s</button>
+      <button class="btn-next" onclick="goNext(3)">Siguiente: Detalles &rarr;</button>
+    </div>
+  </div>
+
+  <!-- ===== NIVEL 4: DETALLES Y ENVIO ===== -->
+  <div class="form-panel" id="panel-4">
+
     <div class="form-card">
       <div class="form-card-title">📝 Descripción</div>
 
@@ -447,6 +647,7 @@
         </div>
         <div class="field-hint"><span id="cnt-corta">0</span>/200 caracteres</div>
         <div class="field-error">La descripción es requerida (mín. 30 caracteres)</div>
+        <div class="field-hint aviso-suave" id="aviso-descripcion" role="status" aria-live="polite" hidden></div>
       </div>
 
       <div class="field">
@@ -492,87 +693,6 @@
         <input type="text" id="contacto_nombre" placeholder="Tu nombre o el del encargado">
       </div>
     </div>
-
-    <div class="form-nav">
-      <button class="btn-next" onclick="goNext(1)">Siguiente: Fotos →</button>
-    </div>
-  </div>
-
-  <!-- ===== PASO 2: FOTOS ===== -->
-  <div class="form-panel" id="panel-2">
-
-    <div class="form-card">
-      <div class="form-card-title">🖼️ Foto principal <span style="color:var(--error);font-size:.8rem">requerida</span></div>
-
-      <div class="foto-upload" id="foto-drop" onclick="document.getElementById('foto-file').click()">
-        <input type="file" id="foto-file" accept="image/*" onchange="handleFotoFile(this)">
-        <div class="foto-upload-icon">📷</div>
-        <p>Toca para subir foto principal</p>
-        <p style="font-size:.75rem;margin-top:4px">JPG / PNG / WebP · máx 5MB</p>
-      </div>
-      <div id="foto-preview-wrap" style="display:none;text-align:center">
-        <div class="foto-preview">
-          <img id="foto-preview-img" src="" alt="preview">
-          <button class="btn-rem-foto" onclick="removeFoto()">×</button>
-        </div>
-      </div>
-
-      <div style="margin-top:.75rem">
-        <span class="foto-url-toggle" onclick="toggleFotoUrl()">O pega una URL de imagen ↓</span>
-        <div id="foto-url-wrap" style="display:none;margin-top:.5rem">
-          <input type="url" id="foto_url" placeholder="https://images.unsplash.com/..." style="width:100%;padding:.625rem .75rem;border:1.5px solid #ddd;border-radius:10px;font-size:.875rem" oninput="previewFromUrl(this.value)">
-          <p class="field-hint">Recomendado: <a href="https://unsplash.com" target="_blank">Unsplash.com</a> — busca tu destino y copia la URL</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="form-card">
-      <div class="form-card-title">🖼️ Galería adicional <span style="font-size:.8rem;font-weight:400;color:var(--muted)">hasta 8 fotos</span></div>
-
-      <div id="galeria-urls">
-        <div class="field galeria-url-row">
-          <input type="url" placeholder="URL foto 2 (opcional)" class="galeria-url" style="padding:.625rem .75rem;border:1.5px solid #ddd;border-radius:10px;font-size:.875rem;width:100%;margin-bottom:.5rem">
-        </div>
-        <div class="field galeria-url-row">
-          <input type="url" placeholder="URL foto 3 (opcional)" class="galeria-url" style="padding:.625rem .75rem;border:1.5px solid #ddd;border-radius:10px;font-size:.875rem;width:100%;margin-bottom:.5rem">
-        </div>
-      </div>
-      <button class="btn-add" onclick="subirFotoGaleria()">⬆️ Subir foto a la galería</button>
-      <button class="btn-add" onclick="addGaleriaRow()">+ Añadir otra foto</button>
-    </div>
-
-    <div class="form-card">
-      <div class="form-card-title">🔗 Redes sociales y web <span style="font-size:.8rem;font-weight:400;color:var(--muted)">opcionales</span></div>
-      <div class="field-row">
-        <div class="field">
-          <label>Instagram</label>
-          <input type="text" id="instagram" placeholder="@tu_cuenta o URL">
-        </div>
-        <div class="field">
-          <label>Sitio web</label>
-          <input type="url" id="sitio_web" placeholder="https://...">
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Email</label>
-          <input type="email" id="email" placeholder="contacto@...">
-        </div>
-        <div class="field">
-          <label>Teléfono fijo</label>
-          <input type="tel" id="telefono" placeholder="6011234567">
-        </div>
-      </div>
-    </div>
-
-    <div class="form-nav">
-      <button class="btn-back" onclick="goBack(2)">← Atrás</button>
-      <button class="btn-next" onclick="goNext(2)">Siguiente: Detalles →</button>
-    </div>
-  </div>
-
-  <!-- ===== PASO 3: DETALLES ESPECÍFICOS ===== -->
-  <div class="form-panel" id="panel-3">
 
     <!-- SERVICIOS/AMENIDADES -->
     <div class="form-card">
@@ -754,15 +874,6 @@
       <p class="field-hint" style="margin-top:.5rem">Sugerencias: ¿Aceptan mascotas? · ¿Hay check-in tardío? · ¿Cuál es la política de cancelación?</p>
     </div>
 
-    <div class="form-nav">
-      <button class="btn-back" onclick="goBack(3)">← Atrás</button>
-      <button class="btn-next" onclick="goNext(3)">Revisar y enviar →</button>
-    </div>
-  </div>
-
-  <!-- ===== PASO 4: REVISAR Y ENVIAR ===== -->
-  <div class="form-panel" id="panel-4">
-
     <div class="form-card">
       <div class="form-card-title">📋 Resumen de tu lugar</div>
       <div id="resumen-contenido">
@@ -781,28 +892,32 @@
     </div>
 
     <div class="form-nav">
-      <button class="btn-back" onclick="goBack(4)">← Editar</button>
+      <button class="btn-back" onclick="goBack(4)">&larr; Editar</button>
       <button class="btn-next" id="btn-submit" onclick="submitForm()">🚀 Enviar solicitud</button>
     </div>
 
     <div class="envio-basico">
-      <p class="envio-basico-titulo">Prefieres enviarlo ya y completarlo despues?</p>
-      <button class="btn-soft" id="btn-submit-basico" onclick="submitForm('basico')">Enviar basico (sin datos de contacto)</button>
-      <p class="field-hint envio-basico-hint">Solo pide nombre, categoria, ciudad, descripcion de 30 caracteres o mas y una foto.</p>
+      <p class="envio-basico-titulo">O para aqu&iacute; y env&iacute;a lo que llevas</p>
+      <button class="btn-hasta" id="btn-submit-basico" onclick="submitForm('hasta')">Enviar hasta aqu&iacute;</button>
+      <p class="field-hint envio-basico-hint">Sin foto obligatoria. Si falta la descripci&oacute;n corta (30 caracteres o m&aacute;s) o el tema del blog, se guarda como borrador para que lo contin&uacute;es.</p>
       <p class="field-hint aviso-contacto" id="aviso-contacto" role="status" aria-live="polite" hidden></p>
     </div>
+
+    <p class="field-error envio-error" id="envio-error" role="alert"></p>
   </div>
 
   <!-- ÉXITO -->
   <div class="success-screen" id="success-screen">
     <div class="success-icon">🎉</div>
     <h2>¡Solicitud recibida!</h2>
-    <p>Tu lugar fue guardado en el sistema de LATAWEL.</p>
+    <p id="success-sub">Tu lugar fue guardado en el sistema de LATAWEL.</p>
+    <p class="success-xp" id="success-xp" hidden></p>
     <p>El equipo lo revisará y publicará en <strong>24–48 horas</strong>.</p>
     <p style="margin-top:.5rem">Una vez aprobado, podrás verlo en:<br>
       <a id="success-url" href="#" target="_blank" style="color:var(--brand-dark);font-weight:700"></a>
     </p>
-    <a href="/index.html" class="success-link">← Ver el directorio</a>
+    <a href="?vista=mios" id="success-mios" class="success-link">Ver mis env&iacute;os</a>
+    <a href="/index.html" class="success-link" style="background:#fff;color:var(--brand-dark);border:1.5px solid var(--brand)">← Ver el directorio</a>
   </div>
 
 </div><!-- /form-wrap -->
@@ -817,6 +932,7 @@
 </div>
 
 <script src="usuario-session.js"></script>
+<script src="/lib/completitud.js"></script>
 <script src="media-upload.js?v=1"></script>
 <script src="dictado-voz.js?v=1"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -830,7 +946,20 @@ var state = {
   step: 1,
   foto_principal_base64: null,
   foto_principal_url: null,
+  borrador: null,   // ADR-099 D6: { id, estado_envio } del borrador reanudado
 };
+
+// ADR-099 D8: blog es una categoria mas. Una sola lista de temas y una sola
+// funcion de tipo, compartidas por la validacion y por el script de UI.
+var EC_TEMAS_BLOG = ['aventura', 'gastro', 'cultura', 'naturaleza', 'tips'];
+// ADR-099 D3.3: tope duro de fotos por envio (12 contando la portada). El
+// servidor es la autoridad; aqui solo se avisa antes de gastar una peticion.
+var EC_MAX_FOTOS = 12;
+
+function esCategoriaBlog(cat) {
+  var s = String(cat || '').trim().toLowerCase();
+  return s === 'blog' || EC_TEMAS_BLOG.indexOf(s) !== -1;
+}
 
 // ============================================================
 // STEPPER
@@ -871,29 +1000,41 @@ function validateStep(step) {
   clearErrors();
   var ok = true;
 
+  // ADR-099 D2: el nivel 1 es Identidad y el 2 es Ubicacion. Cada nivel valida
+  // lo suyo, porque los campos viven en paneles distintos (ADR-003: se ocultan,
+  // no se borran). El avance NUNCA bloquea por descripcion ni por foto (D7).
   if (step === 1) {
     var nombre = v('nombre');
     var cat = document.querySelector('input[name="categoria"]:checked');
-    var ciudad = v('ciudad');
-    var desc = v('descripcion_corta');
     var wa = v('whatsapp');
 
     if (!nombre) { showError('f-nombre', 'nombre'); ok = false; }
     if (!cat) { showError('f-categoria', null); ok = false; }
-    if (!ciudad) { showError('f-ciudad', 'ciudad'); ok = false; }
-    if (!desc || desc.length < 30) { showError('f-descripcion', 'descripcion_corta'); ok = false; }
-    // WhatsApp ya no bloquea el avance. El backend dejo de exigirlo
-    // (solo nombre, categoria, ciudad, descripcion_corta y foto) y el
-    // paso 4 ofrece ademas el envio basico. Se degrada a aviso para no
-    // dejar atascado al usuario en un campo que el envio basico no
-    // necesita. Sigue siendo aviso, no error: showError queda fuera.
+    // ADR-099 D7: la descripcion deja de bloquear el paso 1 (la semilla de
+    // tres campos no la tiene). Se degrada a aviso; al enviar se exige.
+    pintarAvisoDescripcion(v('descripcion_corta').length < 30);
+    // WhatsApp tampoco bloquea: el backend lo dejo de exigir y el envio
+    // hasta aqui no lo necesita. Aviso, no error (showError queda fuera).
     pintarAvisoWhatsapp(!wa || wa.length < 10);
   }
 
   if (step === 2) {
-    var fotoUrl = state.foto_principal_url || state.foto_principal_base64 || v('foto_url');
-    // La foto no es estrictamente bloqueante, pero mostramos aviso
-    // (no ponemos return false para no frenar)
+    var ciudad = v('ciudad');
+    if (!ciudad) { showError('f-ciudad', 'ciudad'); ok = false; }
+    // Ciudad escrita a mano: #ciudad vale '__otra__' (truthy) y el nombre real
+    // vive en #ciudad-otra. Sin esta comprobacion la validacion PASA con el
+    // campo vacio y el backend responde 400: viaje de red perdido.
+    if (ciudad === '__otra__' && !v('ciudad-otra')) {
+      showError('f-ciudad-otra', 'ciudad-otra');
+      ok = false;
+    }
+  }
+
+  if (step === 3) {
+    // La foto no es estrictamente bloqueante (D7): el video se valida como
+    // aviso y la galeria se cuenta, pero no se frena el avance.
+    validarVideoCliente();
+    pintarAvisoFoto(!hayFotoPrincipal());
   }
 
   return ok;
@@ -951,6 +1092,40 @@ document.addEventListener('input', function (ev) {
   pintarAvisoContacto();
 });
 
+// ADR-099 D7: la descripcion no frena el avance, pero el envio completo la
+// exige (>= 30 caracteres). Aviso visible en el propio campo.
+function pintarAvisoDescripcion(falta) {
+  var box = document.getElementById('aviso-descripcion');
+  if (!box) return;
+  if (!falta) { box.hidden = true; box.textContent = ''; return; }
+  box.hidden = false;
+  box.textContent = 'Con 30 caracteres o mas este campo puntua; al enviar la solicitud completa es obligatorio.';
+}
+
+// ADR-099 D7: la foto deja de ser requisito en todos los modos. El bloque de
+// foto no usa .field con id, asi que el aviso vive en su propio parrafo.
+function hayFotoPrincipal() {
+  return !!(state.foto_principal_url || state.foto_principal_base64 || v('foto_url'));
+}
+
+function pintarAvisoFoto(falta) {
+  var box = document.getElementById('aviso-foto');
+  if (!box) return;
+  if (!falta) { box.hidden = true; box.textContent = ''; return; }
+  box.hidden = false;
+  box.textContent = 'Sin foto se puede enviar igual: la portada es un bono, no un requisito.';
+}
+
+// Error de envio en linea (400/409/429 del backend). No sustituye al
+// classico alert: lo acompana, porque en movil el alert tapa el contexto.
+function pintarErrorEnvio(msg) {
+  var box = document.getElementById('envio-error');
+  if (!box) return;
+  box.textContent = msg ? msg : '';
+  if (msg) box.classList.add('visible');
+  else box.classList.remove('visible');
+}
+
 // ============================================================
 // LISTENERS DINÁMICOS
 // ============================================================
@@ -974,6 +1149,9 @@ document.querySelectorAll('.tipo-chip[data-cat]').forEach(function(chip) {
     document.getElementById('f-subcategoria-comida').style.display = cat === 'restaurante' ? 'block' : 'none';
     // Evento: subcategoría
     document.getElementById('f-subcategoria-evento').style.display = cat === 'evento' ? 'block' : 'none';
+    // ADR-099 D8.3: blog es una categoria; su selector de tema solo aplica ahi.
+    var fTema = document.getElementById('f-tema');
+    if (fTema) fTema.style.display = cat === 'blog' ? 'block' : 'none';
   });
 });
 
@@ -1085,7 +1263,7 @@ function toggleFotoUrl() {
 
 function addGaleriaRow(url) {
   var rows = document.querySelectorAll('.galeria-url-row');
-  if (rows.length >= 8) { alert('Máximo 8 fotos en galería'); return; }
+  if (rows.length >= EC_MAX_FOTOS) { alert('M\u00e1ximo ' + EC_MAX_FOTOS + ' fotos por env\u00edo (la portada cuenta dentro del tope)'); return; }
   var n = rows.length + 2;
   var div = document.createElement('div');
   div.className = 'field galeria-url-row';
@@ -1246,18 +1424,22 @@ function buildResumen() {
 // SUBMIT
 // ============================================================
 // ---------------------------------------------------------------
-// DOS NIVELES DE ENVIO
-// 'basico'  : solo nombre, categoria, ciudad, descripcion_corta (30+)
-//             y foto. Sin WhatsApp. Crea la misma fila en draft.
-// 'completo': la validacion completa de siempre (incluye WhatsApp).
+// TRES MODOS DE ENVIO (ADR-099 D2 + D6.2 + D7)
+// 'completo': validacion completa del formulario -> estado_envio 'enviado'.
+// 'basico'  : se conserva por compatibilidad; ya no exige WhatsApp.
+// 'hasta'   : CTA "Enviar hasta aqui" de cualquier nivel. No exige
+//             descripcion ni foto: si falta el minimo del envio, el
+//             backend lo guarda como semilla (borrador reanudable).
 // Ambos terminan en ESTE fetch: un solo camino de red, lo unico que
-// cambia es que se valida antes de llegar aqui.
+// cambia es lo que se valida antes de llegar aqui.
 // ---------------------------------------------------------------
 function validarEnvio(modo) {
   clearErrors();
   var ok = true;
+  var parcial = (modo === 'hasta');
   var nombre = v('nombre');
   var cat = document.querySelector('input[name="categoria"]:checked');
+  var esBlogSel = esCategoriaBlog(cat ? cat.value : '');
   var ciudad = v('ciudad');
   var desc = v('descripcion_corta');
   var foto = state.foto_principal_url || state.foto_principal_base64 || v('foto_url');
@@ -1275,13 +1457,27 @@ function validarEnvio(modo) {
     ok = false;
     focoTrasValidar = document.getElementById('ciudad-otra');
   }
-  if (!desc || desc.length < 30) { showError('f-descripcion', 'descripcion_corta'); ok = false; }
-  if (!foto) { marcarFaltaFoto(); ok = false; }
-
-  if (modo !== 'basico') {
-    var wa = v('whatsapp');
-    if (!wa || wa.length < 10) { showError('f-whatsapp', 'whatsapp'); ok = false; }
+  if (desc.length < 30) {
+    // ADR-099 D7: al ENVIAR la solicitud completa la descripcion se exige;
+    // en el envio "hasta aqui" solo se avisa y el backend decide.
+    if (parcial) { pintarAvisoDescripcion(true); }
+    else { showError('f-descripcion', 'descripcion_corta'); ok = false; }
   }
+  // ADR-099 D7: la foto ya no bloquea en ningun modo (es un bono del catalogo).
+  if (!foto) pintarAvisoFoto(true);
+
+  // ADR-099 D8.4: el email es obligatorio por TIPO (blog), no por nivel; el
+  // contacto del resto de categorias es opcional y solo puntua.
+  if (esBlogSel) {
+    if (!parcial && !v('tema')) { showError('f-tema', 'tema'); ok = false; }
+    if (!v('email')) {
+      if (parcial) { pintarAvisoContacto(); }
+      else { showError('f-email', 'email'); ok = false; }
+    }
+  }
+
+  // El WhatsApp deja de bloquear tambien en el envio completo (D8.4).
+  pintarAvisoWhatsapp(v('whatsapp').length > 0 && v('whatsapp').length < 10);
 
   if (!ok) {
     // Los campos con error viven en paneles ocultos (ADR-003): por eso
@@ -1308,10 +1504,16 @@ function marcarFaltaFoto() {
 }
 
 async function submitForm(modo) {
-  var nivel = (modo === 'basico') ? 'basico' : 'completo';
+  var nivel = (modo === 'hasta') ? 'hasta' : (modo === 'basico' ? 'basico' : 'completo');
+  var parcial = (nivel === 'hasta');
+  // Un solo envio en vuelo: en movil el doble toque dispara dos POST.
+  if (state.enviando) return;
+  pintarErrorEnvio('');
   if (!validarEnvio(nivel)) return;
+  state.enviando = true;
 
-  var btn = document.getElementById(nivel === 'basico' ? 'btn-submit-basico' : 'btn-submit');
+  var btn = document.getElementById(parcial ? 'btn-submit-basico' : 'btn-submit');
+  if (!btn) { state.enviando = false; return; }
   var etiquetaOriginal = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Enviando...';
@@ -1322,6 +1524,7 @@ async function submitForm(modo) {
   var ciudadVal = v('ciudad') === '__otra__' ? v('ciudad-otra') : v('ciudad');
   var fotoUrl = state.foto_principal_url || v('foto_url') || null;
   var fotob64 = state.foto_principal_base64 || null;
+  var esBlog = esCategoriaBlog(cat ? cat.value : '');
 
   // Galería
   var galeriaUrls = Array.from(document.querySelectorAll('.galeria-url')).map(function(inp) {
@@ -1375,9 +1578,41 @@ async function submitForm(modo) {
     _lngU = _pos.coords.longitude;
   } catch(eGeo) { console.warn('[publicar] geolocalizacion no disponible:', eGeo && eGeo.message); }
 
+  // ADR-099 D3.3: tope duro de 12 fotos contando la portada. Se comprueba en
+  // el cliente antes de gastar la peticion; el servidor vuelve a validarlo.
+  var conteoFotos = null;
+  if (window.ECCompletitud && typeof window.ECCompletitud.contarFotos === 'function') {
+    conteoFotos = window.ECCompletitud.contarFotos(galeriaUrls, fotoUrl);
+    if (conteoFotos.total > EC_MAX_FOTOS) {
+      state.enviando = false;
+      btn.disabled = false;
+      btn.innerHTML = etiquetaOriginal;
+      document.getElementById('loading-overlay').classList.remove('active');
+      pintarErrorEnvio('Maximo ' + EC_MAX_FOTOS + ' fotos por envio (contando la portada). Ahora llevas ' + conteoFotos.total + '.');
+      if (window.setStep) window.setStep(3);
+      return;
+    }
+  }
+
+  // ADR-099 D6.2: 'enviado' entra en la cola del admin; 'semilla' es el
+  // borrador reanudable. En el envio "hasta aqui", si falta el minimo del
+  // envio se guarda semilla para no perder lo escrito: parar no es un error.
+  var estadoEnvio = 'enviado';
+  if (parcial) {
+    var minimoEnvio = v('nombre') && cat && ciudadVal && v('descripcion_corta').length >= 30
+      && (!esBlog || (v('tema') && v('email')));
+    if (!minimoEnvio) estadoEnvio = 'semilla';
+  }
+
   var payload = {
     nombre: v('nombre'),
     categoria: cat ? cat.value : '',
+    // ADR-099 D8.2: el tema viaja aparte; el backend valida contra BLOG_TEMAS.
+    tema: esBlog ? (v('tema') || null) : null,
+    estado_envio: estadoEnvio,
+    // ADR-099 D6.4: si el formulario se abrio con ?id=, el POST reclama el
+    // borrador existente en vez de crear una fila nueva.
+    borrador_id: (state.borrador && state.borrador.id) ? state.borrador.id : null,
     tipo_alojamiento: tipoAloj ? tipoAloj.value : null,
     ciudad: ciudadVal,
     departamento: v('departamento') || null,
@@ -1421,7 +1656,9 @@ async function submitForm(modo) {
     sitio_como_llegar: v('sitio_como_llegar') || null,
     sitio_equipamiento: Array.from(document.querySelectorAll('#sitio-equip-chips .am-chip.selected')).map(function(c){ return c.getAttribute('data-val'); }),
     sitio_temporada: Array.from(document.querySelectorAll('#sitio-temporada-chips .am-chip.selected')).map(function(c){ return c.getAttribute('data-val'); }),
-    sitio_permisos: v('sitio_permisos') || null
+    sitio_permisos: v('sitio_permisos') || null,
+    // ADR-099 D9: el video deja de ser exclusivo de blog.
+    video_url: v('video_url') || null
   };
 
   try {
@@ -1442,21 +1679,57 @@ async function submitForm(modo) {
       var url = window.location.origin + '/' + data.slug + '.html';
       document.getElementById('success-url').textContent = url;
       document.getElementById('success-url').href = url;
+      // ADR-099 D6.2/D11: la pantalla dice el estado REAL que devolvio el
+      // servidor (semilla = borrador reanudable; enviado = en revision).
+      var esSemilla = (data.estado_envio === 'semilla');
+      var sub = document.getElementById('success-sub');
+      var h2 = document.querySelector('#success-screen h2');
+      if (h2) h2.textContent = esSemilla ? 'Borrador guardado' : '\u00a1Solicitud recibida!';
+      if (sub) {
+        var pts = (data.completitud && typeof data.completitud.puntos === 'number')
+          ? data.completitud.puntos : null;
+        if (esSemilla) {
+          sub.textContent = 'Guardado como borrador'
+            + (pts !== null ? ' (' + pts + '/100)' : '')
+            + ': puedes continuarlo cuando quieras desde Mis envios.';
+        } else {
+          sub.textContent = 'En revision'
+            + (pts !== null ? ' (' + pts + '/100)' : '')
+            + ': el equipo lo aprueba en 24-48 horas.';
+        }
+        // Un borrador no esta en la cola del admin: no se promete revision
+        // ni URL publica hasta que se envie completo.
+        if (sub.nextElementSibling) sub.nextElementSibling.hidden = esSemilla;
+      }
+      var urlFicha = document.getElementById('success-url');
+      if (urlFicha && urlFicha.parentNode) urlFicha.parentNode.hidden = esSemilla;
+      if (urlFicha) urlFicha.textContent = esSemilla ? '' : url;
       document.querySelectorAll('.form-panel').forEach(function(p) { p.classList.remove('active'); });
       document.getElementById('success-screen').classList.add('active');
+      // ADR-099 T4: lo que se va a recibir, con el MISMO catalogo del motor y
+      // el mismo descargo. Sin catalogo (red caida / 500) no hay linea.
+      if (window.ECXpPublicar && window.ECXpPublicar.pintarExito) {
+        window.ECXpPublicar.pintarExito(data);
+      }
       for (var i = 1; i <= 4; i++) {
         var el = document.getElementById('step-indicator-' + i);
         if (el) el.classList.add('done');
       }
     } else {
-      throw new Error(data.error || 'Error al enviar');
+      // 400 FOTOS_EXCEDIDAS / campo faltante, 409 YA_ENVIADO, 429 cupo.
+      var detalle = data.error || data.mensaje || 'Error al enviar';
+      if (data.campo) detalle += ' (campo: ' + data.campo + ')';
+      throw new Error(detalle);
     }
 
   } catch (err) {
     document.getElementById('loading-overlay').classList.remove('active');
+    state.enviando = false;
     btn.disabled = false;
     btn.innerHTML = etiquetaOriginal;
-    alert('Error: ' + (err.message || 'No se pudo conectar. Intenta de nuevo.'));
+    var msg = (err && err.message) ? err.message : 'No se pudo conectar. Intenta de nuevo.';
+    pintarErrorEnvio(msg);
+    alert('Error: ' + msg);
   }
 }
 </script>
@@ -2030,6 +2303,615 @@ async function submitForm(modo) {
   } else {
     init();
   }
+})();
+</script>
+
+<script>
+// ============================================================
+// ADR-099 -- COMPLETITUD EN VIVO, NIVELES, BLOG, VIDEO, MIS ENVIOS
+// Un solo bloque. No define pesos, umbrales ni montos: los puntos, el
+// tier y los faltantes los calcula lib/completitud.js (ECCompletitud).
+// ASCII-safe (ADR-002): cero acentos literales, escapes \uXXXX.
+// ============================================================
+(function () {
+  'use strict';
+
+  function $(id) { return document.getElementById(id); }
+  function val(id) { var el = $(id); return el ? String(el.value || '').trim() : ''; }
+  function comp() {
+    return (window.ECCompletitud && typeof window.ECCompletitud.calcular === 'function')
+      ? window.ECCompletitud : null;
+  }
+  function catElegida() {
+    var c = document.querySelector('input[name="categoria"]:checked');
+    return c ? c.value : '';
+  }
+
+  // ---------------- fotos: la formula es la del modulo (D3.1) -------------
+  function heroUrl() {
+    var st = window.state || {};
+    return st.foto_principal_url || st.foto_principal_base64 || val('foto_url') || '';
+  }
+
+  function fotosGaleria() {
+    var out = [];
+    var inputs = document.querySelectorAll('.galeria-url');
+    for (var i = 0; i < inputs.length; i++) {
+      var u = String(inputs[i].value || '').trim();
+      if (u) out.push({ url: u });
+    }
+    return out;
+  }
+
+  function conteoFotos() {
+    var M = comp();
+    if (!M) return { total: 0, no_hero: 0, galeria_n: 0 };
+    return M.contarFotos(fotosGaleria(), heroUrl());
+  }
+
+  function subcategoriaActual() {
+    var cat = catElegida();
+    if (cat === 'sitio') return val('sitio_subcategoria');
+    if (cat === 'restaurante') return val('comida_subcategoria');
+    if (cat === 'evento') return val('evento_subcategoria');
+    return '';
+  }
+
+  function seleccionados(sel) {
+    var out = [];
+    var nodos = document.querySelectorAll(sel);
+    for (var i = 0; i < nodos.length; i++) out.push(nodos[i].getAttribute('data-val'));
+    return out;
+  }
+
+  function faqsFormulario() {
+    var filas = document.querySelectorAll('[id^="faq-row-"]');
+    var out = [];
+    for (var i = 0; i < filas.length; i++) {
+      var p = filas[i].querySelector('.faq-p');
+      var pregunta = p ? String(p.value || '').trim() : '';
+      if (pregunta) out.push({ pregunta: pregunta });
+    }
+    return out;
+  }
+
+  function habitacionesFormulario() {
+    var filas = document.querySelectorAll('.habitacion-row');
+    var out = [];
+    for (var i = 0; i < filas.length; i++) {
+      var n = filas[i].querySelector('.hab-nombre');
+      var nombre = n ? String(n.value || '').trim() : '';
+      if (nombre) out.push({ nombre: nombre });
+    }
+    return out;
+  }
+
+  // ---------------- entrada del modulo (sin pesos propios) ----------------
+  function entradaFormulario() {
+    var c = conteoFotos();
+    return {
+      nombre: val('nombre'),
+      categoria: catElegida(),
+      subcategoria: subcategoriaActual(),
+      ciudad: val('ciudad') === '__otra__' ? val('ciudad-otra') : val('ciudad'),
+      departamento: val('departamento'),
+      zona: val('zona'),
+      descripcion_corta: val('descripcion_corta'),
+      descripcion_larga: val('descripcion_larga'),
+      lat: val('lat'),
+      lng: val('lng'),
+      whatsapp: val('whatsapp'),
+      email: val('email'),
+      web: val('sitio_web'),
+      instagram: val('instagram'),
+      video_url: val('video_url'),
+      precio: val('precio_desde'),
+      horario: val('sitio_horario'),
+      faqs: faqsFormulario(),
+      amenidades: seleccionados('.am-chip.selected'),
+      habitaciones: habitacionesFormulario(),
+      como_llegar: val('sitio_como_llegar'),
+      temporada: seleccionados('#sitio-temporada-chips .am-chip.selected'),
+      dificultad: val('sitio_dificultad'),
+      duracion: val('sitio_duracion'),
+      precio_entrada: val('sitio_precio_entrada'),
+      fotos_total: c.total,
+      fotos_no_hero: c.no_hero
+    };
+  }
+
+  var ETIQUETAS_TIER = {
+    basico: 'Nivel basico',
+    intermedio: 'Nivel intermedio',
+    completo: 'Nivel completo'
+  };
+
+  function textoFaltan(r, c, M) {
+    if (r.tier === 'completo') return 'Nivel completo: no falta ningun campo puntuable.';
+    var n = r.faltantes.length;
+    var txt = 'Te faltan ' + n + (n === 1 ? ' campo' : ' campos') + ' para el siguiente nivel.';
+    if (r.puntos >= M.UMBRAL_COMPLETO) {
+      var piezas = [];
+      if (c.no_hero < M.GUARDA_FOTOS_NO_HERO) {
+        piezas.push('mas fotos en la galeria (minimo ' + M.GUARDA_FOTOS_NO_HERO + ' sin contar la portada)');
+      }
+      if (!r.guardas || !r.guardas.tiene_coords) piezas.push('el punto en el mapa');
+      if (piezas.length) txt = 'Para el nivel completo falta ' + piezas.join(' y ') + '.';
+    }
+    return txt;
+  }
+
+  // ---------------- estimacion de XP: catalogo del motor, cero montos -----
+  // GET publico (?tipo=catalogo_xp), UNA vez y sin sesion. Las cifras salen
+  // de bases[]; si la red o el endpoint fallan, la estimacion se oculta y la
+  // barra de completitud (que no depende de la red) sigue funcionando.
+  var XP_URL = '/api/interacciones?tipo=catalogo_xp';
+  var XP_CLAVES = [
+    'publicar_basico', 'publicar_intermedio', 'publicar_completo',
+    'publicar_bono_geo', 'publicar_bono_foto'
+  ];
+  var xpBases = null;
+  var xpPromesa = null;
+
+  function xpBasesDe(data) {
+    var lista = (data && data.bases) || [];
+    var out = {};
+    for (var i = 0; i < lista.length; i++) {
+      var b = lista[i] || {};
+      var k = String(b.accion || '');
+      var n = Number(b.base);
+      if (XP_CLAVES.indexOf(k) === -1) continue;
+      if (isFinite(n) && n > 0) out[k] = n;
+    }
+    for (var j = 0; j < XP_CLAVES.length; j++) {
+      if (typeof out[XP_CLAVES[j]] !== 'number') return null;
+    }
+    return out;
+  }
+
+  function cargarXp() {
+    if (xpPromesa) return xpPromesa;
+    xpPromesa = new Promise(function (resolve) {
+      var cerrado = false;
+      var cerrar = function (bases) {
+        if (cerrado) return;
+        cerrado = true;
+        xpBases = bases;
+        resolve(bases);
+        pintarCompletitud();
+      };
+      var ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+      var t = setTimeout(function () {
+        try { if (ctl) ctl.abort(); } catch (eA) { }
+        cerrar(null);
+      }, 7000);
+      fetch(XP_URL, ctl ? { signal: ctl.signal } : undefined)
+        .then(function (r) { return (r && r.ok) ? r.json() : null; })
+        .then(function (d) { clearTimeout(t); cerrar(xpBasesDe(d && d.data)); })
+        .catch(function () { clearTimeout(t); cerrar(null); });
+    });
+    return xpPromesa;
+  }
+
+  function tierBaseXp(tier) {
+    var k = 'publicar_' + String(tier || 'basico');
+    return (xpBases && typeof xpBases[k] === 'number') ? xpBases[k] : null;
+  }
+
+  function nombreTier(tier) {
+    return String(ETIQUETAS_TIER[tier] || tier || '').toLowerCase();
+  }
+
+  function textoXp(r, c) {
+    if (!xpBases || !r) return '';
+    var base = tierBaseXp(r.tier);
+    if (base === null) return '';
+    // El motor acredita el bono de foto con fotos_total >= 1 (no "no_hero"):
+    // la regla vive en el servidor, aqui solo se refleja el mismo criterio.
+    var foto = (c && c.total >= 1) ? (xpBases.publicar_bono_foto || 0) : 0;
+    var geo = xpBases.publicar_bono_geo || 0;
+    var piezas = [base + ' por el ' + nombreTier(r.tier)];
+    if (foto) piezas.push(foto + ' por tus fotos');
+    var txt = 'Estimaci\u00f3n: ' + (base + foto) + ' puntos ahora ('
+      + piezas.join(' + ') + ').';
+    if (geo) txt += ' Si publicas desde el lugar, sumas ' + geo + ' m\u00e1s.';
+    txt += ' La cifra final la fijan los multiplicadores de nivel y origen al aprobarse.';
+    return txt;
+  }
+
+  // La cifra y su descargo son una sola linea indivisible: sin la frase no se
+  // pinta el numero (seria una promesa falsa).
+  function pintarXp(r, c) {
+    var el = $('ec-comp-xp');
+    var aviso = $('ec-comp-aviso');
+    var txt = textoXp(r, c);
+    if (el) { el.textContent = txt; el.hidden = !txt; }
+    if (aviso) aviso.hidden = !!txt;
+  }
+
+  // Pantalla de exito: mismo origen de datos y mismo descargo. Si el catalogo
+  // no llego, no hay linea (no se inventa ninguna cifra).
+  function pintarExito(datos) {
+    var el = $('success-xp');
+    if (!el) return;
+    el.hidden = true;
+    el.textContent = '';
+    cargarXp().then(function (bases) {
+      if (!bases) return;
+      var res = (datos && datos.completitud) || null;
+      var M = comp();
+      var r = M ? M.calcular(entradaFormulario()) : null;
+      var tier = (res && res.tier) || (r && r.tier) || '';
+      var base = tierBaseXp(tier);
+      if (base === null) return;
+      var c = conteoFotos();
+      var fotos = (res && typeof res.fotos_total === 'number') ? res.fotos_total : c.total;
+      var foto = (fotos >= 1) ? (bases.publicar_bono_foto || 0) : 0;
+      var geo = bases.publicar_bono_geo || 0;
+      var piezas = [base + ' del ' + nombreTier(tier)];
+      if (foto) piezas.push(foto + ' de las fotos');
+      if (geo) piezas.push(geo + ' si publicas desde el lugar');
+      var esSemilla = String((datos && datos.estado_envio) || '') === 'semilla';
+      el.textContent = (esSemilla
+          ? 'Cuando lo env\u00edes completo podr\u00edas recibir hasta '
+          : 'Recibir\u00e1s hasta ')
+        + (base + foto + geo) + ' puntos '
+        + (esSemilla ? '' : 'cuando el equipo lo apruebe ')
+        + '(' + piezas.join(' + ') + ').'
+        + ' Estimaci\u00f3n: la cifra final la fijan los multiplicadores de nivel y origen al aprobarse.';
+      el.hidden = false;
+    });
+  }
+
+  window.ECXpPublicar = { cargar: cargarXp, pintarExito: pintarExito };
+
+  // ---------------- barra de completitud en vivo --------------------------
+  function pintarCompletitud() {
+    var box = $('ec-completitud');
+    if (!box) return;
+    var M = comp();
+    if (!M) { box.hidden = true; return; }
+    box.hidden = false;
+    var c = conteoFotos();
+    var r = M.calcular(entradaFormulario());
+    if ($('ec-comp-pct')) $('ec-comp-pct').textContent = String(r.puntos);
+    if ($('ec-comp-fill')) {
+      $('ec-comp-fill').style.width = Math.max(0, Math.min(100, r.puntos)) + '%';
+    }
+    var prog = $('ec-comp-progress');
+    if (prog) prog.setAttribute('aria-valuenow', String(r.puntos));
+    if ($('ec-comp-tier')) $('ec-comp-tier').textContent = ETIQUETAS_TIER[r.tier] || r.tier;
+    if ($('ec-comp-faltan')) $('ec-comp-faltan').textContent = textoFaltan(r, c, M);
+    pintarXp(r, c);
+    var gc = $('galeria-contador');
+    if (gc && window.EC_MAX_FOTOS) {
+      gc.textContent = c.total + ' de ' + window.EC_MAX_FOTOS + ' fotos (portada incluida).';
+    }
+  }
+
+  // ---------------- video: misma validacion de host que el backend --------
+  window.validarVideoCliente = function () {
+    var inp = $('video_url');
+    var field = $('f-video');
+    if (!inp || !field) return true;
+    var url = String(inp.value || '').trim();
+    var M = comp();
+    var ok = (!url) || !M || M.esVideoUrlSegura(url);
+    if (ok) { field.classList.remove('has-error'); inp.classList.remove('error'); }
+    else { field.classList.add('has-error'); inp.classList.add('error'); }
+    return ok;
+  };
+
+  function pintarEtiquetaEmail() {
+    var lbl = $('lbl-email');
+    if (!lbl) return;
+    var esBlog = window.esCategoriaBlog ? window.esCategoriaBlog(catElegida()) : false;
+    lbl.innerHTML = esBlog
+      ? 'Email <span class="req">*</span>'
+      : 'Email <span class="opt-hint">(opcional)</span>';
+  }
+
+  // ---------------- sesion (misma via que jwtActual de media-upload) ------
+  function jwtActual() {
+    try {
+      if (window.ExploraCO && typeof window.ExploraCO.obtenerJwt === 'function') {
+        var j = window.ExploraCO.obtenerJwt();
+        if (j) return j;
+      }
+    } catch (e1) { /* se intenta con localStorage */ }
+    try {
+      var raw = localStorage.getItem('exploraco_user');
+      if (!raw) return null;
+      var ses = JSON.parse(raw);
+      return (ses && ses.jwt) ? ses.jwt : null;
+    } catch (e2) { return null; }
+  }
+
+  // ---------------- vista=mios (D11) --------------------------------------
+  function estadoVisible(it) {
+    var st = String((it && it.status) || '');
+    var en = String((it && it.estado_envio) || '');
+    if (st === 'published') return { txt: 'Publicado', cls: 'publicado' };
+    if (st === 'archived') return { txt: 'Rechazado', cls: 'rechazado' };
+    if (en === 'semilla' || en === 'borrador') return { txt: 'Borrador', cls: 'borrador' };
+    return { txt: 'En revision', cls: 'revision' };
+  }
+
+  function puntosDe(it) {
+    if (it && it.completitud && typeof it.completitud.puntos === 'number') return it.completitud.puntos;
+    var tags = (it && it.tags) || {};
+    return (typeof tags.pub_completitud === 'number') ? tags.pub_completitud : null;
+  }
+
+  function pintarMios(items) {
+    var cont = $('mios-lista');
+    if (!cont) return;
+    cont.textContent = '';
+    if (!items || !items.length) {
+      var vacio = document.createElement('p');
+      vacio.className = 'field-hint';
+      vacio.textContent = 'Todavia no tienes envios.';
+      cont.appendChild(vacio);
+      return;
+    }
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i] || {};
+      var art = document.createElement('div');
+      art.className = 'mios-item';
+
+      var h = document.createElement('h3');
+      h.textContent = it.nombre || 'Sin nombre';
+      art.appendChild(h);
+
+      var meta = document.createElement('div');
+      meta.className = 'mios-meta';
+      var est = estadoVisible(it);
+      var chip = document.createElement('span');
+      chip.className = 'mios-estado ' + est.cls;
+      chip.textContent = est.txt;
+      meta.appendChild(chip);
+      var pts = puntosDe(it);
+      if (pts !== null) {
+        var sp = document.createElement('span');
+        sp.textContent = pts + '/100';
+        meta.appendChild(sp);
+      }
+      art.appendChild(meta);
+
+      var ac = document.createElement('div');
+      ac.className = 'mios-acciones';
+      if (it.id && it.status !== 'published') {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = 'Continuar';
+        b.setAttribute('data-id', String(it.id));
+        b.addEventListener('click', function (ev) {
+          var t = ev && ev.currentTarget ? ev.currentTarget : null;
+          var id = t ? t.getAttribute('data-id') : null;
+          if (id) window.location.href = '?id=' + encodeURIComponent(id);
+        });
+        ac.appendChild(b);
+      }
+      if (it.status === 'published' && it.slug) {
+        var a = document.createElement('a');
+        a.href = '/lugar/' + encodeURIComponent(it.slug);
+        a.textContent = 'Ver ficha';
+        ac.appendChild(a);
+      }
+      art.appendChild(ac);
+      cont.appendChild(art);
+    }
+  }
+
+  function cargarMios() {
+    var sin = $('mios-sin-sesion');
+    var est = $('mios-estado');
+    var jwt = jwtActual();
+    if (!jwt) {
+      if (sin) sin.hidden = false;
+      if (est) est.textContent = '';
+      var listaVacia = $('mios-lista');
+      if (listaVacia) listaVacia.textContent = '';
+      return;
+    }
+    if (sin) sin.hidden = true;
+    if (est) est.textContent = 'Cargando tus envios...';
+    fetch('/api/publicar-lugar?mios=1', { headers: { 'Authorization': 'Bearer ' + jwt } })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.d || !res.d.ok) {
+          throw new Error((res.d && (res.d.error || res.d.mensaje)) || 'No se pudieron cargar tus envios.');
+        }
+        var items = res.d.items || [];
+        if (est) est.textContent = items.length ? (items.length + (items.length === 1 ? ' envio' : ' envios')) : '';
+        pintarMios(items);
+      })
+      .catch(function (e) {
+        if (est) est.textContent = (e && e.message) ? e.message : 'No se pudieron cargar tus envios.';
+      });
+  }
+
+  function modoMios() {
+    var seccion = $('vista-mios');
+    if (!seccion) return;
+    seccion.hidden = false;
+    var paneles = document.querySelectorAll('.form-panel');
+    for (var i = 0; i < paneles.length; i++) paneles[i].style.display = 'none';
+    var sw = document.querySelector('.stepper-wrap');
+    if (sw) sw.style.display = 'none';
+    cargarMios();
+  }
+
+  // ---------------- reanudar borrador (?id= / ?borrador=) -----------------
+  var SLUG_A_CHIP = {
+    hostal: 'hostal', comida: 'restaurante', sitio: 'sitio',
+    evento: 'evento', blog: 'blog'
+  };
+
+  function ponerValor(id, v) {
+    var el = $(id);
+    if (!el || v === null || v === undefined) return;
+    var s = String(v).trim();
+    if (!s) return;
+    el.value = s;
+  }
+
+  function marcarChips(sel, valores) {
+    if (!valores || !valores.length) return;
+    var nodos = document.querySelectorAll(sel);
+    for (var i = 0; i < nodos.length; i++) {
+      var d = nodos[i].getAttribute('data-val');
+      if (valores.indexOf(d) !== -1) nodos[i].classList.add('selected');
+    }
+  }
+
+  function aplicarBorrador(it) {
+    if (!it || typeof it !== 'object') return;
+    var tags = (it.tags && typeof it.tags === 'object') ? it.tags : {};
+    var catSlug = String(it.categoria_slug || tags.categoria_slug || '');
+    var chip = SLUG_A_CHIP[catSlug];
+    if (chip) {
+      var label = document.querySelector('.tipo-chip[data-cat="' + chip + '"]');
+      if (label) label.click();
+    }
+    ponerValor('nombre', it.nombre || tags.nombre);
+    ponerValor('descripcion_corta', it.lead || tags.descripcion_corta);
+    ponerValor('descripcion_larga', it.descripcion || tags.descripcion_larga);
+    ponerValor('barrio', it.barrio);
+    ponerValor('departamento', it.region || tags.departamento);
+    ponerValor('zona', it.zona);
+    ponerValor('lat', it.lat);
+    ponerValor('lng', it.lng);
+    ponerValor('precio_desde', it.precio_desde);
+    ponerValor('whatsapp', it.whatsapp || tags.whatsapp);
+    ponerValor('email', it.email || tags.email);
+    ponerValor('sitio_web', it.web || tags.web);
+    ponerValor('instagram', it.instagram || tags.instagram);
+    ponerValor('video_url', tags.video_url);
+    ponerValor('sitio_horario', tags.horario || tags.sitio_horario);
+    ponerValor('sitio_dificultad', tags.dificultad);
+    ponerValor('sitio_duracion', tags.duracion);
+    ponerValor('sitio_precio_entrada', tags.precio_entrada);
+    ponerValor('sitio_como_llegar', tags.como_llegar);
+    ponerValor('tema', tags.tema);
+    if (tags.subcategoria) {
+      if (catSlug === 'sitio') ponerValor('sitio_subcategoria', tags.subcategoria);
+      else if (catSlug === 'comida') ponerValor('comida_subcategoria', tags.subcategoria);
+      else if (catSlug === 'evento') ponerValor('evento_subcategoria', tags.subcategoria);
+    }
+    var ciudad = it.ciudad || tags.ciudad;
+    if (ciudad) {
+      ponerValor('ciudad', ciudad);
+      ponerValor('ciudad-buscar', ciudad);
+    }
+    // Medios: la portada a la preview y el resto como filas de galeria.
+    var fotos = it.fotos || it.fotos_galeria || [];
+    var hero = it.foto_hero || tags.foto_hero || null;
+    if (hero && window.state) window.state.foto_principal_url = hero;
+    if (hero && typeof window.showFotoPreview === 'function') window.showFotoPreview(hero);
+    if (!hero && fotos.length) {
+      var primera = fotos[0];
+      var u0 = (primera && typeof primera === 'object') ? primera.url : primera;
+      if (u0) {
+        if (window.state) window.state.foto_principal_url = u0;
+        if (typeof window.showFotoPreview === 'function') window.showFotoPreview(u0);
+      }
+      fotos = fotos.slice(1);
+    }
+    for (var i = 0; i < fotos.length; i++) {
+      var f = fotos[i];
+      var u = (f && typeof f === 'object') ? f.url : f;
+      if (u && typeof window.addGaleriaRow === 'function') window.addGaleriaRow(u);
+    }
+    marcarChips('.am-chip', tags.amenidades);
+    marcarChips('#sitio-temporada-chips .am-chip', tags.temporada);
+  }
+
+  function cargarBorrador(id, paso) {
+    var jwt = jwtActual();
+    var aviso = $('borrador-aviso');
+    if (!jwt) {
+      if (aviso) {
+        aviso.hidden = false;
+        aviso.textContent = 'Entra a tu cuenta para continuar un borrador guardado.';
+      }
+      return;
+    }
+    if (aviso) { aviso.hidden = false; aviso.textContent = 'Cargando tu borrador...'; }
+    fetch('/api/publicar-lugar?id=' + encodeURIComponent(id), {
+      headers: { 'Authorization': 'Bearer ' + jwt }
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error((res.d && (res.d.error || res.d.mensaje)) || 'No se pudo abrir el borrador.');
+        }
+        var it = res.d.item || res.d.lugar || res.d.destino || res.d;
+        aplicarBorrador(it);
+        if (window.state) {
+          var en = (it && (it.estado_envio || (it.tags && it.tags.estado_envio))) || null;
+          window.state.borrador = { id: id, estado_envio: en };
+        }
+        if (aviso) aviso.textContent = 'Borrador cargado: puedes seguir donde lo dejaste.';
+        if (window.setStep) window.setStep(paso || 1);
+        pintarCompletitud();
+      })
+      .catch(function (e) {
+        if (aviso) aviso.textContent = (e && e.message) ? e.message : 'No se pudo abrir el borrador.';
+      });
+  }
+
+  // ---------------- init ------------------------------------------------
+  function init() {
+    pintarEtiquetaEmail();
+    pintarCompletitud();
+    // El catalogo de XP se lee una sola vez; si falla, la estimacion se oculta.
+    cargarXp();
+    // El mapa vive en el nivel 2 y Leaflet mide su contenedor: al cambiar de
+    // nivel se emite un resize (Leaflet lo escucha e invalida el tamano).
+    if (typeof window.setStep === 'function' && !window.__ecStepResize) {
+      var previo = window.setStep;
+      window.setStep = function (n) {
+        previo(n);
+        var latir = function () {
+          try { window.dispatchEvent(new Event('resize')); } catch (eLat) { }
+        };
+        setTimeout(latir, 80);
+        setTimeout(latir, 420);
+      };
+      window.__ecStepResize = true;
+    }
+    var params;
+    try { params = new URLSearchParams(String(window.location.search || '')); }
+    catch (eQ) { return; }
+    if (params.get('vista') === 'mios') { modoMios(); return; }
+    var idB = params.get('id') || params.get('borrador');
+    var paso = parseInt(params.get('paso'), 10);
+    if (idB) {
+      cargarBorrador(idB, (paso >= 1 && paso <= 4) ? paso : 1);
+      return;
+    }
+    if (paso >= 1 && paso <= 4 && window.setStep) window.setStep(paso);
+  }
+
+  var tmr = null;
+  function programar() {
+    if (tmr) clearTimeout(tmr);
+    tmr = setTimeout(function () {
+      pintarCompletitud();
+      pintarEtiquetaEmail();
+    }, 120);
+  }
+
+  document.addEventListener('input', programar);
+  document.addEventListener('change', programar);
+  document.addEventListener('click', function (ev) {
+    var t = ev && ev.target;
+    if (t && t.closest && t.closest('.tipo-chip[data-cat]')) programar();
+  });
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
 </script>
 </body>

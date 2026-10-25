@@ -428,6 +428,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 <script src="map-picker.js?v=2"></script>
 <script src="mapa-fullscreen.js?v=1"></script>
 <script src="media-upload.js"></script>
+<script src="/lib/completitud.js?v=1"></script>
 </head>
 
 <body>
@@ -725,6 +726,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <button class="btn btn-primary" onclick="savePlace()">✓ Guardar y publicar</button>
     </div>
   </div>
+  <div id="ec-aforo" style="display:none;margin:0 0 10px 0;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);font-size:11px;line-height:1.55"></div>
   <div class="editor-layout">
     <!-- FORM -->
     <div class="editor-form-wrap">
@@ -4606,6 +4608,7 @@ function savePlace() {
     } else {
       showAdminToast('✓ Guardado local — sin conexión a DB', '');
     }
+    _modTrasGuardar(p, result);
   });
   setTimeout(function(){ showScreen('tabla'); }, 400);
 }
@@ -6742,6 +6745,11 @@ function _placeToAPI(p) {
 async function _syncToNeon(p) {
   var uuid = _localToUUID[p.id];
   var payload = _placeToAPI(p);
+  /* ADR-099 D6.1: pub_tier, pub_completitud, pub_faltantes, pub_geo,
+     pub_foto y pub_xp_estado son SOLO SERVIDOR. El editor NO los escribe:
+     admin-destinos.js los recalcula sobre la ficha final al aprobar (T3) y
+     esa cifra manda. La tarjeta se refresca al volver a la cola (T5.5),
+     nunca desde aqui. */
   try {
     var res, data;
     if(uuid) {
@@ -7560,6 +7568,7 @@ async function loadPendientes() {
   lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">⏳</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">Cargando...</div></div>';
 
   try {
+    await _modXpCatalogoCargar();
     var url = '/api/admin?recurso=solicitudes&status='+_modFilter+'&limit='+_modLimit+'&offset='+(_modPage*_modLimit);
     var resp = await fetch(url, { headers: _adminHeaders() });
     var data = await resp.json();
@@ -7606,6 +7615,400 @@ function _modGoPage(n) {
   loadPendientes();
 }
 
+/* ------------------------------------------------------------------------
+   ADR-099 D10 / T5 -- AFORO Y XP EN LA COLA DE SOLICITUDES.
+   La aritmetica NO se escribe aqui: sale de lib/completitud.js
+   (window.ECCompletitud), la MISMA que usa el servidor (ADR-099 D3/D4).
+   Los numeros de XP tampoco se escriben aqui: se leen del catalogo
+   publico /api/interacciones?tipo=catalogo_xp (ADR-099 D12).
+   ------------------------------------------------------------------------ */
+
+var _modXpCatalogo = null;
+var _modXpCatalogoVisto = false;
+/* Espejo de la guarda de distancia del bono geo en
+   api/interacciones.js (publicar_lugar_otorgar). Solo se usa cuando la
+   fila NO trae pub_geo booleano; es una ESTIMACION, no una promesa. */
+var _MOD_GEO_DIST_M = 300;
+var _modAprobarPendiente = null;
+
+async function _modXpCatalogoCargar() {
+  if (_modXpCatalogoVisto) return _modXpCatalogo;
+  _modXpCatalogoVisto = true;
+  try {
+    var resp = await fetch('/api/interacciones?tipo=catalogo_xp');
+    var json = await resp.json();
+    var bases = (json && json.data && json.data.bases) || [];
+    var mapa = {};
+    for (var i = 0; i < bases.length; i++) {
+      var b = bases[i] || {};
+      if (!b.accion) continue;
+      if (b.base === null || b.base === undefined) continue;
+      var n = Number(b.base);
+      if (!isFinite(n)) continue;
+      mapa[String(b.accion)] = n;
+    }
+    _modXpCatalogo = Object.keys(mapa).length ? mapa : null;
+  } catch (e) {
+    _modXpCatalogo = null;
+  }
+  return _modXpCatalogo;
+}
+
+function _modNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = Number(v);
+  return isFinite(n) ? n : null;
+}
+
+var _MOD_ETIQUETAS = {
+  nombre: 'nombre', categoria: 'categoria', subcategoria: 'subcategoria',
+  ciudad: 'ciudad', departamento: 'departamento', zona: 'zona',
+  descripcion_corta: 'descripcion corta', descripcion_larga: 'descripcion larga',
+  coords: 'coordenadas', contacto: 'contacto', foto: 'fotos',
+  video: 'video', fotos_3: 'faltan fotos de galeria'
+};
+
+/* Etiquetas de los chips (ADR-099 T5.3). Van con ENTIDADES HTML para que
+   se lean en espanol sin meter un solo byte > 127 en el fichero (ADR-002).
+   Cubre las 23 claves de 'faltantes' de lib/completitud.js (ORDEN). */
+var _MOD_ETIQUETAS_HTML = {
+  nombre: 'Nombre',
+  categoria: 'Categor&iacute;a',
+  subcategoria: 'Subcategor&iacute;a',
+  ciudad: 'Ciudad',
+  departamento: 'Departamento',
+  zona: 'Zona',
+  descripcion_corta: 'Descripci&oacute;n corta',
+  descripcion_larga: 'Descripci&oacute;n larga',
+  coords: 'Coordenadas',
+  contacto: 'Contacto',
+  foto: 'Foto principal',
+  fotos_3: '3 fotos de galer&iacute;a',
+  video: 'V&iacute;deo',
+  precio: 'Precio',
+  horario: 'Horario',
+  faqs: 'Preguntas frecuentes',
+  amenidades: 'Amenidades',
+  habitaciones: 'Habitaciones',
+  como_llegar: 'C&oacute;mo llegar',
+  temporada: 'Temporada',
+  dificultad: 'Dificultad',
+  duracion: 'Duraci&oacute;n',
+  precio_entrada: 'Precio de entrada'
+};
+
+/* Devuelve HTML listo para innerHTML. Las entidades del mapa son literales
+   de confianza y NO pasan por escH (que escaparia el '&'); una clave
+   desconocida si se escapa. */
+function _modEtiquetaHtml(k) {
+  if (Object.prototype.hasOwnProperty.call(_MOD_ETIQUETAS_HTML, k)) {
+    return _MOD_ETIQUETAS_HTML[k];
+  }
+  return escH(_modEtiqueta(k));
+}
+
+function _modEtiqueta(k) {
+  if (_MOD_ETIQUETAS[k]) return _MOD_ETIQUETAS[k];
+  return String(k).replace(/_/g, ' ');
+}
+
+function _modChipsTexto(lista, max) {
+  var out = [];
+  var n = (max && max > 0) ? max : lista.length;
+  for (var i = 0; i < lista.length && i < n; i++) out.push(_modEtiqueta(lista[i]));
+  if (lista.length > out.length) out.push('+' + (lista.length - out.length));
+  return out.join(', ');
+}
+
+/* Tier, completitud, faltantes y XP de UNA fila de /api/admin?recurso=solicitudes.
+   - Si el servidor ya evaluo la fila (tags.pub_*), se muestran SUS numeros:
+     cero recalculo, cero divergencia (ADR-099 D10).
+   - Si no, se recalcula con lib/completitud.js y se etiqueta como estimado. */
+function _modAforoFila(item) {
+  var EC = window.ECCompletitud;
+  var d = (item && item.detalles && typeof item.detalles === 'object') ? item.detalles : {};
+  var tier = (typeof d.pub_tier === 'string' && d.pub_tier) ? d.pub_tier : null;
+  var puntos = _modNum(d.pub_completitud);
+  var faltantes = (Object.prototype.toString.call(d.pub_faltantes) === '[object Array]')
+    ? d.pub_faltantes.slice() : [];
+  var fotosTotal = _modNum(d.pub_fotos_total);
+  var fotosNoHero = _modNum(d.pub_fotos_no_hero);
+  var origen = 'servidor';
+
+  if (tier === null || puntos === null) {
+    if (!EC || typeof EC.calcular !== 'function' || typeof EC.normalizarFila !== 'function') return null;
+    origen = 'estimado';
+    var row = {
+      nombre: item.nombre || '',
+      categoria_slug: item.categoria || '',
+      ciudad: item.ciudad || '',
+      region: item.departamento || '',
+      lead: item.descripcion_corta || '',
+      lat: item.lat, lng: item.lng,
+      whatsapp: item.whatsapp || '',
+      email: item.email || '',
+      web: item.web || '',
+      instagram: item.instagram || '',
+      foto_hero: item.foto_principal || '',
+      tags: d
+    };
+    var norm = EC.normalizarFila(row, []);
+    if (fotosTotal !== null) norm.fotos_total = fotosTotal;
+    if (fotosNoHero !== null) norm.fotos_no_hero = fotosNoHero;
+    var res = EC.calcular(norm);
+    tier = res.tier;
+    puntos = res.puntos;
+    faltantes = res.faltantes.slice();
+    fotosTotal = res.fotos_total;
+    fotosNoHero = res.fotos_no_hero;
+  }
+
+  /* Bonos (ADR-099 D5.2): geo es inmutable y solo deriva de pub_geo o
+     de pub_geo_dist_m; foto premia tener al menos una foto en la ficha. */
+  var bonoGeo = (d.pub_geo === true);
+  if (d.pub_geo !== true && d.pub_geo !== false) {
+    var dist = _modNum(d.pub_geo_dist_m);
+    bonoGeo = (dist !== null && dist <= _MOD_GEO_DIST_M);
+  }
+  var bonoFoto = (fotosTotal !== null && fotosTotal >= 1);
+
+  var cat = _modXpCatalogo || {};
+  var base = (cat['publicar_' + tier] === undefined) ? null : cat['publicar_' + tier];
+  var xpGeo = bonoGeo ? (cat['publicar_bono_geo'] || 0) : 0;
+  var xpFoto = bonoFoto ? (cat['publicar_bono_foto'] || 0) : 0;
+
+  return {
+    tier: tier, puntos: puntos, faltantes: faltantes,
+    fotos_total: fotosTotal, fotos_no_hero: fotosNoHero,
+    base: base, xpGeo: xpGeo, xpFoto: xpFoto,
+    xp: (base === null) ? null : (base + xpGeo + xpFoto),
+    origen: origen
+  };
+}
+
+function _modAforoHtml(item) {
+  var aviso = '<div id="mod-aviso-' + escH(item.id) + '" style="display:none;margin-top:4px;'
+    + 'font-size:10px;font-weight:600;color:#b91c1c"></div>';
+  var af = _modAforoFila(item);
+  if (!af) {
+    return '<div class="mod-card-aforo" style="margin-top:6px;font-size:10px;color:var(--muted)">'
+      + 'Aforo no disponible: lib/completitud.js no cargo.</div>' + aviso;
+  }
+  var nombres = { basico: 'Basico', intermedio: 'Intermedio', completo: 'Completo' };
+  var pct = Math.round(af.puntos);
+  if (!isFinite(pct) || pct < 0) pct = 0;
+  if (pct > 100) pct = 100;
+  var color = (pct >= 75) ? '#16a34a' : ((pct >= 40) ? '#d97706' : '#dc2626');
+  /* ADR-099 T5.3: se listan TODOS los faltantes (sin "6 + +N"), con
+     nombre legible en espanol via entidades HTML. */
+  var chips = '';
+  var i;
+  for (i = 0; i < af.faltantes.length; i++) {
+    chips += '<span style="display:inline-block;padding:1px 6px;margin:1px 3px 1px 0;'
+      + 'border-radius:9px;background:#fee2e2;color:#991b1b;font-size:9px">'
+      + _modEtiquetaHtml(af.faltantes[i]) + '</span>';
+  }
+  var xpTx;
+  if (af.xp === null) {
+    xpTx = 'sin catalogo de XP';
+  } else {
+    xpTx = af.xp + ' estimado (base ' + af.base + ' + geo ' + af.xpGeo + ' + foto ' + af.xpFoto + ')';
+  }
+  var fotosTx = (af.fotos_total === null ? '?' : af.fotos_total) + ' fotos ('
+    + (af.fotos_no_hero === null ? '?' : af.fotos_no_hero) + ' no-hero)';
+
+  return '<div class="mod-card-aforo" style="margin-top:6px;font-size:10px;line-height:1.5">'
+    + '<div style="display:flex;align-items:center;gap:6px">'
+      + '<span style="font-weight:700;text-transform:uppercase;letter-spacing:.04em">'
+      + escH(nombres[af.tier] || af.tier) + '</span>'
+      + '<span style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden">'
+        + '<span style="display:block;height:100%;width:' + pct + '%;background:' + color + '"></span>'
+      + '</span>'
+      + '<span style="font-weight:700">' + pct + '/100</span>'
+    + '</div>'
+    + '<div style="color:var(--muted);margin-top:2px">' + fotosTx
+      + ' &nbsp;|&nbsp; XP: ' + escH(xpTx) + '</div>'
+    + (chips
+        ? '<div style="margin-top:3px">Falta: ' + chips + '</div>'
+        : '<div style="margin-top:3px;color:#16a34a">Sin faltantes</div>')
+    + (af.origen === 'estimado'
+        ? '<div style="margin-top:2px;color:var(--muted)">Sin evaluacion del servidor: '
+          + 'calculado con lib/completitud.js</div>'
+        : '')
+    + '</div>'
+    + aviso;
+}
+
+/* Mensaje del otorgamiento REAL (ADR-099 D10). Si falla, se dice. */
+function _modXpMensaje(ot) {
+  var base = 'Publicado en el directorio';
+  if (!ot) return base + ' - el servidor no informo el XP';
+  if (ot.otorgado === true) {
+    var xp = (ot.xp === null || ot.xp === undefined) ? '?' : ot.xp;
+    return base + ' - XP otorgado: ' + xp;
+  }
+  var motivos = {
+    sin_autor: 'la ficha no tiene autor',
+    ya_otorgado: 'el XP ya estaba otorgado',
+    error_otorgar: 'fallo la acreditacion'
+  };
+  var m = ot.motivo || 'motivo desconocido';
+  return base + ' - XP NO otorgado (' + (motivos[m] || m) + ')';
+}
+
+/* Aforo de un objeto de lugar del editor (misma aritmetica que el servidor). */
+function _modAforoPlace(p) {
+  var EC = window.ECCompletitud;
+  if (!EC || typeof EC.calcular !== 'function' || typeof EC.normalizarFila !== 'function') return null;
+  if (typeof _buildTagsObj !== 'function') return null;
+  var fotos = (p && p.photos) ? p.photos : [];
+  var hero = '';
+  if (fotos.length && typeof _photoToObj === 'function') {
+    var f0 = _photoToObj(fotos[0]);
+    hero = (f0 && f0.url) ? f0.url : '';
+  }
+  var row = {
+    nombre: p.name || '', categoria_slug: p.cat || '',
+    ciudad: p.city || '', region: p.region || '', zona: p.zona || '',
+    lead: p.lead || '', descripcion: p.desc || '',
+    lat: p.lat, lng: p.lng,
+    whatsapp: p.whatsapp || '', email: p.email || '',
+    web: p.web || '', instagram: p.instagram || '',
+    foto_hero: hero, tags: _buildTagsObj(p)
+  };
+  return EC.calcular(EC.normalizarFila(row, fotos));
+}
+
+/* Lugar equivalente al formulario abierto, SOLO para previsualizar. */
+function _ecPlaceDeFormulario() {
+  var p = {
+    id: currentId, status: editorStatus,
+    cat: v('f-cat'), name: v('f-name'), slug: v('f-slug'),
+    city: v('f-city'), region: v('f-region'), zona: v('f-zona'),
+    lead: v('f-lead'), desc: v('f-desc'),
+    lat: parseFloat(v('f-lat')) || 0, lng: parseFloat(v('f-lng')) || 0,
+    whatsapp: v('f-whatsapp'), email: v('f-email'),
+    web: v('f-web'), instagram: v('f-instagram'),
+    photos: []
+  };
+  try { p.photos = getPhotos() || []; } catch (e) { p.photos = []; }
+  /* Motor generico (TSK-012): los extras de categoria se recogen con la
+     misma funcion que usa savePlace, no con un mapa nuevo. */
+  if (typeof collectCategoryTagFields === 'function') {
+    try { collectCategoryTagFields(p, p.cat); } catch (e) {}
+  }
+  return p;
+}
+
+/* Panel del editor: fotos_total / fotos_no_hero ANTES de guardar (D10),
+   para que promover una foto a hero no baje el tier por sorpresa (D3.5). */
+function _ecAforoEditor() {
+  var box = document.getElementById('ec-aforo');
+  if (!box) return;
+  var EC = window.ECCompletitud;
+  if (!EC || typeof EC.contarFotos !== 'function') { box.style.display = 'none'; return; }
+  var fotos = [];
+  try { fotos = getPhotos() || []; } catch (e) { fotos = []; }
+  var hero = (fotos.length && fotos[0] && fotos[0].url) ? fotos[0].url : '';
+  var c = EC.contarFotos(fotos, hero);
+  var guarda = (EC.GUARDA_FOTOS_NO_HERO === undefined) ? '?' : EC.GUARDA_FOTOS_NO_HERO;
+  var partes = [];
+  partes.push('Fotos: <b>' + c.total + '</b> total - <b>' + c.no_hero + '</b> no-hero'
+    + ' (guarda de ' + guarda + ')');
+  var res = null;
+  try { res = _modAforoPlace(_ecPlaceDeFormulario()); } catch (e) { res = null; }
+  if (res) {
+    partes.push('Completitud: <b>' + res.puntos + '/100</b> (' + escH(res.tier) + ')');
+    partes.push('Faltan: ' + escH(_modChipsTexto(res.faltantes, 0)));
+  }
+  box.innerHTML = partes.join(' &nbsp;|&nbsp; ');
+  box.style.display = 'block';
+}
+
+/* Engancha el panel sin tocar el cuerpo de las funciones originales. */
+function _modWrapAforo(nombre) {
+  var orig = window[nombre];
+  if (typeof orig !== 'function') return;
+  window[nombre] = function() {
+    var r = orig.apply(this, arguments);
+    try { _ecAforoEditor(); } catch (e) {}
+    return r;
+  };
+}
+_modWrapAforo('loadForm');
+_modWrapAforo('renderPhotoList');
+_modWrapAforo('updatePhotoPreview');
+_modWrapAforo('addPhotoField');
+_modWrapAforo('removePhotoField');
+_modWrapAforo('previewHero');
+
+/* Vuelta a la cola despues de ampliar un borrador (T5.4). */
+function _modTrasGuardar(p, result) {
+  var pend = _modAprobarPendiente;
+  if (!pend) return;
+  if (String(pend.localId) !== String(p.id)) return;
+  _modAprobarPendiente = null;
+  if (!result || !result.ok) {
+    showAdminToast('No se pudo guardar en el servidor: la ficha sigue sin ampliar', 'error');
+    return;
+  }
+  showAdminToast('Ficha guardada. Aprobar es un segundo clic en la cola: el XP real lo fija el servidor', 'success');
+  setTimeout(function() {
+    if (typeof showScreen === 'function') showScreen('moderacion');
+  }, 900);
+}
+
+/* Paso 1 de 2 del camino largo: abrir el borrador en el editor para
+   ampliarlo. NO aprueba nada (ADR-099 D6.1: pub_* es solo servidor): al
+   guardar se vuelve a la cola y aprobar es el segundo clic. Si la fila no
+   se puede cargar, se avisa en la tarjeta y NO se abre un editor vacio. */
+async function _modCompletarYAprobar(id) {
+  var card = document.getElementById('mod-card-' + id);
+  var aviso = document.getElementById('mod-aviso-' + id);
+  if (card) card.style.opacity = '.5';
+
+  function fallo(msg) {
+    if (card) card.style.opacity = '1';
+    if (aviso) { aviso.textContent = msg; aviso.style.display = 'block'; }
+    showAdminToast(msg, 'error');
+  }
+
+  try {
+    var resp = await fetch('/api/admin-destinos?id=' + encodeURIComponent(id), { headers: _adminHeaders() });
+    var json = await resp.json();
+    if (!json || !json.ok || !json.data) {
+      fallo('No se pudo cargar la ficha para ampliarla: ' + ((json && json.error) || 'respuesta vacia'));
+      return;
+    }
+    var d = json.data;
+    var local = null;
+    for (var k in _localToUUID) {
+      if (String(_localToUUID[k]) === String(id)) {
+        local = places.find(function(x) { return String(x.id) === String(k); });
+        if (local) break;
+      }
+    }
+    if (!local) {
+      local = {
+        id: Date.now(), status: d.status || 'draft',
+        name: d.nombre || '', slug: d.slug || '',
+        cat: d.categoria_slug || 'sitio', photos: [], tags: []
+      };
+      places.push(local);
+    }
+    _localToUUID[local.id] = id;
+    try { localStorage.setItem('admin_local_to_uuid', JSON.stringify(_localToUUID)); } catch (e) {}
+    await _mergeNeonRowIntoLocal(local, d);
+    savePlaces();
+    _modAprobarPendiente = { uuid: id, localId: local.id, nombre: d.nombre || '' };
+    await editPlace(local.id);
+    if (card) card.style.opacity = '1';
+    showAdminToast('Amplia la ficha y guarda: esto NO aprueba. Aprobar es un segundo clic en la cola', '');
+  } catch (e) {
+    fallo('Error al abrir la ficha: ' + (e && e.message ? e.message : 'desconocido'));
+  }
+}
+
 function _renderModCard(item) {
   var d = item.detalles || {};
   var fecha = item.created_at
@@ -7629,7 +8032,8 @@ function _renderModCard(item) {
   // Botones de acción
   var btns = '<a href="/'+escH(item.slug)+'.html" target="_blank" class="btn btn-ghost btn-sm">👁️ Ver</a>';
   if(item.status !== 'published') {
-    btns += '<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;cursor:pointer" onclick="moderarDestino(\''+item.id+'\',\'aprobar\')">✅ Aprobar</button>';
+    btns += '<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;cursor:pointer" onclick="moderarDestino(\''+item.id+'\',\'aprobar\')">✅ Aprobar tal cual</button>';
+    btns += '<button class="btn btn-ghost btn-sm" onclick="_modCompletarYAprobar(\''+item.id+'\')">Ampliar ficha y volver a la cola</button>';
   }
   if(item.status !== 'archived') {
     btns += '<button class="btn btn-danger btn-sm" onclick="moderarDestino(\''+item.id+'\',\'rechazar\')">❌ Rechazar</button>';
@@ -7660,6 +8064,7 @@ function _renderModCard(item) {
           +(precio?' &nbsp;·&nbsp; 💰 '+precio:'')
           +' &nbsp;·&nbsp; 📅 '+fecha
         +'</div>'
+        +_modAforoHtml(item)
         +'<div class="mod-card-desc">'+escH(item.descripcion_corta||'Sin descripción')+'</div>'
         +(contacto?'<div style="font-size:10px;margin-top:5px">'+contacto+'</div>':'')
       +'</div>'
@@ -7682,11 +8087,19 @@ async function moderarDestino(id, accion) {
     if(!data.ok) throw new Error(data.error || 'Error');
 
     var msgs = {
-      aprobar:   '✅ Publicado en el directorio',
-      rechazar:  '❌ Solicitud rechazada',
-      pendiente: '⏳ Movido a pendientes'
+      aprobar:   '\u2705 Publicado en el directorio',
+      rechazar:  '\u274c Solicitud rechazada',
+      pendiente: '\u23f3 Movido a pendientes'
     };
-    showAdminToast(msgs[accion] || 'OK', accion==='aprobar'?'success':'');
+    if (accion === 'aprobar') {
+      /* ADR-099 D10: el numero REAL viaja en otorgamiento. Si el
+         otorgamiento falla se dice; nunca se oculta. */
+      var ot = (data && data.otorgamiento) ? data.otorgamiento : null;
+      var okXp = !!(ot && ot.otorgado === true);
+      showAdminToast(_modXpMensaje(ot), okXp ? 'success' : 'error');
+    } else {
+      showAdminToast(msgs[accion] || 'OK', '');
+    }
 
     // Recargar lista
     loadPendientes();

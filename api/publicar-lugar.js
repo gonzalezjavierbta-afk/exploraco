@@ -8,10 +8,39 @@
 // NO son categoria_slug -- son un sub-tema. Todo submit con uno de
 // esos valores se guarda con categoria_slug='blog' y el tema elegido
 // se preserva en tags.tema (ver BLOG_TEMAS mas abajo).
+//
+// ADR-099 (T2) -- UNA SOLA PUERTA, TRES METODOS, CERO ENDPOINTS NUEVOS.
+//   POST  -- alta de una solicitud (estado_envio='enviado' POR DEFECTO, para
+//            que el publicar.html vivo siga entrando en la cola el dia del
+//            despliegue) o de un teaser (estado_envio='semilla', fuera de la
+//            cola), mas el alta directa del admin (publicar_directo=true, que
+//            exige process.env.ADMIN_SECRET SIN fallback).
+//   GET   -- ?mios=1 lista mis envios; ?id=<uuid> devuelve el detalle de uno
+//            propio. Propiedad por JWT delegada a api/interacciones.js.
+//   PATCH -- ?id=<uuid> actualiza MI borrador con allow-list de claves.
+//   POST con borrador_id + Bearer (D6.4) RECLAMA la semilla propia y la
+//            actualiza EN SU SITIO: nunca inserta una segunda fila. Sin
+//            sesion el borrador_id se ignora y el POST sigue su camino.
+// Ciclo de vida (D6.4): semilla -> borrador -> enviado. Solo 'enviado' se
+// lista en la cola del admin (?recurso=solicitudes).
+// El tier, los faltantes y los dos conteos de fotos los calcula SIEMPRE el
+// servidor con lib/completitud.js (D4): el cliente solo previsualiza. Los
+// pub_* y autor_id son solo-servidor y jamas se confian del body (D6.1).
+// Sin migracion: todo lo nuevo vive en tags JSONB y se fusiona con
+// COALESCE(tags,'{}'::jsonb) || $N::jsonb (ADR-003, Cero Borrado Logico).
 
 const { neon } = require('@neondatabase/serverless');
+const crypto = require('crypto');
+// ADR-099 D4 -- fuente unica de la aritmetica de completitud. Prohibido
+// copiar la formula aqui: si se duplica, el tier del servidor y el del
+// formulario dejan de ser comparables y el XP se paga de menos en silencio.
+const ECCompletitud = require('../lib/completitud.js');
 
 const CAT_MAP = {
+  // ADR-099 D8.2 -- 'blog' es una CATEGORIA mas del mismo formulario. Antes
+  // no estaba aqui y caia en 'sitio' (D8.1), asi que el render -- que
+  // ramifica con cat === 'blog' -- nunca se activaba por esta via.
+  blog:'blog',
   hostal:'hostal', hotel:'hostal', finca:'hostal',
   glamping:'hostal', 'aparta-hotel':'hostal', posada:'hostal',
   restaurante:'comida', cafe:'comida', cafeteria:'comida', bar:'comida',
@@ -261,64 +290,461 @@ function distanciaMetros(lat1, lng1, lat2, lng2) {
   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Nivel de completitud de la publicacion (Fase 2). Mas campos = mas XP.
-function calcularTierPublicacion(b) {
-  var extras = 0;
-  if (b.descripcion_larga) extras++;
-  if (b.foto_principal) extras++;
-  if (b.precio_desde || b.horario) extras++;
-  if (b.sitio_web || b.instagram) extras++;
-  if (b.subcategoria) extras++;
-  if (Array.isArray(b.faqs) && b.faqs.length) extras++;
-  if (Array.isArray(b.amenidades) && b.amenidades.length) extras++;
-  if (b.sitio_tipo_actividad || b.sitio_como_llegar || b.sitio_horario) extras++;
-  var tieneCoords = !!(b.latitud && b.longitud);
-  var tieneGaleria = Array.isArray(b.fotos_galeria) && b.fotos_galeria.length > 0;
-  if (tieneCoords && tieneGaleria && extras >= 4) return 'completo';
-  if (extras >= 2) return 'intermedio';
-  return 'basico';
+// ===========================================================================
+// ADR-099 T2 -- estados de envio, completitud, allow-list y anti-abuso
+// ===========================================================================
+// El tier ya NO se calcula aqui: lo devuelve lib/completitud.js (D4). El
+// contador viejo (extras >= 4) se retira porque no distingue una foto de
+// cinco ni sabe que existe video (D3.7), y era la razon de que el admin que
+// ampliaba una ficha no pudiera mejorar el tier.
+var ESTADO_ENVIO_DEFECTO = 'enviado';
+// D6.4 -- lista UNICA de estados del ciclo: semilla (teaser anonimo) ->
+// borrador (reclamado con sesion o rellenado, fuera de la cola) -> enviado
+// (entra en la cola del admin). La normalizacion y las guardas se apoyan en
+// esta lista para que no aparezca un cuarto estado por descuido.
+var ESTADOS_ENVIO_VALIDOS = ['semilla', 'borrador', 'enviado'];
+// Estados sobre los que se puede escribir con PATCH: el borrador (semilla) y
+// el borrador ya reclamado con sesion (D6.4). 'enviado' NO se edita: 409.
+var ESTADOS_EDITABLES = ['semilla', 'borrador'];
+var MAX_FOTOS = 12;
+var MIN_DESC_CORTA = 30;
+var LIMITE_SEMILLAS_ORIGEN = 3;
+var LIMITE_SEMILLAS_DIA = 20;
+
+// D6.1 -- claves que el cliente SI puede escribir en tags (POST y PATCH).
+var CLAVES_CLIENTE = [
+  'tema', 'subcategoria', 'amenidades', 'habitaciones', 'faqs',
+  'checkin', 'checkout', 'contacto_nombre', 'tipo_actividad', 'dificultad',
+  'duracion', 'horario_visita', 'precio_entrada', 'distancia', 'como_llegar',
+  'permisos', 'equipamiento', 'temporada', 'video_url', 'estado_envio'
+];
+
+// D6.1 -- claves SOLO de servidor. Si llegan por POST o PATCH: 400 y no se
+// escriben. 'pub_geo' por PATCH valdria +40 XP sin geolocalizar: es
+// exactamente la escalada de dinero que ADR-099 cierra.
+var CLAVES_SOLO_SERVIDOR = [
+  'pub_geo', 'pub_foto', 'pub_tier', 'pub_completitud', 'pub_faltantes',
+  'pub_fotos_total', 'pub_fotos_no_hero', 'pub_xp_estado', 'pub_geo_dist_m',
+  'autor_id', 'ip_hash', 'origen_envio', 'semilla_huerfana'
+];
+
+var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function baseApi() {
+  return (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://exploraco.vercel.app');
+}
+
+function leerBody(req) {
+  var b = req && req.body;
+  if (typeof b === 'string') { try { b = JSON.parse(b); } catch (e) { return null; } }
+  if (!b || typeof b !== 'object') return null;
+  return b;
+}
+
+function queryDe(req) {
+  if (req && req.query && typeof req.query === 'object') return req.query;
+  var q = {};
+  var u = String((req && req.url) || '');
+  var i = u.indexOf('?');
+  if (i === -1) return q;
+  var partes = u.slice(i + 1).split('&');
+  for (var j = 0; j < partes.length; j++) {
+    var par = partes[j].split('=');
+    if (!par[0]) continue;
+    try { q[decodeURIComponent(par[0])] = decodeURIComponent(par[1] || ''); }
+    catch (e) { q[par[0]] = par[1] || ''; }
+  }
+  return q;
+}
+
+function cabeceraAuth(req) {
+  var h = (req && req.headers) || {};
+  return String(h['authorization'] || h['Authorization'] || '').trim();
+}
+
+// JSONB de Neon: puede llegar como objeto o como cadena JSON.
+function leerTags(v) {
+  if (!v) return {};
+  if (typeof v === 'string') {
+    try { var o = JSON.parse(v); return (o && typeof o === 'object') ? o : {}; }
+    catch (e) { return {}; }
+  }
+  return (typeof v === 'object') ? v : {};
+}
+
+function numONull(v) {
+  if (v === undefined || v === null || v === '') return null;
+  var n = parseFloat(v);
+  return isFinite(n) ? n : null;
+}
+
+// precio_desde es VARCHAR en la tabla: se guarda ya formateado ('$12.000').
+// Una sola funcion para POST y PATCH para que no puedan divergir (D6.1 mapea
+// precio_desde y horario a su COLUMNA, no a tags).
+function formatearPrecio(v) {
+  if (v === undefined || v === null || v === '') return null;
+  var n = parseInt(String(v).replace(/\D/g, ''), 10);
+  if (!isFinite(n) || n <= 0) return null;
+  return '$' + n.toLocaleString('es-CO');
+}
+
+// Motor de sesion: publicar-lugar NO verifica el JWT, lo delega en
+// api/interacciones.js con el tipo ya existente (mismo camino que usaba el
+// POST). Devuelve autor_id o null. Nunca se loguea el token.
+async function resolverAutor(authHeader) {
+  if (!authHeader) return null;
+  try {
+    var r = await fetch(baseApi() + '/api/interacciones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
+      body: JSON.stringify({ tipo: 'publicar_lugar_registrar' })
+    });
+    var j = await r.json();
+    if (j && j.ok && j.data && j.data.autor_id) return String(j.data.autor_id);
+  } catch (e) {
+    console.warn('[publicar-lugar] registrar autor fallo: ' + (e && e.message));
+  }
+  return null;
+}
+
+// D6.2 -- default 'enviado' (retrocompatible: el publicar.html vivo no manda
+// el campo y debe seguir entrando en la cola el dia del despliegue).
+// D6.4 -- 'borrador' es un estado de PLENO DERECHO del ciclo, no un alias de
+// 'draft' de la columna status: se admite aqui y en ESTADOS_EDITABLES.
+function normEstadoEnvio(v) {
+  var s = String((v === undefined || v === null) ? '' : v).trim().toLowerCase();
+  if (!s) return ESTADO_ENVIO_DEFECTO;
+  if (s === 'draft') s = 'borrador';
+  if (ESTADOS_ENVIO_VALIDOS.indexOf(s) === -1) return null;
+  return s;
+}
+
+// D6.4 -- carga la fila a reclamar. Se devuelve COMPLETA para que el UPDATE
+// pueda conservar lo que el payload no trae (ADR-003: un campo ausente no se
+// borra) y para que la completitud se evalue sobre la fila resultante.
+async function cargarReclamable(sql, id, autorId) {
+  var rows = await sql(
+    'SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.lead, d.descripcion, '
+    + 'd.highlight, d.ciudad, d.region, d.barrio, d.zona, d.lat, d.lng, '
+    + 'd.whatsapp, d.telefono, d.email, d.web, d.instagram, d.foto_hero, '
+    + 'd.precio_desde, d.horario, d.sintro, d.booking, d.hostelworld, '
+    + 'd.airbnb, d.tipo, d.tags, d.status '
+    + 'FROM destinos d WHERE d.id = $1',
+    [id]
+  );
+  var fila = rows && rows[0];
+  // Ajeno = 404, no 403: no se filtra la existencia de borradores de otros
+  // (misma leccion que GET ?id=).
+  if (!fila)
+    return { ok: false, status: 404, body: { ok: false, error: 'NO_ENCONTRADO', code: 'NO_ENCONTRADO' } };
+  var t = leerTags(fila.tags);
+  var dueno = String(t.autor_id || '');
+  if (dueno && dueno !== autorId)
+    return { ok: false, status: 404, body: { ok: false, error: 'NO_ENCONTRADO', code: 'NO_ENCONTRADO' } };
+  var est = normEstadoEnvio(t.estado_envio);
+  // 'enviado' no vuelve atras ni se reescribe: 409 (D6.2 + D6.4).
+  if (est === 'enviado')
+    return { ok: false, status: 409, body: { ok: false, error: 'YA_ENVIADO', code: 'YA_ENVIADO' } };
+  // Solo se reclama una fila que el admin no este moderando ya.
+  if (String(fila.status || '') !== 'draft')
+    return { ok: false, status: 404, body: { ok: false, error: 'NO_ENCONTRADO', code: 'NO_ENCONTRADO' } };
+  if (ESTADOS_EDITABLES.indexOf(est) === -1)
+    return { ok: false, status: 409, body: { ok: false, error: 'NO_EDITABLE', code: 'NO_EDITABLE' } };
+  return { ok: true, status: 200, fila: fila, tags: t };
+}
+
+// D8.2 -- 'blog' es una categoria; los 5 temas siguen resolviendo a 'blog'
+// (retrocompatibilidad de D8.5: categoria='aventura' no se rompe).
+function resolverCategoriaPublicacion(catRaw) {
+  var c = String((catRaw === undefined || catRaw === null) ? '' : catRaw).trim().toLowerCase();
+  var esBlog = (c === 'blog') || BLOG_TEMAS.indexOf(c) !== -1;
+  return { categoria: c, esBlog: esBlog, catSlug: esBlog ? 'blog' : (CAT_MAP[c] || 'sitio') };
+}
+
+// D8.2 -- tags.tema sale de body.tema validado contra BLOG_TEMAS, NO de
+// body.categoria como hacia antes. Si la categoria ES un tema, ese tema se
+// conserva (D8.5).
+function resolverTema(cat, temaRaw) {
+  if (!cat || !cat.esBlog) return null;
+  var t = String((temaRaw === undefined || temaRaw === null) ? '' : temaRaw).trim().toLowerCase();
+  if (BLOG_TEMAS.indexOf(t) !== -1) return t;
+  if (BLOG_TEMAS.indexOf(cat.categoria) !== -1) return cat.categoria;
+  return null;
+}
+
+// Tags de cliente del POST: SOLO lista blanca. El servidor construye el
+// objeto; nunca se fusiona el body entero (D6.1). Los sitio_* del formulario
+// se mapean a su clave de tags.
+function construirTagsCliente(b, catSlug) {
+  var tags = {};
+  if (b.amenidades && b.amenidades.length) tags.amenidades = b.amenidades;
+  if (b.habitaciones && b.habitaciones.length) tags.habitaciones = b.habitaciones;
+  if (b.faqs && b.faqs.length) tags.faqs = b.faqs;
+  if (b.checkin) tags.checkin = b.checkin;
+  if (b.checkout) tags.checkout = b.checkout;
+  if (b.contacto_nombre) tags.contacto_nombre = b.contacto_nombre;
+  if (b.subcategoria && SUBCAT_LISTA[catSlug]) {
+    var subcat = String(b.subcategoria).toLowerCase();
+    if (SUBCAT_LISTA[catSlug].indexOf(subcat) !== -1) tags.subcategoria = subcat;
+  }
+  if (b.sitio_tipo_actividad) tags.tipo_actividad = b.sitio_tipo_actividad;
+  if (b.sitio_dificultad) tags.dificultad = b.sitio_dificultad;
+  if (b.sitio_duracion) tags.duracion = b.sitio_duracion;
+  if (b.sitio_horario) tags.horario_visita = b.sitio_horario;
+  if (b.sitio_precio_entrada) tags.precio_entrada = b.sitio_precio_entrada;
+  if (b.sitio_distancia) tags.distancia = b.sitio_distancia;
+  if (b.sitio_como_llegar) tags.como_llegar = b.sitio_como_llegar;
+  if (b.sitio_permisos) tags.permisos = b.sitio_permisos;
+  if (b.sitio_equipamiento && b.sitio_equipamiento.length) tags.equipamiento = b.sitio_equipamiento;
+  if (b.sitio_temporada && b.sitio_temporada.length) tags.temporada = b.sitio_temporada;
+  return tags;
+}
+
+// D7 + D8.4 + D3.3 -- UNA sola validacion para el POST y para la transicion
+// semilla -> enviado del PATCH. Sin ella el PATCH seria la puerta trasera
+// para encolar fichas vacias (D6.2).
+//   semilla: nombre + categoria + ciudad. Sin descripcion, sin foto.
+//   enviado: lo anterior + descripcion_corta >= 30 + email si es blog.
+//   foto:    NUNCA es requisito (deroga ADR-097 D5 en esa clausula).
+function validarEnvio(d) {
+  if (d.fotosTotal > MAX_FOTOS)
+    return { ok: false, code: 'FOTOS_EXCEDIDAS', campo: 'fotos_galeria', error: 'FOTOS_EXCEDIDAS' };
+  if (!d.nombre)
+    return { ok: false, code: 'CAMPO_REQUERIDO', campo: 'nombre', error: 'Campo requerido: nombre' };
+  if (!d.categoria)
+    return { ok: false, code: 'CAMPO_REQUERIDO', campo: 'categoria', error: 'Campo requerido: categoria' };
+  if (!d.ciudad)
+    return { ok: false, code: 'CAMPO_REQUERIDO', campo: 'ciudad', error: 'Campo requerido: ciudad' };
+  if (d.estadoEnvio === 'semilla') return { ok: true };
+  var lead = String((d.lead === undefined || d.lead === null) ? '' : d.lead).trim();
+  if (lead.length < MIN_DESC_CORTA)
+    return { ok: false, code: 'DESCRIPCION_CORTA_INVALIDA', campo: 'descripcion_corta',
+      error: 'Campo requerido: descripcion_corta (minimo ' + MIN_DESC_CORTA + ' caracteres)' };
+  if (d.esBlog) {
+    if (!String(d.email || '').trim())
+      return { ok: false, code: 'CAMPO_REQUERIDO', campo: 'email', error: 'Campo requerido: email' };
+    if (BLOG_TEMAS.indexOf(String(d.tema || '').trim().toLowerCase()) === -1)
+      return { ok: false, code: 'TEMA_INVALIDO', campo: 'tema', error: 'TEMA_INVALIDO' };
+  }
+  return { ok: true };
+}
+
+// D6.1 -- allow-list del PATCH. Fail-closed y VISIBLE: devuelve la clave
+// ofensora en vez de ignorarla en silencio.
+function claveProhibida(body) {
+  var fuentes = [body];
+  if (body && body.tags && typeof body.tags === 'object') fuentes.push(body.tags);
+  for (var f = 0; f < fuentes.length; f++) {
+    var o = fuentes[f];
+    if (!o || typeof o !== 'object') continue;
+    for (var k in o) {
+      if (!Object.prototype.hasOwnProperty.call(o, k)) continue;
+      if (CLAVES_SOLO_SERVIDOR.indexOf(k) !== -1) return k;
+      if (String(k).indexOf('pub_') === 0) return k;
+    }
+  }
+  return null;
+}
+
+function ipDe(req) {
+  var h = (req && req.headers) || {};
+  var xff = String(h['x-forwarded-for'] || h['X-Forwarded-For'] || '');
+  var ip = xff.split(',')[0].trim();
+  if (!ip) ip = String(h['x-real-ip'] || h['X-Real-Ip'] || '').trim();
+  if (!ip && req && req.socket && req.socket.remoteAddress) ip = String(req.socket.remoteAddress);
+  return ip;
+}
+
+// D6.6.3 -- sha256(ip + secreto del dia). Sin sal, el hash de una IP es
+// reversible por fuerza bruta en 2^32 y tags es legible desde el admin. Se
+// guarda el hash, NUNCA la IP cruda (minimizacion de datos).
+function hashIp(ip, secreto) {
+  var dia = new Date().toISOString().slice(0, 10);
+  return crypto.createHash('sha256')
+    .update(String(ip || '') + '|' + String(secreto) + '|' + dia)
+    .digest('hex');
+}
+
+// D3.6 + D4 -- evalua la fila que se va a persistir. La galeria llega YA
+// contada (D3.1): lib/completitud.js no consulta la base.
+function evaluarFila(fila, tags, conteo) {
+  var entrada = {
+    nombre: fila.nombre || '',
+    categoria_slug: fila.categoria_slug || '',
+    subcategoria: tags.subcategoria || '',
+    ciudad: fila.ciudad || '',
+    departamento: fila.departamento || '',
+    zona: fila.zona || '',
+    lead: fila.lead || '',
+    descripcion: fila.descripcion || '',
+    lat: fila.lat,
+    lng: fila.lng,
+    whatsapp: fila.whatsapp || '',
+    email: fila.email || '',
+    web: fila.web || '',
+    instagram: fila.instagram || '',
+    tags: tags,
+    fotos_total: conteo.total,
+    fotos_no_hero: conteo.no_hero
+  };
+  var res = ECCompletitud.calcular(entrada);
+  return { res: res, pers: ECCompletitud.persistible(res) };
+}
+
+// Lo que el cliente necesita para pintar la barra y la estimacion de XP sin
+// recalcular reglas (D10/D12: la cifra final la fijan los multiplicadores).
+function respuestaCompletitud(ev) {
+  return {
+    puntos: ev.res.puntos,
+    tier: ev.res.tier,
+    faltantes: ev.res.faltantes,
+    guardas: ev.res.guardas,
+    bloques: ev.res.bloques,
+    version: ev.res.version,
+    fotos_total: ev.pers.pub_fotos_total,
+    fotos_no_hero: ev.pers.pub_fotos_no_hero
+  };
 }
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // D6.3 -- el preflight lo responde ESTE handler, no vercel.json. Sin
+  // 'Authorization' el Bearer de GET/PATCH no pasaria preflight aunque el
+  // metodo este permitido.
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  var metodo = String(req.method || '').toUpperCase();
+  if (metodo === 'GET') return manejarGet(req, res);
+  if (metodo === 'PATCH') return manejarPatch(req, res);
+  if (metodo !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
+  return manejarPost(req, res);
+};
 
-  // Parsear body si llega como string
-  var body = req.body;
-  if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
-  if (!body || typeof body !== 'object') return res.status(400).json({ error: 'Body JSON requerido' });
-
-  var esBlog = BLOG_TEMAS.indexOf(String(body.categoria||'').toLowerCase()) !== -1;
-
-  // Validar requeridos. Blog reusa el mismo formulario base (nombre=
-  // titulo, ciudad=destino, descripcion_corta=resumen) pero pide email
-  // en vez de whatsapp -- el modal "Comparte tu experiencia" no
-  // recolecta whatsapp (ver index.html #blog-modal).
-  //
-  // ENVIO BASICO SIN WHATSAPP: whatsapp deja de ser requerido. La regla
-  // minima del envio es nombre, categoria, ciudad, descripcion_corta y
-  // foto_principal.
-  //
-  // NO se exige NINGUN contacto (ni whatsapp, ni email, ni sesion JWT): un
-  // envio sin via de contacto se acepta igual y el destino queda con el
-  // autor sin forma de ser located -- el aviso al usuario es trabajo del
-  // frontend, no un 400 del backend. Solo el camino de blog sigue
-  // exigiendo email, porque su modal no recolecta whatsapp.
-  var reqs = esBlog
-    ? ['nombre','categoria','ciudad','descripcion_corta','email']
-    : ['nombre','categoria','ciudad','descripcion_corta','foto_principal'];
-  for (var i = 0; i < reqs.length; i++) {
-    if (!body[reqs[i]] || !String(body[reqs[i]]).trim())
-      return res.status(400).json({ error: 'Campo requerido: ' + reqs[i] });
-  }
+// ===========================================================================
+// POST -- alta unica (solicitud, semilla o alta directa del admin)
+// ===========================================================================
+async function manejarPost(req, res) {
+  var body = leerBody(req);
+  if (!body) return res.status(400).json({ ok: false, error: 'Body JSON requerido', code: 'BODY_INVALIDO' });
 
   try {
+    var directo = (body.publicar_directo === true || String(body.publicar_directo) === 'true');
+    var estadoEnvio = normEstadoEnvio(body.estado_envio);
+    // El alta directa del admin siempre es una publicacion: nace 'enviado'.
+    if (directo) estadoEnvio = 'enviado';
+    if (!estadoEnvio || estadoEnvio === 'borrador')
+      return res.status(400).json({ ok: false, error: 'estado_envio no permitido en el alta',
+        code: 'ESTADO_ENVIO_INVALIDO', campo: 'estado_envio' });
+
+    var authPub = cabeceraAuth(req);
+    var autorId = await resolverAutor(authPub);
+
+    // D6.5 -- el camino admin del mismo endpoint NO hereda un secreto
+    // publico: sin la variable de entorno no hay alta directa (401), y no
+    // existe fallback al literal que hoy usa la notificacion.
+    if (directo) {
+      var secretoAdmin = process.env.ADMIN_SECRET;
+      if (!secretoAdmin)
+        return res.status(401).json({ ok: false, error: 'ADMIN_NO_CONFIGURADO', code: 'ADMIN_NO_CONFIGURADO' });
+      var tokenAdmin = authPub.replace(/^Bearer\s+/i, '').trim();
+      if (!tokenAdmin || tokenAdmin !== secretoAdmin)
+        return res.status(401).json({ ok: false, error: 'No autorizado', code: 'NO_AUTORIZADO' });
+    }
+
     var sql = neon(process.env.DATABASE_URL);
 
-    var catSlug = esBlog ? 'blog' : (CAT_MAP[(body.categoria||'').toLowerCase()] || 'sitio');
+    // D6.4 -- RECLAMO del borrador. Las tres condiciones son necesarias:
+    // sesion valida, id con forma de UUID y fila propia que aun no este
+    // enviada. Sin JWT el borrador_id se IGNORA en silencio (nunca se reclama
+    // por id a ciegas) y el POST sigue su camino normal de alta.
+    var borradorId = String((body.borrador_id === undefined || body.borrador_id === null)
+      ? '' : body.borrador_id).trim();
+    var rec = null;
+    if (borradorId && autorId && !directo) {
+      if (!UUID_RE.test(borradorId))
+        return res.status(400).json({ ok: false, error: 'borrador_id invalido', code: 'ID_INVALIDO' });
+      rec = await cargarReclamable(sql, borradorId, autorId);
+      if (!rec.ok) return res.status(rec.status).json(rec.body);
+
+      // ADR-003 -- el payload se completa con lo que la semilla ya tenia: un
+      // campo AUSENTE no se borra; un campo vacio explicito si (mismo
+      // contrato que el PATCH).
+      var mapaColumnas = {
+        nombre: 'nombre', categoria: 'categoria_slug', ciudad: 'ciudad',
+        departamento: 'region', barrio: 'barrio', zona: 'zona',
+        latitud: 'lat', longitud: 'lng',
+        whatsapp: 'whatsapp', telefono: 'telefono', email: 'email',
+        sitio_web: 'web', instagram: 'instagram',
+        precio_desde: 'precio_desde', horario: 'horario',
+        foto_principal: 'foto_hero', frase_destacada: 'highlight',
+        sintro: 'sintro', booking_url: 'booking',
+        hostelworld_url: 'hostelworld', airbnb_url: 'airbnb',
+        tipo_alojamiento: 'tipo',
+        descripcion_corta: 'lead', descripcion_larga: 'descripcion'
+      };
+      for (var mc in mapaColumnas) {
+        if (!Object.prototype.hasOwnProperty.call(mapaColumnas, mc)) continue;
+        if (body[mc] === undefined) body[mc] = rec.fila[mapaColumnas[mc]];
+      }
+    }
+
+    var cat = resolverCategoriaPublicacion(body.categoria);
+    var temaFinal = resolverTema(cat, body.tema);
+
+    // D3.1 -- la galeria se cuenta con la formula unica (hero fuera de la
+    // galeria). D3.3 -- tope duro de 12, contado DESPUES de deduplicar.
+    var conteo = ECCompletitud.contarFotos(body.fotos_galeria, body.foto_principal);
+
+    // D6.4 -- el estado del reclamado lo DERIVA el servidor, no lo elige el
+    // cliente: 'enviado' si el payload resultante cumple el minimo de envio
+    // completo (D6.2/D7), 'borrador' si solo cumple el minimo de guardado.
+    // Un alta nueva conserva el contrato de siempre (estado_envio del body).
+    var datosValidacion = {
+      nombre: String(body.nombre || '').trim(),
+      categoria: cat.categoria,
+      ciudad: String(body.ciudad || '').trim(),
+      lead: body.descripcion_corta,
+      email: body.email,
+      esBlog: cat.esBlog,
+      tema: temaFinal,
+      fotosTotal: conteo.total
+    };
+    var estadoFinal = estadoEnvio;
+    var v = { ok: true };
+    if (rec) {
+      datosValidacion.estadoEnvio = 'semilla';
+      var vBase = validarEnvio(datosValidacion);
+      if (!vBase.ok) return res.status(400).json({ ok: false, error: vBase.error, code: vBase.code, campo: vBase.campo });
+      datosValidacion.estadoEnvio = 'enviado';
+      v = validarEnvio(datosValidacion);
+      estadoFinal = v.ok ? 'enviado' : 'borrador';
+    } else {
+      datosValidacion.estadoEnvio = estadoEnvio;
+      v = validarEnvio(datosValidacion);
+      if (!v.ok) return res.status(400).json({ ok: false, error: v.error, code: v.code, campo: v.campo });
+    }
+
+    // D6.6 -- anti-abuso sin infraestructura nueva. Solo la SEMILLA consume
+    // cupo: un 'enviado' con sesion no se limita por IP (la sesion ya acota
+    // por identidad). Contadores en SQL porque serverless es stateless.
+    // El RECLAMO no consume cupo: no crea fila, actualiza una que ya existe.
+    var ipHash = null;
+    if (!rec && estadoEnvio === 'semilla') {
+      var secretoSemilla = process.env.SEMILLA_HASH_SECRET;
+      if (!secretoSemilla)
+        return res.status(429).json({ ok: false, error: 'SEMILLA_GATE_NO_CONFIGURADO', code: 'SEMILLA_GATE_NO_CONFIGURADO' });
+      ipHash = hashIp(ipDe(req), secretoSemilla);
+      var cOrigen = await sql("SELECT COUNT(*)::int AS n FROM destinos WHERE tags->>'ip_hash' = $1 AND creado_en > date_trunc('day', now())", [ipHash]);
+      var nOrigen = (cOrigen && cOrigen[0]) ? Number(cOrigen[0].n) : 0;
+      if (nOrigen >= LIMITE_SEMILLAS_ORIGEN)
+        return res.status(429).json({ ok: false, error: 'DEMASIADAS_SEMILLAS', code: 'DEMASIADAS_SEMILLAS' });
+      var cGlobal = await sql("SELECT COUNT(*)::int AS n FROM destinos WHERE tags->>'estado_envio' = 'semilla' AND creado_en > date_trunc('day', now())", []);
+      var nGlobal = (cGlobal && cGlobal[0]) ? Number(cGlobal[0].n) : 0;
+      if (nGlobal >= LIMITE_SEMILLAS_DIA)
+        return res.status(429).json({ ok: false, error: 'DEMASIADAS_SEMILLAS', code: 'DEMASIADAS_SEMILLAS' });
+    }
+
     var nuevoSlug = slug(body.nombre, body.ciudad);
 
     // Zona (columna zona, migracion 028). Lista cerrada de 5 valores o
@@ -327,89 +753,144 @@ module.exports = async function handler(req, res) {
     var zonaFinal = resolverZona(body.zona, body.departamento);
 
     // precio_desde es VARCHAR en la tabla -- formatear como texto
-    var precio = null;
-    if (body.precio_desde) {
-      var num = parseInt(String(body.precio_desde).replace(/\D/g,''));
-      if (!isNaN(num) && num > 0) precio = '$' + num.toLocaleString('es-CO');
+    var precio = formatearPrecio(body.precio_desde);
+
+    // Tags de cliente (lista blanca) + tema + video. D9: el video deja de ser
+    // exclusivo de blog con la MISMA validacion de host; si el host no esta
+    // permitido simplemente no se escribe (ni 400 ni 500).
+    var tags = construirTagsCliente(body, cat.catSlug);
+    if (temaFinal) tags.tema = temaFinal;
+    if (body.video_url) {
+      var vu = String(body.video_url).trim();
+      if (esVideoUrlSegura(vu)) tags.video_url = vu;
     }
 
-    // tags JSONB -- todo lo que no tiene columna propia
-    var tags = {};
-    if (body.amenidades   && body.amenidades.length)   tags.amenidades    = body.amenidades;
-    if (body.habitaciones && body.habitaciones.length) tags.habitaciones  = body.habitaciones;
-    if (body.faqs         && body.faqs.length)         tags.faqs          = body.faqs;
-    if (body.checkin)      tags.checkin      = body.checkin;
-    if (body.checkout)     tags.checkout     = body.checkout;
-    if (body.contacto_nombre) tags.contacto_nombre = body.contacto_nombre;
-    // Subcategoria (ADR-016) -- lista cerrada por categoria final
-    if (body.subcategoria && SUBCAT_LISTA[catSlug]) {
-      var subcat = String(body.subcategoria).toLowerCase();
-      if (SUBCAT_LISTA[catSlug].indexOf(subcat) !== -1) {
-        tags.subcategoria = subcat;
-      }
-    }
-    // Campos especificos de sitio turistico
-    if (body.sitio_tipo_actividad) tags.tipo_actividad  = body.sitio_tipo_actividad;
-    if (body.sitio_dificultad)     tags.dificultad      = body.sitio_dificultad;
-    if (body.sitio_duracion)       tags.duracion        = body.sitio_duracion;
-    if (body.sitio_horario)        tags.horario_visita  = body.sitio_horario;
-    if (body.sitio_precio_entrada) tags.precio_entrada  = body.sitio_precio_entrada;
-    if (body.sitio_distancia)      tags.distancia       = body.sitio_distancia;
-    if (body.sitio_como_llegar)    tags.como_llegar     = body.sitio_como_llegar;
-    if (body.sitio_permisos)       tags.permisos        = body.sitio_permisos;
-    if (body.sitio_equipamiento && body.sitio_equipamiento.length) tags.equipamiento = body.sitio_equipamiento;
-    if (body.sitio_temporada    && body.sitio_temporada.length)    tags.temporada    = body.sitio_temporada;
-    // Campos especificos de blog (Sprint Inspirate)
-    if (esBlog) {
-      tags.tema = String(body.categoria).toLowerCase();
-      if (body.video_url && esVideoUrlSegura(body.video_url)) {
-        tags.video_url = String(body.video_url).trim();
-      }
-    }
-
-    var tierPub = calcularTierPublicacion(body);
+    // D2.2 -- bono geo: <= 300 m entre dispositivo y pin. D5 -- se guarda
+    // tambien pub_geo_dist_m para que un futuro recalculo sea posible sin
+    // migracion (pub_geo es inmutable).
+    var latD = numONull(body.latitud);
+    var lngD = numONull(body.longitud);
+    var latU = numONull(body.lat_usuario);
+    var lngU = numONull(body.lng_usuario);
     var geoPub = false;
-    var latU = parseFloat(body.lat_usuario), lngU = parseFloat(body.lng_usuario);
-    var latD = parseFloat(body.latitud), lngD = parseFloat(body.longitud);
-    if (isFinite(latU) && isFinite(lngU) && isFinite(latD) && isFinite(lngD)
-      && distanciaMetros(latU, lngU, latD, lngD) <= 300) geoPub = true;
-    var fotoPub = Array.isArray(body.fotos_galeria) && body.fotos_galeria.length > 0;
+    var geoDist = null;
+    if (latU !== null && lngU !== null && latD !== null && lngD !== null) {
+      geoDist = Math.round(distanciaMetros(latU, lngU, latD, lngD));
+      geoPub = geoDist <= 300;
+    }
 
-    // Autor (Fase 2): solo si el usuario ya esta logueado (Bearer valido).
-    // publicar-lugar no verifica el JWT: lo reenvia a interacciones, que
-    // es el unico lugar con el motor de sesion.
-    var autorId = null;
-    var authPub = req.headers['authorization'] || req.headers['Authorization'] || '';
-    if (authPub) {
-      try {
-        var baseUrlPub = (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://exploraco.vercel.app');
-        var rReg = await fetch(baseUrlPub + '/api/interacciones', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': authPub },
-          body: JSON.stringify({ tipo: 'publicar_lugar_registrar' })
-        });
-        var jReg = await rReg.json();
-        if (jReg && jReg.ok && jReg.data && jReg.data.autor_id) autorId = String(jReg.data.autor_id);
-      } catch (eReg) {
-        console.warn('[publicar-lugar] registrar autor fallo: ' + (eReg && eReg.message));
+    // D7 -- lead no puede ser el literal "undefined": String(undefined) lo
+    // produciria. Cadena vacia por defecto; el render ya degrada.
+    var nombreFinal = String(body.nombre || '').trim();
+    var ciudadFinal = String(body.ciudad || '').trim();
+    var leadFinal = String((body.descripcion_corta === undefined || body.descripcion_corta === null)
+      ? '' : body.descripcion_corta).trim();
+
+    // Blog: el modal solo pide un resumen. Se usa tambien como arranque del
+    // cuerpo completo para que el editor tenga texto de partida -- si llega
+    // descripcion_larga explicita, esa tiene prioridad.
+    var descripcionFinal = body.descripcion_larga
+      ? String(body.descripcion_larga)
+      : (cat.esBlog && leadFinal ? leadFinal : null);
+
+    // D6.4 -- al reclamar, la completitud se evalua sobre la fila RESULTANTE
+    // (tags viejos + delta), no sobre el payload suelto: si no, el tier del
+    // borrador reclamado saldria por debajo del que la fila va a tener.
+    var tagsEval = tags;
+    if (rec) {
+      tagsEval = {};
+      var tk;
+      for (tk in rec.tags) {
+        if (Object.prototype.hasOwnProperty.call(rec.tags, tk)) tagsEval[tk] = rec.tags[tk];
+      }
+      for (tk in tags) {
+        if (Object.prototype.hasOwnProperty.call(tags, tk)) tagsEval[tk] = tags[tk];
       }
     }
+
+    var ev = evaluarFila({
+      nombre: nombreFinal,
+      categoria_slug: cat.catSlug,
+      ciudad: ciudadFinal,
+      departamento: body.departamento,
+      zona: zonaFinal,
+      lead: leadFinal,
+      descripcion: descripcionFinal,
+      lat: latD,
+      lng: lngD,
+      whatsapp: body.whatsapp,
+      email: body.email,
+      web: body.sitio_web,
+      instagram: body.instagram
+    }, tagsEval, conteo);
+
+    // Claves SOLO de servidor: se estampan DESPUES de las del cliente, asi
+    // que cualquier intento de inyeccion queda pisado (D6.1).
     tags.autor_id = autorId;
-    tags.pub_tier = tierPub;
+    tags.estado_envio = estadoFinal;
+    tags.origen_envio = directo ? 'admin' : (estadoFinal === 'semilla' ? 'teaser' : 'formulario');
+    if (ipHash) tags.ip_hash = ipHash;
+    tags.pub_tier = ev.pers.pub_tier;
+    tags.pub_completitud = ev.pers.pub_completitud;
+    tags.pub_faltantes = ev.pers.pub_faltantes;
+    tags.pub_fotos_total = ev.pers.pub_fotos_total;
+    tags.pub_fotos_no_hero = ev.pers.pub_fotos_no_hero;
     tags.pub_geo = geoPub;
-    tags.pub_foto = fotoPub;
+    tags.pub_foto = ev.pers.pub_fotos_total >= 1;
     tags.pub_xp_estado = autorId ? 'pendiente' : 'sin_autor';
+    if (geoDist !== null) tags.pub_geo_dist_m = geoDist;
 
-    // Blog: el modal solo pide un resumen (descripcion_corta). Se usa
-    // tambien como arranque del cuerpo completo (descripcion) para que
-    // el editor tenga texto de partida al revisar/ampliar la historia
-    // antes de aprobarla -- si llega descripcion_larga explicita (ej.
-    // desde el admin), esa tiene prioridad.
-    var descripcionFinal = body.descripcion_larga
-      || (esBlog ? body.descripcion_corta : null)
-      || null;
+    // Alta directa del admin: conserva la publicacion inmediata de hoy. La
+    // completitud se calcula igual y el XP solo se acreditara si hay autor
+    // (publicar_lugar_otorgar devuelve sin_autor si no lo hay).
+    var statusFinal = directo ? 'published' : 'draft';
 
-    var rows = await sql(
+    // D6.4 -- RECLAMO: se ACTUALIZA la fila reclamada, NUNCA se inserta otra
+    // (si se insertara, la semilla quedaria huerfana y el autor veria dos
+    // envios). El WHERE repite las condiciones del reclamo para que una
+    // carrera (dos pestanas sobre el mismo borrador) no pueda pisar una fila
+    // ya enviada. Slug, status y flags de moderacion NO se tocan aqui.
+    var filaRec = null;
+    if (rec) {
+      statusFinal = String(rec.fila.status || 'draft');
+      var updRec = await sql(
+        'UPDATE destinos SET '
+        + 'nombre = $2, categoria_slug = $3, lead = $4, descripcion = $5, highlight = $6, '
+        + 'ciudad = $7, region = $8, barrio = $9, zona = $10, '
+        + 'lat = $11, lng = $12, '
+        + 'whatsapp = $13, telefono = $14, email = $15, web = $16, instagram = $17, '
+        + 'precio_desde = $18, horario = $19, foto_hero = $20, '
+        + 'booking = $21, hostelworld = $22, airbnb = $23, tipo = $24, '
+        + 'sintro = $25, '
+        + "tags = COALESCE(tags, '{}'::jsonb) || $26::jsonb, "
+        + 'actualizado_en = NOW() '
+        + "WHERE id = $1 AND status = 'draft' "
+        + "AND (tags->>'autor_id' IS NULL OR tags->>'autor_id' = $27) "
+        + "AND COALESCE(tags->>'estado_envio', 'enviado') IN ('semilla', 'borrador') "
+        + 'RETURNING id, slug, status, tags',
+        [rec.fila.id, nombreFinal, cat.catSlug, leadFinal, descripcionFinal,
+         body.frase_destacada || null,
+         ciudadFinal, body.departamento || null, body.barrio || null, zonaFinal,
+         latD, lngD,
+         body.whatsapp || null, body.telefono || null, body.email || null,
+         body.sitio_web || null, body.instagram || null,
+         precio, body.horario || null, body.foto_principal || null,
+         body.booking_url || null, body.hostelworld_url || null, body.airbnb_url || null,
+         body.tipo_alojamiento || null,
+         normSintro(body.sintro),
+         JSON.stringify(tags), autorId]
+      );
+      filaRec = updRec && updRec[0];
+      if (!filaRec) {
+        var chk = await sql('SELECT tags FROM destinos WHERE id = $1', [rec.fila.id]);
+        var tChk = (chk && chk[0]) ? leerTags(chk[0].tags) : {};
+        if (normEstadoEnvio(tChk.estado_envio) === 'enviado')
+          return res.status(409).json({ ok: false, error: 'YA_ENVIADO', code: 'YA_ENVIADO' });
+        return res.status(404).json({ ok: false, error: 'NO_ENCONTRADO', code: 'NO_ENCONTRADO' });
+      }
+    }
+
+    var rows = rec ? null : await sql(
       'INSERT INTO destinos ( '
       + 'slug, nombre, categoria_slug, '
       + 'lead, descripcion, highlight, '
@@ -432,94 +913,547 @@ module.exports = async function handler(req, res) {
       + '$20, '
       + '$21,$22,$23, '
       + '$24,$25, $26, '
-      + "'draft',false,false, "
+      + '$27,false,false, '
       + 'NOW(),NOW() '
       + ') RETURNING id, slug',
       [
         nuevoSlug,
-        String(body.nombre).trim(),
-        catSlug,
-        String(body.descripcion_corta).trim(),           // lead
+        nombreFinal,
+        cat.catSlug,
+        leadFinal,                                        // lead (nunca "undefined")
         descripcionFinal,                                 // descripcion
-        body.frase_destacada    || null,                 // highlight
-        String(body.ciudad).trim(),
-        body.departamento       || null,                 // region
+        body.frase_destacada    || null,                  // highlight
+        ciudadFinal,
+        body.departamento       || null,                  // region
         body.barrio             || null,
         zonaFinal,                                        // zona ($10)
-        body.latitud  ? parseFloat(body.latitud)  || null : null,
-        body.longitud ? parseFloat(body.longitud) || null : null,
+        latD,
+        lngD,
         body.whatsapp           || null,
         body.telefono           || null,
         body.email              || null,
-        body.sitio_web          || null,                 // web
+        body.sitio_web          || null,                  // web
         body.instagram          || null,
         precio,
         body.horario            || null,
-        body.foto_principal     || null,                 // foto_hero
-        body.booking_url        || null,                 // booking
-        body.hostelworld_url    || null,                 // hostelworld
-        body.airbnb_url         || null,                 // airbnb
-        body.tipo_alojamiento   || null,                 // tipo
+        body.foto_principal     || null,                  // foto_hero
+        body.booking_url        || null,                  // booking
+        body.hostelworld_url    || null,                  // hostelworld
+        body.airbnb_url         || null,                  // airbnb
+        body.tipo_alojamiento   || null,                  // tipo
         JSON.stringify(tags),
         normSintro(body.sintro),
+        statusFinal                                       // $27
       ]
     );
 
-    var destino = rows[0];
+    var destino = rec ? { id: filaRec.id, slug: filaRec.slug } : rows[0];
 
-    // Fotos de galeria -> destinos_fotos
+    // Fotos de galeria -> destinos_fotos, deduplicadas por url (D3.3). El
+    // hero NO se inserta aqui: va a la columna foto_hero (D3.1).
     if (Array.isArray(body.fotos_galeria)) {
+      var vistas = {};
+      var orden = 0;
+      // D6.4 -- al reclamar la fila ya existe: se deduplica contra su galeria
+      // actual y el orden continua desde el final, para no duplicar fotos ni
+      // reordenar las que la semilla ya tuviera.
+      if (rec) {
+        var yaFotos = await sql('SELECT url FROM destinos_fotos WHERE destino_id = $1', [destino.id]);
+        for (var q0 = 0; q0 < (yaFotos || []).length; q0++) {
+          var uYa = String(yaFotos[q0].url || '').trim();
+          if (uYa) vistas[uYa] = 1;
+        }
+        orden = (yaFotos || []).length;
+      }
       for (var j = 0; j < body.fotos_galeria.length; j++) {
         var foto = body.fotos_galeria[j];
-        if (!foto || !foto.url) continue;
+        var urlFoto = (foto && foto.url) ? String(foto.url).trim() : '';
+        if (!urlFoto || vistas[urlFoto]) continue;
+        vistas[urlFoto] = 1;
         try {
           await sql(
             'INSERT INTO destinos_fotos (destino_id, url, caption, orden) VALUES ($1,$2,$3,$4)',
-            [destino.id, foto.url, foto.caption||'', j]
+            [destino.id, urlFoto, (foto && foto.caption) || '', orden]
           );
         } catch(e) { /* no fatal -- la foto principal ya esta */ }
+        orden++;
       }
     }
 
-    // Notificar al admin de nueva solicitud (fire & forget)
-    try {
-      fetch(
-        (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://exploraco.vercel.app')
-        + '/api/admin?recurso=notificaciones',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + (process.env.ADMIN_SECRET || 'exploraco12345'),
-          },
-          body: JSON.stringify({
-            tipo:             'solicitud',
-            nombre:           String(body.nombre).trim(),
-            categoria:        catSlug,
-            ciudad:           String(body.ciudad).trim(),
-            whatsapp:         body.whatsapp || '',
-            descripcion_corta:String(body.descripcion_corta||'').trim(),
-            precio_desde:     precio || '',
-          }),
-        }
-      ).catch(function() {});
-    } catch(_) {}
+    // D6.4 -- notificar al admin SOLO cuando entra en la cola: las semillas
+    // no ensucian la cola y el alta directa del admin no se auto-notifica.
+    // NOTA (ADR-099 Deuda 7): el fallback 'exploraco12345' de esta llamada
+    // interna es uno de los tres usos existentes y NO se toca aqui.
+    if (estadoFinal === 'enviado' && !directo) {
+      try {
+        fetch(
+          baseApi() + '/api/admin?recurso=notificaciones',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + (process.env.ADMIN_SECRET || 'exploraco12345'),
+            },
+            body: JSON.stringify({
+              tipo:             'solicitud',
+              nombre:           nombreFinal,
+              categoria:        cat.catSlug,
+              ciudad:           ciudadFinal,
+              whatsapp:         body.whatsapp || '',
+              descripcion_corta: leadFinal,
+              precio_desde:     precio || '',
+            }),
+          }
+        ).catch(function() {});
+      } catch(_) {}
+    }
 
-    var mensajeOk = esBlog
-      ? '\u00a1Historia recibida! El equipo la revisar\u00e1 y la publicar\u00e1 en el blog en 24-48h.'
-      : '\u00a1Solicitud recibida! El equipo revisar\u00e1 y publicar\u00e1 tu lugar en 24-48h.';
+    var mensajeOk;
+    if (estadoFinal === 'semilla') {
+      mensajeOk = 'Borrador guardado. Puedes continuarlo cuando quieras.';
+    } else if (estadoFinal === 'borrador') {
+      mensajeOk = 'Borrador reclamado y guardado. Solo falta completar lo que pide el envio.';
+    } else if (cat.esBlog) {
+      mensajeOk = '\u00a1Historia recibida! El equipo la revisar\u00e1 y la publicar\u00e1 en el blog en 24-48h.';
+    } else {
+      mensajeOk = '\u00a1Solicitud recibida! El equipo revisar\u00e1 y publicar\u00e1 tu lugar en 24-48h.';
+    }
 
+    // 200 (no 201) y contrato actual intacto: ok, mensaje, slug, id, status,
+    // url. Se anade lo que el cliente necesita para no recalcular reglas.
     return res.status(200).json({
       ok: true,
       mensaje: mensajeOk,
       slug:   destino.slug,
       id:     destino.id,
-      status: 'draft',
+      status: statusFinal,
       url:    'https://exploraco.vercel.app/' + destino.slug + '.html',
+      estado_envio: estadoFinal,
+      origen_envio: tags.origen_envio,
+      completitud: respuestaCompletitud(ev)
     });
 
   } catch(err) {
     console.error('[publicar-lugar]', err.message);
-    return res.status(500).json({ error: 'Error al guardar.', detalle: err.message });
+    return res.status(500).json({ ok: false, error: 'Error al guardar.', detalle: err.message });
   }
-};
+}
+
+// ===========================================================================
+// GET -- ?mios=1 (lista) y ?id=<uuid> (detalle propio). D6.3.
+// ===========================================================================
+async function manejarGet(req, res) {
+  try {
+    var q = queryDe(req);
+    var authPub = cabeceraAuth(req);
+    if (!authPub)
+      return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA', code: 'SESION_REQUERIDA' });
+    var autorId = await resolverAutor(authPub);
+    if (!autorId)
+      return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA', code: 'SESION_REQUERIDA' });
+
+    var sql = neon(process.env.DATABASE_URL);
+    var id = String(q.id || '').trim();
+
+    if (id) {
+      if (!UUID_RE.test(id))
+        return res.status(400).json({ ok: false, error: 'id invalido', code: 'ID_INVALIDO' });
+      var rows = await sql(
+        'SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.lead, d.descripcion, '
+        + 'd.highlight, d.ciudad, d.region, d.barrio, d.zona, d.lat, d.lng, '
+        + 'd.whatsapp, d.telefono, d.email, d.web, d.instagram, '
+        + 'd.precio_desde, d.horario, d.foto_hero, d.sintro, d.status, d.tags, '
+        + 'd.creado_en, d.actualizado_en '
+        + 'FROM destinos d WHERE d.id = $1',
+        [id]
+      );
+      var fila = rows && rows[0];
+      var tagsDet = fila ? leerTags(fila.tags) : {};
+      // Ajeno = 404, no 403: no se filtra la existencia de envios de otros.
+      if (!fila || String(tagsDet.autor_id || '') !== autorId)
+        return res.status(404).json({ ok: false, error: 'NO_ENCONTRADO', code: 'NO_ENCONTRADO' });
+
+      var fotos = await sql(
+        'SELECT url, caption, orden FROM destinos_fotos WHERE destino_id = $1 ORDER BY orden',
+        [id]
+      );
+      var listaFotos = [];
+      for (var i = 0; i < (fotos || []).length; i++) {
+        listaFotos.push({ url: fotos[i].url, caption: fotos[i].caption, orden: fotos[i].orden });
+      }
+      return res.status(200).json({
+        ok: true,
+        item: {
+          id: fila.id,
+          slug: fila.slug,
+          nombre: fila.nombre,
+          categoria_slug: fila.categoria_slug,
+          lead: fila.lead,
+          descripcion: fila.descripcion,
+          highlight: fila.highlight,
+          ciudad: fila.ciudad,
+          departamento: fila.region,
+          barrio: fila.barrio,
+          zona: fila.zona,
+          lat: fila.lat,
+          lng: fila.lng,
+          whatsapp: fila.whatsapp,
+          telefono: fila.telefono,
+          email: fila.email,
+          web: fila.web,
+          instagram: fila.instagram,
+          precio_desde: fila.precio_desde,
+          horario: fila.horario,
+          foto_hero: fila.foto_hero,
+          sintro: fila.sintro,
+          status: fila.status,
+          estado_envio: String(tagsDet.estado_envio || ESTADO_ENVIO_DEFECTO),
+          origen_envio: tagsDet.origen_envio || null,
+          pub_tier: tagsDet.pub_tier || null,
+          pub_completitud: (tagsDet.pub_completitud === undefined ? null : tagsDet.pub_completitud),
+          pub_faltantes: tagsDet.pub_faltantes || [],
+          pub_fotos_total: (tagsDet.pub_fotos_total === undefined ? null : tagsDet.pub_fotos_total),
+          pub_fotos_no_hero: (tagsDet.pub_fotos_no_hero === undefined ? null : tagsDet.pub_fotos_no_hero),
+          creado_en: fila.creado_en,
+          actualizado_en: fila.actualizado_en,
+          tags: tagsDet,
+          fotos: listaFotos
+        }
+      });
+    }
+
+    var mios = String(q.mios || '');
+    if (mios === '1' || mios === 'true') {
+      var limit = parseInt(String(q.limit || '20'), 10);
+      if (!isFinite(limit) || limit < 1) limit = 20;
+      if (limit > 100) limit = 100;
+      var offset = parseInt(String(q.offset || '0'), 10);
+      if (!isFinite(offset) || offset < 0) offset = 0;
+
+      var filas = await sql(
+        "SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.status, d.tags, "
+        + "d.creado_en, d.actualizado_en FROM destinos d "
+        + "WHERE d.tags->>'autor_id' = $1 ORDER BY d.creado_en DESC LIMIT $2 OFFSET $3",
+        [autorId, limit, offset]
+      );
+      // El total usa EXACTAMENTE el mismo WHERE que la lista: si no, la
+      // paginacion miente (misma leccion que D10 en la cola del admin).
+      var tot = await sql("SELECT COUNT(*)::int AS n FROM destinos WHERE tags->>'autor_id' = $1", [autorId]);
+
+      var items = [];
+      for (var k = 0; k < (filas || []).length; k++) {
+        var f = filas[k];
+        var t = leerTags(f.tags);
+        items.push({
+          id: f.id,
+          slug: f.slug,
+          nombre: f.nombre,
+          categoria_slug: f.categoria_slug,
+          status: f.status,
+          estado_envio: String(t.estado_envio || ESTADO_ENVIO_DEFECTO),
+          pub_tier: t.pub_tier || null,
+          pub_completitud: (t.pub_completitud === undefined ? null : t.pub_completitud),
+          pub_faltantes: t.pub_faltantes || [],
+          pub_fotos_total: (t.pub_fotos_total === undefined ? null : t.pub_fotos_total),
+          creado_en: f.creado_en,
+          actualizado_en: f.actualizado_en
+        });
+      }
+      var total = (tot && tot[0]) ? Number(tot[0].n) : items.length;
+      return res.status(200).json({ ok: true, items: items, total: total, limit: limit, offset: offset });
+    }
+
+    return res.status(400).json({ ok: false, error: 'Parametro requerido: mios=1 o id', code: 'PARAMETRO_REQUERIDO' });
+
+  } catch (err) {
+    console.error('[publicar-lugar][GET]', err.message);
+    return res.status(500).json({ ok: false, error: 'Error al consultar.', detalle: err.message });
+  }
+}
+
+// ===========================================================================
+// PATCH -- ?id=<uuid>. Solo mis borradores, allow-list de claves, merge
+// JSONB (ADR-003) y revalidacion al pasar a 'enviado'. D6.1 + D6.2.
+// ===========================================================================
+async function manejarPatch(req, res) {
+  try {
+    var body = leerBody(req);
+    if (!body)
+      return res.status(400).json({ ok: false, error: 'Body JSON requerido', code: 'BODY_INVALIDO' });
+
+    var q = queryDe(req);
+    var id = String(q.id || body.id || '').trim();
+    if (!UUID_RE.test(id))
+      return res.status(400).json({ ok: false, error: 'id invalido', code: 'ID_INVALIDO' });
+
+    var authPub = cabeceraAuth(req);
+    if (!authPub)
+      return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA', code: 'SESION_REQUERIDA' });
+    var autorId = await resolverAutor(authPub);
+    if (!autorId)
+      return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA', code: 'SESION_REQUERIDA' });
+
+    // D6.1 -- allow-list ANTES de tocar la base: fail-closed y visible.
+    var prohibida = claveProhibida(body);
+    if (prohibida)
+      return res.status(400).json({ ok: false, error: 'CLAVE_NO_PERMITIDA: ' + prohibida,
+        code: 'CLAVE_NO_PERMITIDA', clave: prohibida });
+
+    var sql = neon(process.env.DATABASE_URL);
+    var rows = await sql(
+      'SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.lead, d.descripcion, '
+      + 'd.ciudad, d.region, d.barrio, d.zona, d.lat, d.lng, '
+      + 'd.whatsapp, d.telefono, d.email, d.web, d.instagram, d.foto_hero, '
+      + 'd.precio_desde, d.horario, '
+      + 'd.tags, d.status '
+      + 'FROM destinos d WHERE d.id = $1',
+      [id]
+    );
+    var fila = rows && rows[0];
+    if (!fila)
+      return res.status(404).json({ ok: false, error: 'NO_ENCONTRADO', code: 'NO_ENCONTRADO' });
+
+    var tagsActuales = leerTags(fila.tags);
+    if (String(tagsActuales.autor_id || '') !== autorId)
+      return res.status(403).json({ ok: false, error: 'NO_ES_TU_BORRADOR', code: 'NO_ES_TU_BORRADOR' });
+    if (String(fila.status || '') !== 'draft')
+      return res.status(409).json({ ok: false, error: 'NO_EDITABLE', code: 'NO_EDITABLE' });
+
+    var estadoActual = String(tagsActuales.estado_envio || ESTADO_ENVIO_DEFECTO);
+    // 'enviado' no vuelve atras: 409 (no 403) porque el problema es el
+    // ESTADO, no la propiedad. Sacar de la cola una solicitud en revision es
+    // lo que D6.2 prohibe.
+    if (estadoActual === 'enviado')
+      return res.status(409).json({ ok: false, error: 'YA_ENVIADO', code: 'YA_ENVIADO' });
+    if (ESTADOS_EDITABLES.indexOf(estadoActual) === -1)
+      return res.status(409).json({ ok: false, error: 'NO_EDITABLE', code: 'NO_EDITABLE' });
+
+    var estadoDestino = estadoActual;
+    var traeEstado = (body.estado_envio !== undefined && body.estado_envio !== null
+      && String(body.estado_envio).trim() !== '');
+    if (traeEstado) {
+      var objetivo = normEstadoEnvio(body.estado_envio);
+      if (!objetivo)
+        return res.status(400).json({ ok: false, error: 'ESTADO_ENVIO_INVALIDO',
+          code: 'ESTADO_ENVIO_INVALIDO', campo: 'estado_envio' });
+      if (objetivo === 'semilla' && estadoActual !== 'semilla')
+        return res.status(400).json({ ok: false, error: 'TRANSICION_INVALIDA',
+          code: 'TRANSICION_INVALIDA', campo: 'estado_envio' });
+      estadoDestino = objetivo;
+    }
+
+    // --- Valores de columna resultantes (merge fila + body) ---
+    var cat = (body.categoria !== undefined)
+      ? resolverCategoriaPublicacion(body.categoria)
+      : { categoria: String(fila.categoria_slug || ''),
+          esBlog: String(fila.categoria_slug || '') === 'blog',
+          catSlug: String(fila.categoria_slug || 'sitio') };
+
+    var nombre = (body.nombre !== undefined) ? String(body.nombre || '').trim() : String(fila.nombre || '').trim();
+    var ciudad = (body.ciudad !== undefined) ? String(body.ciudad || '').trim() : String(fila.ciudad || '').trim();
+    var region = (body.departamento !== undefined) ? (body.departamento || null) : (fila.region || null);
+    var barrio = (body.barrio !== undefined) ? (body.barrio || null) : (fila.barrio || null);
+    var zona = (body.zona !== undefined || body.departamento !== undefined)
+      ? resolverZona(body.zona !== undefined ? body.zona : fila.zona, region)
+      : (fila.zona || null);
+    var lead = (body.descripcion_corta !== undefined)
+      ? String(body.descripcion_corta === null ? '' : body.descripcion_corta).trim()
+      : String(fila.lead || '');
+    var descripcion = (body.descripcion_larga !== undefined)
+      ? (body.descripcion_larga ? String(body.descripcion_larga) : null)
+      : (fila.descripcion || null);
+    var lat = (body.latitud !== undefined) ? numONull(body.latitud) : numONull(fila.lat);
+    var lng = (body.longitud !== undefined) ? numONull(body.longitud) : numONull(fila.lng);
+    var whatsapp = (body.whatsapp !== undefined) ? (body.whatsapp || null) : (fila.whatsapp || null);
+    var telefono = (body.telefono !== undefined) ? (body.telefono || null) : (fila.telefono || null);
+    var email = (body.email !== undefined) ? (body.email || null) : (fila.email || null);
+    var web = (body.sitio_web !== undefined) ? (body.sitio_web || null) : (fila.web || null);
+    var instagram = (body.instagram !== undefined) ? (body.instagram || null) : (fila.instagram || null);
+    var fotoHero = (body.foto_principal !== undefined)
+      ? (body.foto_principal ? String(body.foto_principal).trim() : null)
+      : (fila.foto_hero || null);
+    // D6.1 -- precio_desde y horario son COLUMNA, no tags. Si no vienen en el
+    // body se conserva lo que ya tenia la fila (no se borra en silencio).
+    var precio = (body.precio_desde !== undefined)
+      ? formatearPrecio(body.precio_desde)
+      : (fila.precio_desde || null);
+    var horario = (body.horario !== undefined) ? (body.horario || null) : (fila.horario || null);
+
+    // --- Delta de tags: SOLO claves de la lista blanca ---
+    var delta = {};
+    var tCliente = (body.tags && typeof body.tags === 'object') ? body.tags : {};
+    var k;
+    for (k in tCliente) {
+      if (!Object.prototype.hasOwnProperty.call(tCliente, k)) continue;
+      if (CLAVES_CLIENTE.indexOf(k) === -1) continue;
+      if (k === 'estado_envio') continue;
+      delta[k] = tCliente[k];
+    }
+    // Simetria con el POST: el formulario puede mandar sitio_* y se mapean a
+    // su clave de tags, siempre dentro de la lista blanca.
+    var tagsPost = construirTagsCliente(body, cat.catSlug);
+    for (k in tagsPost) {
+      if (!Object.prototype.hasOwnProperty.call(tagsPost, k)) continue;
+      if (delta[k] === undefined) delta[k] = tagsPost[k];
+    }
+
+    if (delta.subcategoria !== undefined) {
+      var sc = String(delta.subcategoria === null ? '' : delta.subcategoria).toLowerCase();
+      if (SUBCAT_LISTA[cat.catSlug] && SUBCAT_LISTA[cat.catSlug].indexOf(sc) !== -1) delta.subcategoria = sc;
+      else delete delta.subcategoria;
+    }
+    if (delta.video_url !== undefined) {
+      var vv = String(delta.video_url === null ? '' : delta.video_url).trim();
+      if (vv && esVideoUrlSegura(vv)) delta.video_url = vv;
+      else delete delta.video_url;
+    }
+
+    // D8.2 -- el tema se valida contra BLOG_TEMAS y solo existe en blog.
+    var temaEfectivo = '';
+    if (cat.esBlog) {
+      var temaSrc = (body.tema !== undefined)
+        ? body.tema
+        : (delta.tema !== undefined ? delta.tema : tagsActuales.tema);
+      var temaNorm = String((temaSrc === undefined || temaSrc === null) ? '' : temaSrc).trim().toLowerCase();
+      if (BLOG_TEMAS.indexOf(temaNorm) !== -1) {
+        delta.tema = temaNorm;
+        temaEfectivo = temaNorm;
+      } else {
+        delete delta.tema;
+        temaEfectivo = String(tagsActuales.tema || '');
+      }
+    } else {
+      delete delta.tema;
+    }
+
+    if (estadoDestino !== estadoActual) delta.estado_envio = estadoDestino;
+
+    // --- Galeria: se cuenta la resultante, deduplicada por url (D3.3) ---
+    var fotosActuales = await sql(
+      'SELECT url FROM destinos_fotos WHERE destino_id = $1 ORDER BY orden', [id]);
+    var fotosTodas = [];
+    var vistos = {};
+    var f;
+    for (f = 0; f < (fotosActuales || []).length; f++) {
+      var u0 = String(fotosActuales[f].url || '').trim();
+      if (!u0 || vistos[u0]) continue;
+      vistos[u0] = 1;
+      fotosTodas.push({ url: u0 });
+    }
+    var nuevas = [];
+    if (Array.isArray(body.fotos_galeria)) {
+      for (f = 0; f < body.fotos_galeria.length; f++) {
+        var fotoN = body.fotos_galeria[f];
+        var u1 = (fotoN && fotoN.url) ? String(fotoN.url).trim() : '';
+        if (!u1 || vistos[u1]) continue;
+        vistos[u1] = 1;
+        fotosTodas.push({ url: u1 });
+        nuevas.push({ url: u1, caption: (fotoN && fotoN.caption) || '' });
+      }
+    }
+    var conteo = ECCompletitud.contarFotos(fotosTodas, fotoHero);
+
+    // D6.2 -- la transicion a 'enviado' REVALIDA la validacion minima
+    // completa: sin esto el PATCH seria la puerta trasera para encolar
+    // fichas vacias.
+    if (estadoDestino === 'enviado') {
+      var v = validarEnvio({
+        estadoEnvio: 'enviado',
+        nombre: nombre,
+        categoria: cat.categoria || cat.catSlug,
+        ciudad: ciudad,
+        lead: lead,
+        email: email,
+        esBlog: cat.esBlog,
+        tema: temaEfectivo,
+        fotosTotal: conteo.total
+      });
+      if (!v.ok) return res.status(400).json({ ok: false, error: v.error, code: v.code, campo: v.campo });
+    } else if (conteo.total > MAX_FOTOS) {
+      return res.status(400).json({ ok: false, error: 'FOTOS_EXCEDIDAS',
+        code: 'FOTOS_EXCEDIDAS', campo: 'fotos_galeria' });
+    }
+
+    // --- Completitud sobre la fila RESULTANTE (D5.1) ---
+    var tagsFinal = {};
+    for (k in tagsActuales) {
+      if (Object.prototype.hasOwnProperty.call(tagsActuales, k)) tagsFinal[k] = tagsActuales[k];
+    }
+    for (k in delta) {
+      if (Object.prototype.hasOwnProperty.call(delta, k)) tagsFinal[k] = delta[k];
+    }
+
+    var ev = evaluarFila({
+      nombre: nombre,
+      categoria_slug: cat.catSlug,
+      ciudad: ciudad,
+      departamento: region,
+      zona: zona,
+      lead: lead,
+      descripcion: descripcion,
+      lat: lat,
+      lng: lng,
+      whatsapp: whatsapp,
+      email: email,
+      web: web,
+      instagram: instagram
+    }, tagsFinal, conteo);
+
+    // Los pub_* los recalcula SIEMPRE el servidor. pub_geo NO se toca: es
+    // inmutable (D5.2, solo se midio en el envio).
+    delta.pub_tier = ev.pers.pub_tier;
+    delta.pub_completitud = ev.pers.pub_completitud;
+    delta.pub_faltantes = ev.pers.pub_faltantes;
+    delta.pub_fotos_total = ev.pers.pub_fotos_total;
+    delta.pub_fotos_no_hero = ev.pers.pub_fotos_no_hero;
+    delta.pub_foto = ev.pers.pub_fotos_total >= 1;
+
+    // Galeria nueva: solo despues de validar, para no dejar fotos huerfanas.
+    var baseOrden = fotosTodas.length - nuevas.length;
+    for (f = 0; f < nuevas.length; f++) {
+      try {
+        await sql(
+          'INSERT INTO destinos_fotos (destino_id, url, caption, orden) VALUES ($1,$2,$3,$4)',
+          [id, nuevas[f].url, nuevas[f].caption || '', baseOrden + f]
+        );
+      } catch (eFoto) { /* no fatal */ }
+    }
+
+    // ADR-003: MERGE JSONB, nunca reemplazo total.
+    var upd = await sql(
+      'UPDATE destinos SET '
+      + 'nombre = $2, categoria_slug = $3, lead = $4, descripcion = $5, '
+      + 'ciudad = $6, region = $7, barrio = $8, zona = $9, '
+      + 'lat = $10, lng = $11, '
+      + 'whatsapp = $12, telefono = $13, email = $14, web = $15, instagram = $16, '
+      + 'foto_hero = $17, '
+      + 'precio_desde = $18, horario = $19, '
+      + "tags = COALESCE(tags, '{}'::jsonb) || $20::jsonb, "
+      + 'actualizado_en = NOW() '
+      + "WHERE id = $1 AND status = 'draft' AND tags->>'autor_id' = $21 "
+      + 'RETURNING id, slug, status, tags',
+      [id, nombre, cat.catSlug, lead, descripcion, ciudad, region, barrio, zona,
+       lat, lng, whatsapp, telefono, email, web, instagram, fotoHero, precio, horario,
+       JSON.stringify(delta), autorId]
+    );
+
+    var filaUpd = upd && upd[0];
+    if (!filaUpd)
+      return res.status(404).json({ ok: false, error: 'NO_ENCONTRADO', code: 'NO_ENCONTRADO' });
+    var tagsRes = leerTags(filaUpd.tags);
+
+    return res.status(200).json({
+      ok: true,
+      id: filaUpd.id,
+      slug: filaUpd.slug,
+      status: filaUpd.status,
+      estado_envio: String(tagsRes.estado_envio || estadoDestino),
+      completitud: respuestaCompletitud(ev),
+      tags: tagsRes
+    });
+
+  } catch (err) {
+    console.error('[publicar-lugar][PATCH]', err.message);
+    return res.status(500).json({ ok: false, error: 'Error al actualizar.', detalle: err.message });
+  }
+}

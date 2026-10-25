@@ -29,13 +29,15 @@ var ROOT = path.join(__dirname, '..');
 var MOTOR = 'api/interacciones.js';
 var GUIA = 'usuario-session.js';
 
-var ESPERADO_FILAS = 19;
+var ESPERADO_FILAS = 24;
 
 // EXCLUSIONES: claves de XP_BASES que no son fuente de un jugador desde la UI,
 // por lo que NO se exige fila en la guia. Comentario de cada una:
 //   publicar_basico|publicar_intermedio|publicar_completo|publicar_bono_geo|
-//     publicar_bono_foto -> las reparte el admin server-to-server con ADMIN_SECRET
-//     (api/interacciones.js:15439); nunca las dispara un jugador.
+//     publicar_bono_foto -> siguen exentas de Assert A porque el monto lo
+//     reparte el admin server-to-server con ADMIN_SECRET (api/interacciones.js),
+//     no un POST del jugador. Desde ADR-099 D12 SI tienen fila en la guia
+//     (grupo 'publicar'), asi que Assert B las sigue cubriendo.
 //   spot_atributos     -> verificada huerfana: 0 call-sites desde la UI.
 //   visita_bono_rural  -> modificador automatico que ACOMPANA a `visita` (bono
 //     rural cuando el destino esta en zona rural); la guia lo documenta dentro

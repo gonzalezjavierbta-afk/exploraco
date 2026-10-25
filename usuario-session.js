@@ -2564,6 +2564,68 @@
       requisitos: ['sesion'],
       tipo: 'activa',
       superficie: 'Ficha del Activo Oculto'
+    },
+    // ---- AGRUPACION documentada: publicar_* (ADR-099 D12) ----
+    // El backend entrega las cinco claves de la publicacion (nivel + dos
+    // bonos). Para el usuario es UNA sola accion: publicar una ficha. Se
+    // agrupan bajo grupo:'publicar' (ver EC_XP_GRUPOS) igual que las dos
+    // resenas, y la guia toma cada monto de bases[] del backend. Aqui NO
+    // vive ningun monto de XP: solo texto.
+    publicar_basico: {
+      accion: 'publicar_basico',
+      grupo: 'publicar',
+      nombre: 'Publicar un lugar: envio basico',
+      dinamica: 'El envio minimo del formulario: los datos del lugar y poco mas. Puede ir sin foto y '
+        + 'aun asi se paga el nivel basico; si no llevas foto, solo dejas de cobrar el bono de foto. '
+        + 'El XP no entra al enviar: se acredita cuando el lugar se aprueba.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Formulario de publicacion (publicar.html)'
+    },
+    publicar_intermedio: {
+      accion: 'publicar_intermedio',
+      grupo: 'publicar',
+      nombre: 'Publicar un lugar: ficha intermedia',
+      dinamica: 'Paga mas que el envio basico porque la ficha llega mas completa: mas campos resueltos. '
+        + 'No es una accion aparte ni se suma al basico: es el mismo envio y el sistema paga el monto '
+        + 'del nivel que alcanza la ficha, no la suma de los tres.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Formulario de publicacion (publicar.html)'
+    },
+    publicar_completo: {
+      accion: 'publicar_completo',
+      grupo: 'publicar',
+      nombre: 'Publicar un lugar: ficha completa',
+      dinamica: 'La ficha entregada entera, con todos los campos que pide el formulario largo. Es la '
+        + 'cifra mas alta de la publicacion y sustituye a la del nivel intermedio, no se suma a ella. '
+        + 'Los dos bonos van aparte y la cifra final la fijan los multiplicadores de nivel y origen.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Formulario de publicacion (publicar.html)'
+    },
+    publicar_bono_geo: {
+      accion: 'publicar_bono_geo',
+      grupo: 'publicar',
+      nombre: 'Bono por publicar desde el lugar',
+      dinamica: 'Se suma al nivel de la ficha solo si envias desde el propio lugar: el dispositivo tiene '
+        + 'que estar a menos de trescientos metros del pin, el mismo radio corto que se usa para el '
+        + 'check-in. Poner el pin en el mapa no basta y publicar desde casa no lo paga; sin ubicacion '
+        + 'del dispositivo no hay bono.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Formulario de publicacion (publicar.html)'
+    },
+    publicar_bono_foto: {
+      accion: 'publicar_bono_foto',
+      grupo: 'publicar',
+      nombre: 'Bono por publicar con foto',
+      dinamica: 'Se suma al nivel de la ficha cuando el envio lleva foto del lugar. La falta de foto NO '
+        + 'bloquea la publicacion: el envio basico puede ir sin foto y entonces este bono no se paga. '
+        + 'La foto tiene que ser del lugar, no una imagen de relleno.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Formulario de publicacion (publicar.html)'
     }
   };
 
@@ -2581,6 +2643,25 @@
       requisitos: ['sesion'],
       tipo: 'activa',
       superficie: 'Ficha del destino (pestana Resenas)'
+    },
+    // Misma logica para las cinco claves de la publicacion (ADR-099 D12):
+    // nivel de la ficha + dos bonos, una sola fila con los cinco montos
+    // del backend al lado. Esta ficha es la que explica las dos reglas
+    // que el usuario no puede adivinar (foto opcional y geo desde el
+    // lugar), porque la fila fusionada solo pinta un texto.
+    publicar: {
+      nombre: 'Publicar un lugar',
+      dinamica: 'Cuanto mas completa llegue la ficha, mas paga: hay un monto para el envio basico, otro '
+        + 'para la ficha intermedia y otro para la completa, y se paga UNO (el del nivel alcanzado), '
+        + 'no la suma de los tres. Encima de eso van dos bonos. Dos reglas que no se adivinan: (a) el '
+        + 'envio basico puede ir SIN foto, y si vas sin foto simplemente no cobras el bono de foto, no '
+        + 'se rechaza el envio; (b) el bono de geolocalizacion solo se paga si publicas DESDE el lugar, '
+        + 'con el dispositivo a menos de trescientos metros del pin: poner el pin en el mapa no basta. '
+        + 'La cifra final la fijan los multiplicadores de nivel y origen y se acredita al aprobar el '
+        + 'lugar, no al enviar.',
+      requisitos: ['sesion'],
+      tipo: 'activa',
+      superficie: 'Formulario de publicacion (publicar.html)'
     }
   };
 

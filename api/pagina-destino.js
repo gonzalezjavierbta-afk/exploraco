@@ -873,7 +873,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var temasBlog = (Array.isArray(tags.temas) && tags.temas.length)
                   ? tags.temas
                   : (temaBlog ? [temaBlog] : []);
-  var videoUrlBlog = tags.video_url || '';
+  // ADR-099 D9: tags.video_url deja de ser exclusivo de blog. Una sola
+  // variable para TODAS las categorias y el mismo saneado host+id
+  // (videoEmbedUrlMedia). Sin lista de hosts nueva.
+  var videoUrlMedia = String(tags.video_url || '').trim();
   var cuerpoBlog    = d.descripcion || d.lead || '';
   var palabrasBlog  = cuerpoBlog ? cuerpoBlog.trim().split(/\s+/).filter(Boolean).length : 0;
   var tiempoLecturaBlog = palabrasBlog ? Math.max(1, Math.round(palabrasBlog / 200)) : 0;
@@ -1111,11 +1114,12 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + (amenidades.length ? '<div class="tagrow">'+amenidades.map(function(a){ return '<span class="tpill">'+esc(typeof a==='string'?a:(a.nombre||''))+'</span>'; }).join('')+'</div>' : '')
     + '</div></section>';
 
-  // -- SECCION (Blog): Video embebido --------------------------------
+  // -- Video embebido (TODAS las categorias, ADR-099 D9) --------------
   // Convierte la URL cruda a un embed src construido en servidor a
   // partir de un host+id validados -- nunca se inyecta la URL del
-  // usuario directamente en el src del iframe.
-  function videoEmbedUrlBlog(raw) {
+  // usuario directamente en el src del iframe. Host no reconocido o
+  // URL malformada devuelven cadena vacia: el llamador NO emite bloque.
+  function videoEmbedUrlMedia(raw) {
     try {
       var url = new URL(String(raw));
       var host = url.hostname.toLowerCase().replace(/^www\./, '');
@@ -1138,7 +1142,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // Convierte el cuerpo del post (texto plano con parrafos separados
   // por \n\n y marcadores inline) en HTML estructurado:
   //   [foto:URL|texto]   -> figure con img + figcaption
-  //   [video:URL]        -> div con iframe (via videoEmbedUrlBlog)
+  //   [video:URL]        -> div con iframe (via videoEmbedUrlMedia)
   // Cualquier otro bloque -> <p class="stext">. Los marcadores mal
   // formados o con URLs invalidas se descartan sin romper el render.
   // Solo se aplica a la categoria blog.
@@ -1162,7 +1166,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       }
       var vidMatch = /^\[video:(.*?)\]$/.exec(b);
       if (vidMatch) {
-        var vidSrc = videoEmbedUrlBlog(vidMatch[1].trim());
+        var vidSrc = videoEmbedUrlMedia(vidMatch[1].trim());
         if (vidSrc) {
           out += '<div class="bvid"><iframe src="'+esc(vidSrc)+'" title="Video del articulo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>';
         }
@@ -1172,15 +1176,20 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     }
     return out;
   }
-  var secBlogVideo = '';
-  if (cat === 'blog' && videoUrlBlog) {
-    var embedSrcBlog = videoEmbedUrlBlog(videoUrlBlog);
-    if (embedSrcBlog) {
-      secBlogVideo = '<section class="ssec bwhite" id="video"><div class="sin">'
-        + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Video</h2><div class="stnum">'+nextNum()+'</div></div>'
-        + '<div class="blog-video-wrap"><iframe src="'+esc(embedSrcBlog)+'" title="Video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>'
-        + '</div></section>';
-    }
+  // -- SECCION: Video (TODAS las categorias, ADR-099 D9) -------------
+  // Una sola ruta de render, la misma que ya probo blog: mismo saneado
+  // (host+id validados, nunca la URL cruda en el src del iframe), mismo
+  // contenedor .blog-video-wrap (CSS global, 16:9) y mismo fallback. Si
+  // tags.video_url falta, apunta a un host no permitido o no produce un
+  // embed valido, la seccion NO se emite: cero hueco con marco, cero
+  // "undefined" en el HTML (ADR-008, degradacion condicional).
+  var secVideo = '';
+  var videoEmbedSrc = videoUrlMedia ? videoEmbedUrlMedia(videoUrlMedia) : '';
+  if (videoEmbedSrc) {
+    secVideo = '<section class="ssec bwhite" id="video" data-ec-video="1"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Video</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="blog-video-wrap"><iframe src="'+esc(videoEmbedSrc)+'" title="Video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>'
+      + '</div></section>';
   }
 
   // -- SECCION (Blog): Quien escribe (autor) --------------------------
@@ -2393,9 +2402,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     });
     return out;
   }
-  var SEC_HOSTAL_DEFAULT = ['descripcion','galeria','habitaciones','reservar','reglas-casa','actividades','eventos-hostal','como-llegar','contacto','faq','resenas','relacionados'];
+  var SEC_HOSTAL_DEFAULT = ['descripcion','video','galeria','habitaciones','reservar','reglas-casa','actividades','eventos-hostal','como-llegar','contacto','faq','resenas','relacionados'];
   var secHostalMapa = {
     'descripcion': secDescripcion,
+    'video': secVideo,
     'galeria': secGaleria,
     'habitaciones': secHabitaciones,
     'reservar': secReservar,
@@ -2425,6 +2435,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // -- SUBNAV STICKY: anclas solo a secciones que van a existir ------
   var subnavItems = [
     {id:'descripcion', label:'Sobre',       has:!!secDescripcion},
+    // ADR-099 D9: "Video" existe para cualquier categoria que tenga un
+    // video_url saneable; se coloca junto a "Sobre" porque la seccion se
+    // ensambla justo despues de la descripcion (misma posicion que blog).
+    {id:'video',       label:'Video',       has:!!secVideo},
     {id:'galeria',     label:'Fotos',       has:!!secGaleria},
     {id:'dificultad',  label:'Dificultad',  has:!!secDificultad},
     {id:'entradas',    label:'Entradas',    has:!!secEntradas},
@@ -2468,8 +2482,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     {id:'como-llegar', label:'Como llegar', has:!!secComoLlegar},
     {id:'faq',         label:'FAQ',         has:!!secFaq},
     {id:'resenas',     label:'Resenas',     has:!!secResenas},
-    {id:'autor',       label:'Autor',       has:!!secBlogAutor},
-    {id:'video',       label:'Video',       has:!!secBlogVideo}
+    {id:'autor',       label:'Autor',       has:!!secBlogAutor}
   ].filter(function(it){ return it.has; });
 
   // ADR-034: el subnav sticky del hostal SIEMPRE refleja el orden efectivo
@@ -2612,7 +2625,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + (cat === 'hostal'
       ? secHostalHTML
       : secDescripcion + '\n'
-        + secBlogVideo + '\n'
+        + secVideo + '\n'
         + secBlogAutor + '\n'
         + secDificultad + '\n'
         + secEntradas + '\n'

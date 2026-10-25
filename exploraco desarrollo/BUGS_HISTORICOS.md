@@ -2281,3 +2281,47 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **Archivos:** `agenda.html`, `mi-perfil.html` (**sin cambios de markup en esta tanda**).
 **Estado:** **OBSERVACION ABIERTA (preexistente, sin tarea asignada).** No se corrige aqui: en `agenda.html` el desbalance es de **conteo** (posible `<div` dentro de un string JS, una plantilla o un comentario) y no tiene sintoma visual; corregirlo exige su propia tarea para no tocar markup sin motivo. **No re-auditar en cada pasada.**
 
+## BUG-128: el modal de portada (`#publicar-modal`) **no guardaba nada en el sistema** y enviaba a WhatsApp con el numero de relleno `573001234567` -- **CORREGIDO**
+
+**Severidad: ALTA de producto** (el usuario creia que habia publicado y **nadie recibia nada**: el alta se perdia entera). **Estado: CORREGIDO en el arbol de trabajo, verificado local por `@qa-auditor` (0 bloqueadores); SIN COMMIT y SIN DESPLEGAR: en produccion el fallo sigue VIVO hasta el `push`.** Tarea: **TSK-220**. Decision: **ADR-099** D1/D2 (el argumento vive una sola vez alli).
+
+**Sintoma:** desde el boton "Publicar" de la portada se abria `#publicar-modal` (`index.html:4623-4700`, logica en `:2586-2678`); al enviar, el flujo **guardaba en `localStorage`** y abria `wa.me/573001234567`, un **numero de relleno**. Ninguna fila llegaba a `destinos` y la cola del admin no veia la solicitud.
+
+**Lo que este bug NO era:** no era un fallo de `api/publicar-lugar.js` (el endpoint funcionaba: `publicar.html` publicaba por el desde TSK-212) ni del motor de render. Era **una quinta via de alta paralela** que no llamaba al backend: el defecto real es de **arquitectura de flujo**, no de validacion.
+
+**Fix aplicado (la quinta via se degrada a teaser, no se mantiene como via completa):**
+
+1. El modal pasa a **teaser de 3 campos** (nombre, categoria, ciudad) que hace **`POST` real** con `estado_envio='semilla'` y **redirige a `publicar.html?id=<id>&paso=2`** (`index.html:2695`) para seguir el embudo. La semilla entra **fuera de la cola** hasta que se completa y se envia.
+2. **Fuera el WhatsApp de relleno** del camino de publicacion: `573001234567` **ya no aparece** en `index.html`. `localStorage` queda como **respaldo, no como camino principal**.
+3. Sin cupo de borradores (`429`) o sin gate configurado, el modal **avisa y ofrece el formulario completo** (`index.html:2686`/`:2688`) en vez de fingir exito.
+
+**Verificacion:** `573001234567` **ausente** de `index.html` (medido por `Select-String`); el teaser crea semilla y redirige (`index.html:2686-2695`); `node --check` del inline **PASS**; divs `index.html` **375/375**; ASCII **0 bytes nuevos**. El criterio `[manual]` de "no se abre WhatsApp y el numero no aparece en el camino de publicacion" queda en el **checklist de navegador de `NEXT.md`**.
+
+## BUG-129: `contacto.html:54` conserva el **mismo numero de relleno** `573001234567` -- **ABIERTO (fuera del alcance de ADR-099)**
+
+**Severidad: MEDIA de contenido** (no rompe nada, pero **todo usuario que escribe por el canal de contacto de la web escribe al vacio**; es el unico canal de contacto publicado). **Estado: ABIERTO, sin tarea asignada y sin arreglar en esta tanda.**
+
+**Contexto (medido):** al retirar el numero del camino de publicacion (BUG-128) se hizo un barrido del literal en el repo: `Select-String -Pattern "573001234567"` devuelve **una sola aparicion**, `contacto.html:54` (`<a href="https://wa.me/573001234567" ...>`). **No aparece** en `index.html` ni en `publicar.html`.
+
+**Lo que este bug NO es:** no es una regresion de ADR-099 (el numero **ya estaba** ahi antes) y **no** se corrige aqui: sustituirlo por el numero real es una **decision de negocio** (que numero, de quien, con que horario de atencion) y no un cambio tecnico; ademas queda **fuera del alcance** del embudo unico.
+
+**Deuda:** dar de alta el numero real (o retirar el canal) en una tarea propia de contenido. Hasta entonces, **el canal de contacto de la web no entrega los mensajes**.
+
+## BUG-130: un destino con **una sola foto** renderiza la seccion de galeria con **cabecera y cuerpo vacio** -- **ABIERTO (todas las categorias)**
+
+**Severidad: MEDIA visual** (no hay error de servidor ni de datos; el visitante ve un titulo de galeria sin fotos). **Estado: ABIERTO, sin tarea asignada y sin arreglar en esta tanda** (no es regresion de ADR-099: el guard es preexistente).
+
+**Causa raiz:** `api/pagina-destino.js:1828` define `var hayGaleriaCurada = galMerge.length > 1;`. Con **exactamente una** foto disponible en la galeria curada, `hayGaleriaCurada` es `false` y el **cuerpo** de la galeria no se pinta (`:1867`, `galCuradaHTML`), pero la **cabecera** de la seccion si se emite; el resultado es el bloque con titulo y **cero** elementos (`api/pagina-destino.js:1828-1884`).
+
+**Lo que este bug NO es:** no es un fallo de la cascada de fotos (si la foto existe, `galMerge` la contiene) ni de `buildHTML()` en general: es **una condicion de igualdad mal elegida** en un solo guard. Tampoco es nuevo: viene del motor v9 y **no** lo introdujo el video global de ADR-099.
+
+**Deuda:** decidir el comportamiento correcto con una sola foto -- (a) ocultar **tambien la cabecera** (`hayGaleria && hayGaleriaCurada`) o (b) tratar `>= 1` como galeria valida -- y cubrirlo con un smoke de `buildHTML()` en el fixture de **1 foto**. Afecta a **las 5 categorias** porque el guard es comun.
+
+## BUG-131: **deudas aceptadas** del embudo unico -- fallback de `ADMIN_SECRET`, ledger fuera de la CTE atómica y `COALESCE` de compatibilidad en la cola -- **ABIERTAS / ACEPTADAS**
+
+**Severidad: BAJA, deliberada.** Se registran como **deuda documentada y aceptada**, no como fallo, para que no se re-descubran como hallazgo nuevo ni se confundan con regresiones. **Estado: ABIERTAS / ACEPTADAS (2026-10-24).** Decision: `DECISIONS.md` **ADR-099** (**Deuda 7** y **Deuda 9**); el argumento **no se repite aqui**.
+
+- **(a) Fallback `ADMIN_SECRET || 'exploraco12345'`.** Presente y **sin cambiar** en `api/publicar-lugar.js` (llamada interna a `publicar_lugar_registrar`, `:995`), `api/interacciones.js` (`:15482` en el portero de `publicar_lugar_otorgar`, y los demas call-sites del fichero) y `api/admin.js` (`:89`, `:93`, `:402`). **Consecuencia:** si `ADMIN_SECRET` falta en el entorno, el secreto es **publico y adivinable**. **No se toco** porque cambiarlo en una sola llamada deja las otras incoherentes y el fallo seria silencioso; el arreglo correcto es **una tanda de secreto unico y fail-closed** para todos los call-sites a la vez (ADR-099 D6.5).
+- **(b) El ledger de XP se escribe DESPUES de la CTE atomica.** El `claim` de idempotencia y el saldo van en **una** sentencia (`EXISTS (SELECT 1 FROM usr)`), pero `registrarXpLedger`, `acreditarClaseYCofre` y `repartirXpReferidos` van **detras**, cada uno con su `catch` (swallow). **Consecuencia:** un fallo del ledger deja **saldo acreditado sin fila de auditoria** (nunca al reves: **no se paga dos veces**). Se eligio esta asimetria a proposito -- el dinero se cobra una sola vez y la auditoria es **best-effort** -- y `XP_FORCE_FAIL=ledger` es **inerte sin variable de entorno**, luego **no corre en Vercel** (ADR-099 D5.3).
+- **(c) `COALESCE(d.tags->>'estado_envio','enviado') = 'enviado'` en la cola.** `api/admin.js:368` (listado) y `:374` (`COUNT`) usan el `COALESCE` para que las **filas legacy** (creadas antes de `estado_envio`, sin la clave en `tags`) **sigan entrando** en la cola. **Consecuencia:** el filtro **no** es una igualdad literal y una fila sin la clave se trata como enviada; es lo correcto para no perder solicitudes historicas, pero **deja una rama implicita** que hay que recordar al leer el SQL. Se retirara cuando no queden filas sin la clave.
+

@@ -5858,5 +5858,47 @@ En movil el CTA del hero se salia de la tarjeta: `#sinp` tenia `flex:1` **sin `m
 
 `index.html` (unico fichero de codigo; **sin commit; NO desplegado**). Documentacion (este pase, unico): `TASKS.md` (esta seccion) y `NEXT.md` (linea de estado). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**); `BUGS_HISTORICOS.md` **NO se toco** (**no hay bug nuevo**: el solapamiento era un fallo de layout en un solo breakpoint, corregido en el mismo turno); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron**.
 
+## TSK-220 - Embudo unico de publicacion: borrador semilla reanudable, completitud con pesos declarados en `lib/completitud.js`, XP recalculado sobre la ficha FINAL y modal de portada degradado a teaser (ADR-099) - 2026-10-24 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL -- SIN COMMIT Y SIN DESPLEGAR** -- 2026-10-24 (pase documental unico R2). **Sin migracion, sin endpoint nuevo** (`api/` sigue en **8/8**) y **sin ADR nuevo**: la decision vive en **ADR-099** (revision 3, aprobada), cuyo `Estado` se amplia en este mismo pase con la linea de implementacion. Bugs: **BUG-128** (cerrado), **BUG-129** y **BUG-130** (abiertos) y **BUG-131** (deudas aceptadas).
+
+### Motivo
+
+El alta de un lugar tenia **cinco vias** y ninguna era la puerta del producto, con **tres nociones distintas de "completitud"** y un punto de fuga: el modal de portada **no llegaba al backend** (guardaba en `localStorage` y abria WhatsApp a un numero de relleno). El XP, ademas, se congelaba con el nivel **enviado** (`tags.pub_tier`) y no con el nivel **aprobado**, asi que la ampliacion del admin nunca se pagaba. El argumento completo esta **una sola vez** en `DECISIONS.md` **ADR-099**.
+
+### 1. Entregables (medidos contra el archivo real, ADR-006)
+
+1. **`lib/completitud.js` (NUEVO, 24.040 bytes):** modulo de **doble superficie** (CommonJS + `window.ECCompletitud`), **6 bloques con pesos declarados** en una unica tabla `PESOS`, umbrales **40** (intermedio) / **75** (completo), **guarda de `completo`** (>= 3 fotos **no-hero** + coordenadas), `normalizarFila` y `persistible`. Una sola fuente de verdad para servidor, `publicar.html` y `admin.html`.
+2. **`scripts/smoke_completitud.js` (NUEVO, 15.172 bytes):** **74/74 PASS**. Congela los **13 fixtures** F1-F13 con sus puntos y tier, la **monotonia**, la **paridad de superficies** (`module.exports` == `window.ECCompletitud`), la regla **puntos <-> faltantes**, la formula unica de fotos y las guardas duras.
+3. **`api/publicar-lugar.js`:** `estado_envio` con tres estados `semilla -> borrador -> enviado` (lista cerrada `ESTADOS_ENVIO_VALIDOS`), **reclamo** de la semilla propia por `borrador_id` **con Bearer** (sin JWT se ignora en silencio, nunca se reclama), **envio basico sin foto**, galeria con tope **12** (`FOTOS_EXCEDIDAS`), `video_url` en **todas** las categorias, **blog** como categoria con `tema` validado, `pub_*` **solo servidor**, `pub_geo_dist_m`, `GET ?mios=1`/`GET ?id=`, `PATCH ?id=` con **allow-list** y `409 YA_ENVIADO`, topes de semilla **3/dia por origen** y **20/dia global** con `ip_hash` **fail-closed**, `publicar_directo` sin fallback de secreto y CORS con `PATCH`.
+4. **`api/interacciones.js`:** `publicar_lugar_otorgar` **recalcula tier y completitud sobre la ficha FINAL**; sentencia unica `claim` + saldo con `EXISTS (SELECT 1 FROM usr)` (**nunca claim sin saldo**); ledger, `acreditarClaseYCofre` y referidos **despues**, cada uno con su propio `catch` (swallow); `motivo:'usuario_inexistente'` (200 reintentable) y `XP_FORCE_FAIL=ledger` **inerte sin env**.
+5. **`api/admin.js`:** la cola y su `COUNT` filtran **solo** `estado_envio='enviado'` (con `COALESCE(...,'enviado')` para filas legacy); el POST devuelve `otorgamiento:{otorgado,xp,tier,motivo}`.
+6. **`api/pagina-destino.js`:** video para las **5 categorias** con **una sola ruta** de render y fallback; la galeria ya era global; banner de `draft` **intacto**.
+7. **`publicar.html`:** 4 niveles con "Enviar hasta aqui", **barra de completitud**, **estimacion de XP desde `catalogo_xp` sin montos hardcodeados**, blog como categoria, video, `?vista=mios`, rehidratacion `?id=`/`?paso=` y meta corregida (ya no dice "publicacion inmediata").
+8. **`admin.html`:** tarjeta con tier, completitud, chips de faltantes y XP estimado; "Ampliar ficha y volver a la cola" en **dos pasos** (sin auto-aprobar); aviso con el XP **real** del `otorgamiento`; **ya no escribe `pub_*`**.
+9. **`index.html`:** el modal de portada es **teaser de 3 campos** que crea semilla y redirige a `publicar.html?id=<id>&paso=2` (verificado en `index.html:2695`); fuera el WhatsApp de relleno y el `localStorage` como camino principal.
+10. **`usuario-session.js`:** **5 entradas nuevas** en `EC_XP_CATALOGO` bajo `grupo:'publicar'` + `EC_XP_GRUPOS.publicar`, **sin montos**.
+11. **`vercel.json`:** `PATCH` en `Access-Control-Allow-Methods`. **`scripts/smoke_xp_guia.js`:** **19 -> 24** filas esperadas.
+
+### 2. Verificacion (QA, 0 bloqueadores)
+
+| Control | Resultado |
+|---|---|
+| `--check` | **7/7** |
+| ASCII-safety (ADR-002) | **0 bytes nuevos** |
+| Balance de divs | **178/178 · 1173/1173 · 375/375** |
+| `express_check` | **PASS** |
+| Smokes | **74/74 · 30/30 · 9/9 · 177/177** |
+| `smoke_auditoria_pagina_destino` | **69/76**, **identico a `HEAD`** -> **0 regresiones** |
+| Presupuesto Vercel | **8/8** funciones, cero endpoint nuevo |
+
+### 3. Despliegue y pendientes
+
+**NO SE HA DESPLEGADO: nada de esta tanda esta commiteado ni publicado.** El codigo vive en el arbol de trabajo (**10 ficheros de codigo modificados** + `DECISIONS.md` con ADR-099 + **2 NUEVOS** `lib/completitud.js` y `scripts/smoke_completitud.js` + `tmp/` sin trackear). **Orden de despliegue: backend primero** (`api/publicar-lugar.js`, `api/interacciones.js`, `api/admin.js`, `api/pagina-destino.js`), despues `vercel.json` y al final las 3 UI (`publicar.html`, `admin.html`, `index.html`) + `usuario-session.js`. Los pendientes verificables y los riesgos estan en `NEXT.md`.
+
+### 4. Archivos tocados
+
+`lib/completitud.js` y `scripts/smoke_completitud.js` (**NUEVOS**); `api/publicar-lugar.js`, `api/interacciones.js`, `api/admin.js`, `api/pagina-destino.js`, `publicar.html`, `admin.html`, `index.html`, `usuario-session.js`, `vercel.json`, `scripts/smoke_xp_guia.js`. **Sin commit y sin desplegar.** Documentacion (este pase, unico): `TASKS.md` (esta seccion), `DECISIONS.md` (Estado de ADR-097 y de ADR-099), `BLUEPRINT.md` (contrato del endpoint y de la cola), `BUGS_HISTORICOS.md` (BUG-128..BUG-131) y `NEXT.md`. **`PROJECT.md` NO se toco** (el alcance del producto no cambia).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

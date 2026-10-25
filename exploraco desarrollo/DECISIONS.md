@@ -8551,7 +8551,9 @@ Debe devolver **`## ADR-096:`**, y el conteo de ADR debe subir de 95 a 96. El ci
 **ID:** ADR-097
 **Fecha:** 2026-10-15
 **Autor:** `@architect` (diseño). Gate de riesgo CONFIRMADO por el operador (toca `api/publicar-lugar.js`, `publicar.html` y el generador del catalogo).
-**Estado:** **ACEPTADO / PENDIENTE DE IMPLEMENTAR.** Fijadas por decision del operador: (1) el envio basico y el completo crean la misma fila `status='draft'`, (2) `whatsapp` pasa a condicional y la foto a obligatoria en modo basico, (3) cero endpoints nuevos y cero migraciones nuevas, (4) `dictado-voz.js` y `map-picker.js` no se tocan.
+**Estado:** **ACEPTADO / IMPLEMENTADO EN PRODUCCION (estado corregido el 2026-10-24: deriva documental detectada).** El Estado decia "PENDIENTE DE IMPLEMENTAR" y **era falso**: la geografia **si esta implementada** -- `geo-ciudades.js` esta versionado (commit `773fe42`) y `api/publicar-lugar.js` **ya escribe** `destinos.zona` re-derivada (verificado contra el archivo real: **30** lineas con `zona` en `HEAD`), con la columna y su `CHECK` presentes en Neon. Fijadas por decision del operador: (1) el envio basico y el completo crean la misma fila `status='draft'`, (2) `whatsapp` pasa a condicional y la foto a obligatoria en modo basico, (3) cero endpoints nuevos y cero migraciones nuevas, (4) `dictado-voz.js` y `map-picker.js` no se tocan.
+
+**Derogacion parcial (2026-10-24, en `ADR-099` D7):** se **deroga UNICAMENTE** la premisa (2) en su clausula "la foto pasa a **OBLIGATORIA** en modo basico", y con ella el **criterio de verificacion 4**, que queda **ANULADO** (un `POST` basico **sin foto y sin `whatsapp`** ya **no** devuelve `400`: entra con el `estado_envio` que declare -- `semilla`/`borrador` quedan fuera de la cola, `enviado` entra en ella). El resto de este ADR -- geografia derivada, catalogo con `zona` precalculada, `zona` re-derivada en el backend, dos niveles sobre la MISMA cola, cero endpoints y cero migraciones, `dictado-voz.js`/`map-picker.js` intactos -- **sigue vigente**. El argumento y las restricciones del embudo viven **una sola vez** en `DECISIONS.md` **ADR-099** (ADR-084 D1): aqui solo se apunta la derogacion, **no se reescribe el cuerpo**.
 **Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-096`** (linea 8352); no existia ningun `ADR-097`. Se escribe como **097**, el siguiente consecutivo libre. Tamano real medido hoy: **1.275,7 KB / 8.545 lineas**.
 
 ### Problema
@@ -8712,3 +8714,381 @@ Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Se
 ```
 
 Debe devolver **`## ADR-098:`** y el conteo **97**. El cierre documental (`TASKS.md`, `NEXT.md`, `BLUEPRINT.md`) corresponde al **pase unico R2** de `@docs-keeper`, no a este ADR.
+
+---
+
+## ADR-099: El alta de un lugar pasa a ser un **embudo unico** (`publicar.html`) con **borrador semilla reanudable**, **completitud con pesos declarados** servida por una **fuente unica compartida** (`lib/completitud.js`) y **XP recalculado sobre la ficha final** al aprobar; el modal de portada queda como **teaser** y el editor del admin como **ampliacion**, no como vias paralelas [**deroga** la clausula "foto OBLIGATORIA en modo basico" de ADR-097 D5 y su criterio de verificacion 4]
+
+**ID:** ADR-099
+**Fecha:** 2026-10-24
+**Autor:** `@architect` (diseno). Gate de riesgo CONFIRMADO explicitamente por el operador (toca `api/publicar-lugar.js`, `api/interacciones.js`, `api/admin.js`, `publicar.html`, `admin.html`, `index.html` y `api/pagina-destino.js`).
+**Estado:** **ACEPTADO / PENDIENTE DE IMPLEMENTAR.** Es un ADR de **diseno**: no escribe codigo. Las 8 restricciones del operador (teaser de borrador, basico sin foto, solo fotos y video, XP sobre ficha final, escala 25/60/120+40+30, bono geo sin cambios, borrador reanudable y "Mis lugares" en esta entrega, alcance de todos los items publicables) se registran como **premisa**, no se re-abren. **Revision 2 (misma fecha):** `@architect-review` emitio **SOLICITA CAMBIOS** con **7 bloqueadores** (B1-B7) y el operador los acepto **todos** junto con **4 respuestas**; esta version reescribe **solo** D1 (puntero de secreto), D3, D5, D6, D7 (relajacion de UI), D8, D9 (linea de galeria), D10, el orden de despliegue, las deudas y los criterios T1-T6. **No** se crea ADR-100: la correccion vive aqui. **Revision 3 (misma fecha, APROBADO con 3 bloqueadores de una linea + 3 residuales):** se cierran **B7-a** (`acreditarClaseYCofre` sobrevive a la eliminacion del `catch`), **B7-b** (la CTE cubre solo `claim` + `xp_total`; ledger fuera, opcion (b), con Deuda 9) y **B3-c** (bloque Identidad con credito parcial por campo, D3.0, F11 = 9), mas **R1** (CORS tambien en el handler `:284-285`), **R2** (dos hechos medidos falsos corregidos: `lib/score.js` y `usuario-session.js:819`) y **R3** (`XP_FORCE_FAIL` inerte y fuera de Vercel).
+**Implementacion (2026-10-24, pase unico R2):** **IMPLEMENTADO Y VERIFICADO LOCAL -- SIN COMMIT Y SIN DESPLEGAR.** El diseño se ejecuto completo y `@qa-auditor` cerro con **0 bloqueadores**: `--check` **7/7**, ASCII **0 bytes nuevos**, balance de divs **178/178 · 1173/1173 · 375/375**, `express_check` **PASS**, smokes **74/74 · 30/30 · 9/9 · 177/177**, `smoke_auditoria_pagina_destino` **69/76 identico a `HEAD`** (0 regresiones) y **8/8** funciones serverless (cero endpoint nuevo). Entregado: `lib/completitud.js` (pesos declarados, umbrales 75/40, guarda de `completo`), `scripts/smoke_completitud.js` (**74/74**, fixtures F1-F13 y paridad de superficies), `api/publicar-lugar.js` (`semilla -> borrador -> enviado`, reclamo por `borrador_id`, `PATCH`, `GET ?mios=1`/`?id=`, topes de semilla), `api/interacciones.js` (`publicar_lugar_otorgar` recalcula tier y completitud sobre la ficha final), `api/admin.js` (cola solo `enviado` + `otorgamiento`), `api/pagina-destino.js` (video global), `publicar.html`, `admin.html`, `index.html` y `usuario-session.js`. **Deudas aceptadas:** **7** (fallback `ADMIN_SECRET`) y **9** (ledger fuera de la CTE). **Pendientes y orden de despliegue:** `NEXT.md`; detalle de ejecucion: `TASKS.md` **TSK-220**.
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-098`** (linea 8633); no existia ningun `ADR-099`. Se escribe como **099**, el siguiente consecutivo libre. Conteo de encabezados `^## ADR-` antes de esta seccion: **97**. Tamano real medido hoy: **1.303,6 KB / 8.714 lineas**.
+
+### Problema
+
+Hoy **conviven cinco vias de alta** y ninguna es la puerta del producto:
+
+1. **`publicar.html`** (89,2 KB) con 4 pasos y `POST` real a `/api/publicar-lugar`. Es la unica que llega al backend completa.
+2. **"Envio basico"** escondido en el **paso 4** (`publicar.html:788-793`), es decir, despues de que el usuario ya rellenó los cuatro pasos: la via barata existe, pero se ofrece al final del camino caro.
+3. **Modal `#publicar-modal` de la portada** (`index.html:4623-4700`, logica en `:2586-2678`): **no llega al backend**. Guarda en `localStorage` y abre WhatsApp a un numero de relleno `573001234567`. El usuario cree que publico; nadie recibe nada.
+4. **Modal "Comparte tu experiencia"** (`index.html:1434`), que entra como `categoria_slug='blog'` por el mismo endpoint.
+5. **Editor del admin** (`admin.html:714`, `savePlace()` en `:4481`), que escribe fichas por una via propia.
+
+El resultado es un sistema con **cinco validaciones distintas**, **tres nociones distintas de "completitud"** (la del contador del servidor, la de los 4 pasos, la del editor) y **un punto de fuga** (el modal) que consume atencion del usuario y no produce fila. A esto se suma que el XP se congela con el nivel **enviado** (`api/interacciones.js:15492` lee `tags.pub_tier`), no con el nivel **aprobado**, de modo que la ampliacion del admin nunca se paga.
+
+### Datos medidos (2026-10-24, contra el archivo real; no se re-miden aqui los ya fijados en ADR-097)
+
+1. **La escala de XP ya existe y no se toca:** `api/interacciones.js:461-488` declara `publicar_basico 25`, `publicar_intermedio 60`, `publicar_completo 120`, `publicar_bono_geo 40`, `publicar_bono_foto 30`. La restriccion del operador es que esta escala queda **intacta**.
+2. **El tier ya es un dato persistido, pero se calcula con un contador ad-hoc:** `calcularTierPublicacion()` (`api/publicar-lugar.js:265-280`) suma `extras` con ocho `if` y devuelve `completo` solo si `coords AND galeria AND extras>=4` (`:277`). **No hay pesos, no hay video, y "mas fotos" no cuenta**: `tieneGaleria` es booleano (`:276`).
+3. **Los bonos ya son ortogonales al tier:** `pub_geo` se calcula por distancia dispositivo-pin `<= 300` m (`:371-375`) y `pub_foto` por `fotos_galeria.length > 0` (`:376`). Se escriben en `tags` junto al tier (`:398-400`), con `tags.autor_id` (`:397`) y `tags.pub_xp_estado` (`:401`, `pendiente` si hay autor, `sin_autor` si no).
+4. **La validacion actual exige foto y no exige contacto:** `reqs` (`:310-312`) pide `['nombre','categoria','ciudad','descripcion_corta','foto_principal']` para no-blog y anade `email` para blog. El comentario `:301-309` documenta que la foto es requisito y el contacto no.
+5. **El autor se resuelve delegando en el motor de sesion, no duplicando el verificador:** `publicar-lugar.js` no verifica JWT; hace un `fetch` interno a `/api/interacciones` con `{tipo:'publicar_lugar_registrar'}` reenviando el `Bearer` (`:384-396`), y ese handler responde `{autor_id}` tras `verificarSesion(req)` (`api/interacciones.js:15460-15463`). **Este es el precedente que D6 reutiliza.**
+6. **La acreditacion ya lee la fila final, pero usa el tier congelado:** `publicar_lugar_otorgar` (`api/interacciones.js:15469-15524`) hace `SELECT tags, nombre, lat, lng FROM destinos` (`:15474`), reclama idempotencia por `tags.pub_xp_estado` (`:15486-15491`) y luego toma `var tierPub = String(tagsPub.pub_tier || 'basico')` (`:15492`). Es decir: **la fila final esta a mano; el tier, no se recalcula**.
+7. **El ledger ya tiene el desglose que D5 necesita:** `registrarXpLedger` (`api/interacciones.js:1764`) acepta `accion`, `xp_base`, `mult_nivel`, `mult_stack`, `mult_final`, `cap_aplicado`, `bonos_planos`, `xp_final`, `contexto` y `origen` (la llamada de publicacion en `:15508-15514` ya manda `contexto:{destino_id, tier, geo, foto}`). **No hace falta columna nueva ni migracion.**
+8. **El admin ya dispara la acreditacion al aprobar:** `api/admin.js:343-405`, recurso `solicitudes`, `accion:'aprobar'` -> `status='published'` -> `fetch` a `publicar_lugar_otorgar` con `ADMIN_SECRET` (`:383-392`). El `GET` ya devuelve `d.tags AS detalles` (`:361`), asi que **la tarjeta puede mostrar tier, completitud y faltantes sin cambiar el SELECT**.
+9. **Blog YA es una sola categoria en la base, con 5 sub-temas:** el comentario de cabecera lo dice explicitamente (`api/publicar-lugar.js:6-10`) y `BLOG_TEMAS` (`:24`) **fuerza `categoria_slug='blog'`** guardando el tema en `tags.tema`. El render lo confirma: `pagina-destino.js:2192` ramifica con `cat === 'blog'` y `:1176` inserta el bloque de video con `tags.video_url` (`:876`). **Consecuencia: D8 no necesita migracion ni normalizacion nueva; solo UI.**
+10. **`video_url` es hoy exclusivo de blog:** se escribe solo dentro de `if (esBlog)` (`:363-368`) y con `esVideoUrlSegura()` (`:227-236`, match **exacto** de host contra `VIDEO_HOSTS`, sin `endsWith`). Para el resto de categorias, `tags.video_url` nunca se llena.
+11. **La guia de XP no conoce la publicacion:** `GET /api/interacciones?tipo=catalogo_xp` (`:9447`) **itera `XP_BASES`**, asi que las cinco claves de publicacion **ya salen del servidor**; el hueco esta en el cliente, `EC_XP_CATALOGO` (`usuario-session.js:2400`), que **no tiene ninguna entrada de publicar** y es el fallback de etiquetas (`:2690`).
+12. **Existe un precedente de modulo compartido:** `lib/score.js` (**8.681 bytes**) ya es consumido por servidor y cliente. Y `publicar.html` **no carga el nucleo de sesion** (hecho medido en ADR-098 D1: `uid` era `null` mientras el JWT si venia del `localStorage`), lo que condiciona D6 y D11.
+13. **Presupuesto de Vercel: 8/8 funciones.** Todo lo de este ADR se resuelve **extendiendo `api/publicar-lugar.js`** con metodos y query params. Prohibido endpoint nuevo.
+
+### Opciones
+
+**Sobre la puerta unica (D1):**
+
+- **(A) Consolidar en `publicar.html` y degradar los demas puntos de entrada a teaser/ampliacion.** Un solo formulario, un solo `POST`, una sola validacion. Coste: tocar tres archivos de UI.
+- **(B) Mantener el modal como via completa y hacer que `publicar.html` sea el "modo avanzado".** Cero refactor, pero **duplica la validacion en cliente** y deja dos escrituras; el modal ya demostro que se desincroniza (WhatsApp de relleno).
+- **(C) Unificar en el editor del admin y retirar el formulario publico.** Mata la contribucion de usuarios; descartada por producto.
+
+Elegida: **A**. Razon unica: el coste dominante hoy no es escribir el formulario, es **mantener cinco validaciones en acuerdo**. Un solo camino de escritura es la unica forma de que la completitud (D3) signifique lo mismo en los cuatro consumidores.
+
+**Sobre la fuente de la verdad de la completitud (D4):**
+
+- **(a) El servidor sirve las reglas por el endpoint existente y el cliente solo hace aritmetica.** Atractiva porque el cliente no tiene numeros, pero **la aritmetica es la regla**: contar fotos en rangos, aplicar guardas duras y topar extras es logica, no datos. Con (a) la logica sigue duplicada y ademas hay una ida y vuelta por cada previsualizacion.
+- **(b) Modulo compartido `lib/completitud.js` (precedente `lib/score.js`) con doble superficie de export y smoke de paridad.** Una sola implementacion fisica, `require` en el servidor y `<script>` en el cliente.
+- **(c) Duplicacion en cliente y servidor con smoke de paridad.** Es (b) pero con dos copias que hay que mantener en acuerdo a mano: el smoke detecta la deriva, no la evita.
+
+Elegida: **(b)**. Razon unica: el repositorio ya tiene el patron (`lib/score.js`) y el problema que se quiere cerrar no es "que el cliente no calcule", es "que no existan dos implementaciones". Un smoke sobre dos copias documenta la deriva; un archivo unico la hace imposible.
+
+**Sobre el borrador reanudable (D6):**
+
+- **(A) Endpoint nuevo `/api/borradores`.** Prohibido por presupuesto 8/8.
+- **(B) Extender `api/publicar-lugar.js` con `GET`/`PATCH` y query params sobre el mismo recurso.** Cero endpoints, cero migraciones, misma tabla y mismo modelo de `tags`.
+- **(C) Solo `localStorage`.** No sobrevive a otro dispositivo, no es "Mis lugares", no sirve al admin.
+
+Elegida: **B**.
+
+### Decision
+
+**D1 -- Una sola puerta: `publicar.html` es el unico formulario.** Toda alta de un item publicable (hospedaje, comida, sitio, evento, blog/experiencia y alta directa del admin) pasa por el **mismo `POST /api/publicar-lugar`** y el mismo modelo de `tags`.
+
+- El **modal `#publicar-modal` de la portada se conserva como teaser de borrador** (restriccion 1): recolecta el minimo de D7, crea una **semilla** (`tags.estado_envio='semilla'`, `tags.origen_envio='teaser'`), guarda el `id` en `localStorage` bajo `ec_borrador_pendiente` y **redirige** a `publicar.html?borrador=<id>&paso=2`. **Se elimina del camino de publicacion el numero de relleno `573001234567`**: el modal deja de abrir WhatsApp como si fuera un envio.
+- El **modal de blog** (`index.html:1434`) se alinea con la misma regla: es **otro teaser**, con `categoria='blog'` y el tema preseleccionado en `tags.tema`. No conserva un `POST` propio con validacion propia.
+- El **editor del admin no se duplica**: el alta directa del admin es el **mismo `POST`** con `tags.origen_envio='admin'` y `publicar_directo=true` (aceptado **solo** si `ADMIN_SECRET` **existe** y coincide, **sin fallback**: ver D6.5), que crea la fila en `published` y dispara `publicar_lugar_otorgar` por el camino ya existente (`api/admin.js:383-392`). El editor (`admin.html:714`, `savePlace():4481`) queda como **via de ampliacion de una ficha existente**, no de creacion paralela.
+- **Justificacion (unica):** el objetivo de D1 no es estetico, es que exista **una sola validacion**. Mientras el modal escriba por su cuenta, D3 y D5 son inaplicables porque hay escrituras que no pasan por la completitud.
+
+**D2 -- Reconciliacion de niveles: 4 pasos de UI, 3 tiers canonicos, 2 bonos ortogonales.** Los 4 pasos de `publicar.html` son **progreso del formulario**, no niveles. El mapeo explicito:
+
+| Paso UI | Contenido | Efecto en el tier |
+|---|---|---|
+| 1 Identidad | nombre, categoria, subcategoria | habilita la **semilla** (D7) |
+| 2 Ubicacion | ciudad, departamento, mapa/pin, coords manuales, "Usar mi ubicacion" | habilita el **bono geo** (D2.2) |
+| 3 Relato y extras | descripcion corta/larga, precio, horario, faqs, amenidades, como llegar... | sube **bloques** de completitud (D3) |
+| 4 Medios y revision | fotos a Blob, `video_url`, estimacion de XP, envio | habilita el **bono foto** y el envio |
+
+- **D2.1** El tier **no se elige en la UI**: se **deriva** de la completitud (D3) y se persiste en `tags.pub_tier`. Los tres valores siguen siendo `basico|intermedio|completo` porque la escala de XP esta congelada (restriccion 5) y `publicar_lugar_otorgar` construye la clave como `'publicar_' + tier` (`api/interacciones.js:15493-15494`): un cuarto valor caeria al `publicar_basico` por el fallback de `:15494` y pagaria de menos en silencio.
+- **D2.2** Los bonos son **independientes del tier y no lo modifican**: `pub_geo` (<= 300 m entre dispositivo y pin, **sin cambios**, restriccion 6) y `pub_foto` (>= 1 foto). Un `completo` sin geolocalizacion cobra 120; un `basico` con geolocalizacion cobra 25+40. Esto **ya es el comportamiento actual** (`:371-376`, `:15496-15497`) y se conserva para no renegociar la escala.
+- **D2.3** Se unifica la nocion de "foto": hoy la validacion exige `foto_principal` (`:312`) y el bono mira `fotos_galeria` (`:376`), **dos campos distintos**. D3 deja de contar `fotos_galeria` del body y pasa a contar **la fila** con la formula unica de D3.1 (`fotos_total` para puntuar, `fotos_no_hero` para la guarda).
+
+**D3 -- Modelo de completitud con pesos declarados, una sola formula de conteo de fotos y guardas duras (sustituye el contador ad-hoc de `:266-279`).** `evaluarCompletitud(entrada)` devuelve `{ puntaje, tier, faltantes[], bloques{} }` sobre **100 puntos**:
+
+| Bloque | Peso | Que lo llena |
+|---|---|---|
+| Identidad | 15 | **crédito parcial por campo (tabla D3.0)**: nombre 3; categoria 3; subcategoria 2; ciudad 3; departamento 2; zona 2 |
+| Relato | 15 | `descripcion_corta` >= 30 caracteres 7; `descripcion_larga` >= 200 8 |
+| Ubicacion | 10 | `lat` y `lng` validas 10 |
+| Contacto | 10 | al menos uno de `whatsapp`, `email`, `web`, `instagram` 10 |
+| Medios | 30 | `fotos_total` 1 -> 10; 2-4 -> 20; **>= 5 -> 25**; **`video_url` valido +5** |
+| Extras de categoria | 20 | precio, horario, faqs, amenidades, habitaciones, como llegar, temporada, dificultad, duracion, precio de entrada: 2 cada uno, tope 20 |
+
+**D3.0 -- Bloque Identidad: credito parcial declarado, campo por campo.** La v1 agrupaba tres campos en un solo peso (`categoria+subcategoria 5`, `ciudad+departamento+zona 6`), lo que hacia **imposible** puntuar una semilla: sus 15 puntos exigian campos que la semilla no tiene (B3-c). Se re-especifica con **un peso por campo** y una regla de coherencia:
+
+| Campo | Puntos | Se suma si... |
+|---|---|---|
+| `nombre` | 3 | no vacio |
+| `categoria` | 3 | resuelta a un `categoria_slug` valido (`CAT_MAP` o `blog`) |
+| `subcategoria` | 2 | presente y en la lista cerrada de la categoria (ADR-016) |
+| `ciudad` | 3 | no vacia |
+| `departamento` | 2 | no vacio |
+| `zona` | 2 | **`resolverZona()` produjo valor** (no basta con que llegue el campo) |
+| **Total** | **15** | |
+
+- **Regla de coherencia (la que cierra la contradiccion):** *un campo **puntua** si y solo si **no figura en `faltantes`***. `subcategoria`, `departamento` y `zona` dejan de ser "claves de faltantes que ademas dan puntos": son claves de `faltantes` **mientras faltan** y dejan de estarlo en el mismo instante en que aportan. El smoke asserta la equivalencia (`puntos > 0` <=> `clave ausente de faltantes`) en los 13 fixtures.
+- **Consecuencia aritmetica:** la **semilla** de D7 (`nombre` + `categoria` + `ciudad`) vale **3 + 3 + 3 = 9**, no 15. `subcategoria`, `departamento` y `zona` **no** los aporta el teaser.
+
+**D3.1 -- Formula unica de conteo de fotos (vinculante para D3, D5 y la guarda de `completo`).** La galeria **no vive en `tags`**: `publicar-lugar.js:470-482` inserta cada foto en **`destinos_fotos`** y `tags.fotos_galeria` **nunca se persiste**; el hero va a la columna `foto_hero` (`:458`). Ademas `admin-destinos.js:102` marca `es_hero` y `:127`/`:133` escriben `es_hero` en `destinos_fotos`, con sincronizacion de `foto_hero` desde la foto `es_hero` (`:159`). Por eso **`1 + COUNT(*)` duplica el hero** cuando el admin lo promovio, y **no lo cuenta** cuando la fila vino de `publicar.html` (donde el hero nunca se inserta en la galeria). La formula es unica y explicita:
+
+- `galeria_n` = `COUNT(DISTINCT url)` de `destinos_fotos` para el destino.
+- `hero_en_galeria` = `COUNT(*)` de `destinos_fotos` con `url = destinos.foto_hero`.
+- **`fotos_total` = `galeria_n` + (1 si `foto_hero` no es nulo **y** `hero_en_galeria = 0`, si no 0).** Es el numero que **puntua** en el bloque medios.
+- **`fotos_no_hero` = `galeria_n` - (1 si `hero_en_galeria > 0`, si no 0).** Es el numero que **abre la guarda dura**.
+
+Las dos cifras se calculan **una sola vez** en el servidor (subconsultas del `SELECT` de D5) y se pasan a `evaluarCompletitud()` como datos ya contados: **`lib/completitud.js` no consulta la base**. Asi el cliente previsualiza exactamente lo mismo cuando el formulario conoce sus propias fotos.
+
+**D3.2 -- Guardas duras de `completo` (resolucion 1 del operador).** `completo` exige **las tres** cosas a la vez: `puntaje >= 75` **y** `fotos_no_hero >= 3` **y** coordenadas validas. `intermedio` = `40-74`; `basico` = `< 40`. Las guardas sustituyen el `extras>=4` de `:277`, que era un numero magico sin relacion con los medios.
+
+**D3.3 -- Limite duro de subida: 12 fotos por envio (resolucion 3).** El techo de 5 fotos es **solo de puntuacion**; el limite de subida es **12 `fotos_total`** por envio, **validado en servidor** (no en el cliente) y contado **despues de deduplicar por `url`**. Con mas de 12: **400 `FOTOS_EXCEDIDAS`**. Un `PATCH` que dejaria mas de 12 tambien falla. El limite existe porque el bloque medios ya se satura en 5 y sin tope el `INSERT` de `:471-482` se vuelve un vector de abuso de almacenamiento en Blob.
+
+**D3.4 -- Fixtures dorados (recalculados; son contrato del smoke de D4).** Base "ficha completa" = identidad 15 + relato 15 + ubicacion 10 + contacto 10 + extras 20 = **70 sin medios**. Todos los fixtures asumen hero **no** insertado en `destinos_fotos` (caso `publicar.html`), salvo F13:
+
+| # | Fixture | fotos_total | fotos_no_hero | coords | video | puntaje | tier esperado |
+|---|---|---|---|---|---|---|---|
+| F1 | 0 fotos, resto completo | 0 | 0 | si | no | 70 | **intermedio** |
+| F2 | 1 foto, resto completo | 1 | 1 | si | no | 80 | **intermedio** (guarda 3 fotos) |
+| F3 | 2 fotos, resto completo | 2 | 2 | si | no | 90 | **intermedio** (guarda 3 fotos) |
+| F4 | 3 fotos, resto completo | 3 | 3 | si | no | 90 | **completo** |
+| F5 | 4 fotos, resto completo | 4 | 4 | si | no | 90 | **completo** |
+| F6 | 5 fotos, resto completo | 5 | 5 | si | no | 95 | **completo** |
+| F7 | 5 fotos + video | 5 | 5 | si | si | 100 | **completo** |
+| F8 | 5 fotos + video, **sin coords** | 5 | 5 | no | si | 90 | **intermedio** (guarda coords) |
+| F9 | **1 foto + video + todo lo demas** | 1 | 1 | si | si | 85 | **intermedio** (el caso que contradecia el borrador v1: la guarda lo resuelve) |
+| F10 | blog: 5 fotos + video + email, **sin extras** | 5 | 5 | si | si | **78** | **completo** |
+| F11 | semilla: solo nombre+categoria+ciudad | 0 | 0 | no | no | **9** | **basico** |
+| F12 | 12 fotos + video (limite duro) | 12 | 12 | si | si | 100 | **completo** |
+| F13 | hero promovido desde galeria: 3 en galeria, 1 es hero | 3 | 2 | si | no | 90 | **intermedio** (ver D3.5) |
+
+**D3.5 -- Monotonia, y la unica excepcion (contradiccion nueva detectada al recalcular).** Cada bloque es una funcion **no decreciente** de su entrada (los rangos de fotos son crecientes, el video suma, los extras topan) y los bloques son independientes: **anadir cualquier campo o foto nunca baja puntos ni tier**. La guarda tambien es monotona: solo puede **levantar** el techo, nunca bajarlo. **Excepcion declarada:** *promover* una foto de galeria a hero (`es_hero` + sincronizacion de `foto_hero`, `admin-destinos.js:102,127,133,159`) reduce `fotos_no_hero` en 1 y puede **bajar** el tier (F13). Se acepta porque la regla del operador es literal ("excluyendo la que coincide con `foto_hero`") y porque el hero **deja de ser galeria**; se mitiga con dos cosas: el editor del admin **muestra los dos conteos antes de guardar**, y D5 **no reescribe** filas ya `otorgado` (no retroactivo), asi que ningun XP pagado se reclama hacia atras.
+
+**D3.6 -- Persistencia (ADR-003, merge JSONB):** `tags.pub_completitud` (entero 0-100), `tags.pub_faltantes` (array de claves cortas: `foto`, `fotos_3`, `video`, `coords`, `contacto`, `descripcion_larga`, `zona`...), `tags.pub_tier`, y los dos conteos `tags.pub_fotos_total` / `tags.pub_fotos_no_hero` para que admin y "Mis lugares" no tengan que recalcular. Siempre `COALESCE(tags,'{}'::jsonb) || $N::jsonb`; **nunca** se reemplaza `tags`.
+
+**D3.7 -- Justificacion (unica):** el contador actual no distingue "una foto" de "cinco fotos" ni sabe que existe video, asi que el admin que amplia una ficha **no puede mejorar el tier** y el autor no tiene razon para subir mas material. Los pesos convierten la ampliacion en progreso medible, que es la condicion para que D5 (puntos sobre ficha final) tenga sentido.
+
+**D4 -- Fuente unica de la verdad: `lib/completitud.js` con doble superficie y smoke de paridad. El servidor es autoridad.**
+
+- El archivo es **uno solo** y exporta `evaluarCompletitud()` de dos formas: `module.exports` (para `require` desde `api/publicar-lugar.js` y `api/interacciones.js`) y `window.ECCompletitud` (para `<script src="/lib/completitud.js">` en `publicar.html` y `admin.html`). **Precedente real, corregido (R2-i):** `lib/score.js` es precedente de **modulo compartido en `lib/`**, no de doble superficie: expone **solo** `module.exports` (`lib/score.js:163`) y **ningun HTML lo carga**. `lib/completitud.js` es por tanto el **primer** archivo de `lib/` con doble superficie; esa superficie es justo lo que el smoke de D4 tiene que probar, porque no hay precedente que la garantice.
+- **El cliente solo previsualiza.** El valor que se persiste es **siempre** el que calcula el servidor en el `POST`/`PATCH`; la previsualizacion es una promesa de UI, no un dato. Si el cliente y el servidor discrepan, gana el servidor y el smoke falla en CI, no en produccion.
+- **`lib/completitud.js` es ASCII-safe (ADR-002)** porque entra en el bundle serverless: 0 bytes > 127, escapes `\uXXXX` simples, cero backticks.
+- **Smoke de paridad obligatorio** (`scripts/smoke_completitud.js`): (i) fixtures con `{entrada, puntaje, tier}` dorados; (ii) el archivo expone **las dos** superficies y devuelven lo mismo; (iii) un `POST` real minimo devuelve `tags.pub_completitud` **igual** al valor que el cliente previsualizo para el mismo payload. Sin (iii) el smoke no prueba nada que no sea tautologico.
+- **Justificacion (unica):** con un solo archivo la paridad es estructural; el smoke existe para detectar que alguien **dejo de usar** el archivo (una copia pegada en el HTML) y para congelar los umbrales como regresion.
+
+**D5 -- Los puntos se calculan sobre la fila final, al aprobar, en una sola sentencia atomica, y no son retroactivos.**
+
+**D5.1 -- De donde salen los datos de la ficha final.** `publicar_lugar_otorgar` (`api/interacciones.js:15469`) **ya lee la fila** pero solo trae `tags, nombre, lat, lng` (`:15474`), que **no basta**: la galeria no esta en `tags` (D3.1) y `lead`/`ciudad`/`region`/`zona`/`foto_hero` no vienen. El `SELECT` de `:15474` **se amplia** a `d.id, d.tags, d.nombre, d.lead, d.descripcion, d.ciudad, d.region, d.zona, d.lat, d.lng, d.foto_hero, d.categoria_slug` mas **tres subconsultas** que implementan D3.1 sin duplicar el hero: `galeria_n` = `COUNT(DISTINCT url)` de `destinos_fotos`; `hero_en_galeria` = `COUNT(*)` con `url = d.foto_hero`; y de ahi `fotos_total` y `fotos_no_hero` por la formula declarada. Con esas dos cifras se llama a `evaluarCompletitud()`, se **reescriben** `pub_tier`, `pub_completitud`, `pub_faltantes`, `pub_fotos_total` y `pub_fotos_no_hero`, y se **sustituye** la lectura congelada `tagsPub.pub_tier` de `:15492`.
+
+**D5.2 -- `pub_foto` se recalcula desde la fila final; `pub_geo` no.** `pub_foto` = `fotos_total >= 1` **en la fila aprobada**: si el admin anadio fotos, el autor cobra el bono de 30 (lectura literal de la restriccion 4). `pub_geo` es **inmutable**: la fila no conserva `lat_usuario`, la distancia dispositivo-pin solo se puede medir en el envio y el bono premia la **precision del aportante**, no la calidad de la ficha. Para que un futuro recalculo sea posible sin migracion, el `POST` guarda `tags.pub_geo_dist_m` desde esta entrega.
+
+**D5.3 -- Atomicidad: una sola CTE para `claim` + `xp_total`; ledger, clase/cofre y referidos van DESPUES.** El codigo actual **no es atomico y puede pagar dos veces**: `:15506` incrementa `xp_total` **antes** de escribir el ledger (`:15508`) y el `catch` de `:15517` solo devuelve `pub_xp_estado='pendiente'`, **sin descontar el `xp_total` ya sumado**. Un reintento tras un fallo parcial acredita de nuevo.
+- **Alcance exacto de la CTE (decision del operador, opcion (b)):** la CTE cubre **`claim` + `xp_total`**, con el patron encadenado que ya usa el fichero (`:2027-2031`, patron ADR-091): `claim` (`UPDATE ... SET tags = COALESCE(tags,'{}'::jsonb) || $pub WHERE COALESCE(tags->>'pub_xp_estado','') <> 'otorgado' RETURNING id`) -> `saldo` (`UPDATE usuarios SET xp_total = xp_total + $xp`), con el `xp` calculado en JS **antes** de emitir la sentencia. Postgres garantiza atomicidad de sentencia: si el saldo falla, el claim **no existe**. El `catch` con `pub_xp_estado='pendiente'` de `:15516-15523` **se elimina** porque deja de ser necesario: **el doble pago lo impide el claim, no el ledger**.
+- **`registrarXpLedger` (`:1764`) NO puede estar dentro de la CTE:** emite su propio `INSERT` con logica JS (`mult_origen`, `contexto.origen`, normalizacion de `cap`). Se ejecuta **DESPUES, fuera de la atomicidad**. **Consecuencia aceptada y documentada:** si la escritura del ledger falla, el XP queda **acreditado sin fila de auditoria**; se registra el fallo en consola y se reconcilia con `xp_ledger` vs `usuarios.xp_total` como **deuda operativa** (Deuda 9).
+- **`acreditarClaseYCofre` (`:1977`) se ejecuta DESPUES de la CTE, fuera de la atomicidad, con su propio swallow; su fallo no revierte el XP ni el claim.** Es la llamada que vive hoy en `:15507` y que **se perderia** si se borrara el bloque `:15505-15523` entero: eliminarlo arrastraria la progresion de `xp_clase`/`nivel_clase`/cofre, una **regresion silenciosa de clase**. Queda prohibido eliminar esa llamada al eliminar el `catch`.
+- **`repartirXpReferidos` (`:15515`)** tampoco entra en la CTE (emite sus propias consultas): se ejecuta **despues**, recibe una **clave de idempotencia** (`destino_id`) y **no repite** el reparto si ya existe para esa clave. Su fallo **no revierte** el XP del autor (ya pagado) y se registra para reintento; lo que **no** puede pasar es que un reintento del endpoint reparta dos veces.
+
+**D5.4 -- Desglose en `xp_ledger`: una sola fila** `accion='publicar_lugar'` (la idempotencia garantiza una sola acreditacion por destino), con `xp_base` = base del **tier final**, `bonos_planos` = geo + foto, y `contexto = { destino_id, tier, completitud, fotos_total, fotos_no_hero, faltantes_n, geo, foto, origen_envio, recalculo: true|false }`. `mult_nivel`, `mult_stack`, `mult_final`, `cap_aplicado` y `origen` siguen viniendo de `calcularXpAcreditado`/`origenLedger` (`:15499-15514`): **no se toca el motor de multiplicadores**.
+
+**D5.5 -- No retroactivo:** los destinos con `tags.pub_xp_estado='otorgado'` **no** se recalculan; el claim es la barrera y no se salta. La deriva (lugares aprobados con tier congelado) se **acepta y se registra**; un recalculatorio masivo seria tarea aparte, con `ADMIN_SECRET` sin fallback (D6.5) y fila de ajuste en el ledger.
+
+**D5.6 -- Justificacion (unica):** hoy el admin amplia una ficha, el tier no cambia y el autor cobra lo mismo: la ampliacion es trabajo no remunerado y el admin no tiene incentivo para hacerla. Pagar sobre la ficha final alinea los tres intereses sin tocar la escala.
+
+**D6 -- Borrador reanudable y "mis envios" sin endpoint nuevo: `GET` y `PATCH` sobre `api/publicar-lugar.js`, con allow-list de escritura.**
+
+**D6.1 -- `PATCH /api/publicar-lugar?id=<uuid>` actualiza mi borrador, y solo claves permitidas.** La propiedad **no se verifica aqui**: se resuelve delegando en el motor de sesion con el patron ya existente (`:384-396`, `tipo:'publicar_lugar_registrar'` -> `verificarSesion(req)` -> `autor_id`), y luego se exige `tags->>'autor_id' = $autor AND status='draft'`. **El merge JSONB es de una allow-list, no del body entero:** el servidor **construye** el objeto `tags` a partir de `CLAVES_CLIENTE` y **descarta el resto**, devolviendo **400 `CLAVE_NO_PERMITIDA`** con la clave ofensora (fail-closed y visible, no silencioso).
+- **`CLAVES_CLIENTE`** (escribibles por el cliente): `tema`, `subcategoria`, `amenidades`, `habitaciones`, `faqs`, `checkin`, `checkout`, `contacto_nombre`, `tipo_actividad`, `dificultad`, `duracion`, `horario_visita`, `precio_entrada`, `distancia`, `como_llegar`, `permisos`, `equipamiento`, `temporada`, `video_url`, `estado_envio` (con las transiciones de D6.2). Los campos de **columna** (`nombre`, `ciudad`, `departamento`, `barrio`, `zona`, `lat`, `lng`, `lead`, `descripcion`, `foto_hero`, `precio_desde`, `horario`, contactos, `categoria_slug`) se mapean a su columna, no a `tags`.
+- **Solo servidor, jamas por `PATCH` ni por `POST`:** `pub_geo`, `pub_foto`, `pub_tier`, `pub_completitud`, `pub_faltantes`, `pub_fotos_total`, `pub_fotos_no_hero`, `pub_xp_estado`, `pub_geo_dist_m`, `autor_id`, `ip_hash`, `origen_envio`, `semilla_huerfana`. Si llegan, **400** y no se escriben: **`PATCH {tags:{pub_geo:true}}` valdria +40 XP sin geolocalizar**, que es la escalada de dinero que este ADR cierra. Los `pub_*` los **recalcula siempre el servidor** desde la fila resultante.
+- **Idempotente por construccion:** `PATCH` no inserta filas; repetir el mismo payload devuelve el mismo estado (**200**).
+
+**D6.2 -- `estado_envio`: default `enviado` y transiciones cerradas (resolucion 2).** Un `POST` **sin** `estado_envio` se guarda como **`enviado`** (retrocompatible: el `publicar.html` vivo hoy sigue entrando en la cola el dia del despliegue, sin tocar el cliente). El **teaser manda `semilla` explicita**. Transiciones permitidas: `semilla -> borrador`, `semilla -> enviado` (solo con `autor_id`), `borrador -> enviado`. **Prohibidas:** cualquier vuelta atras desde `enviado` (**409 `YA_ENVIADO`**, para no sacar de la cola una solicitud en revision) y cualquier `-> semilla` desde un estado posterior (**400**).
+- **`PATCH` a `enviado` revalida la validacion minima completa** (la misma funcion que el `POST`, D7): `nombre` + `categoria` + `ciudad` + `descripcion_corta >= 30`, mas `email` si es blog (D8) y el limite de 12 fotos (D3.3). Sin esa revalidacion, el `PATCH` seria una puerta trasera para encolar fichas vacias.
+
+**D6.3 -- `GET /api/publicar-lugar?mios=1&limit=&offset=`** lista mis envios con `WHERE tags->>'autor_id' = $autor`, devolviendo `id`, `slug`, `nombre`, `categoria_slug`, `status`, `tags.estado_envio`, `tags.pub_tier`, `tags.pub_completitud`, `tags.pub_faltantes`, `tags.pub_fotos_total`, `creado_en`, `actualizado_en`, `items[]` y `total`. Sin sesion: **401**. **`GET ?id=<uuid>`** devuelve **mi** borrador completo para rehidratar el formulario, con el mismo control de propiedad.
+- **CORS en DOS sitios, no en uno.** `vercel.json:16` declara `Access-Control-Allow-Methods` sin `PATCH` y hay que anadirlo; **pero el preflight no lo responde `vercel.json`**: lo responde el propio handler en `api/publicar-lugar.js:284` con `'POST, OPTIONS'` y `:285` con `Content-Type`. Con eso, **el `Bearer` de `GET`/`PATCH` no pasa preflight** aunque el handler acepte el metodo. Se anade `:284-285` a esta decision: metodos **`POST, GET, PATCH, OPTIONS`** y cabeceras **`Content-Type, Authorization`**. Cambiar solo `vercel.json` dejaria el `PATCH` roto en el navegador con el backend en verde.
+
+**D6.4 -- Ciclo de vida y reclamo.** `semilla` (teaser, minimo de D7) -> `borrador` (reclamado o rellenado con sesion) -> `enviado` (entra en la cola del admin). Solo `enviado` se lista en `recurso=solicitudes`. **Reclamo:** `POST` con `borrador_id` + `Bearer` valido sobre una fila `draft` con `estado_envio='semilla'` y `tags.autor_id IS NULL` -> se estampa `autor_id`, `estado_envio='borrador'` y `pub_xp_estado='pendiente'`. Una semilla que **nadie reclama** nunca llega a `enviado` y por tanto **nunca** llega a `published`: no hay XP sin sesion (coherente con `:401`, que ya deja `sin_autor`).
+
+**D6.5 -- El camino admin del mismo endpoint no hereda un secreto publico.** `publicar_directo` (D1) exige `process.env.ADMIN_SECRET` **definida** y coincidente: si la variable **no existe**, **401 `ADMIN_NO_CONFIGURADO`**, **sin fallback**. Hoy el literal `ADMIN_SECRET || 'exploraco12345'` aparece en `publicar-lugar.js:493`, `interacciones.js:15471` y `admin.js:89` (y `:390`): en un endpoint **publico** ese fallback equivale a **publicar sin moderacion** si falta la env. Este ADR exige el fallback **cero** en la ruta nueva y registra los tres usos existentes como **deuda** (no se tocan aqui porque cambiarlos exige coordinar tres despliegues y un secreto nuevo en produccion).
+
+**D6.6 -- Vector de abuso y mitigacion sin infraestructura nueva.** El vector es real: creacion anonima ilimitada de borradores (inflacion de tabla, cola del admin envenenada, coste de almacenamiento en Blob).
+1. **La semilla anonima no entra en la cola del admin** (`estado_envio <> 'semilla'`): el spam no tiene premio visible ni ocupa revision.
+2. **Tope en SQL, no en memoria (serverless es stateless):** **3 semillas por origen y dia** y **20 semillas por dia en total** (resolucion del operador). Contadores: `COUNT(*)` de `destinos` con `tags->>'ip_hash' = $1` y `creado_en > date_trunc('day', now())`, y el mismo conteo sin filtro de origen. Al exceder: **429 `DEMASIADAS_SEMILLAS`**. El tope **solo aplica a `semilla`**: un `enviado` con sesion no se limita por IP (la sesion ya acota por identidad).
+3. **`ip_hash` con secreto diario y fail-closed:** `ip_hash = sha256(ip + SEMILLA_HASH_SECRET_del_dia)`. **Sin la variable de entorno, no se aceptan semillas** (**429 `SEMILLA_GATE_NO_CONFIGURADO`**), porque `sha256(ip)` sin sal es reversible por fuerza bruta en **2^32** y `tags` es legible desde el admin. Se guarda el hash, **nunca la IP cruda** (minimizacion de datos).
+4. **Sin sesion no hay avance:** `semilla` y `borrador` no se pueden marcar `enviado` sin `autor_id`; `publicar_lugar_otorgar` ya devuelve `sin_autor` (`:15482`).
+5. **Barrido perezoso, no job:** no hay cron en Vercel Hobby, asi que la semilla huerfana se **archiva** (`status='archived'`, `tags.semilla_huerfana=true`) cuando el `GET` del admin la ve con `creado_en < now() - interval '30 days'` y `autor_id IS NULL`. **Archivar no es borrar** (ADR-003): la fila y su `tags` se conservan y el admin puede verla con `?status=archived`.
+
+**D6.7 -- Fuera de alcance declarado:** captcha (infraestructura nueva) y rate-limit por usuario autenticado (la sesion ya acota por identidad).
+
+**D6.8 -- Justificacion (unica):** el borrador reanudable es la unica forma de que el teaser de D1 no sea una promesa vacia, y `GET`/`PATCH` sobre el mismo recurso evita el endpoint numero 9. La allow-list no es defensa extra: es la **condicion** para que un endpoint publico con merge JSONB no sea un emisor de XP.
+
+**D7 -- Validacion minima del borrador semilla, y derogacion de ADR-097 D5 en la clausula de la foto.**
+
+- **Semilla (`estado_envio='semilla'`): solo `nombre` + `categoria` + `ciudad`.** Sin descripcion, sin foto, sin contacto. Tres campos: es lo que el teaser puede pedir sin convertirse en un formulario.
+- **El cliente vivo bloquea esa semilla y hay que relajarlo en dos puntos concretos de `publicar.html`:** `:884` exige `descripcion_corta >= 30` para pasar del paso 1 y `:1279` bloquea el envio sin foto. Con la semilla de tres campos, **ninguno de los dos puede seguir siendo bloqueante en modo semilla**: `:884` se degrada a aviso cuando el formulario se abre con `?borrador=` o en modo semilla (la validacion de descripcion se exige al **enviar**, D7), y `:1279` pasa a **aviso** en todos los modos (la foto es bono, no requisito). **Donde se relaja:** esas dos lineas y su `showError` asociado; el resto de la validacion de `publicar.html` no se toca. El servidor no depende de ellas: `reqs` (`:310-312`) es la autoridad.
+- **Envio (`estado_envio='enviado'`):** `nombre` + `categoria` + `ciudad` + `descripcion_corta` (>= 30). **La foto deja de ser requisito** y pasa a ser **bono** de 30 XP (restriccion 2 y 5). El contacto sigue **opcional** para no-blog (ADR-097 D5 se mantiene en esa parte) y `email` sigue **obligatorio para blog** (D8).
+- **`lead` no puede ser el literal `undefined`:** `publicar-lugar.js:442` hace `String(body.descripcion_corta).trim()` sin guarda, asi que una semilla de tres campos guardaria **`lead="undefined"`** en la ficha (visible en la portada y en el admin). Valor por defecto obligatorio: `lead = ''` (cadena vacia) cuando `descripcion_corta` falta, y el render ya degrada a `tags`/categoria cuando `lead` esta vacio. El mismo guard aplica a `descripcion` (`:443`) y a `nombre`/`ciudad`, que ya son obligatorios.
+- **Se deroga, de ADR-097, unicamente:** (i) la clausula de su D5 "**la FOTO pasa a OBLIGATORIA en modo basico**"; (ii) el criterio de verificacion **4** de ADR-097 ("el mismo `POST` sin foto devuelve **400**"), que queda **anulado** y se sustituye por el criterio de aceptacion de backend de este ADR. El resto de ADR-097 (geografia derivada, catalogo unico, `whatsapp` condicional, dos niveles sobre la misma cola `draft`, cero endpoints nuevos) **sigue vigente**.
+- **Por que el choque es inevitable y no un descuido:** ADR-097 D5 se redacto cuando "basico" era **un envio**; ADR-099 separa **semilla** (borrador) de **envio** (solicitud) y ademas hace de la foto un bono. Con la foto obligatoria, el bono `publicar_bono_foto` seria **siempre verdadero** y valdria 30 puntos para todo el mundo, que es lo mismo que no existir.
+- **Justificacion (unica):** la foto es el campo que mas abandono produce en un formulario movil y el unico que el admin puede completar despues; exigirla en la puerta de entrada contradice D1.
+
+**D8 -- Blog como una categoria mas del mismo formulario (y el bug que impedia que funcionara).**
+
+**D8.1 -- Hoy `categoria='blog'` NO funciona: cae en `sitio`.** `esBlog` se calcula **solo** con `BLOG_TEMAS` (`publicar-lugar.js:294`), lista que **no contiene `'blog'`** (`:24`); `CAT_MAP` (`:14-20`) **tampoco** tiene entrada `blog`, asi que `categoria='blog'` cae al `catSlug` por defecto **`sitio`**; y `:364` guardaria `tags.tema='blog'`, un tema que no existe en `BLOG_TEMAS`. El render ramifica con `cat === 'blog'` (`pagina-destino.js:2192`) y por tanto **nunca** se activa por esta via. El "ya esta resuelto" del borrador v1 era falso.
+
+**D8.2 -- Correccion (tres cambios, ninguno estructural).** (i) `esBlog` pasa a ser verdadero si `categoria` normalizada es **`'blog'`** **o** esta en `BLOG_TEMAS`; (ii) `CAT_MAP` gana **`blog: 'blog'`**, de modo que `categoria_slug='blog'` se persiste tal cual; (iii) **`tags.tema` se toma de `body.tema`** validado contra `BLOG_TEMAS` (`aventura|gastro|cultura|naturaleza|tips`), **no** de `body.categoria` como hace hoy `:364`. Si `categoria='blog'` y el tema falta o es invalido: **400 `TEMA_INVALIDO`** en `enviado`; en `semilla` el tema es **opcional** (D7).
+
+**D8.3 -- UI:** "Blog / Experiencia" es una **categoria** del paso 1 con un selector de **tema** que escribe `tema`. El usuario deja de elegir un tema como si fuera una categoria.
+
+**D8.4 -- Requisito de `email`: obligatorio por TIPO, no por nivel.** `email` es obligatorio **solo** cuando el item es **blog** (`categoria='blog'` o un tema de `BLOG_TEMAS`) **y** `estado_envio='enviado'`; en `semilla` no se exige. Para **cualquier otro tipo** (hospedaje, comida, sitio, evento, alta del admin) el contacto es **opcional en los tres niveles**: "al menos uno de {whatsapp, email, web, instagram}" **puntua** en el bloque contacto de D3 pero **no bloquea**, en `basico` ni en `completo`. Es la regla que ya vive en `:310-312`; lo unico que cambia es que se evalua en `enviado`, no en `semilla`.
+
+**D8.5 -- Retrocompatibilidad:** un `POST` con `categoria='aventura'` **sigue funcionando** (el normalizador de `:294` lo convierte a `categoria_slug='blog'` con `tags.tema='aventura'`); el formulario nuevo manda `categoria='blog'` + `tema`. Ningun cliente antiguo se rompe y **no hay migracion**: las filas historicas ya estan bien guardadas (`categoria_slug='blog'`), el unico defecto estaba en la rama que nunca se ejercito.
+
+**D9 -- Medios: fotos y video, nada de audio.**
+
+- **Fotos:** `foto_principal` -> columna `foto_hero` (`:458`) y galeria -> tabla **`destinos_fotos`** (`:470-482`, con `caption` y `orden`), a Vercel Blob con contexto `destino` (ADR-098). **La galeria no se guarda en `tags`**: `tags.fotos_galeria` es solo el nombre del campo de entrada del cliente, nunca una clave persistida (D3.1). Sin cambios de contrato.
+- **Video:** `tags.video_url` deja de ser exclusivo de blog. Se escribe para **cualquier** categoria con la **misma** validacion de host (`esVideoUrlSegura`, `:227-236`: match **exacto** contra `VIDEO_HOSTS`, nunca `endsWith`). Sin validacion nueva, sin lista nueva.
+- **Que se renderiza:** cuando `tags.video_url` existe, la ficha muestra el bloque de video **en cualquier categoria**, con la misma degradacion que hoy usa el blog (`pagina-destino.js:1176`): si `videoEmbedUrlBlog()` no produce URL de embed, **el bloque no se emite** y la ficha cae a `foto_hero` (ADR-008, Silent Fallback). Generalizar la condicion de `:876`/`:1176` de "blog" a "hay video" es el unico cambio de render.
+- **Audio: fuera de alcance** (restriccion 3). `dictado-voz.js` sigue siendo **entrada de texto por voz**, no un medio publicable: no se sube a Blob, no cuenta en completitud y no se renderiza.
+
+**D10 -- Admin: la tarjeta muestra el numero antes de aprobar.**
+
+- **Sin cambiar el `SELECT` de la lista:** `GET recurso=solicitudes` ya devuelve `d.tags AS detalles` (`api/admin.js:361`), de donde salen `pub_tier`, `pub_completitud`, `pub_faltantes`, `pub_fotos_total`, `pub_geo`, `pub_foto`, `autor_id`, `estado_envio` y `video_url`.
+- **La tarjeta muestra:** nivel (tier), barra de completitud con porcentaje, **chips de campos faltantes**, y **XP estimado** = base del tier previsualizado + bonos, con la etiqueta explicita **"estimado"**.
+- **El XP real tiene que llegar al cliente, y hoy no llega:** `api/admin.js:386` hace el `fetch` a `publicar_lugar_otorgar` **y descarta el body**. Se exige **leer la respuesta** y devolverla en el JSON de `recurso=solicitudes` como `otorgamiento: { ok, otorgado, xp, tier, motivo }`, de modo que el admin muestre la cifra **real** al confirmar. Sin eso, D10 solo puede prometer y nunca contrastar.
+- **Dos acciones, ninguna nueva:** "Aprobar tal cual" -> `POST {accion:'aprobar'}` (existente, `:372-392`). "Ampliar y aprobar" -> abre el editor (`admin.html:714`, `savePlace():4481`) con la ficha cargada; al guardar se recalcula la completitud **desde la fila** con `lib/completitud.js` (superficie cliente) y el servidor **revalida** al aprobar (D5). El editor muestra `fotos_total` y `fotos_no_hero` **antes de guardar**, para que promover una foto a hero (D3.5) no baje el tier por sorpresa.
+- **La cola excluye semillas, y el total tiene que filtrar igual:** `WHERE d.status=$1` (`:364`) pasa a excluir `tags->>'estado_envio'='semilla'`; `&incluir_semillas=1` las muestra. **El `COUNT(*)` de `:368` hoy no filtra por estado** (cuenta todos los `draft` del sistema, incluidas las semillas y las archivadas): debe aplicar **exactamente** el mismo `WHERE` que la lista, o la paginacion miente.
+- **Justificacion (unica):** aprobar sin ver el XP que se va a pagar es la forma mas barata de inflar la economia; y sin ver los faltantes, el admin no sabe **que** ampliar.
+
+**D11 -- "Mis lugares": estados visibles y continuacion del borrador.**
+
+- Vive en **`publicar.html?vista=mios`**: mismo archivo, cero rutas nuevas, cero endpoints nuevos. Consume `GET /api/publicar-lugar?mios=1` (D6).
+- **Estados visibles:** **Borrador** (`estado_envio` en `semilla|borrador`), **En revision** (`status='draft'` + `enviado`), **Publicado** (`status='published'`), **Rechazado** (`status='archived'`). Cada uno con su accion: "Continuar" -> `publicar.html?borrador=<id>` (rehidrata via `GET ?id=`), "Ver ficha" -> `/lugar/<slug>` solo si `published`.
+- **`publicar.html` ya carga el nucleo de sesion y eso NO hay que anadirlo (R2-ii, corregido):** `<script src="usuario-session.js">` esta en **`publicar.html:819`**. Lo que falta no es la etiqueta, es **no depender de un objeto que puede estar vacio en el instante de uso**: D6 y D11 leen el JWT con la misma via que `jwtActual()` (`media-upload.js:51-57`, `window.ExploraCO.obtenerJwt()` y, si no, `localStorage`) y **no** de `window.ExploraCO.usuario`, que es lo que ADR-098 midio como `null`. La sesion sirve para **atribucion** (`mios=1`, `PATCH`); el prefijo de Blob ya no depende de ella (ADR-098).
+- **Justificacion (unica):** un embudo sin estado visible es un agujero negro; el autor que no ve su envio vuelve a enviarlo por WhatsApp, que es el comportamiento que D1 quiere eliminar.
+
+**D12 -- Puntos visibles: guia de XP y estimacion en el formulario.**
+
+- **La escala no se duplica:** `GET /api/interacciones?tipo=catalogo_xp` ya publica las cinco claves desde `XP_BASES` (`:9447`). El cliente **compone** la estimacion con ese catalogo cacheado: base del tier previsualizado + bonos. **Ningun numero de XP se escribe a mano en el HTML.**
+- **La guia "Como ganar XP" gana su entrada:** `EC_XP_CATALOGO` (`usuario-session.js:2400`) recibe **cinco entradas** (`publicar_basico`, `publicar_intermedio`, `publicar_completo`, `publicar_bono_geo`, `publicar_bono_foto`) con etiqueta, descripcion y grupo `publicar`, servidas por `abrirGuiaXP` (`:2851`). **No se toca `XP_BASES`** (restriccion 5).
+- **Texto obligatorio junto a la cifra del formulario:** *"estimacion; la cifra final la fijan los multiplicadores de nivel y origen y se acredita al aprobar"*. Sin esa frase, la estimacion se lee como promesa y D5 (recalculo) parece un incumplimiento.
+- **Justificacion (unica):** publicar es hoy la accion de mayor XP del sistema (hasta 190 con bonos) y **no aparece** en la guia: el usuario no tiene motivo declarado para elegir el formulario largo.
+
+### Orden de despliegue (obligatorio; el default `enviado` de D6.2 lo hace posible)
+
+1. **Backend primero:** `lib/completitud.js` + `api/publicar-lugar.js` (`estado_envio` con default `enviado`, allow-list del `PATCH`, limite de 12 fotos, `GET`/`PATCH`) + `api/interacciones.js` (CTE atomica, `SELECT` ampliado). El `publicar.html` **vivo** sigue entrando en la cola porque no manda `estado_envio` y el default es `enviado`: **no hay ventana de perdida de solicitudes**.
+2. **`vercel.json`** con `PATCH` en `Access-Control-Allow-Methods` (D6.3), en el mismo despliegue o antes de que el cliente lo use.
+3. **Admin:** filtro de cola por `estado_envio`, `COUNT` alineado, `otorgamiento` devuelto al cliente (D10).
+4. **Frontend al final:** teaser que manda `semilla` explicita, `publicar.html` con `usuario-session.js`, `lib/completitud.js` y `vista=mios`, y la relajacion de `:884`/`:1279` (D7). **Si el frontend fuera primero, las semillas entrarian como `enviado`** (el backend viejo ignora el campo) y **contaminarian la cola el dia 1**.
+
+### Consecuencias y deudas
+
+- **Una sola escritura, una sola validacion.** El modal de portada y el de blog dejan de producir estados intermedios propios; el WhatsApp de relleno desaparece del camino de publicacion. **Coste:** tres archivos de UI tocados a la vez (`publicar.html`, `index.html`, `admin.html`) y un `publicar.html` que crece; el aislador es que **no se anade logica de validacion al HTML**, solo llamadas a `lib/completitud.js` y al endpoint.
+- **La completitud deja de ser un numero magico.** A cambio, los umbrales (75/40) y los pesos pasan a ser **contrato**: cambiarlos exige ADR, no un ajuste de codigo, porque alteran el XP pagado. El smoke de D4 congela los fixtures.
+- **`lib/completitud.js` se convierte en dependencia compartida de dos funciones serverless.** Su radio de fallo es alto: un error de sintaxis en ese archivo tumba `publicar-lugar.js` **e** `interacciones.js`. Mitigacion: `node --check` en el Escudo GOLD y el smoke de paridad **antes** de desplegar.
+- **Deuda 1 -- `pub_geo` no es recalculable.** La fila no conserva `lat_usuario`. Se mitiga guardando `tags.pub_geo_dist_m` desde esta entrega; recalcularlo exigiria una migracion de datos historicos (fuera de alcance).
+- **Deuda 2 -- Deriva documental de ADR-097.** Su estado dice "PENDIENTE DE IMPLEMENTAR" mientras `geo-ciudades.js`, el catalogo y `resolverZona()` (`:177`) **ya estan en produccion**. **No se corrige en este ADR**; el **pase unico R2** de `@docs-keeper` al cierre de esta entrega actualiza ese estado. Se deja constancia aqui para que no se confunda con una omision.
+- **Deuda 3 -- Verificador JWT duplicado `[DEUDA-EXPRESS]` de ADR-098.** D6 **no la empeora**: reutiliza el patron de delegacion (`publicar_lugar_registrar` -> `verificarSesion`), que no duplica el verificador. Sigue pendiente y con la misma condicion de escalada de ADR-098.
+- **Deuda 4 -- Rate-limit en SQL.** Los contadores de D6.6 (3 por origen y dia, 20 globales al dia) son `COUNT(*)` sobre `tags->>'ip_hash'` **sin indice funcional**: aceptable al volumen actual, degrada con el trafico. Convertirlo en indice exige migracion (fuera de alcance) y es la primera tarea si aparece latencia en el `POST`. **Segunda consecuencia:** el secreto de `ip_hash` es **diario**, asi que un mismo origen tiene un hash distinto cada dia y el conteo **no** puede agregarse entre dias; es el precio de que el hash no sea reversible.
+- **Deuda 5 -- Barrido perezoso.** La semilla huerfana se archiva **cuando alguien mira**, no por reloj. Si nadie abre el admin, las semillas se acumulan como `draft` archivables. Se acepta: no consumen cola ni XP.
+- **Deuda 6 -- XP estimado vs real.** El admin ve una estimacion; el numero real depende de multiplicadores de nivel y origen. La UI debe decirlo **siempre** (D10, D12). Un "XP prometido" en cliente seria un bug de producto, no de codigo. **Mitigacion en esta entrega:** el XP real **viaja** al cliente (`otorgamiento`, D10) y se muestra al confirmar.
+- **Deuda 7 -- `ADMIN_SECRET || 'exploraco12345'` en tres sitios.** El literal aparece en `api/publicar-lugar.js:493`, `api/interacciones.js:15471` y `api/admin.js:89` (y `:390`). D6.5 exige **cero fallback en la ruta nueva**, pero **no** cambia los tres usos existentes: quitarlos exige que la variable este definida en produccion **antes** del despliegue y coordinarlo con el `fetch` interno de `admin.js:386`, o la acreditacion de XP se cae en silencio. **Condicion de escalada:** si el secreto tiene que rotarse o replicarse una segunda vez, los tres usos se unifican en un helper `fail-closed` con su propio ADR.
+- **Deuda 8 -- `repartirXpReferidos` sin clave de idempotencia.** D5.3 exige que la acepte (`destino_id`); mientras no la tenga, un reintento puede repartir dos veces a los referidos **aunque el XP del autor ya sea atomico**. Se cierra **en la misma tarea T3**, no despues, porque el criterio de aceptacion inyecta el fallo y lo mide.
+- **Deuda 9 -- Ledger fuera de la atomicidad (consecuencia aceptada de D5.3, opcion (b)).** `registrarXpLedger` (`:1764`) emite su propio `INSERT` con logica JS y **no puede** entrar en la CTE, asi que un fallo entre el saldo y el ledger deja **XP acreditado sin fila de auditoria**. Se acepta porque **el doble pago lo impide el claim**, no el ledger. Mitigacion en esta entrega: se registra el fallo en consola con `destino_id` y `xp`, y el criterio T3.5(b) mide que el saldo no se duplica. **Deuda operativa:** reconciliacion periodica `SUM(xp_ledger.xp_final)` vs `usuarios.xp_total` por usuario, con las diferencias investigadas como acreditaciones sin auditoria; si la deriva supera el ruido de los redondeos, se convierte en tarea propia (no en este ADR).
+- **Riesgo residual aceptado:** una semilla reclamada por un usuario distinto del que la creo (mismo dispositivo compartido, `localStorage` heredado) transfiere la autoria. Se acepta porque el reclamo exige sesion y la semilla **no tiene autor previo**; el admin puede corregir `autor_id` desde el editor.
+- **Fuera de alcance:** activos ocultos y reclamaciones de propiedad (restriccion 8), audio (restriccion 3), captcha, y cualquier endpoint nuevo (presupuesto 8/8).
+
+### Criterios de aceptacion verificables, por tarea
+
+**T1 -- `lib/completitud.js` (`@js-silo-dev`)**
+1. `node --check lib/completitud.js` -> **0 errores**; ASCII-safety: **0 bytes > 127**.
+2. Expone `module.exports.evaluarCompletitud` **y** `window.ECCompletitud.evaluarCompletitud`; ambos devuelven **identico** resultado en los 13 fixtures.
+3. **Fixtures dorados: los 13 de la tabla D3.4**, con su `puntaje` y su `tier` exactos: F1 70/intermedio, F2 80/intermedio, F3 90/intermedio, F4 90/completo, F5 90/completo, F6 95/completo, F7 100/completo, F8 90/intermedio, F9 **85/intermedio**, F10 **78**/completo, F11 **9**/basico, F12 100/completo, F13 90/**intermedio**. Ningun fixture puede pasar con el contador viejo de `:265-280` (control de que la sustitucion es real).
+4. **Coherencia puntos/faltantes (D3.0):** en los 13 fixtures, para cada clave de identidad (`subcategoria`, `departamento`, `zona`, `ciudad`, `categoria`, `nombre`), `puntos del campo > 0` **si y solo si** la clave **no** figura en `faltantes`.
+5. **Monotonia programatica:** el smoke anade campos uno a uno sobre F1 hasta F12 y asserta que `puntaje` **nunca decrece** y que el tier **nunca baja**. La unica excepcion declarada (F13, hero promovido) se asserta **como excepcion**, no como fallo.
+6. `scripts/smoke_completitud.js` -> **13/13 pass**, y falla si se le inyecta una copia divergente.
+
+**T2 -- Backend `api/publicar-lugar.js` (`@backend-dev`).** *Todos los criterios de T2 son verificables por script (`curl` + `neon_select.js`) salvo donde se marca `[manual]`.*
+1. `node --check` -> 0 errores; ASCII **0 bytes > 127**; sin `api/nueva*` en `git status` (8/8).
+2. `POST` **sin** `estado_envio` (caso `publicar.html` vivo) -> **200** y `tags.estado_envio='enviado'` (retrocompatibilidad de D6.2). El mismo `POST` con `estado_envio='semilla'` -> **200** y `'semilla'`.
+3. `POST` con **solo** `nombre`+`categoria`+`ciudad`+`estado_envio='semilla'` -> **200**, `status='draft'`, `tags.pub_completitud` **= 9** (3+3+3 de D3.0; **no** 15: `subcategoria`, `departamento` y `zona` no vienen del teaser), `tags.pub_tier='basico'`, `tags.pub_faltantes` **contiene `subcategoria`, `departamento` y `zona`**, y **`lead` es cadena vacia, nunca el literal `"undefined"`** (`:442`).
+4. `POST` con `estado_envio='enviado'` y **sin `foto_principal`** -> **200** (control negativo de la derogacion de ADR-097 D5). Sin `descripcion_corta` -> **400** nombrando el campo.
+5. `POST` de blog con `categoria='blog'` + `tema='gastro'` -> **`categoria_slug='blog'`** (no `sitio`), `tags.tema='gastro'`. `categoria='blog'` **sin** `tema` y `estado_envio='enviado'` -> **400 `TEMA_INVALIDO`**. `categoria='aventura'` **sigue** dando `categoria_slug='blog'` + `tags.tema='aventura'`.
+6. `tags.video_url` se escribe para **`hostal`** (no blog) con host permitido; con host no permitido **no** se escribe y no hay 500.
+7. **Limite duro de fotos:** `POST` con 13 `fotos_galeria` distintas -> **400 `FOTOS_EXCEDIDAS`**; con **12** -> **200** y `tags.pub_fotos_total=12`.
+8. `PATCH ?id=` sin `Bearer` -> **401**; con `Bearer` de otro usuario -> **403 `NO_ES_TU_BORRADOR`**; con el autor sobre un borrador -> **200** y `tags` **fusionado** (una clave preexistente no desaparece: prueba explicita de ADR-003).
+9. **Allow-list (B4):** `PATCH {tags:{pub_geo:true}}` -> **400 `CLAVE_NO_PERMITIDA`** y `tags.pub_geo` **sin cambios**; idem `pub_tier`, `pub_xp_estado`, `autor_id`, `ip_hash`, `origen_envio`. Control positivo: `PATCH {tags:{faqs:[...]}}` -> **200**.
+10. `PATCH` repetido con el mismo payload -> **200** y **mismo** `tags` (idempotencia; `COUNT(*)` de la tabla sin cambios).
+11. **Transiciones (B-mayor):** `PATCH` sobre un borrador ya `enviado` -> **409 `YA_ENVIADO`** (no 403); `PATCH` a `enviado` sin `descripcion_corta` -> **400** (revalidacion de D6.2).
+12. `GET ?mios=1` sin `Bearer` -> **401**; con `Bearer` -> solo filas de `tags.autor_id` propio, con `estado_envio`, `pub_tier`, `pub_completitud`, `pub_fotos_total` y `total`.
+13. **Rate-limit (B5):** 4.º `POST` de `semilla` en el mismo dia desde el mismo origen -> **429 `DEMASIADAS_SEMILLAS`**; el 21.º global del dia -> **429**; `tags.ip_hash` presente y **distinto de la IP cruda**; con `SEMILLA_HASH_SECRET` **sin definir** -> **429 `SEMILLA_GATE_NO_CONFIGURADO`** (fail-closed). Control positivo: un `POST` con `Bearer` y `estado_envio='enviado'` **no** consume cupo de semilla.
+14. **Secreto admin sin fallback (B6):** `POST` con `publicar_directo=true` y `Authorization: Bearer exploraco12345` -> **401** cuando `ADMIN_SECRET` no esta definida; con la variable definida y el valor correcto -> **200** y `status='published'`.
+15. Semilla con `creado_en` de 31 dias -> el `GET` del admin la devuelve `archived` + `semilla_huerfana`, y la fila **sigue existiendo** (ADR-003).
+16. **CORS (mayor):** `vercel.json` incluye `PATCH` en `Access-Control-Allow-Methods`; el preflight `OPTIONS` del `PATCH` -> **200** con `PATCH` listado. `[manual]` la parte de "el navegador ya no bloquea" (se verifica en T6 con el formulario real).
+
+**T3 -- Backend `api/interacciones.js` (`@backend-dev`, gate).** *Verificable por script con `curl` + `neon_select.js`, salvo `[manual]`.*
+1. `node --check` -> 0 errores; ASCII **0 bytes > 127**.
+2. **El `SELECT` ampliado trae la galeria real:** un destino con `foto_hero` **no** insertada en `destinos_fotos` y 3 fotos de galeria da `fotos_total=4` y `fotos_no_hero=3`; el mismo destino con el hero **promovido** a `es_hero` (sincronizado por `admin-destinos.js:127,159`) da `fotos_total=4` y `fotos_no_hero=3` (**no** `5`/`4`: control de la duplicacion de B2). Con 2 en galeria y hero promovido -> `fotos_total=3`, `fotos_no_hero=2`.
+3. Aprobar un `draft` **ampliado por el admin** (se le anaden 3 fotos) devuelve `xp` **mayor** que el mismo lugar aprobado sin ampliar, y `tags.pub_tier`/`pub_completitud`/`pub_fotos_total`/`pub_fotos_no_hero` **reescritos** en la fila.
+4. Segundo `POST` de `publicar_lugar_otorgar` sobre el mismo destino -> `{otorgado:false, motivo:'ya_otorgado'}` y `xp_total` **sin cambios** (una sola fila en `xp_ledger`).
+5. **Atomicidad con fallo inyectado (B7, reescrito segun la opcion (b)).** El interruptor de prueba `XP_FORCE_FAIL` es **inerte sin la variable de entorno**, **no se define en Vercel** y **solo existe para el smoke local** (R3); jamas en el camino de produccion. Dos casos, dos asserts:
+   - **(a) `XP_FORCE_FAIL=saldo`** (fallo **dentro** de la CTE, tras el `claim`): respuesta **500**, `xp_total` **sin cambios** y `pub_xp_estado` **sigue `pendiente`** (la sentencia es atomica: el claim no existe). Repetir sin el interruptor -> **200** y `xp_total` sube **exactamente una vez**.
+   - **(b) `XP_FORCE_FAIL=ledger`** (fallo **despues** de la CTE, en `registrarXpLedger`): el XP **queda acreditado sin fila de auditoria** (consecuencia aceptada de D5.3). El assert **no** es "ledger sin filas" sino el verificable: **un fallo forzado no duplica el saldo ni el claim, y deja como maximo una fila de ledger**. Concretamente: `xp_total` acreditado **una sola vez**, `pub_xp_estado='otorgado'`, y `COUNT(*)` de `xp_ledger` para ese destino **<= 1** tras dos intentos (el reintento devuelve `ya_otorgado` y no vuelve a escribir). El delta de `xp_total` se reconcilia contra `xp_ledger` como **Deuda 9**.
+   - **Control negativo del bug actual:** el `catch` de `:15516-15523` **ya no existe** en el codigo, y **`acreditarClaseYCofre` (`:1977`) sigue siendo invocada** despues de la CTE (si se borro el `catch` y con el la llamada, `xp_clase`/`nivel_clase`/cofre dejan de actualizarse: regresion silenciosa de clase, assert explicito sobre `nivel_clase`).
+6. **Referidos idempotentes (Deuda 8):** dos llamadas consecutivas a `repartirXpReferidos` con la misma clave (`destino_id`) -> el segundo reparto **no** acredita (delta 0 en los saldos de los referidos).
+7. La fila de `xp_ledger` lleva `contexto.completitud`, `contexto.fotos_total`, `contexto.fotos_no_hero` y `contexto.recalculo`; `bonos_planos` = geo + foto.
+8. Un destino ya `otorgado` **antes** del despliegue conserva su XP (**no retroactivo**): su `pub_tier` no se reescribe.
+9. `pub_geo` de un destino aprobado **no cambia** al aprobar; `pub_foto` **si** cambia si el admin anadio fotos.
+
+**Marcado de verificabilidad.** Son **verificables por script** T1, T2 (salvo 16), T3, y de T4/T5/T6 solo los puntos marcados `[script]`. Son **checklist manual** (no hay DOM ni navegador en CI): **T4.2, T4.5, T5.1, T5.2, T5.4, T6.2-T6.7**. Para reducir lo manual, **T4.2 y T4.5 se convierten en smoke** llamando a `buildHTML()` con dos payloads fijos y buscando/no buscando el marcador del bloque de video (`data-ec-video`), que es lo mismo que hace el Escudo GOLD con `buildHTML()`.
+
+**T4 -- Render `api/pagina-destino.js` (`@renderer-dev`, gate)**
+1. `[script]` `node --check` -> 0 errores; ASCII **0 bytes > 127**; balance de divs OK (Escudo GOLD).
+2. `[script, smoke `buildHTML()`]` Un destino `comida` con `tags.video_url` valido **emite** el bloque de video (marcador `data-ec-video` presente); el mismo destino **sin** `video_url` **no** lo emite y el HTML no contiene `undefined`.
+3. `[script, smoke `buildHTML()`]` Un `video_url` que no produce embed -> **no** se emite el bloque y la ficha cae a `foto_hero` con `onerror` (ADR-008).
+4. `[script]` Un `draft` sigue mostrando el banner de "pendiente de revision" (`:2582`) sin romperse con `pub_completitud` presente.
+5. `[script, smoke `buildHTML()`]` Blog **no** cambia de aspecto (regresion cero sobre `cat === 'blog'`: mismo HTML con y sin los `pub_*` nuevos).
+
+**T5 -- Admin (`@admin-dev`, gate)**
+1. `[manual]` La tarjeta de solicitud muestra tier, `%` de completitud y chips de faltantes **sin** cambiar el `SELECT` de la lista (`d.tags AS detalles`, `:361`).
+2. `[manual]` El XP estimado coincide con `25/60/120` + bonos del tier mostrado; al confirmar se muestra el `xp` **real** que devuelve el servidor (`otorgamiento`, D10) y **puede diferir** (la UI lo admite con la palabra "estimado").
+3. `[script]` La cola por defecto **no** lista semillas; `&incluir_semillas=1` **si** las lista; y **el `total` del `COUNT` (`:368`) coincide con el numero de `items` filtrados** (hoy cuenta todos los `draft`: control de la paginacion mentirosa).
+4. `[manual]` "Ampliar y aprobar" abre el editor, guarda con `savePlace()`, muestra `fotos_total`/`fotos_no_hero` antes de guardar, y al volver a la cola la completitud **subio**; el balance de divs de `admin.html` sigue OK.
+5. `[script]` Alta directa del admin (`origen_envio='admin'`, `publicar_directo=true`) crea la fila **`published`** y el XP se acredita. **Sin `ADMIN_SECRET` definida -> 401 `ADMIN_NO_CONFIGURADO`** (sin fallback, B6). **Sin `Bearer` -> la fila se crea sin autor y `publicar_lugar_otorgar` devuelve `{otorgado:false, motivo:'sin_autor'}`: no hay XP** (alineado con la resolucion 1 y con `:15482`).
+
+**T6 -- Frontend (`@frontend-tpl` + `@admin-dev`)**
+1. `[script]` `publicar.html` carga **`lib/completitud.js`** (etiqueta presente y `GET /lib/completitud.js` -> **200**) y `window.ECCompletitud` queda definido; `usuario-session.js` **ya estaba** en `:819`, asi que solo se comprueba que **sigue ahi una sola vez** (no se anade de nuevo). Consola **sin errores**.
+2. `[manual]` El teaser de portada crea semilla y redirige a `publicar.html?borrador=<id>&paso=2`; **no** se abre WhatsApp y `573001234567` **no aparece** en el camino de publicacion.
+3. `[manual]` El modal de blog crea semilla con `categoria='blog'` y el tema elegido; no hace `POST` propio.
+4. `[manual]` La previsualizacion de completitud y de XP **cambia al anadir la 2.ª foto y al anadir video**, y coincide con lo que persiste el servidor para el mismo payload (contraste manual contra `tags.pub_completitud`).
+5. `[manual]` `publicar.html?vista=mios` muestra los cuatro estados con las acciones correctas; "Continuar" rehidrata el borrador.
+6. `[manual]` **La semilla de 3 campos avanza**: con solo nombre+categoria+ciudad, el paso 1 **no** bloquea por descripcion (`:884` degradado a aviso) y el envio **no** bloquea por foto (`:1279` degradado a aviso); sin `descripcion_corta` al **enviar**, el servidor responde 400 y la UI lo muestra.
+7. `[script]` Cero IDs eliminados del DOM (ADR-003, diff de `id=` entre versiones); `[manual]` `onerror` en toda `<img>` dinamica (ADR-008) y CSS nuevo bajo selector padre unico (ADR-004).
+8. `[script]` La guia "Como ganar XP" (`abrirGuiaXP`) muestra las **5** entradas de publicar; ningun numero de XP escrito a mano en HTML (grep de `25|60|120|40|30` en el bloque de la guia).
+
+**T7 -- Cierre documental (`@docs-keeper`, pase unico R2)**
+1. `ADR-097` cambia de estado a **IMPLEMENTADO** (deriva documental, Deuda 2) y su criterio de verificacion 4 se marca **anulado por ADR-099**.
+2. `TASKS.md`/`NEXT.md` reflejan T1-T6; `BLUEPRINT.md` §4/§6 recogen `pub_completitud`/`pub_faltantes`/`estado_envio`.
+3. `git status` sin archivos fuera de los dominios declarados.
+
+### Verificacion del propio ADR
+
+Numero correlativo verificado contra el archivo real (ADR-006): ultimo encabezado previo `ADR-098` en la linea 8633, **97** encabezados `^## ADR-` antes de esta seccion, tamano medido **1.303,6 KB / 8.714 lineas** al escribir la revision 1. Secciones: problema / datos medidos / opciones / decision (D1-D12) / orden de despliegue / consecuencias y deudas / criterios de aceptacion por tarea. **Ninguna de las 8 restricciones del operador se re-abre**; D7 deroga **solo** la clausula de foto obligatoria de ADR-097 D5 y su criterio de verificacion 4, y lo dice explicitamente. El argumento de cada decision aparece **una sola vez** aqui (ADR-084 D1); lo de ADR-097 se cita, no se repite. ASCII-safety **no aplica** a este fichero (ADR-002: los `.md` de gobernanza admiten tildes); **si aplica** a `lib/completitud.js`, `api/publicar-lugar.js`, `api/interacciones.js`, `api/pagina-destino.js`, `api/admin.js` y `admin.html`.
+
+**Trazabilidad de la revision 2 (7 bloqueadores, todos cerrados y localizables):**
+
+| Bloqueador | Donde se cierra |
+|---|---|
+| **B1** -- `categoria='blog'` caia en `sitio` | **D8.1-D8.2** (predicado de `esBlog`, entrada `blog` en `CAT_MAP`, `tema` desde `body.tema` validado) + **T2.5** |
+| **B2** -- la galeria vive en `destinos_fotos`, no en `tags` | **D3.1** (formula unica con `galeria_n`, `hero_en_galeria`, `fotos_total`, `fotos_no_hero`) + **D5.1** (`SELECT` ampliado) + **T3.2** (control de la duplicacion del hero) |
+| **B3** -- D3 se contradecia con su fixture | **D3.2** (guarda de 3 fotos no-hero + coords) + **D3.4** (13 fixtures recalculados) + **D3.5** (monotonia y su unica excepcion) + **T1.3/T1.4** |
+| **B4** -- `PATCH` permitia escribir `pub_geo` (+40 XP) | **D6.1** (allow-list `CLAVES_CLIENTE`, `pub_*` solo servidor, 400 `CLAVE_NO_PERMITIDA`) + **T2.9** |
+| **B5** -- tope de semillas 5/hora y `sha256(ip)` reversible | **D6.6** (3/dia por origen + 20/dia global, secreto diario, fail-closed) + **T2.13** |
+| **B6** -- `publicar_directo` heredaba el secreto publico | **D6.5** (`ADMIN_SECRET` obligatoria, sin fallback, 401 `ADMIN_NO_CONFIGURADO`) + **Deuda 7** + **T5.5** |
+| **B7** -- el rollback no era atomico y pagaba dos veces | **D5.3** (CTE atomica de `claim` + `xp_total`; `catch` de `:15516-15523` eliminado; `acreditarClaseYCofre` conservada fuera de la CTE; ledger y referidos fuera con clave de idempotencia) + **Deuda 8** + **Deuda 9** + **T3.5** |
+
+**Contradicciones nuevas detectadas al corregir, resueltas aqui:** (i) **promover una foto de galeria a hero puede bajar el tier** (D3.5, aceptada y mitigada, con fixture F13); (ii) **el secreto diario de `ip_hash` impide agregar el conteo entre dias** (Deuda 4); (iii) **el `COUNT` del admin no filtra por estado** y hacia que la paginacion mintiera (D10 + T5.3); (iv) **`lead="undefined"` en las semillas** por `:442` (D7 + T2.3); (v) **el fallback de `ADMIN_SECRET` es preexistente en tres sitios** y no se toca en esta entrega (Deuda 7).
+
+```
+Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Select-Object -Last 1
+(Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Measure-Object).Count
+```
+
+Debe devolver **`## ADR-099:`** y el conteo **98**. El cierre documental (`TASKS.md`, `NEXT.md`, `BLUEPRINT.md`) corresponde al **pase unico R2** de `@docs-keeper`, no a este ADR.

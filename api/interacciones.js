@@ -213,6 +213,11 @@ var BUSQ = require('../busqueda.js');
 var normGeo = BUSQ.normGeo;
 var sqlNormGeo = BUSQ.sqlNormGeo;
 
+// ADR-099 D4/D5: fuente UNICA de la aritmetica de completitud. Vive en
+// lib/completitud.js (fuera de api/ por el techo 8/8) y no consulta la base:
+// los conteos de fotos se los pasa el SELECT de publicar_lugar_otorgar (D3.1).
+var ECCompletitud = require('../lib/completitud.js');
+
 // v9 Gamificacion v4.0: probabilidades de cromos por rareza (ADR-018)
 var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 };
 
@@ -15466,62 +15471,205 @@ module.exports = async function handler(req, res) {
       // Fase 2: otorgar XP al autor cuando el admin APRUEBA el lugar
       // (status='published'). Autorizado con ADMIN_SECRET (server-to-server
       // desde admin.js). Idempotente via tags.pub_xp_estado.
+      //
+      // ADR-099 D5 -- el XP se calcula sobre la FICHA FINAL, no sobre lo que
+      // envio el usuario: el admin amplia una ficha, el tier se RECALCULA y
+      // el autor cobra lo que la ficha vale al aprobarse. No retroactivo
+      // (D5.5): un destino ya 'otorgado' sale por la puerta de abajo sin que
+      // se le reescriba pub_tier.
       if (tipo2 === 'publicar_lugar_otorgar') {
         var admSecretPub = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
         if (admSecretPub !== (process.env.ADMIN_SECRET || 'exploraco12345'))
           return res.status(401).json({ ok: false, error: 'No autorizado' });
         if (!destinoId2) return res.status(400).json({ ok: false, error: 'destino_id requerido' });
-        var filasPub = await sql('SELECT tags, nombre, lat, lng FROM destinos WHERE id=$1', [destinoId2]);
+        // D5.1 -- SELECT ampliado: la fila final completa (la galeria NO vive
+        // en tags, D3.1) mas los DOS conteos de destinos_fotos con la formula
+        // unica, calculados UNA sola vez en el servidor: galeria_n =
+        // COUNT(DISTINCT url) y hero_en_galeria = filas con url = foto_hero,
+        // de modo que el hero no se cuenta dos veces.
+        var filasPub = await sql(
+          'SELECT d.id, d.nombre, d.categoria_slug, d.ciudad, d.region, d.zona, '
+          + 'd.barrio, d.lead, d.descripcion, d.precio_desde, d.horario, '
+          + 'd.whatsapp, d.email, d.telefono, d.web, d.instagram, '
+          + 'd.foto_hero, d.lat, d.lng, d.status, d.tags, '
+          + '(SELECT COUNT(DISTINCT df.url)::int FROM destinos_fotos df '
+          + 'WHERE df.destino_id = d.id AND df.url IS NOT NULL) AS galeria_n, '
+          + '(SELECT COUNT(*)::int FROM destinos_fotos df '
+          + 'WHERE df.destino_id = d.id AND d.foto_hero IS NOT NULL '
+          + 'AND df.url = d.foto_hero) AS hero_en_galeria '
+          + 'FROM destinos d WHERE d.id = $1',
+          [destinoId2]
+        );
         if (!filasPub.length) return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
+        var filaPub = filasPub[0];
         // ADR-058: punto del lugar publicado.
-        var pubLat = typeof filasPub[0].lat === 'number' ? filasPub[0].lat : parseFloat(filasPub[0].lat);
-        var pubLng = typeof filasPub[0].lng === 'number' ? filasPub[0].lng : parseFloat(filasPub[0].lng);
+        var pubLat = typeof filaPub.lat === 'number' ? filaPub.lat : parseFloat(filaPub.lat);
+        var pubLng = typeof filaPub.lng === 'number' ? filaPub.lng : parseFloat(filaPub.lng);
         var pubPunto = tieneCoordsValidas(pubLat, pubLng) ? { lat: pubLat, lng: pubLng } : null;
-        var tagsPub = filasPub[0].tags || {};
+        var tagsPub = filaPub.tags || {};
         var autorPub = tagsPub.autor_id;
         if (!autorPub) return res.status(200).json({ ok: true, otorgado: false, motivo: 'sin_autor' });
         if (tagsPub.pub_xp_estado === 'otorgado')
           return res.status(200).json({ ok: true, otorgado: false, motivo: 'ya_otorgado' });
-        // Claim idempotente: solo el primero que cambia el estado otorga XP.
-        var claimPub = await sql(
-          'UPDATE destinos SET tags = COALESCE(tags, \'{}\'::jsonb) || $2::jsonb '
-          + 'WHERE id=$1 AND COALESCE(tags->>\'pub_xp_estado\', \'\') <> \'otorgado\' RETURNING id',
-          [destinoId2, JSON.stringify({ pub_xp_estado: 'otorgado' })]
-        );
-        if (!claimPub.length) return res.status(200).json({ ok: true, otorgado: false, motivo: 'ya_otorgado' });
-        var tierPub = String(tagsPub.pub_tier || 'basico');
+        // D3.1 -- las dos cifras, con la formula unica y en un solo sitio.
+        var galeriaNPub = parseInt(filaPub.galeria_n, 10);
+        if (!isFinite(galeriaNPub) || galeriaNPub < 0) galeriaNPub = 0;
+        var heroEnGaleriaPub = parseInt(filaPub.hero_en_galeria, 10);
+        if (!isFinite(heroEnGaleriaPub) || heroEnGaleriaPub < 0) heroEnGaleriaPub = 0;
+        var fotosTotalPub = galeriaNPub
+          + ((filaPub.foto_hero && heroEnGaleriaPub === 0) ? 1 : 0);
+        var fotosNoHeroPub = Math.max(0, galeriaNPub - (heroEnGaleriaPub > 0 ? 1 : 0));
+        // D5.1 -- lib/completitud.js no consulta la base: normaliza la fila y
+        // recibe los conteos ya hechos. El merge con la fila cruda conserva
+        // tags (extras, video_url, subcategoria) para que el puntaje sea el de
+        // la ficha real.
+        var normPub = ECCompletitud.normalizarFila(filaPub, []);
+        var entradaPub = Object.assign({}, filaPub, normPub);
+        entradaPub.fotos_total = fotosTotalPub;
+        entradaPub.fotos_no_hero = fotosNoHeroPub;
+        var resCompPub = ECCompletitud.calcular(entradaPub);
+        var persPub = ECCompletitud.persistible(resCompPub);
+        // D5 -- el tier ya NO se lee congelado de tags.pub_tier: se recalcula.
+        var tierPub = String(persPub.pub_tier || 'basico');
+        // D5.2 -- pub_foto se recalcula desde la fila final; pub_geo es
+        // INMUTABLE (premia la precision del aportante, no la calidad de la
+        // ficha) y solo se deriva si el envio dejo pub_geo_dist_m.
+        var fotoBonoPub = fotosTotalPub >= 1;
+        var geoPubFinal = null;
+        if (tagsPub.pub_geo === true || tagsPub.pub_geo === false) {
+          geoPubFinal = tagsPub.pub_geo;
+        } else if (tagsPub.pub_geo_dist_m !== undefined && tagsPub.pub_geo_dist_m !== null) {
+          var distPubM = parseFloat(tagsPub.pub_geo_dist_m);
+          geoPubFinal = isFinite(distPubM) && distPubM <= 300;
+        }
         var baseKeyPub = 'publicar_' + tierPub;
         if (XP_BASES[baseKeyPub] === undefined) baseKeyPub = 'publicar_basico';
         var xpBasePub = numXp(XP_BASES[baseKeyPub]);
-        var bonoGeoPub = tagsPub.pub_geo ? numXp(XP_BASES.publicar_bono_geo) : 0;
-        var bonoFotoPub = tagsPub.pub_foto ? numXp(XP_BASES.publicar_bono_foto) : 0;
+        var bonoGeoPub = geoPubFinal ? numXp(XP_BASES.publicar_bono_geo) : 0;
+        var bonoFotoPub = fotoBonoPub ? numXp(XP_BASES.publicar_bono_foto) : 0;
         var ctxPub = await contextoXpE(sql, autorPub);
         var resPub = await calcularXpAcreditado(sql, xpBasePub, ctxPub.nivel_clase,
           ctxPub.clase_id, ctxPub.tag,
           { nivel_usuario: ctxPub.nivel_usuario, usuario_id: autorPub, punto: pubPunto });
         var xpTotalPub = red2(resPub.xp_final + bonoGeoPub + bonoFotoPub);
-        // Acreditacion con rollback del claim: si algo falla, el estado
-        // vuelve a 'pendiente' para permitir reintento (idempotencia real).
+        // D5.3 -- claim + saldo en UNA sola sentencia (patron encadenado
+        // ADR-091). Postgres garantiza atomicidad de sentencia: si el saldo
+        // falla, el claim NO existe; si el claim no devuelve fila, no se suma
+        // nada. El doble pago lo impide el claim, no el ledger, luego el catch
+        // que devolvia pub_xp_estado='pendiente' (y que pagaba dos veces)
+        // se elimina: ya no hay estado intermedio que revertir.
+        //
+        // CORRECCION 2026-10-24 -- el claim exigia solo que el destino no
+        // estuviera 'otorgado', NO que el autor existiera: con un autor
+        // borrado o un id ausente de usuarios.id el UPDATE del saldo no
+        // devolvia fila pero el claim SI quedaba escrito, el lugar quedaba
+        // 'otorgado' con 0 XP y el reintento salia por 'ya_otorgado' -> el
+        // pago se perdia para siempre. Ahora la CTE usr comprueba la
+        // existencia del autor y el claim la exige: sin autor no hay claim,
+        // no se toca pub_xp_estado, no se escribe ledger y la respuesta es
+        // 200 otorgado:false motivo usuario_inexistente (reintentable).
+        //
+        // El orden claim -> saldo se MANTIENE a proposito y es parte del
+        // arreglo: la dependencia (el saldo solo suma si EXISTS claim) es lo
+        // que cierra la carrera de dos aprobaciones simultaneas. Invertirla
+        // (saldo -> claim) dejaria el saldo acreditado en el reintento
+        // perdedor: el UPDATE de usuarios no ve el tags que el otro proceso
+        // acaba de escribir, y su relectura bajo bloqueo solo se produce en
+        // la fila de destinos, que es la que el claim vuelve a filtrar.
+        var tagsClaimPub = {
+          pub_xp_estado: 'otorgado',
+          pub_tier: persPub.pub_tier,
+          pub_completitud: persPub.pub_completitud,
+          pub_faltantes: persPub.pub_faltantes,
+          pub_fotos_total: persPub.pub_fotos_total,
+          pub_fotos_no_hero: persPub.pub_fotos_no_hero,
+          pub_foto: fotoBonoPub
+        };
+        // pub_geo solo se reescribe con su valor inmutable (o la derivacion
+        // desde pub_geo_dist_m); si no hay ni uno ni otro, no se toca.
+        if (geoPubFinal !== null) tagsClaimPub.pub_geo = geoPubFinal;
+        var ctePub = await sql(
+          'WITH usr AS ('
+          + 'SELECT u.id FROM usuarios u WHERE u.id = $4::uuid'
+          + '), claim AS ('
+          + 'UPDATE destinos SET tags = COALESCE(tags, \'{}\'::jsonb) || $2::jsonb '
+          + 'WHERE id=$1 AND COALESCE(tags->>\'pub_xp_estado\', \'\') <> \'otorgado\' '
+          + 'AND EXISTS (SELECT 1 FROM usr) '
+          + 'RETURNING id'
+          + '), saldo AS ('
+          + 'UPDATE usuarios SET xp_total = xp_total + $3::numeric '
+          + 'WHERE id = $4::uuid AND EXISTS (SELECT 1 FROM claim) '
+          + 'RETURNING xp_total'
+          + ') SELECT (SELECT COUNT(*)::int FROM claim) AS claim_n, '
+          + '(SELECT COUNT(*)::int FROM usr) AS usr_n, '
+          + '(SELECT xp_total FROM saldo) AS xp_total_nuevo',
+          [destinoId2, JSON.stringify(tagsClaimPub), xpTotalPub, autorPub]
+        );
+        var claimNPub = parseInt((ctePub && ctePub[0] && ctePub[0].claim_n) || 0, 10);
+        if (!isFinite(claimNPub)) claimNPub = 0;
+        if (claimNPub < 1) {
+          var usrNPub = parseInt((ctePub && ctePub[0] && ctePub[0].usr_n) || 0, 10);
+          if (!isFinite(usrNPub) || usrNPub < 1)
+            return res.status(200).json({
+              ok: true, otorgado: false, motivo: 'usuario_inexistente',
+              autor_id: autorPub
+            });
+          return res.status(200).json({ ok: true, otorgado: false, motivo: 'ya_otorgado' });
+        }
+        // D5.3 / Deuda 9 -- ledger FUERA de la atomicidad: si falla, el XP
+        // queda acreditado sin fila de auditoria; solo se registra en consola
+        // y NO se revierte el XP ni el claim. Una sola fila por otorgamiento.
         try {
-          await sql('UPDATE usuarios SET xp_total=xp_total+$1 WHERE id=$2', [xpTotalPub, autorPub]);
-          await acreditarClaseYCofre(sql, autorPub, ctxPub, xpTotalPub);
+          // Interruptor SOLO de smoke local (R3): inerte sin la env y jamas
+          // definido en Vercel.
+          if (process.env.XP_FORCE_FAIL === 'ledger')
+            throw new Error('XP_FORCE_FAIL=ledger (smoke)');
           await registrarXpLedger(sql, Object.assign({
             usuario_id: autorPub, accion: 'publicar_lugar', xp_base: xpBasePub,
             mult_nivel: resPub.m_nivel, mult_stack: resPub.mult_stack,
             mult_final: resPub.mult_global_c, cap_aplicado: resPub.cap_aplicado,
             bonos_planos: red2(bonoGeoPub + bonoFotoPub), xp_final: xpTotalPub,
-            contexto: { destino_id: destinoId2, tier: tierPub, geo: !!tagsPub.pub_geo, foto: !!tagsPub.pub_foto }
+            contexto: {
+              destino_id: destinoId2, tier: tierPub,
+              completitud: persPub.pub_completitud,
+              pub_completitud: persPub.pub_completitud,
+              fotos_total: persPub.pub_fotos_total,
+              fotos_no_hero: persPub.pub_fotos_no_hero,
+              faltantes_n: (persPub.pub_faltantes || []).length,
+              recalculo: true,
+              origen_envio: tagsPub.origen_envio || null,
+              geo: geoPubFinal === true, foto: fotoBonoPub
+            }
           }, origenLedger(resPub, 'destino', pubPunto)));
-          await repartirXpReferidos(sql, autorPub, xpTotalPub);
-        } catch (eOtorgaXp) {
-          await sql(
-            'UPDATE destinos SET tags = COALESCE(tags, \'{}\'::jsonb) || $2::jsonb WHERE id=$1',
-            [destinoId2, JSON.stringify({ pub_xp_estado: 'pendiente' })]
-          ).catch(function(eRoll) { console.warn('[publicar_lugar] rollback estado fallo: ' + (eRoll && eRoll.message)); });
-          console.warn('[publicar_lugar] acreditacion fallo, estado revertido: ' + (eOtorgaXp && eOtorgaXp.message));
-          return res.status(500).json({ ok: false, error: 'XP no acreditado, reintentable' });
+        } catch (eLedgerPub) {
+          console.warn('[publicar_lugar] ledger no registrado (Deuda 9): '
+            + (eLedgerPub && eLedgerPub.message));
         }
-        return res.status(200).json({ ok: true, otorgado: true, xp: xpTotalPub, autor_id: autorPub, tier: tierPub });
+        // D5.3 -- clase/cofre DESPUES de la CTE, fuera de la atomicidad y
+        // best-effort con su propio swallow. NO puede desaparecer: es la
+        // progresion de xp_clase / nivel_clase / cofre (regresion silenciosa
+        // de clase si se elimina junto al catch).
+        try {
+          await acreditarClaseYCofre(sql, autorPub, ctxPub, xpTotalPub);
+        } catch (eClasePub) {
+          console.warn('[publicar_lugar] clase/cofre best-effort: ' + (eClasePub && eClasePub.message));
+        }
+        // Referidos: un reintento NO puede pagar dos veces porque el claim
+        // atomico de la CTE ya devuelve 'ya_otorgado' y este punto no se
+        // alcanza (Deuda 8: repartirXpReferidos no lleva clave de idempotencia
+        // propia; la barrera es el claim).
+        try {
+          await repartirXpReferidos(sql, autorPub, xpTotalPub);
+        } catch (eRefPub) {
+          console.warn('[publicar_lugar] referidos best-effort: ' + (eRefPub && eRefPub.message));
+        }
+        return res.status(200).json({
+          ok: true, otorgado: true, motivo: 'otorgado',
+          xp: xpTotalPub, autor_id: autorPub, tier: tierPub,
+          completitud: persPub.pub_completitud,
+          fotos_total: persPub.pub_fotos_total,
+          fotos_no_hero: persPub.pub_fotos_no_hero
+        });
       }
 
       // DEFECTO CERRADO 2026-10-05: los 3 POST de sumiderosVivian por DEBAJO

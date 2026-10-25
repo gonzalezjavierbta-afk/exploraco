@@ -2608,73 +2608,110 @@ function closePublicarModal() {
   if(cat) cat.value = '';
   var err = document.getElementById('pub-error');
   if(err) err.style.display = 'none';
+  ['pub-error-1','pub-error-2','pub-error-3'].forEach(function(id) {
+    var e = document.getElementById(id);
+    if(e){ e.style.display = 'none'; e.textContent = ''; }
+  });
   var succ = document.getElementById('pub-success');
   if(succ) succ.style.display = 'none';
+  var step1 = document.getElementById('pub-step-1');
+  if(step1) step1.style.display = 'block';
+  ['pub-step-2','pub-step-3'].forEach(function(id) {
+    var s = document.getElementById(id);
+    if(s) s.style.display = 'none';
+  });
+  var dots = document.getElementById('pub-steps');
+  if(dots) dots.style.display = 'none';
+  var teaserBtn = document.getElementById('pub-teaser-btn');
+  if(teaserBtn){ teaserBtn.disabled = false; teaserBtn.textContent = 'Guardar borrador y continuar'; }
   var btns = document.getElementById('pub-btns');
   if(btns) btns.style.display = 'flex';
 }
 
 function submitPublicar() {
-  var name    = (document.getElementById('pub-name')    ||{}).value||'';
-  var cat     = (document.getElementById('pub-cat')     ||{}).value||'';
-  var city    = (document.getElementById('pub-city')    ||{}).value||'';
-  var wa      = (document.getElementById('pub-wa')      ||{}).value||'';
-  var desc    = (document.getElementById('pub-desc')    ||{}).value||'';
-  var contact = (document.getElementById('pub-contact') ||{}).value||'';
+  var name = (document.getElementById('pub-name') ||{}).value||'';
+  var cat  = (document.getElementById('pub-cat')  ||{}).value||'';
+  var city = (document.getElementById('pub-city') ||{}).value||'';
 
-  var err = document.getElementById('pub-error');
+  var err = document.getElementById('pub-error-1');
+  function pubAviso(msg) {
+    if(err){ err.textContent = msg; err.style.display = 'block'; }
+  }
 
   if(!name.trim()) {
-    if(err){ err.textContent = 'Por favor ingresa el nombre de tu lugar.'; err.style.display = 'block'; }
-    document.getElementById('pub-name').focus(); return;
+    pubAviso('Por favor ingresa el nombre de tu lugar.');
+    var elName = document.getElementById('pub-name'); if(elName) elName.focus();
+    return;
   }
   if(!cat) {
-    if(err){ err.textContent = 'Selecciona la categoría de tu lugar.'; err.style.display = 'block'; }
-    document.getElementById('pub-cat').focus(); return;
+    pubAviso('Selecciona la categoria de tu lugar.');
+    var elCat = document.getElementById('pub-cat'); if(elCat) elCat.focus();
+    return;
   }
   if(!city.trim()) {
-    if(err){ err.textContent = 'Ingresa la ciudad de tu lugar.'; err.style.display = 'block'; }
-    document.getElementById('pub-city').focus(); return;
-  }
-  if(!wa.trim()) {
-    if(err){ err.textContent = 'Ingresa un WhatsApp para que podamos contactarte.'; err.style.display = 'block'; }
-    document.getElementById('pub-wa').focus(); return;
+    pubAviso('Ingresa la ciudad de tu lugar.');
+    var elCity = document.getElementById('pub-city'); if(elCity) elCity.focus();
+    return;
   }
   if(err) err.style.display = 'none';
 
-  // Build WhatsApp message to LATAWEL team
-  var catLabels = {hostal:'Hospedaje',comida:'Restaurante/Café',sitio:'Sitio turístico',evento:'Evento'};
-  var nl = '\n';
-  var msg = '\u{1F1E8}\u{1F1F4} *Nueva solicitud LATAWEL*' + nl + nl
-    + '*Lugar:* ' + name.trim() + nl
-    + '*Categor\u00eda:* ' + (catLabels[cat]||cat) + nl
-    + '*Ciudad:* ' + city.trim() + nl
-    + '*WhatsApp:* ' + wa.trim() + nl
-    + (desc.trim() ? '*Descripci\u00f3n:* ' + desc.trim() + nl : '')
-    + (contact.trim() ? '*Contacto:* ' + contact.trim() + nl : '')
-    + nl + 'Quiero aparecer en LATAWEL.';
+  // ADR-099 D1 + D7: la portada es un TEASER de borrador. Solo crea una
+  // semilla (nombre + categoria + ciudad) que NO entra en la cola de
+  // moderacion, y manda al formulario completo. No simula el envio.
+  var btn = document.getElementById('pub-teaser-btn');
+  var etiqueta = 'Guardar borrador y continuar';
+  if(btn){ btn.disabled = true; btn.textContent = 'Guardando borrador...'; }
 
-  // Open WhatsApp to LATAWEL number
-  var waNumber = '573001234567'; // Replace with real LATAWEL WhatsApp
-  var waLink = document.getElementById('pub-wa-direct');
-  if(waLink) waLink.href = 'https://wa.me/' + waNumber + '?text=' + encodeURIComponent(msg);
-
-  // Save to localStorage as pending submission
-  try {
-    var submissions = JSON.parse(localStorage.getItem('pub_submissions')||'[]');
-    submissions.push({name:name,cat:cat,city:city,wa:wa,desc:desc,contact:contact,ts:Date.now()});
-    localStorage.setItem('pub_submissions', JSON.stringify(submissions));
-  } catch(e) {}
-
-  // Show success state
-  var btns = document.getElementById('pub-btns');
-  var succ = document.getElementById('pub-success');
-  if(btns) btns.style.display = 'none';
-  if(succ) succ.style.display = 'block';
-
-  // Also open WhatsApp automatically
-  var waUrl = 'https://wa.me/' + waNumber + '?text=' + encodeURIComponent(msg);
-  setTimeout(function() { window.open(waUrl, '_blank'); }, 600);
+  fetch('/api/publicar-lugar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nombre:       name.trim(),
+      categoria:    cat,
+      ciudad:       city.trim(),
+      estado_envio: 'semilla'
+    })
+  })
+    .then(function(r){
+      return r.json()
+        .then(function(d){ return { status: r.status, data: d }; })
+        .catch(function(){ return { status: r.status, data: null }; });
+    })
+    .then(function(res){
+      var data = res.data || {};
+      var exito = (res.status >= 200 && res.status < 300) && data.ok === true;
+      if(!exito) {
+        if(btn){ btn.disabled = false; btn.textContent = etiqueta; }
+        if(res.status === 429) {
+          pubAviso('Se agoto el cupo de borradores por hoy. Puedes seguir en el formulario completo: publicar.html');
+        } else if(res.status === 401) {
+          pubAviso('El alta de borradores no esta disponible ahora. Usa el formulario completo: publicar.html');
+        } else {
+          pubAviso((data && data.error) ? String(data.error) : 'No se pudo guardar el borrador. Intenta de nuevo.');
+        }
+        return;
+      }
+      var id = data.id ? String(data.id) : '';
+      var destino = 'publicar.html' + (id ? ('?id=' + encodeURIComponent(id) + '&paso=2') : '');
+      // Respaldo, no camino principal: el avance es la redireccion a publicar.html.
+      try { localStorage.setItem('ec_borrador_pendiente', id); } catch(e) {}
+      var step1 = document.getElementById('pub-step-1');
+      var dots  = document.getElementById('pub-steps');
+      var succ  = document.getElementById('pub-success');
+      var link  = document.getElementById('pub-continuar');
+      if(step1) step1.style.display = 'none';
+      if(dots)  dots.style.display  = 'none';
+      if(link)  link.href = destino;
+      if(succ)  succ.style.display  = 'block';
+      // ADR-003: el nodo de WhatsApp directo se conserva, ya no se ofrece.
+      var waLink = document.getElementById('pub-wa-direct');
+      if(waLink) waLink.style.display = 'none';
+      setTimeout(function(){ window.location.href = destino; }, 1200);
+    })
+    .catch(function(){
+      if(btn){ btn.disabled = false; btn.textContent = etiqueta; }
+      pubAviso('Error de conexion: no se guardo nada. Intenta de nuevo.');
+    });
 }
 
 // Close publicar modal on backdrop click
@@ -4629,7 +4666,7 @@ function submitBlog() {
         <div>
           <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--gold);margin-bottom:6px">📣 LATAWEL · Directorio turístico</div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:#fff;letter-spacing:-0.5px">Publica tu lugar</div>
-          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-top:5px;line-height:1.6">Aparece frente a miles de viajeros. El listado básico es <strong style="color:rgba(255,255,255,.7)">completamente gratis</strong>.</p>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-top:5px;line-height:1.6">Empieza con 3 datos y termina tu ficha en el formulario completo. El listado basico es <strong style="color:rgba(255,255,255,.7)">completamente gratis</strong>.</p>
         </div>
         <button onclick="closePublicarModal()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:rgba(255,255,255,.6);font-size:16px;cursor:pointer;padding:6px 12px;line-height:1;transition:all .12s;flex-shrink:0" onmouseover="this.style.background='rgba(255,255,255,.15)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">✕</button>
       </div>
@@ -4656,8 +4693,8 @@ function submitBlog() {
 
     <!-- Form -->
     <div style="padding:24px 28px" id="pub-form-area">
-      <!-- Step indicator -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+      <!-- Step indicator (oculto: el teaser es de un solo paso) -->
+      <div id="pub-steps" style="display:none;align-items:center;gap:8px;margin-bottom:20px">
         <div id="pub-step-dot-1" style="width:24px;height:24px;border-radius:50%;background:var(--gold);color:#000;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>
         <div style="flex:1;height:2px;background:rgba(255,255,255,.1)" id="pub-step-line-1"></div>
         <div id="pub-step-dot-2" style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.1);color:rgba(255,255,255,.4);font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>
@@ -4694,7 +4731,8 @@ function submitBlog() {
                 onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='rgba(255,255,255,.12)'">
             </div>
           </div>
-          <div>
+          <!-- ADR-099: el teaser pide solo 3 campos; el nodo se conserva oculto (ADR-003). -->
+          <div style="display:none">
             <label style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.4);display:block;margin-bottom:5px">Descripción breve</label>
             <textarea id="pub-desc" placeholder="¿Qué hace especial a tu lugar? (opcional)" rows="2"
               style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:11px 14px;font-size:13px;color:#fff;font-family:'Outfit',sans-serif;outline:none;resize:vertical;transition:border-color .15s"
@@ -4702,7 +4740,8 @@ function submitBlog() {
           </div>
         </div>
         <div id="pub-error-1" style="display:none;color:#f87171;font-size:11px;margin-top:10px;padding:8px 12px;background:rgba(239,68,68,.1);border-radius:5px;border:1px solid rgba(239,68,68,.2)"></div>
-        <button onclick="pubNextStep(1)" style="width:100%;padding:13px;background:var(--gold);border:none;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;cursor:pointer;color:var(--black);margin-top:14px;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Continuar →</button>
+        <button id="pub-teaser-btn" onclick="submitPublicar()" style="width:100%;padding:13px;background:var(--gold);border:none;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;cursor:pointer;color:var(--black);margin-top:14px;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Guardar borrador y continuar</button>
+        <p style="font-size:10px;color:rgba(255,255,255,.28);margin-top:8px;text-align:center;line-height:1.6">Se guarda un borrador sin publicar y sigues en el formulario completo.</p>
       </div>
 
       <!-- Step 2: Contacto -->
@@ -4767,12 +4806,13 @@ function submitBlog() {
       <!-- Success state -->
       <div id="pub-success" style="display:none;text-align:center;padding:28px 20px">
         <div style="font-size:52px;margin-bottom:12px">🎉</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;color:#fff;margin-bottom:8px">¡Solicitud recibida!</div>
-        <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:20px;line-height:1.7">Te contactaremos por WhatsApp en las próximas <strong style="color:rgba(255,255,255,.7)">24 horas</strong> para coordinar tu publicación gratuita en LATAWEL.</div>
-        <div style="display:flex;gap:10px;justify-content:center">
-          <button onclick="closePublicarModal()" style="padding:10px 24px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black)">Perfecto ✓</button>
-          <a id="pub-wa-direct" href="#" target="_blank" style="padding:10px 20px;background:#25D366;border-radius:5px;font-size:13px;font-weight:700;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px">💬 WhatsApp directo</a>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;color:#fff;margin-bottom:8px">Borrador guardado</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:20px;line-height:1.7">Tu borrador quedo guardado y <strong style="color:rgba(255,255,255,.7)">no entra en revision</strong> hasta que lo envies. Te llevamos al formulario completo para terminar la ficha.</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <a id="pub-continuar" href="publicar.html" style="padding:10px 24px;background:var(--gold);border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black);text-decoration:none">Continuar ahora</a>
+          <button onclick="closePublicarModal()" style="padding:10px 20px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:5px;font-size:12px;color:rgba(255,255,255,.6);cursor:pointer">Cerrar</button>
         </div>
+        <a id="pub-wa-direct" href="#" target="_blank" style="display:none" aria-hidden="true"></a>
       </div>
     </div>
   </div>
