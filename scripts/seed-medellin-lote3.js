@@ -297,6 +297,37 @@ function normalizarTags(tags) {
 }
 
 // ---------------------------------------------------------------------------
+// subcategoria: BASE.subcategoria -> tags.subcategoria (una sola fuente)
+// ---------------------------------------------------------------------------
+
+// El contrato v2 (.opencode/prompts/GEMINI_MASTER_PROMPT.md) pone la
+// subcategoria en BASE, pero el motor (api/pagina-destino.js) y el admin la
+// leen en tags.subcategoria. La lista cerrada NO se copia aqui por tercera
+// vez: se consume la de lib/completitud.js (:129-134), que ya es copia
+// sincronizada a mano de api/publicar-lugar.js (ADR-016).
+function aplicarSubcategoria(baseFicha, tags) {
+  var bruto = (baseFicha || {}).subcategoria;
+  if (bruto === null || bruto === undefined) return; // sin clave: legado
+  if (typeof bruto === 'string' && !bruto.trim()) return; // cadena vacia: legado
+  var cat = C.resolverCategoria((baseFicha || {}).categoria_slug) || 'sitio';
+  var lista = C.SUBCAT_LISTA[cat] || [];
+  var valor = (typeof bruto === 'string') ? bruto.trim().toLowerCase() : '';
+  if (!valor || lista.indexOf(valor) === -1) {
+    console.warn('[aviso] BASE.subcategoria=' + JSON.stringify(bruto)
+      + ' no esta en la lista cerrada de ' + cat + ' (' + lista.join(', ') + ')'
+      + ' -> no se escribe tags.subcategoria');
+    return;
+  }
+  var previo = tags.subcategoria;
+  if (previo !== null && previo !== undefined && String(previo).trim() !== ''
+      && String(previo).trim().toLowerCase() !== valor) {
+    console.warn('[aviso] conflicto de subcategoria: TAGS.subcategoria='
+      + JSON.stringify(previo) + ' se ignora, gana BASE.subcategoria=' + valor);
+  }
+  tags.subcategoria = valor;
+}
+
+// ---------------------------------------------------------------------------
 // Construccion de la ficha lista para escribir
 // ---------------------------------------------------------------------------
 
@@ -322,6 +353,7 @@ function construirFicha(slug, informe) {
 
   var baseFicha = ficha.BASE || {};
   var tags = normalizarTags(ficha.TAGS);
+  aplicarSubcategoria(baseFicha, tags);
   var faqs = Array.isArray(ficha.FAQS) ? ficha.FAQS : [];
   var fotos = fotosDeFicha(slug, ficha, inf);
 

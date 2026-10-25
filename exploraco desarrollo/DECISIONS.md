@@ -9177,3 +9177,125 @@ ADR-099 declaro un **embudo unico de alta** (`publicar.html` -> `POST /api/publi
 8. `Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Select-Object -Last 1` devuelve **`## ADR-100:`** y el conteo **99**.
 
 **Cierre documental:** `TASKS.md` / `NEXT.md` / `BLUEPRINT.md` se actualizan en el **pase unico R2** de `@docs-keeper`, no en este ADR (Regla de Oro 9).
+
+## ADR-101: La subcategoria de sitio `ciudad` ("Ciudad / Pueblo") entra en la lista cerrada con **12 secciones** propias y el contrato de secciones por subcategoria queda con **una sola fuente (el motor)**; el **FAQ** se resuelve con `destinos_detalles.faqs` como canonico y `tags.faqs` como espejo legado [NO deroga ninguna premisa de ADR previos; fija el contrato que ADR-016 dejo abierto. **Revision 2**]
+
+**ID:** ADR-101
+**Fecha:** 2026-10-25
+**Autor:** `@architect` (diseno y verificacion contra el archivo real). Gate de riesgo CONFIRMADO explicitamente por el operador para escribir este ADR.
+**Estado:** **ACEPTADO.** ADR de **diseno/contrato**: no propone endpoint nuevo (presupuesto Vercel Hobby **8/8**), no ejecuta migraciones y no implementa por si mismo; fija el contrato que `@renderer-dev`, `@admin-dev`, `@backend-dev` y `@data-migration` consumen. Implementacion medida a la Revision 2: **8 de 9 copias de la lista movidas**, **D6 implementado en codigo**, **1 copia pendiente** (`admin.html:1397-1408`).
+
+**Revision 2 (2026-10-25).** Aplica el veredicto **SOLICITA CAMBIOS** de `@architect-review` sobre la Revision 1 de este mismo ADR. Bloqueadores corregidos: **B1** D6 estaba incompleto —hay **dos** almacenes de FAQ y el render los cruzaba por la condicion equivocada—; **B2** D2 subestimo las copias de la lista cerrada: son **9**, no 6; **B3** `transporte` es la **misma clave JSONB** en `hostal` y en `ciudad`, hecho que no estaba registrado; **B4** la frase que atribuia el registro de las 6 secciones nuevas al motor generico del admin era **FALSA** a la fecha. Ademas, la medicion de Revision 2 contra el archivo real (ADR-006) encontro que **el codigo avanzo desde la Revision 1**: se registra el **estado medido**, no la deuda supuesta.
+
+### Contexto
+
+El directorio cubre lugares puntuales (parque, museo, bar, sitio historico), pero **no tiene entidad para una ciudad o un pueblo entero**, que es justo el tipo de pagina que pide el contenido de destino (que ver, barrios, transporte, seguridad, presupuesto, cuando ir). La lista de subcategorias de sitio es **cerrada** y cada slug es una llave de gating en el motor: si el slug no esta en el mapa, la pagina **degrada a solo descripcion** (`api/pagina-destino.js:830-832`), y por eso el valor no puede ser texto libre.
+
+El contrato de secciones por subcategoria existia **nueve veces** en el repo (motor, ruta publica, buscador, completitud, validador, select del admin, formulario publico, mapa y radios de interaccion) y estaba **desincronizado**. A la Revision 2, ocho copias ya lo reflejan y **solo el select del admin** sigue sin `ciudad`: eso confirma que el riesgo no es escribir la lista, es que **una copia nueva no falle** cuando se olvide.
+
+### Datos medidos (2026-10-25, contra el archivo real; el codigo gana a la documentacion, ADR-006)
+
+**A. Tabla definitiva: las 9 copias de la lista cerrada de sitio + 2 consumidores del mismo dato** (estado medido en Revision 2):
+
+| # | Sitio | Rango | Estado |
+|---|---|---|---|
+| 1 | Motor: etiquetas | `api/pagina-destino.js:29-38` (`ciudad:'Ciudad / Pueblo'` en `33`) | **OK** |
+| 2 | Motor: gating | `api/pagina-destino.js:51-63` (`ciudad` en `62`, 12 ids) | **OK** |
+| 3 | Motor: parsers de las listas nuevas | `api/pagina-destino.js:820-826` (barrios, seguridad, gastronomia, presupuesto, cuando_ir) + `844` (transporte reusado) | **OK** |
+| 4 | Ruta publica (`CLAVES_CLIENTE` y lista) | `api/publicar-lugar.js:58-59` | **OK** |
+| 5 | Buscador | `busqueda.js:100-102` | **OK** |
+| 6 | Completitud | `lib/completitud.js:129-131` | **OK** |
+| 7 | Validador de fichas | `scripts/validate_ficha.js:97-100` | **OK** |
+| 8 | Formulario publico | `publicar.html:356-370` (`value="ciudad"` en `366`) | **OK** |
+| 9 | Mapa (`SCAT_LBL`) | `mapas.html:185-188` (`ciudad:'Ciudad / Pueblo'` en `187`) | **OK** |
+| 10 | Radios de interaccion | `api/interacciones.js:286-293` (`ciudad: 3000` en `293`) | **OK** |
+| **11** | **Select del admin** | **`admin.html:1397-1408`** (9 `option`, **sin** `ciudad`) | **PENDIENTE** |
+
+(Los 9 sitios de contrato son 1-2, 4-9 y 11; 3 y 10 son consumidores del mismo dato y se listan porque tambien lo codifican. `admin.html:3401` registra `subcategoria` en `CATEGORY_TAG_FIELDS` pero **el catalogo de opciones vive en el HTML**, no en el motor generico: por eso el select no se arregla solo.)
+
+**B. Degradacion por slug fuera del mapa:** `api/pagina-destino.js:830-832` — `subcategoria` presente y desconocida -> `['descripcion']`; `subcategoria` ausente -> `null` (sin gating). Ese comportamiento es la **razon** de que la lista sea cerrada y de que `ciudad` deba entrar en los dos mapas del motor, no solo en el validador.
+
+**C. `transporte` es UNA clave con DOS formas.** `api/pagina-destino.js:820-821` lo documenta: la clave `tags.transporte` **no se duplica** para ciudad, y el parser es unico (`844`). Pero el item no tiene la misma forma: `hostal` usa `icon/title/detail` (panel `admin.html:1146-1162`, collector `3499-3500`) y `ciudad` usa `icono/nombre/descripcion`. **No hay migracion**: el render es tolerante a las dos formas porque lee el arreglo y pinta campos con fallback; lo que se exige es **una sola forma por categoria** en la ficha y que el admin **no las mezcle en el mismo item**.
+
+**D. FAQ: DOS almacenes y el render los cruzaba por la condicion equivocada.** La Revision 1 describia solo el defecto del admin; el defecto real es de **fuente de verdad**. El fallback del render colgaba de `!det.amenidades` (`api/pagina-destino.js:3266-3276` en la Revision 1) y copiaba `det.faqs = tg.faqs`: (i) borrar todas las FAQs en el admin dejaba `destinos_detalles.faqs='[]'` pero `tags.faqs` obsoleto, y el render **resucitaba** las preguntas; (ii) con `destinos_detalles.faqs` NULL y `tags.faqs` poblado, el editor mostraba vacio y al guardar escribia `'[]'`. Efecto neto: **perdida o resurreccion de datos** al editar cualquier ficha no-hostal con FAQ. Estado medido en Revision 2 (**ya implementado**, con la decision del operador): `api/pagina-destino.js:3281-3288` (fallback solo si `det.faqs` es NULL/undefined; un `'[]'` **no** se sobrescribe), `admin.html:7508-7520` (carga desde `d.faqs` con fallback al espejo **solo** si es NULL), `admin.html:3593-3601` (espejo `tags.faqs` **siempre** sincronizado, incluido array vacio), `admin.html:4613` (`collectFaqs()` ya no se ejecuta en `blog`), builder sacado de `especifico-hostal` a nodo general (`admin.html:1712-1723`), sin filas de ejemplo al abrir (`3290-3297`). Persisten: `api/admin-destinos.js:465` (`safeJSON(b.faqs) || null`) y `475` (`faqs=COALESCE(EXCLUDED.faqs, destinos_detalles.faqs)`), que ahora es **correcto por contrato**: `'[]'` es borrado explicito y `NULL` significa "no tocar".
+
+**E. Ruta publica descarta el contrato en silencio:** `api/publicar-lugar.js:315-320` (`CLAVES_CLIENTE`) no incluye `barrios`, `transporte`, `seguridad`, `presupuesto`, `gastronomia`, `cuando_ir`, `atracciones`, `actividades_gratis` ni `contexto`. El admin **no** sufre esto porque mergea el JSONB completo (`api/admin-destinos.js:447-449`, `COALESCE(tags,'{}') || $N::jsonb`).
+
+**F. Contrato v2 implementado:** `.opencode/prompts/GEMINI_MASTER_PROMPT.md` (**430** lineas, 17/17 claves del motor, 10/10 subcategorias; secciones de ciudad en `336`, `339`, `417`), `scripts/validate_ficha.js` v2 con `--estricto` (12/12 controles). El contrato **existe**; lo que falta es la ultima copia (tabla A, fila 11).
+
+**G. Registro generico del admin INCOMPLETO (correccion de B4):** `CATEGORY_TAG_LISTS` (`admin.html:3478-3503`) solo declara `tours`, `equipamiento`, `entradas`, `itinerario`, `dificultad_tags` para sitio y `actividades`, `transporte`, `eventos_hostal` para hostal: **no** contiene `barrios`, `seguridad`, `presupuesto`, `gastronomia`, `cuando_ir` ni `atracciones`. El panel de transporte existe **solo** en hostal. Por tanto, **las 6 secciones nuevas de ciudad todavia NO estan registradas** en el motor generico y su ausencia en el admin es deuda, no un hecho consumado.
+
+### Decision
+
+**D1 — Se crea la subcategoria de sitio `ciudad` ("Ciudad / Pueblo") y la lista cerrada pasa a 10 slugs:** `naturaleza, museo, cultura, bar, parque, espacio-publico, sitio-historico, religioso, aventura, ciudad`. Un slug fuera de la lista **degrada la pagina a solo descripcion** (`api/pagina-destino.js:830-832`). Las **12 secciones** de `ciudad`, en este orden de contrato: `descripcion`, `atracciones`, `actividades_gratis`, `programacion`, `accesibilidad`, `contexto`, `barrios`, `transporte`, `seguridad`, `presupuesto`, `gastronomia`, `cuando_ir`. Las **6 ultimas son nuevas** (`barrios`, `transporte`, `seguridad`, `presupuesto`, `gastronomia`, `cuando_ir`) y su render ya esta en el motor (tabla A, fila 3). Radio de interaccion "Estuve aqui" para `ciudad`: **3000 m** (`api/interacciones.js:293`), porque una ciudad no se mide con el radio de una plaza.
+
+**D2 — El MOTOR es la fuente unica de secciones y de nombres de clave, y la lista se replica en 9 sitios (tabla A).** Regla vinculante: **cualquier lista nueva de subcategorias que se cree en el repo debe fallar el check de desincronizacion** mientras no coincida con la del motor; una lista que no se pueda contrastar no se acepta en revision. Por **ADR-084 D1**, el argumento de esta lista se escribe **una vez, aqui**; los demas ficheros, skills y ADR **apuntan** a este ADR en vez de re-explicarlo.
+
+**D3 — `subcategoria` viaja en BASE de la ficha, no en TAGS.** El seed la mapea a `tags.subcategoria` al construir la fila; **no se duplica** dentro de `TAGS` (dos valores divergentes en la misma ficha es el fallo a evitar). El validador la lee de BASE y comprueba pertenencia a D1.
+
+**D3 bis — `transporte`: misma clave, forma distinta por categoria, sin migracion.** `hostal` usa `icon/title/detail`; `ciudad` usa `icono/nombre/descripcion`. El render acepta ambas; **la ficha debe usar una sola forma por categoria** y el admin **no debe mezclar formas en el mismo item** (un item mestizo se degrada a texto vacio en el campo que falte). Prohibido renombrar la clave o moverla a `destinos_detalles`.
+
+**D4 — `zona` es obligatoria en modo estricto para las CUATRO categorias** (`sitio`, `comida`, `evento`, `hostal`) y se **deriva del departamento** (`ciudad -> departamento -> zona`), nunca se escribe a mano. En modo legado (D5) sigue siendo opcional.
+
+**D5 — Las 36 fichas de Medellin ya emitidas son legado valido.** Sin `subcategoria`: el motor las trata con `null` = **sin gating** (render completo, `830-832`) y el validador las acepta por su **modo legado**. **No se re-fichan**; si se re-editan, se les puede anadir `subcategoria` sin romper nada.
+
+**D6 — FAQ: `destinos_detalles.faqs` es CANONICO y `tags.faqs` es ESPEJO LEGADO** (decision del operador, Registro 2). Reglas normativas:
+1. El render usa `destinos_detalles.faqs` y **solo** cae al espejo cuando la columna es `NULL`/`undefined` (nunca escrita). Un `'[]'` es **borrado explicito** y **no se sobrescribe** (`api/pagina-destino.js:3281-3288`).
+2. El admin carga desde `destinos_detalles.faqs`; si es `NULL`, cae al espejo para no mostrar el constructor vacio y borrar las FAQ reales al guardar (`admin.html:7508-7520`).
+3. El admin **mantiene el espejo siempre sincronizado**, incluido `[]`, para no dejar dos verdades contradictorias (`admin.html:3593-3601`).
+4. `collectFaqs()` no se ejecuta donde el render no pinta FAQ (`blog`) y el builder **no siembra preguntas de ejemplo**: una fila vacia no viaja como dato (`admin.html:4613`, `1712-1723`, `3290-3297`).
+5. Backend: `COALESCE(EXCLUDED.faqs, destinos_detalles.faqs)` se conserva (`api/admin-destinos.js:475`); la distincion ausencia/borrado se resuelve en **el cliente**, que envia `null` cuando no toco FAQs. Cambiar el backend a "ignorar `[]`" queda **prohibido**: reintroduciria el borrado silencioso.
+6. `api/pagina-destino.js:2294` sigue pintando FAQ para toda categoria distinta de `blog`: es correcto **si** el dato es de la categoria.
+Gates historicos de la implementacion: `@admin-dev` (1-4) y `@backend-dev` (5).
+
+**D7 — La ruta publica debe aceptar el contrato.** `api/publicar-lugar.js:315-320` (`CLAVES_CLIENTE`) se **amplia con whitelist explicita** con las claves del contrato v2 (`atracciones`, `actividades_gratis`, `contexto`, `barrios`, `transporte`, `seguridad`, `presupuesto`, `gastronomia`, `cuando_ir`), **sin** pasar a comodin: la defensa contra claves arbitrarias se mantiene; lo que cambia es que el contrato deja de descartarse en silencio. Descartar en silencio una seccion valida es peor que rechazarla. Gate `@backend-dev`, ASCII-safe (ADR-002), sin endpoint nuevo.
+
+### Consecuencias
+
+- Una pagina de ciudad deja de forzarse dentro de `espacio-publico` y declara **12 secciones** con nombre de clave estable.
+- **Las secciones nuevas no se registran solas:** hasta que se anadan a `CATEGORY_TAG_LISTS` (`admin.html:3478-3503`) con su panel propio, el admin **no las edita** y una ficha de ciudad cargada por seed solo se mantiene por la ruta publica o por SQL. Es una consecuencia de la regla de 7 pasos (BLUEPRINT §6), no un detalle opcional.
+- La desincronizacion es **detectable y acotada**: fuente = motor, 8 copias ya alineadas, 1 pendiente.
+- El FAQ deja de corromperse: el admin deja de ser una via de perdida de datos y el `'[]'` significa lo que dice.
+- `zona` obligatoria en las 4 categorias endurece el modo estricto: fichas viejas entran por legado, fichas nuevas **no**.
+
+### Alternativas descartadas
+
+1. **Usar `espacio-publico` para una ciudad.** Descartada: heredaria el gating de plaza/parque (`api/pagina-destino.js:59`) y **no** tendria `barrios`, `transporte`, `presupuesto` ni `cuando_ir`; ademas el chip del hero diria "Espacio Publico", error factible de SEO y de confianza.
+2. **`subcategoria` en texto libre.** Descartada: un slug libre no esta en el mapa -> degradacion a solo descripcion (`830-832`) **sin error visible**; el fallo seria silencioso y por ficha.
+3. **Dos slugs `pueblo` y `ciudad`.** Descartada: duplicaria el contrato de 12 secciones, el gating y las 9 copias, y obligaria a decidir en cada pueblo si es "pueblo" o "ciudad" sin criterio medible.
+4. **Mantener el fallback de FAQ atado a `!det.amenidades` (Revision 1, B1).** Descartada: es el defecto, no una opcion; ataba la resurreccion de FAQs a la ausencia de un campo que no tiene relacion.
+5. **Un solo almacen: mover FAQ a `tags.faqs` y dejar `destinos_detalles.faqs`.** Descartada: la columna es la que el admin ya escribe y la que permite `COALESCE` sin tocar `api/*.js`; el espejo se queda como legado de la ruta publica.
+
+### Deudas
+
+1. **`admin.html:1397-1408`**: anadir `ciudad` al select (unica copia de la tabla A pendiente). Gate `@admin-dev`.
+2. **`admin.html:3478-3503` + paneles**: registrar en `CATEGORY_TAG_LISTS` las 6 secciones de ciudad (`barrios`, `transporte` con forma `icono/nombre/descripcion`, `seguridad`, `presupuesto`, `gastronomia`, `cuando_ir`) y crear su panel (el de transporte hoy existe **solo** para hostal, `1146-1162`). Gate `@admin-dev`. Hasta entonces, esas secciones se cargan por seed o ruta publica.
+3. **Check anti-desincronizacion** (D2): script de `$0` en `scripts/` que compare las 9 copias contra `api/pagina-destino.js:51-63` y falle con numero de linea. Candidato natural a `verificar-*`, nunca a endpoint.
+4. **Smoke de ciudad**: ficha con las 12 secciones + 36 fichas de Medellin en modo legado, comparando numero de secciones renderizadas.
+5. **D7 pendiente**: la ruta publica sigue descartando el contrato (dato E); mientras no se amplie `CLAVES_CLIENTE`, toda ficha de ciudad con secciones nuevas debe entrar por el admin o por seed.
+6. **Cierre documental**: `TASKS.md` / `NEXT.md` / `BLUEPRINT.md` (§4 y paso 7 del patron) se actualizan en el **pase unico R2** de `@docs-keeper`, no en este ADR (Regla de Oro 9).
+
+### Criterio de verificacion
+
+1. `Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-101"` -> **1** linea; `Select-String -Pattern "ADR-101"` no repite encabezado; total de `^## ADR-` sin cambio por la revision.
+2. `Select-String -Pattern "Revision 2|RADIO_POR_SUBCATEGORIA|3000"` -> presente en el rango de este ADR.
+3. Las 9 copias de la tabla A devuelven **10** slugs de sitio y el **conjunto identico** (comparacion de conjuntos, no de orden).
+4. `api/interacciones.js:293` devuelve `ciudad: 3000` y una interaccion sin `subcategoria` sigue en el default de 50 m (no regresion).
+5. Una ficha de ciudad del prompt v2 pasa `node scripts/validate_ficha.js <ruta> --estricto` y renderiza las 12 secciones sin bloque vacio; un item de `transporte` con `icon/title/detail` **y** otro con `icono/nombre/descripcion` renderizan texto (tolerancia), y el mismo item mestizo **no** se acepta en revision de ficha.
+6. Las 36 fichas de Medellin siguen pasando en **modo legado** y renderizan completo (sin gating).
+7. FAQ, las dos direcciones del defecto: (a) borrar todas las FAQ y guardar deja `destinos_detalles.faqs='[]'` y el render **no** resucita `tags.faqs`; (b) con `destinos_detalles.faqs` NULL y `tags.faqs` poblado, el editor **muestra** las preguntas y al guardar **no** escribe `'[]'`.
+8. Una seccion del contrato enviada por `POST /api/publicar-lugar` **persiste** en `tags` (prueba de D7): `tags ? 'presupuesto'` devuelve la fila.
+
+### Revision 3 (2026-10-25)
+
+Fija el **estado medido hoy** (ADR-006) y **sustituye** las frases de estado de la Revision 2 ("1 copia pendiente", fila **11** de la tabla A, deudas 1-3); la Revision 2 se conserva como registro historico y el argumento de D1-D7 **no** se reescribe ni se repite.
+
+1. **B2 / fila 11 de la tabla A: CERRADO.** `admin.html:1405` ya emite `<option value="ciudad">` y `SITIO_SUBCAT_MODULES['ciudad']` esta alineado al motor: la tabla de copias pasa de 9 a **10**.
+2. **Copia 10, no prevista en la Revision 2: `mapa-cultural.js:393`** (`mdSubcatLabel` / `scMap`). Sin ella el chip del drawer de la portada pintaba el **slug crudo**; corregido. El contrato ya no tiene 9 replicas, tiene **10**.
+3. **Registro generico del admin (deuda 2): CERRADO.** `SITIO_COLECCIONES` cubre las **14 claves** de sitio (las 12 de `ciudad` + `horarios_zona`, `que_ver`, `colecciones`, `recorridos`), y `que_ver` entra como **alias** de campos de `accesibilidad`, sin duplicar el campo.
+4. **Check anti-desincronizacion (deuda 3): CERRADO y ejecutable.** `scripts/verificar-subcategorias.js` (10/10 copias, `--self-test` 5/5, `--json`, `module.exports`) queda integrado en el Escudo GOLD por `scripts/gold_shield.js` junto a `express_check`, documentado en `.opencode/skills/gold-shield/SKILL.md`. La regla de D2 deja de ser una recomendacion y pasa a ser un gate que corre.
+5. **Propagacion del seed: CERRADA.** `aplicarSubcategoria()` alcanza `scripts/seed-medellin-lote2..6.js` (lote6 con `construirFicha(slug)` propia, adaptada sin cambiar el contrato); arnes **36/36**, DRY diff **0**.
+
+**Precedente que se fija:** el mismo pase encontro dos defectos reales del admin. (i) El boton emitia `horarios-zona` mientras el colector leia `horarios_zona`. (ii) `loadForm` precargaba con `p[k]` en vez de la clave local, asi que las listas nuevas nunca se rellenaban (afectaba tambien a `cuando_ir` y `actividades_gratis`). Regla: **un motor declarativo nuevo necesita prueba de precarga, no solo de colecta**; registrar claves sin probar la ida y vuelta deja listas vacias en silencio. El criterio de verificacion 3 se cumple ahora sobre **10** copias y lo mide `verificar-subcategorias.js`, no una comparacion manual.
+
+**Deudas que SIGUEN abiertas:** (i) **verificacion contra Neon real**: `DATABASE_URL` no esta definida en este entorno, de modo que la persistencia de D7 sigue probada solo por lectura de codigo; (ii) **smoke funcional de `buildHTML()` con datos mock de `ciudad`**: hoy la cobertura son arneses `vm` por seccion, no una ficha completa que cuente **12** secciones renderizadas (deuda 4 de la Revision 2 sigue viva).

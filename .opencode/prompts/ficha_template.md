@@ -1,20 +1,25 @@
 # Ficha: <Nombre del establecimiento> - <Ciudad>
 
 Datos para la pagina dinamica <slug>.html (categoria <hostal|comida|sitio|evento>).
-Generada con el prompt `.opencode/prompts/GEMINI_MASTER_PROMPT.md`.
-Este archivo es el contrato: el bloque JSON del final alimenta el seed.
+Generada con el prompt `.opencode/prompts/GEMINI_MASTER_PROMPT.md` (v2).
+Esta ficha es la VISTA PREVIA humana: el contrato es el bloque JSON del final,
+con la estructura de la seccion 6 del prompt maestro (no hay una segunda copia
+de las reglas aqui).
 
 ## Datos generales
 
 - **Slug:** <slug>
 - **Nombre:** <nombre>
 - **Categoria:** <categoria_slug>
+- **Subcategoria:** <slug de la lista cerrada: sitio | comida | evento; en hostal va ausente>
+- **Zona:** <andina | amazonica | caribe | pacifico | llanos (derivada del departamento)>
+- **Sintro:** <una linea, <= 200 caracteres>
 - **Lead:** <1-3 frases gancho>
 - **Descripcion:** <3-5 parrafos ricos en datos, separados por linea en blanco>
 - **Highlight:** <corto con "·">
 - **Ciudad:** <ciudad>
-- **Region:** <region>
-- **Barrio:** <barrio>
+- **Region:** <departamento>
+- **Barrio:** <barrio o vacio en ciudad>
 - **Lat:** <lat>
 - **Lng:** <lng>
 - **Whatsapp:** <57... o ausente>
@@ -59,6 +64,26 @@ Este archivo es el contrato: el bloque JSON del final alimenta el seed.
 - **Secretos:** (icono / titulo / texto / tag / tag_color)
 - **Regulaciones** y **checklist tip**
 - **Temporada matriz** Ene-Dic e **dificultad tags**
+- **Colecciones / recorridos / horarios por zona / accesibilidad / contexto /
+  programacion:** segun la subcategoria (museo, cultura, bar, espacio publico,
+  sitio-historico, religioso); los keys exactos estan en el prompt maestro.
+
+### (Sitio - ciudad/pueblo) Guia de ciudad
+- Tipo de destino (Ciudad o Pueblo), duracion sugerida, precio de entrada,
+  distancia, como llegar, permisos, temporada y nota de temporada, contexto.
+- **Atracciones:** (6-12: icono + nombre + descripcion)
+- **Actividades gratis:** (4-8: icono + nombre + descripcion)
+- **Programacion:** (dia/fecha + eventos)
+- **Accesibilidad:** (icono + nombre + descripcion)
+- **Barrios donde dormir:** (icono + nombre + tipo + descripcion)
+- **Transporte:** (icono + nombre + descripcion; aeropuerto, metro/bus, taxi/app)
+- **Seguridad:** (icono + nombre + descripcion; primer item = riesgo por zona
+  con fuente y fecha)
+- **Presupuesto diario:** (tipo Mochilero/Medio/Alto + rango COP + detalle)
+- **Gastronomia tipica:** (icono + nombre + descripcion, plato y donde probarlo)
+- **Cuando ir:** (periodo o temporada + estado ideal/posible/no + nota)
+- Las 6 listas (barrios, transporte, seguridad, presupuesto, gastronomia,
+  cuando_ir) son obligatorias y llevan minimo 3 items cada una.
 
 ### (Evento) El evento
 - Fecha inicio/fin, edicion, sede, organiza, lema.
@@ -105,7 +130,13 @@ Este archivo es el contrato: el bloque JSON del final alimenta el seed.
 ## Notas de conversion (cierra content-loader)
 
 - `foto_hero` se toma de `FOTOS_SUGERIDAS[0]`.
+- `subcategoria` viaja en BASE; el backend la promueve a `tags.subcategoria`
+  (api/publicar-lugar.js), que es lo que lee el motor de render.
+- `zona`, `sintro`, `barrio` y `hero_bg` son columnas de `destinos`.
 - `fauna_flora` y `secretos` (sitio) se serializan con `JSON.stringify` en el seed.
+- Las 6 listas de ciudad (`barrios`, `transporte`, `seguridad`, `presupuesto`,
+  `gastronomia`, `cuando_ir`) van como JSONB dentro de `tags`, igual que
+  `atracciones` o `programacion`.
 - Emoji, iconos y `temporada_matriz` se pasan como escapes `\uXXXX` en el seed
   (ADR-002: ASCII-safe en archivos JS; la ficha puede llevar UTF-8 limpio).
 - Fotos rotas (HEAD != 200) se descartan y se busca un archivo alternativo

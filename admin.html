@@ -736,6 +736,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         <div class="ftab" onclick="showFormTab('media')" id="ftab-media"><span>📷</span> Fotos</div>
         <div class="ftab" onclick="showFormTab('contenido')" id="ftab-contenido"><span>✏️</span> Contenido</div>
         <div class="ftab" onclick="showFormTab('especifico')" id="ftab-especifico"><span>🎯</span> Específico</div>
+        <div class="ftab" onclick="showFormTab('faq')" id="ftab-faq"><span>❓</span> FAQs</div>
         <div class="ftab" onclick="showFormTab('contacto')" id="ftab-contacto"><span>📞</span> Contacto</div>
       </div>
 
@@ -993,7 +994,6 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <div class="cetab"      onclick="showCatTab('hostal-reservar')">📅 Reservas</div>
             <div class="cetab"      onclick="showCatTab('hostal-transporte')">🚌 Cómo llegar</div>
             <div class="cetab"      onclick="showCatTab('hostal-events')">🎉 Eventos</div>
-            <div class="cetab"      onclick="showCatTab('hostal-faq')">❓ FAQs</div>
             <div class="cetab"      onclick="showCatTab('hostal-politicas')">📋 Políticas</div>
           </div>
 
@@ -1183,34 +1183,6 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               </div>
             </div>
             <button class="btn btn-ghost btn-sm" onclick="addHostalEvent()">+ Añadir evento</button>
-          </div>
-
-          <!-- ── FAQs ── -->
-          <div class="cat-panel" id="cat-hostal-faq">
-            <div class="form-hint">Preguntas frecuentes que aparecen en la sección FAQ de la página. Mínimo 4 recomendadas.</div>
-            <div id="faq-builder-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px">
-              <div class="faq-builder-row" style="background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)">
-                <input class="form-input faq-q-inp" value="¿Cuál es la política de cancelación?" style="margin-bottom:4px">
-                <textarea class="form-input faq-a-inp" rows="2">Cancelación gratuita hasta 48h antes. Después se cobra 50% de la primera noche.</textarea>
-                <button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕</button>
-              </div>
-              <div class="faq-builder-row" style="background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)">
-                <input class="form-input faq-q-inp" value="¿Hay check-in tardío después de las 10pm?" style="margin-bottom:4px">
-                <textarea class="form-input faq-a-inp" rows="2">Sí, tenemos recepción 24h. Avisa con anticipación por WhatsApp.</textarea>
-                <button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕</button>
-              </div>
-              <div class="faq-builder-row" style="background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)">
-                <input class="form-input faq-q-inp" value="¿El desayuno está incluido?" style="margin-bottom:4px">
-                <textarea class="form-input faq-a-inp" rows="2">Incluido en habitaciones privadas. En dormitorios tiene costo adicional de $8.000.</textarea>
-                <button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕</button>
-              </div>
-              <div class="faq-builder-row" style="background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)">
-                <input class="form-input faq-q-inp" value="¿Aceptan mascotas?" style="margin-bottom:4px">
-                <textarea class="form-input faq-a-inp" rows="2">No admitimos mascotas en áreas comunes ni dormitorios.</textarea>
-                <button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕</button>
-              </div>
-            </div>
-            <button class="btn btn-ghost btn-sm" onclick="addFaqRow()">+ Añadir pregunta</button>
           </div>
 
           <!-- ── POLITICAS Y EXTRAS (TASK-001) ── -->
@@ -1430,6 +1402,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               <option value="bar">Bar</option>
               <option value="parque">Parque</option>
               <option value="espacio-publico">Espacio público</option>
+              <option value="ciudad">Ciudad / Pueblo</option>
               <option value="sitio-historico">Sitio histórico</option>
               <option value="religioso">Religioso</option>
               <option value="aventura">Aventura</option>
@@ -1442,6 +1415,21 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <div class="cetab" onclick="showCatTab('sitio-entradas')">Entradas</div>
             <div class="cetab" onclick="showCatTab('sitio-itinerario')">Itinerario</div>
             <div class="cetab" onclick="showCatTab('sitio-extras')">Extras</div>
+            <div class="cetab" onclick="showCatTab('sitio-atracciones')">Atracciones</div>
+            <div class="cetab" onclick="showCatTab('sitio-barrios')">Barrios</div>
+            <div class="cetab" onclick="showCatTab('sitio-transporte')">Transporte</div>
+            <div class="cetab" onclick="showCatTab('sitio-seguridad')">Seguridad</div>
+            <div class="cetab" onclick="showCatTab('sitio-gastronomia')">Gastronomia</div>
+            <div class="cetab" onclick="showCatTab('sitio-presupuesto')">Presupuesto</div>
+            <div class="cetab" onclick="showCatTab('sitio-cuando-ir')">Cuando ir</div>
+            <div class="cetab" onclick="showCatTab('sitio-programacion')">Programacion</div>
+            <div class="cetab" onclick="showCatTab('sitio-horarios-zona')">Horarios por zona</div>
+            <div class="cetab" onclick="showCatTab('sitio-accesibilidad')">Accesibilidad</div>
+            <div class="cetab" onclick="showCatTab('sitio-actividades-gratis')">Actividades gratis</div>
+            <div class="cetab" onclick="showCatTab('sitio-que-ver')">Que ver</div>
+            <div class="cetab" onclick="showCatTab('sitio-colecciones')">Colecciones</div>
+            <div class="cetab" onclick="showCatTab('sitio-recorridos')">Recorridos</div>
+            <div class="cetab" onclick="showCatTab('sitio-contexto')">Contexto</div>
           </div>
           <div class="cat-panel on" id="cat-sitio-tours">
             <div id="tour-list-admin" style="margin-bottom:8px"></div>
@@ -1592,6 +1580,111 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               <textarea class="form-input" id="f-regulaciones" rows="3" placeholder="Ej: Cupo maximo 200 personas/dia. No se permiten mascotas. Guia obligatorio..."></textarea>
             </div>
           </div>
+
+          <!-- SECCION: Atracciones (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-atracciones">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Lugares imperdibles del destino: icono, nombre y descripcion.</p>
+            <div id="sitio-atracciones-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('atracciones')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Barrios (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-barrios">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Barrios o zonas del destino, con su tipo (ej: historico, nocturno, comercial).</p>
+            <div id="sitio-barrios-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('barrios')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Transporte (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-transporte">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Como moverse: metro, taxi, bus, apps. Icono, nombre y descripcion.</p>
+            <div id="sitio-transporte-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('transporte')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Seguridad (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-seguridad">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Recomendaciones de seguridad para el visitante.</p>
+            <div id="sitio-seguridad-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('seguridad')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Gastronomia (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-gastronomia">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Que comer: platos y bebidas tipicas con su descripcion.</p>
+            <div id="sitio-gastronomia-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('gastronomia')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Presupuesto (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-presupuesto">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Rango de gasto por tipo de viajero (mochilero, medio, alto).</p>
+            <div id="sitio-presupuesto-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('presupuesto')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Cuando ir (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-cuando-ir">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Mejor epoca: estado ideal / posible / no, con una nota.</p>
+            <div id="sitio-cuando-ir-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('cuando_ir')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Programacion (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-programacion">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Agenda por dia (eventos o actividades programadas).</p>
+            <div id="sitio-programacion-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('programacion')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Horarios por zona (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-horarios-zona">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Horario y estado (Abierto / Cerrado) de cada zona o recinto.</p>
+            <div id="sitio-horarios-zona-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('horarios_zona')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Accesibilidad (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-accesibilidad">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Condiciones de acceso: rampas, ascensores, baños adaptados...</p>
+            <div id="sitio-accesibilidad-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('accesibilidad')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Actividades gratis (contrato buildHTML) -->
+          <div class="cat-panel" id="cat-sitio-actividades-gratis">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Planes sin costo: icono, nombre y descripcion.</p>
+            <div id="sitio-actividades-gratis-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('actividades_gratis')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Que ver (contrato buildHTML: acces-row) -->
+          <div class="cat-panel" id="cat-sitio-que-ver">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Puntos destacados: icono, nombre y descripcion. Mismo contrato que Accesibilidad ({icono,nombre,descripcion}).</p>
+            <div id="sitio-que-ver-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('que_ver')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Colecciones (museo / cultura) -->
+          <div class="cat-panel" id="cat-sitio-colecciones">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Colecciones o salas: nombre, precio, descripcion y enlace (opcional).</p>
+            <div id="sitio-colecciones-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('colecciones')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Recorridos (museo / cultura / sitio-historico / religioso) -->
+          <div class="cat-panel" id="cat-sitio-recorridos">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Recorridos: icono, nombre, duracion y descripcion.</p>
+            <div id="sitio-recorridos-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioListaRow('recorridos')">+ Agregar</button>
+          </div>
+
+          <!-- SECCION: Contexto historico / cultural (texto plano) -->
+          <div class="cat-panel" id="cat-sitio-contexto">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Contexto historico y cultural del destino (texto libre).</p>
+            <textarea class="form-input" id="f-sitio-contexto" rows="6" placeholder="Historia, cultura y datos que ayuden a entender el destino..."></textarea>
+          </div>
+
         </div>
 
         <div id="especifico-evento" class="cat-panel">
@@ -1735,6 +1828,37 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           </div>
         </div><!-- /especifico-blog -->
       </div><!-- /fpanel-especifico -->
+
+      <!-- TAB: FAQ (pestana propia: visible en TODAS las categorias menos blog).
+           El nodo #faq-builder-list se traslado aqui desde especifico-hostal
+           (mismo id, mismas clases faq-builder-row / faq-q-inp / faq-a-inp,
+           mismos moveFaqRow/removeRow). api/pagina-destino.js solo pinta FAQ
+           si la categoria no es blog, por eso la pestana se oculta en blog. -->
+      <div class="ftab-panel" id="fpanel-faq">
+        <div class="card-section">
+          <div class="card-section-title">❓ Preguntas frecuentes</div>
+          <div class="form-hint" style="margin-bottom:10px">
+            Estas preguntas se publican en la sección FAQ de la página pública del destino.
+            El orden de las filas es el orden en que aparecen.
+          </div>
+          <div id="faq-builder-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px">
+            <div class="faq-builder-row" style="background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)">
+              <input class="form-input faq-q-inp" value="" placeholder="Pregunta" style="margin-bottom:4px">
+              <textarea class="form-input faq-a-inp" rows="2" placeholder="Respuesta"></textarea>
+              <span style="display:flex;gap:4px;align-items:center;margin-top:4px"><button class="btn btn-ghost btn-icon btn-sm" type="button" onclick="moveFaqRow(this,-1)" title="Subir" aria-label="Subir pregunta">&#9650;</button><button class="btn btn-ghost btn-icon btn-sm" type="button" onclick="moveFaqRow(this,1)" title="Bajar" aria-label="Bajar pregunta">&#9660;</button></span>
+              <button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" type="button" onclick="addFaqRow()">+ Añadir pregunta</button>
+            <button class="btn btn-ghost btn-sm" type="button" onclick="insertFaqSuggestions()">💡 Insertar preguntas sugeridas</button>
+          </div>
+          <div class="form-hint" style="margin-top:8px">
+            Las preguntas sugeridas se insertan SOLO como enunciado: la respuesta
+            se escribe a mano, nunca se rellena sola.
+          </div>
+        </div>
+      </div><!-- /fpanel-faq -->
 
       <!-- TAB: CONTACTO -->
       <div class="ftab-panel" id="fpanel-contacto">
@@ -3163,6 +3287,8 @@ function newPlace() {
   });
   /* TSK-071: f-cat quedo vacio -> ocultar herramientas del cuerpo blog */
   updateBlogBodyTools();
+  /* Arranque del editor: f-cat vacio -> la pestana FAQ es visible. */
+  updateFaqTabVisibility();
 }
 async function editPlace(id) {
   var p = places.find(function(x){ return x.id===id; });
@@ -3282,24 +3408,13 @@ function clearForm() {
   /* -- Reset orden de modulos del hostal (ADR-034) -- */
   if (typeof _renderHostalModulos === 'function') _renderHostalModulos(HOSTAL_MODULOS_ORDEN_DEFAULT.slice());
 
-  /* ── Reset FAQ list ── */
+  /* ── Reset FAQ list: UNA fila en blanco, sin filas ficticias ──
+     Las preguntas sugeridas no se siembran aqui: se insertan a proposito
+     con insertFaqSuggestions() y llegan con la respuesta VACIA. */
   var faqList = document.getElementById('faq-builder-list');
   if(faqList) {
     faqList.innerHTML = '';
-    [['¿Cuál es la política de cancelación?','Cancelación gratuita hasta 48h antes. Después se cobra 50% de la primera noche.'],
-     ['¿Hay check-in tardío después de las 10pm?','Sí, tenemos recepción 24h. Avisa con anticipación por WhatsApp.'],
-     ['¿El desayuno está incluido?','Incluido en habitaciones privadas. En dormitorios tiene costo adicional.'],
-     ['¿Aceptan mascotas?','No admitimos mascotas en áreas comunes ni dormitorios.']
-    ].forEach(function(faq){
-      var row = document.createElement('div');
-      row.className = 'faq-builder-row';
-      row.style.cssText = 'background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)';
-      row.innerHTML = '<input class="form-input faq-q-inp" value="'+faq[0]+'" placeholder="Pregunta" style="margin-bottom:4px">'
-        +'<textarea class="form-input faq-a-inp" rows="2" placeholder="Respuesta">'+faq[1]+'</textarea>'
-        +_faqMoveBtns()
-        +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕</button>';
-      faqList.appendChild(row);
-    });
+    if (typeof addFaqRow === 'function') addFaqRow();
   }
 
   /* ── Reset evento fields ── */
@@ -3321,6 +3436,14 @@ function clearForm() {
     var el = document.getElementById(id);
     if(el) el.innerHTML = '';
   });
+  /* ADR-016: colecciones de sitio (contrato de buildHTML) -> lista vacia,
+     sin filas fantasma; el boton "+ Agregar" es la unica via de alta. */
+  if (typeof SITIO_COLECCIONES === 'object' && SITIO_COLECCIONES) {
+    Object.keys(SITIO_COLECCIONES).forEach(function(k){
+      var box = document.getElementById(SITIO_COLECCIONES[k].cont);
+      if (box) box.innerHTML = '';
+    });
+  }
   /* -- Reset comida dynamic lists (P2) -- */
   var menuList = document.getElementById('menu-item-list');
   if(menuList) menuList.innerHTML = '';
@@ -3404,6 +3527,9 @@ var CATEGORY_TAG_FIELDS = {
       collector: function(){ return (typeof collectSitioSecretos==='function') ? collectSitioSecretos() : ''; } },
     { key:'regulaciones',   id:'f-regulaciones' },
     { key:'checklist_tip',  id:'f-checklist-tip' },
+    /* contexto (ADR-016): texto plano, unica seccion de sitio que no es
+       lista. Forma congelada: string (se pinta con <br> por salto de linea). */
+    { key:'contexto',       id:'f-sitio-contexto' },
     { key:'subcategoria',   id:'f-subcategoria-sitio' }
   ],
   /* TASK-001 (completado). Los primeros 6 son los campos nuevos del
@@ -3481,6 +3607,176 @@ var CATEGORY_TAG_FIELDS = {
   ]
 };
 
+/* ── COLECCIONES DE SITIO (contrato de buildHTML, ADR-016) ──
+   Cada seccion que el motor pinta como lista se declara UNA vez aqui:
+   contenedor, clase de fila y campos. De esta tabla salen el render
+   (_sitioRenderColeccion), el colector (_sitioCollectColeccion) y el boton
+   "+ Agregar" (addSitioListaRow) -- no hay doce bloques copiados a mano.
+   Formas congeladas (api/pagina-destino.js: parseo 795-826, render 1666-1915):
+     atracciones / actividades_gratis / accesibilidad / transporte /
+     seguridad / gastronomia -> [{icono,nombre,descripcion}]
+     barrios                  -> [{icono,nombre,tipo,descripcion}]
+     presupuesto              -> [{tipo,rango,detalle}]
+     cuando_ir                -> [{periodo,estado,nota}]   estado: ideal|posible|no
+     programacion             -> [{dia,eventos}]
+     horarios_zona            -> [{zona,horario,estado}]    estado: Abierto|Cerrado
+     colecciones              -> [{nombre,precio,descripcion,url}]
+     recorridos               -> [{icono,nombre,descripcion,duracion}]
+     que_ver                  -> [{icono,nombre,descripcion}]  (reusa accesibilidad)
+   "contexto" es texto plano: va en CATEGORY_TAG_FIELDS.sitio.
+   Campos "solo-identidad" (icono, estado): una fila que solo los tenga NO se
+   guarda, para no crear filas fantasma al pulsar "+ Agregar". */
+var SITIO_COLECCIONES = {
+  'atracciones': {
+    cont:'sitio-atracciones-list', cls:'sitio-atracciones-row',
+    campos:[{k:'icono',ph:'📍',center:true},{k:'nombre',ph:'Nombre'},{k:'descripcion',ph:'Descripcion breve',ta:true}]
+  },
+  'barrios': {
+    cont:'sitio-barrios-list', cls:'sitio-barrios-row',
+    campos:[{k:'icono',ph:'◆',center:true},{k:'nombre',ph:'Barrio'},{k:'tipo',ph:'Tipo (historico, nocturno...)'},{k:'descripcion',ph:'Descripcion',ta:true}]
+  },
+  'transporte': {
+    cont:'sitio-transporte-list', cls:'sitio-transporte-row',
+    campos:[{k:'icono',ph:'🚌',center:true},{k:'nombre',ph:'Medio (Metro, Taxi, Uber...)'},{k:'descripcion',ph:'Detalle y tiempo',ta:true}]
+  },
+  'seguridad': {
+    cont:'sitio-seguridad-list', cls:'sitio-seguridad-row',
+    campos:[{k:'icono',ph:'⚠',center:true},{k:'nombre',ph:'Recomendacion'},{k:'descripcion',ph:'Detalle',ta:true}]
+  },
+  'gastronomia': {
+    cont:'sitio-gastronomia-list', cls:'sitio-gastronomia-row',
+    campos:[{k:'icono',ph:'🍽',center:true},{k:'nombre',ph:'Plato o bebida'},{k:'descripcion',ph:'Descripcion',ta:true}]
+  },
+  'presupuesto': {
+    cont:'sitio-presupuesto-list', cls:'sitio-presupuesto-row',
+    campos:[{k:'tipo',ph:'Mochilero'},{k:'rango',ph:'$80.000 - $150.000 / dia'},{k:'detalle',ph:'Que incluye',ta:true}]
+  },
+  'cuando_ir': {
+    cont:'sitio-cuando-ir-list', cls:'sitio-cuando-ir-row',
+    campos:[{k:'periodo',ph:'Dic - Mar'},{k:'estado',sel:['','ideal','posible','no']},{k:'nota',ph:'Nota (clima, temporada alta...)',ta:true}]
+  },
+  'programacion': {
+    cont:'sitio-programacion-list', cls:'sitio-programacion-row',
+    campos:[{k:'dia',ph:'Lunes'},{k:'eventos',ph:'Eventos o actividades del dia',ta:true}]
+  },
+  'horarios_zona': {
+    cont:'sitio-horarios-zona-list', cls:'sitio-horarios-zona-row',
+    campos:[{k:'zona',ph:'Centro historico'},{k:'horario',ph:'8:00 - 18:00'},{k:'estado',sel:['','Abierto','Cerrado']}]
+  },
+  'accesibilidad': {
+    cont:'sitio-accesibilidad-list', cls:'sitio-accesibilidad-row',
+    campos:[{k:'icono',ph:'♿',center:true},{k:'nombre',ph:'Condicion de acceso'},{k:'descripcion',ph:'Detalle',ta:true}]
+  },
+  'actividades_gratis': {
+    cont:'sitio-actividades-gratis-list', cls:'sitio-actividades-gratis-row',
+    campos:[{k:'icono',ph:'🆓',center:true},{k:'nombre',ph:'Actividad'},{k:'descripcion',ph:'Detalle',ta:true}]
+  },
+  /* Forma congelada del render de Colecciones (pagina-destino.js:1644-1656):
+     {nombre, precio, descripcion, url}. "precio" lo formatea money(). */
+  'colecciones': {
+    cont:'sitio-colecciones-list', cls:'sitio-colecciones-row',
+    cols:'1fr 130px 2fr 90px auto',
+    campos:[{k:'nombre',ph:'Sala precolombina'},{k:'precio',ph:'$25.000'},{k:'descripcion',ph:'Que se exhibe',ta:true},{k:'url',ph:'https://...'}]
+  },
+  /* Forma congelada del render de Recorridos (pagina-destino.js:1658-1672):
+     {icono, nombre, descripcion, duracion}. */
+  'recorridos': {
+    cont:'sitio-recorridos-list', cls:'sitio-recorridos-row',
+    cols:'60px 1fr 2fr 140px auto',
+    campos:[{k:'icono',ph:'ico',center:true},{k:'nombre',ph:'Recorrido guiado'},{k:'descripcion',ph:'Que incluye',ta:true},{k:'duracion',ph:'45 min'}]
+  }
+};
+
+/* que_ver se pinta con el MISMO contrato que accesibilidad
+   ({icono,nombre,descripcion}: pagina-destino.js:1795-1802, clase acces-row).
+   Se REUSA su definicion de campos en vez de duplicarla; solo cambian el
+   contenedor y la clase de fila. */
+SITIO_COLECCIONES.que_ver = {
+  cont:'sitio-que-ver-list', cls:'sitio-que-ver-row',
+  campos: SITIO_COLECCIONES.accesibilidad.campos
+};
+
+/* Campos cuyo valor no basta para considerar que la fila tiene datos. */
+function _sitioCampoIdentidad(k) { return k === 'icono' || k === 'estado'; }
+
+/* Columnas del grid de la fila segun cuantos campos tenga la coleccion. */
+function _sitioGridCols(n) {
+  if (n <= 2) return '110px 1fr auto';
+  if (n === 3) return '90px 1fr 2fr auto';
+  return '60px 1fr 140px 2fr auto';
+}
+
+/* HTML de UNA fila. Reusa las clases existentes (form-input/form-select). */
+function _sitioRowHTML(clave, data) {
+  var spec = SITIO_COLECCIONES[clave];
+  if (!spec) return '';
+  var html = '';
+  spec.campos.forEach(function(c){
+    var raw = (data && data[c.k] !== undefined && data[c.k] !== null) ? String(data[c.k]) : '';
+    var val = (typeof _esc === 'function') ? _esc(raw) : raw;
+    if (c.sel) {
+      html += '<select class="form-input form-select" data-field="' + c.k + '">'
+        + c.sel.map(function(o){
+            return '<option value="' + o + '"' + (o === raw ? ' selected' : '') + '>' + (o || '—') + '</option>';
+          }).join('')
+        + '</select>';
+    } else if (c.ta) {
+      html += '<textarea class="form-input" data-field="' + c.k + '" rows="2" placeholder="' + c.ph + '">' + val + '</textarea>';
+    } else {
+      html += '<input class="form-input" data-field="' + c.k + '" value="' + val + '" placeholder="' + c.ph + '"'
+        + (c.center ? ' style="text-align:center"' : '') + '>';
+    }
+  });
+  return html + '<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+}
+
+/* Alta de UNA fila (boton "+ Agregar" y render de precarga). */
+function addSitioListaRow(clave, data) {
+  var spec = SITIO_COLECCIONES[clave];
+  if (!spec) return;
+  var box = document.getElementById(spec.cont);
+  if (!box) return;
+  var row = document.createElement('div');
+  row.className = spec.cls;
+  row.style.cssText = 'display:grid;grid-template-columns:' + (spec.cols || _sitioGridCols(spec.campos.length))
+    + ';gap:6px;align-items:start;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)';
+  row.innerHTML = _sitioRowHTML(clave, data || {});
+  box.appendChild(row);
+}
+
+/* Render completo: SIEMPRE limpia el contenedor. Sin items -> lista vacia,
+   nunca filas fantasma de la ficha anterior. */
+function _sitioRenderColeccion(clave, items) {
+  var spec = SITIO_COLECCIONES[clave];
+  if (!spec) return;
+  var box = document.getElementById(spec.cont);
+  if (!box) return;
+  box.innerHTML = '';
+  if (!Array.isArray(items)) return;
+  items.forEach(function(it){ if (it && typeof it === 'object') addSitioListaRow(clave, it); });
+}
+
+/* Colector: lee las filas por [data-field] y devuelve la forma del contrato.
+   Una fila sin datos (solo icono/estado o vacia) NO se devuelve. */
+function _sitioCollectColeccion(clave) {
+  var spec = SITIO_COLECCIONES[clave];
+  if (!spec) return [];
+  var box = document.getElementById(spec.cont);
+  if (!box) return [];
+  var out = [];
+  box.querySelectorAll('.' + spec.cls).forEach(function(row){
+    var obj = {}, tiene = false;
+    spec.campos.forEach(function(c){
+      var el = row.querySelector('[data-field="' + c.k + '"]');
+      var v = el ? String(el.value === undefined || el.value === null ? '' : el.value).trim() : '';
+      obj[c.k] = v;
+      if (v && !_sitioCampoIdentidad(c.k)) tiene = true;
+    });
+    if (tiene) out.push(obj);
+  });
+  return out;
+}
+
 var CATEGORY_TAG_LISTS = {
   sitio: [
     { key:'tours',        localKey:'tours',
@@ -3492,7 +3788,38 @@ var CATEGORY_TAG_LISTS = {
     { key:'itinerario',   localKey:'itinerario',
       collector: function(){ return (typeof collectSitioItinerario==='function') ? collectSitioItinerario() : []; } },
     { key:'dificultad_tags', localKey:'dificultadTags',
-      collector: function(){ return (typeof collectDificultadTags==='function') ? collectDificultadTags() : []; } }
+      collector: function(){ return (typeof collectDificultadTags==='function') ? collectDificultadTags() : []; } },
+    /* ADR-016: secciones de sitio con forma de lista (contrato de buildHTML).
+       Una entrada por coleccion; el render/colector es el generico de
+       SITIO_COLECCIONES, asi que anadir una seccion no toca este bloque. */
+    { key:'atracciones', localKey:'atracciones',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('atracciones') : []; } },
+    { key:'barrios', localKey:'barrios',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('barrios') : []; } },
+    { key:'transporte', localKey:'transporte',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('transporte') : []; } },
+    { key:'seguridad', localKey:'seguridad',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('seguridad') : []; } },
+    { key:'gastronomia', localKey:'gastronomia',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('gastronomia') : []; } },
+    { key:'presupuesto', localKey:'presupuesto',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('presupuesto') : []; } },
+    { key:'cuando_ir', localKey:'cuandoIr',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('cuando_ir') : []; } },
+    { key:'programacion', localKey:'programacion',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('programacion') : []; } },
+    { key:'horarios_zona', localKey:'horariosZona',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('horarios_zona') : []; } },
+    { key:'accesibilidad', localKey:'accesibilidad',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('accesibilidad') : []; } },
+    { key:'actividades_gratis', localKey:'actividadesGratis',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('actividades_gratis') : []; } },
+    { key:'que_ver', localKey:'queVer',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('que_ver') : []; } },
+    { key:'colecciones', localKey:'colecciones',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('colecciones') : []; } },
+    { key:'recorridos', localKey:'recorridos',
+      collector: function(){ return (typeof _sitioCollectColeccion==='function') ? _sitioCollectColeccion('recorridos') : []; } },
   ],
   hostal: [
     { key:'actividades',  localKey:'actividades',
@@ -3596,7 +3923,15 @@ function _buildTagsObj(p) {
   if (p.checkout) tagsObj.checkout = p.checkout;
   if (p.habs && p.habs.length) tagsObj.habitaciones = p.habs;
   if (p.amenities && p.amenities.length) tagsObj.amenidades = p.amenities;
-  if (p.faqs && p.faqs.length) tagsObj.faqs = p.faqs;
+  /* FAQ: destinos_detalles.faqs es la FUENTE CANONICA y tags.faqs es ESPEJO
+     legado. El espejo se emite SIEMPRE que el objeto traiga el arreglo
+     (incluido array VACIO), para que no quede un tags.faqs viejo
+     contradiciendo al detalle cuando se borran todas las preguntas.
+     En blog no existe la clave: pagina-destino.js no pinta FAQ y
+     _placeToAPI() ya omite faqs para que el COALESCE del backend no borre
+     nada. Sin p.faqs (objetos sinteticos de la previsualizacion de aforo)
+     no se inventa la clave: solo se espeja lo que el editor realmente lee. */
+  if (p.cat !== 'blog' && Array.isArray(p.faqs)) tagsObj.faqs = p.faqs;
 
   var defs = CATEGORY_TAG_FIELDS[p.cat] || [];
   defs.forEach(function(d){
@@ -3957,21 +4292,6 @@ function loadForm(p) {
           evList.appendChild(row);
         });
       }
-      /* FAQs */
-      var faqList=document.getElementById('faq-builder-list');
-      if(faqList&&p.faqs&&p.faqs.length){
-        faqList.innerHTML='';
-        p.faqs.forEach(function(f){
-          var row=document.createElement('div');
-          row.className='faq-builder-row';
-          row.style.cssText='background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)';
-          row.innerHTML='<input class="form-input faq-q-inp" value="'+_esc(f.q||'')+'" placeholder="Pregunta" style="margin-bottom:4px">'
-            +'<textarea class="form-input faq-a-inp" rows="2" placeholder="Respuesta">'+_esc(f.a||'')+'</textarea>'
-            +_faqMoveBtns()
-            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕</button>';
-          faqList.appendChild(row);
-        });
-      }
     },100);
   }
 
@@ -4166,6 +4486,26 @@ function loadForm(p) {
           if (secTxt) secTxt.value = '';
         }
       }
+      /* ADR-016: colecciones del contrato de sitio. El render es generico y
+         LIMPIA cada contenedor: sin datos queda lista vacia (cero filas
+         fantasma de la ficha anterior). */
+      if (typeof SITIO_COLECCIONES === 'object' && SITIO_COLECCIONES) {
+        Object.keys(SITIO_COLECCIONES).forEach(function(k){
+          /* La clave de tags no siempre coincide con la clave local que deja
+             _applyTagsToLocal() (horarios_zona->horariosZona, cuando_ir->
+             cuandoIr, que_ver->queVer, actividades_gratis->actividadesGratis).
+             Se resuelve el localKey desde CATEGORY_TAG_LISTS.sitio en vez de
+             asumir p[k]; sin esto la precarga salia vacia. */
+          var items = p[k];
+          if (!Array.isArray(items)) {
+            var defs = CATEGORY_TAG_LISTS.sitio || [];
+            for (var i = 0; i < defs.length; i++) {
+              if (defs[i].key === k) { items = p[defs[i].localKey]; break; }
+            }
+          }
+          _sitioRenderColeccion(k, Array.isArray(items) ? items : []);
+        });
+      }
     }, 100);
   }
 
@@ -4259,6 +4599,35 @@ function loadForm(p) {
       // El id ya quedo en f-blog-autor-id arriba; esto solo resuelve
       // nombre/bio/foto para mostrar la tarjeta de vista previa.
       blogPrecargarAutor(p.id_autor || '');
+    },100);
+  }
+
+  /* ── FAQs (pestana propia, TODAS las categorias menos blog) ──
+     admin-destinos.js hace COALESCE de destinos_detalles.faqs, asi que el
+     constructor se LIMPIA SIEMPRE antes de pintar: si se dejaran las filas
+     del destino anterior, un guardado machacaria las FAQs reales por las de
+     la ficha previa (ese era el defecto medido). Sin p.faqs queda UNA fila
+     en blanco: estado vacio real, nunca ejemplos ficticios.
+     En blog no se toca: p.faqs no existe y la clave no viaja. */
+  if(p.cat !== 'blog') {
+    setTimeout(function(){
+      var faqList=document.getElementById('faq-builder-list');
+      if(!faqList) return;
+      faqList.innerHTML='';
+      if(!p.faqs || !p.faqs.length){
+        if(typeof addFaqRow==='function') addFaqRow();
+        return;
+      }
+      p.faqs.forEach(function(f){
+        var row=document.createElement('div');
+        row.className='faq-builder-row';
+        row.style.cssText='background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)';
+        row.innerHTML='<input class="form-input faq-q-inp" value="'+_esc(f.q||'')+'" placeholder="Pregunta" style="margin-bottom:4px">'
+          +'<textarea class="form-input faq-a-inp" rows="2" placeholder="Respuesta">'+_esc(f.a||'')+'</textarea>'
+          +_faqMoveBtns()
+          +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕</button>';
+        faqList.appendChild(row);
+      });
     },100);
   }
 }
@@ -4511,7 +4880,6 @@ function savePlace() {
   if(cat === 'hostal') {
     p.habs          = collectHabs();
     p.amenities     = collectAmenities('servicios-grid');  /* reads .srv-check inputs */
-    p.faqs          = collectFaqs();
     p.checkin       = v('f-checkin');
     p.checkout      = v('f-checkout');
     p.bookingUrl    = v('f-booking-url');
@@ -4592,8 +4960,10 @@ function savePlace() {
     collectCategoryTagFields(p, 'blog');
   }
 
-  /* ── FAQs (all categories) ── */
-  p.faqs = collectFaqs();
+  /* ── FAQs (pestana propia; solo categorias con FAQ) ──
+     En blog p.faqs queda SIN DEFINIR a proposito: _placeToAPI() omite la
+     clave para que admin-destinos.js haga COALESCE y no borre nada. */
+  if(cat !== 'blog') p.faqs = collectFaqs();
 
   if(idx === -1) places.push(p); else places[idx] = p;
   savePlaces();
@@ -4942,6 +5312,12 @@ function showFormTab(tab) {
   if(t) t.classList.add('on');
   if(p) p.classList.add('on');
   if(tab==='contacto') setTimeout(function(){ updateMiniMap(); },100);
+  /* Pestana FAQ: garantiza el estado vacio real (una fila en blanco) si el
+     constructor quedara sin filas al entrar. */
+  if(tab==='faq') setTimeout(function(){
+    var l = document.getElementById('faq-builder-list');
+    if(l && !l.children.length && typeof addFaqRow==='function') addFaqRow();
+  },30);
   /* ADR-017: al abrir el tab FOTOS cargar la seccion Foto Top; solo se
      muestra si hay un destino con Neon UUID resuelto (regla 6) */
   if(tab==='media') setTimeout(mostrarFotoTopSection, 50);
@@ -4969,6 +5345,23 @@ function updateCatUI() {
      contador) solo visibles en categoria blog */
   updateBlogBodyTools();
   updateTagSuggestions(cat);
+  /* FAQ: pestana propia visible en TODAS las categorias menos blog
+     (api/pagina-destino.js solo pinta FAQ si cat !== 'blog'). */
+  updateFaqTabVisibility();
+}
+
+/* Visibilidad de la pestana FAQ del editor. blog no tiene FAQ en la pagina
+   publica, asi que la pestana se oculta; si el editor estaba DENTRO de ella
+   al cambiar a blog, se vuelve a General para no dejar un panel oculto
+   activo. Se llama desde updateCatUI() y desde el arranque del editor. */
+function updateFaqTabVisibility() {
+  var tab = document.getElementById('ftab-faq');
+  var panel = document.getElementById('fpanel-faq');
+  var esBlog = v('f-cat') === 'blog';
+  if(tab) tab.style.display = esBlog ? 'none' : '';
+  if(panel && esBlog) panel.style.display = 'none';
+  else if(panel) panel.style.display = '';
+  if(esBlog && tab && tab.classList.contains('on')) showFormTab('general');
 }
 function catLabel(c) {
   return {hostal:'Hospedaje',comida:'Comida',sitio:'Lugar',evento:'Evento',blog:'Blog'}[c]||c;
@@ -5450,17 +5843,48 @@ function showCatTab(id) {
 
 /* ── ADR-016: visibilidad de modulos de sitio por subcategoría ── */
 var SITIO_SUBCAT_MODULES = {
-  'naturaleza':     ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras'],
-  'aventura':       ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras'],
-  'parque':         ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras'],
-  'museo':          ['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras'],
-  'cultura':        ['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras'],
-  'sitio-historico':['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras'],
-  'religioso':      ['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras'],
-  'espacio-publico':['sitio-tours','sitio-entradas','sitio-extras'],
-  'bar':            ['sitio-entradas','sitio-extras']
+  'naturaleza':     ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras',
+                     'sitio-horarios-zona','sitio-que-ver'],
+  'aventura':       ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras',
+                     'sitio-horarios-zona','sitio-que-ver'],
+  /* parque: el motor anade atracciones/horarios_zona/accesibilidad/
+     actividades_gratis a las secciones de tours (pagina-destino.js:58). */
+  'parque':         ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras',
+                     'sitio-atracciones','sitio-horarios-zona','sitio-accesibilidad','sitio-actividades-gratis'],
+  /* museo/cultura/sitio-historico/religioso: el motor pinta colecciones
+     (museo, cultura) y recorridos (los cuatro) -- pagina-destino.js:55-61.
+     El editor ya tiene panel para ambas (SITIO_COLECCIONES.colecciones /
+     .recorridos), asi que se encienden solo donde el motor las renderiza. */
+  'museo':          ['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras',
+                     'sitio-colecciones','sitio-recorridos',
+                     'sitio-horarios-zona','sitio-accesibilidad','sitio-programacion'],
+  'cultura':        ['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras',
+                     'sitio-colecciones','sitio-recorridos',
+                     'sitio-horarios-zona','sitio-accesibilidad','sitio-programacion','sitio-contexto'],
+  'sitio-historico':['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras',
+                     'sitio-recorridos',
+                     'sitio-horarios-zona','sitio-accesibilidad','sitio-programacion','sitio-contexto'],
+  'religioso':      ['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras',
+                     'sitio-recorridos',
+                     'sitio-horarios-zona','sitio-accesibilidad','sitio-contexto'],
+  /* espacio-publico: descripcion/entradas/atracciones/horarios_zona/
+     accesibilidad/actividades_gratis/programacion (pagina-destino.js:59). */
+  'espacio-publico':['sitio-entradas','sitio-atracciones','sitio-horarios-zona','sitio-accesibilidad',
+                     'sitio-actividades-gratis','sitio-programacion'],
+  /* ciudad: las 12 secciones del motor (pagina-destino.js:62). "descripcion"
+     es la pestana Contenido (campo generico f-desc), no un panel de sitio;
+     "entradas" NO se renderiza en ciudad, por eso no se mapea. */
+  'ciudad':         ['sitio-atracciones','sitio-actividades-gratis','sitio-programacion','sitio-accesibilidad',
+                     'sitio-contexto','sitio-barrios','sitio-transporte','sitio-seguridad','sitio-presupuesto',
+                     'sitio-gastronomia','sitio-cuando-ir'],
+  /* bar: solo las claves del motor que tienen panel (pagina-destino.js:57). */
+  'bar':            ['sitio-entradas','sitio-horarios-zona','sitio-accesibilidad','sitio-programacion']
 };
-var SITIO_ALL_TABS = ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras'];
+/* Fallback "sin subcategoria": TODAS las pestanas reales del editor. */
+var SITIO_ALL_TABS = ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras',
+  'sitio-atracciones','sitio-barrios','sitio-transporte','sitio-seguridad','sitio-gastronomia','sitio-presupuesto',
+  'sitio-cuando-ir','sitio-programacion','sitio-horarios-zona','sitio-accesibilidad','sitio-actividades-gratis',
+  'sitio-que-ver','sitio-colecciones','sitio-recorridos','sitio-contexto'];
 function applySubcategoriaSitio() {
   var sel = document.getElementById('f-subcategoria-sitio');
   var sub = sel ? sel.value : '';
@@ -6323,6 +6747,37 @@ function addFaqRow() {
   list.appendChild(row);
 }
 
+/* ── PREGUNTAS SUGERIDAS DE FAQ ──
+   Insertan SOLO el enunciado; la respuesta llega VACIA a proposito (prohibido
+   inventar respuestas: las escribe el editor). Una lista por categoria; la
+   pestana FAQ es comun a todas menos blog. */
+var FAQ_SUGGESTIONS = {
+  hostal: ['¿Cuál es la política de cancelación?', '¿Cuál es el horario de check-in y check-out?', '¿El desayuno está incluido?', '¿Aceptan mascotas?', '¿Cómo manejan el ruido y la seguridad?'],
+  comida: ['¿Se puede reservar mesa?', '¿Tienen opciones dietéticas?', '¿Hay parqueadero?', '¿Cuál es el horario?', '¿Cuál es el precio promedio por persona?'],
+  sitio:  ['¿Cuánto cuestan las entradas y qué incluyen?', '¿Cuál es el horario?', '¿Cómo llegar?', '¿El lugar es accesible?', '¿Cuánto tiempo se recomienda dedicarle?'],
+  ciudad: ['¿Es segura la ciudad?', '¿Cómo llegar desde el aeropuerto?', '¿Cuál es la mejor época para visitarla?', '¿Cuál es el presupuesto diario?', '¿Dónde alojarse?'],
+  evento: ['¿Dónde consigo la boletería?', '¿Hay edad mínima?', '¿A qué hora es el ingreso?', '¿Cómo llegar en transporte público?', '¿Qué debo llevar?']
+};
+function insertFaqSuggestions() {
+  var list = document.getElementById('faq-builder-list');
+  if(!list) return;
+  var qs = FAQ_SUGGESTIONS[v('f-cat')] || [];
+  if(!qs.length) return;
+  /* Estado vacio: se retiran las filas TOTALMENTE vacias para no dejar
+     huecos. Una fila con algo escrito no se toca (cero perdida de datos). */
+  Array.prototype.slice.call(list.querySelectorAll('.faq-builder-row')).forEach(function(row){
+    var q = row.querySelector('.faq-q-inp'), a = row.querySelector('.faq-a-inp');
+    if((!q || !q.value.trim()) && (!a || !a.value.trim())) row.remove();
+  });
+  qs.forEach(function(q){
+    addFaqRow();                       /* fila nueva: respuesta VACIA */
+    var rows = list.querySelectorAll('.faq-builder-row');
+    var last = rows[rows.length-1];
+    var qInp = last ? last.querySelector('.faq-q-inp') : null;
+    if(qInp) qInp.value = q;
+  });
+}
+
 /* ── COLLECT TRANSPORT ── */
 function collectTransport() {
   var items = [];
@@ -6683,7 +7138,7 @@ function _placeToAPI(p) {
   // categoria que tenga entradas en CATEGORY_TAG_FIELDS/_LISTS.
   var tagsObj = _buildTagsObj(p);
 
-  return {
+  var _payload = {
     // Campos principales — nombres exactos del schema Neon
     slug:           p.slug||'',
     nombre:         p.name||'',
@@ -6729,7 +7184,7 @@ function _placeToAPI(p) {
     habitaciones:   p.habs||[],
     amenidades:     p.amenities||[],
     scores:         p.scores||{},
-    faqs:           p.faqs||[],
+    faqs:           p.faqs||[],   /* se omite en blog: ver el delete de abajo */
     /* BUG-C fix (TASK-001): transporte y eventos_hostal ya no viajan
        aqui -- admin-destinos.js v2.1 nunca tuvo columna para ellos en
        destinos_detalles y los descartaba siempre en el servidor. Ahora
@@ -6740,6 +7195,13 @@ function _placeToAPI(p) {
     checkout:       p.checkout||'',
     booking_url:    p.bookingUrl||'',
   };
+  /* FAQ: la clave SOLO viaja si la categoria no es blog. En blog se omite
+     para que admin-destinos.js aplique COALESCE sobre
+     destinos_detalles.faqs y no borre las FAQs existentes con un []. Un
+     array VACIO en una categoria con FAQ si viaja: permite borrar todas las
+     preguntas a proposito desde el editor. */
+  if (p.cat === 'blog') { delete _payload.faqs; }
+  return _payload;
 }
 
 async function _syncToNeon(p) {
@@ -7429,7 +7891,17 @@ async function _mergeNeonRowIntoLocal(local, d) {
   local.bookingUrl = d.booking_url || local.bookingUrl;
   if (d.habitaciones && d.habitaciones.length) local.habs      = d.habitaciones;
   if (d.amenidades   && d.amenidades.length)   local.amenities = d.amenidades;
-  if (d.faqs         && d.faqs.length)         local.faqs      = d.faqs;
+  /* FAQ: destinos_detalles.faqs (d.faqs) es la fuente canonica.
+     - null/undefined = el detalle nunca se escribio (ficha que entro por la
+       ruta publica, que solo escribe tags): se cae al ESPEJO tags.faqs para
+       no mostrar el constructor vacio y borrar las FAQ reales al guardar.
+     - [] = borrado explicito: se respeta el vacio y NO se consulta el espejo
+       (ausencia != borrado). */
+  if (d.faqs === null || d.faqs === undefined) {
+    if (Array.isArray(tags.faqs) && tags.faqs.length) local.faqs = tags.faqs;
+  } else if (Array.isArray(d.faqs)) {
+    local.faqs = d.faqs;
+  }
 
   // Escudo GOLD -- TRACE/INFO: cuantas llaves de tags llegaron de Neon
   var tagKeys = Object.keys(tags);

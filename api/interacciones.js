@@ -284,6 +284,8 @@ var TIERRA_RADIO_M = 6371008.8;
 var RADIO_DEFAULT_M = 50;
 var RADIO_POR_CATEGORIA = { sitio: 50, hostal: 50, comida: 50, evento: 150 };
 var RADIO_POR_SUBCATEGORIA = {
+  // ciudad: el centro/plaza y su entorno no se verifican con 50 m.
+  ciudad: 3000,
   naturaleza: 250, aventura: 250, parque: 150,
   'espacio-publico': 50, 'sitio-historico': 50, museo: 50, cultura: 50,
   religioso: 50, bar: 50, restaurante: 50, cafe: 50, gastrobar: 50,

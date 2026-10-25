@@ -99,7 +99,7 @@
   // Listas cerradas del repo (publicar-lugar.js / BLUEPRINT seccion 4).
   var SUBCAT_LISTA = {
     sitio: ['naturaleza', 'museo', 'cultura', 'bar', 'parque', 'espacio-publico',
-            'sitio-historico', 'religioso', 'aventura'],
+            'sitio-historico', 'religioso', 'aventura', 'ciudad'],
     comida: ['restaurante', 'cafe', 'gastrobar', 'comida-rapida', 'dulces'],
     evento: ['concierto', 'festival', 'teatro', 'exposicion', 'deporte', 'cine', 'fiesta']
   };

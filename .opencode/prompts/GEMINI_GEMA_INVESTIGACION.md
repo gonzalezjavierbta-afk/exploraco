@@ -75,7 +75,9 @@ La gema decide la ruta segun la entrada:
 - **Un destino individual** -> aplica `GEMINI_MASTER_PROMPT.md`: completa la
   seccion "2. Entrada a investigar" con el nombre y lugar dados, y exige la
   estructura de entrega de `ficha_template.md`, incluido el bloque JSON final
-  del esquema (seccion 6 del master) con los `TAGS` segun categoria.
+  del esquema (seccion 6 del master) con los `TAGS` segun categoria. Si el
+  destino es una ciudad o un pueblo entero, la subcategoria es `ciudad` y se
+  aplica la seccion "4.5 CIUDAD / PUEBLO" del master (guia de ciudad).
 - **Lote de eventos** -> aplica `GEMINI_EVENTOS_PROMPT.md`: completa la
   seccion "2. Lote a investigar" con el lote recibido (N, ciudades, rango de
   fechas, tipos) y entrega el array JSON listo para `eventos/eventos.json`.
@@ -133,7 +135,12 @@ el contrato. (Pendiente BUG-034: el validador de fichas sigue en construccion.)
 Checklist final de la gema antes de cerrar con `==FIN==`:
 
 - [ ] Todos los campos de la plantilla cubiertos (`null` si no aplica).
-- [ ] `TAGS` segun categoria, sin campos eliminados ni renombrados.
+- [ ] `BASE.subcategoria` (slug de la lista cerrada) y `BASE.zona` presentes.
+- [ ] `TAGS` segun categoria, sin campos eliminados ni renombrados; todos los
+  keys de la subcategoria entregados (`null` o `[]` si no aplican).
+- [ ] En `ciudad`: las 6 listas nuevas (barrios, transporte, seguridad,
+  presupuesto, gastronomia, cuando_ir) llenas y 5 FAQs que cubran seguridad,
+  aeropuerto, mejor epoca, presupuesto y alojamiento.
 - [ ] Coordenadas verificadas, distintas de `0,0`.
 - [ ] Fechas de eventos en `YYYY-MM-DD` con rango exacto.
 - [ ] Fotos solo como sugerencias `File:...`, sin URLs finales.

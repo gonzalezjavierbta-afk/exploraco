@@ -45,6 +45,20 @@ node scripts/smoke_test_<slug>.js
 ```
 Resultado: todos los checks PASS + balance de divs
 
+### 5. Lista cerrada de subcategorias de sitio (guard, bloqueante)
+
+Una copia desincronizada de la lista cerrada de subcategorias de sitio es
+BLOQUEANTE de despliegue. El argumento (por que son 10 copias) vive en
+`DECISIONS.md` ADR-101; aqui solo el comando.
+
+```bash
+node scripts/gold_shield.js
+```
+Ejecuta `scripts/express_check.js` (sintaxis + ASCII-safety + balance de divs)
+y despues el guard `scripts/verificar-subcategorias.js`. Exit 0 = limpio;
+exit 1 = bloqueante (FAIL nuevo en express_check o desincronizacion de la lista).
+Solo el guard: `node scripts/gold_shield.js --sin-express`.
+
 ## Reporte estructurado
 
 ```
@@ -56,6 +70,7 @@ Resultado: todos los checks PASS + balance de divs
 | ASCII-safety | PASS/FAIL | 0/0/0 |
 | Balance divs | PASS/FAIL | X/Y diff=Z |
 | Smoke test   | PASS/FAIL | N/N checks |
+| Subcategorias| PASS/FAIL | 10/10 copias |
 
 **Veredicto:** LIMPIO / BLOQUEANTE / RECOMENDACIÓN
 ```

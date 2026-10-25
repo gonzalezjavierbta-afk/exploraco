@@ -2325,7 +2325,7 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 - **(b) El ledger de XP se escribe DESPUES de la CTE atomica.** El `claim` de idempotencia y el saldo van en **una** sentencia (`EXISTS (SELECT 1 FROM usr)`), pero `registrarXpLedger`, `acreditarClaseYCofre` y `repartirXpReferidos` van **detras**, cada uno con su `catch` (swallow). **Consecuencia:** un fallo del ledger deja **saldo acreditado sin fila de auditoria** (nunca al reves: **no se paga dos veces**). Se eligio esta asimetria a proposito -- el dinero se cobra una sola vez y la auditoria es **best-effort** -- y `XP_FORCE_FAIL=ledger` es **inerte sin variable de entorno**, luego **no corre en Vercel** (ADR-099 D5.3).
 - **(c) `COALESCE(d.tags->>'estado_envio','enviado') = 'enviado'` en la cola.** `api/admin.js:368` (listado) y `:374` (`COUNT`) usan el `COALESCE` para que las **filas legacy** (creadas antes de `estado_envio`, sin la clave en `tags`) **sigan entrando** en la cola. **Consecuencia:** el filtro **no** es una igualdad literal y una fila sin la clave se trata como enviada; es lo correcto para no perder solicitudes historicas, pero **deja una rama implicita** que hay que recordar al leer el SQL. Se retirara cuando no queden filas sin la clave.
 
-## BUG-132: el motor de render **sobrescribe las FAQ de `destinos_detalles`** con `tags.faqs` cuando no hay `det.amenidades` -- **ABIERTO** (motor de render, todas las categorias)
+## BUG-132: el motor de render **sobrescribe las FAQ de `destinos_detalles`** con `tags.faqs` cuando no hay `det.amenidades` -- **CERRADO (2026-10-25, TSK-225 / ADR-101 Rev. 2)** (motor de render, todas las categorias)
 
 **Severidad: MEDIA-ALTA (perdida silenciosa de una seccion entera).** Detectado el **2026-10-25** durante el lote Medellin/Envigado (**TSK-221**). **NO corregido** en esa tanda: el arreglo vive en `api/` y exige gate + Escudo GOLD (**`@renderer-dev`**).
 
@@ -2347,6 +2347,8 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **Estado en el lote de TSK-221:** las **36 fichas** de Medellin/Envigado lo **compensan** persistiendo las FAQ **tambien** en `destinos.tags` (los 6 seeds escriben `tags.faqs`), de modo que las paginas pintan su seccion. **Eso es un rodeo por el lado de los DATOS, no un arreglo del motor:** la deuda sigue abierta y el siguiente lote de otra ciudad volvera a morderla si no se corrige antes.
 
 **Arreglo esperado (criterio de cierre):** dar **precedencia real** a `destinos_detalles` (`if (!det.faqs) det.faqs = tg.faqs;`) o **fusionar** por `id`/pregunta cuando ambas fuentes traigan entradas, y cubrirlo con un **smoke de `buildHTML()`** de fixture con FAQ **solo** en detalles -> la seccion debe aparecer. **Gate obligatorio:** `@renderer-dev`.
+
+**CERRADO el 2026-10-25 (TSK-225 / ADR-101 Revision 2).** El bloque se reescribio en `api/pagina-destino.js:3284-3291`: el espejo `tags.faqs` **solo** rellena `det.faqs` cuando la columna es `NULL`/`undefined`, y un **`[]` cuenta como borrado explicito** (antes no solo resucitaba FAQ borradas: un `NULL` terminaba guardado como `'[]'`). La asignacion ya **no depende** de la guarda de `det.amenidades`. El criterio de cierre se cumple por la via de la precedencia (`det.faqs` NULL -> espejo), **no** por fusion; la red automatica por direccion queda en la deuda **TSK-229 / D4** (`@qa-auditor`). La mitad "admin" del mismo defecto esta en **BUG-136**.
 
 ## BUG-133: los seeds del lote resolvian las fotos desde un **artefacto compartido** (`ficha/_informe-fotos.json`), luego regenerarlo con otro lote dejaba **0 fotos** y tumbaba las fichas a `draft` -- **CERRADO (misma tanda, 2026-10-25)**
 
@@ -2383,5 +2385,25 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **Correccion aplicada:** `SET caption=$1, orden=$2, es_hero=$3 WHERE id=$4` en los **6** seeds de lote: **4 placeholders, 4 parametros**.
 
 **Verificacion (en real, no en `--dry`):** `lote1` y `lote6` pasan `--write` **dos veces seguidas** con **exit 0** y **sin duplicar**. Conteos estables entre pasadas: `destinos` = **258**, Medellin/Envigado = **48**, `interacciones` = **919**, `destinos_fotos` = **205**, `destinos_detalles` = **48**.
+
+## BUG-136: guardar desde el admin un lugar/ciudad **con FAQs** sustituia `destinos_detalles.faqs` por las **4 FAQs de ejemplo del hostal** (o por `'[]'`), y el render podia **resucitar FAQs borradas** por el doble almacen -- **CERRADO (2026-10-25, TSK-225) / ADR-101 Revision 2**
+
+**Severidad: ALTA (perdida silenciosa de contenido editado por el usuario, en cualquier categoria). Estado: CERRADO el 2026-10-25.**
+
+**Sintoma:** se editaba un lugar o una ciudad con FAQs reales en `admin.html`, se guardaba, y la seccion FAQ de la ficha publica mostraba **las 4 preguntas de ejemplo del hostal** (horarios, check-in y similares) o **desaparecia**. En el otro sentido, borrar todas las FAQ y guardar dejaba un `[]` que **volvia a pintarse** al recargar: el borrado **no se sostiene**. Ningun error en pantalla: guardado en verde y contenido cambiado.
+
+**Causa (defecto de DISENO, no de una linea):** el constructor de FAQ vivia **dentro del panel de hostal**, de modo que su plantilla de ejemplo se aplicaba a categorias que **no son hostal**, y el campo no se recogia ni se limpiaba cuando la categoria no lo exponia. Encima habia **dos almacenes** para el mismo dato (`destinos_detalles.faqs` y el espejo `tags.faqs`) **sin una precedencia escrita en el cliente**: al guardar se escribia el espejo con lo que hubiera en el DOM (la plantilla de ejemplo o vacio) y al leer se podia preferir el espejo sobre la columna. Las dos mitades del fallo se tapaban entre si: **BUG-132** era la mitad del motor (pintaba `tags.faqs` aunque `det.faqs` existiera) y esta es la mitad del **admin** (sobrescribia `det.faqs` con el espejo).
+
+**Patron de falla (el que hay que recordar):** **un campo con plantilla de ejemplo y almacenamiento duplicado convierte un guardado en una escritura destructiva.** Si la plantilla no se limpia por categoria y la precedencia no esta escrita, el valor "por defecto" **gana al valor del usuario** y no hay sintoma.
+
+**Correccion aplicada:**
+1. El constructor de FAQ **sale** del panel de hostal y pasa a **pestana propia** (`admin.html:739`, `ftab-faq` / `fpanel-faq`), visible en **todas las categorias menos blog**.
+2. `loadForm` **limpia y pinta siempre**; `savePlace` recoge el campo **solo si no es blog**; `_placeToAPI` **omite la clave** en blog.
+3. `_buildTagsObj` (`admin.html:3586`) mantiene el espejo `tags.faqs` **sincronizado, incluido `[]`**, o sea el borrado explicito **viaja**.
+4. La carga cae al espejo **solo** si `destinos_detalles.faqs` es **NULL**: un `[]` es decision del usuario y se respeta.
+5. En el motor, `api/pagina-destino.js:3284-3291` aplica la **misma precedencia** (ver **BUG-132**, cerrado en la misma tanda).
+
+**Verificacion:** `smoke_completitud` **74/74**; `smoke_zona_paridad --sin-neon` **46/46**; `smoke_016` **52/52**; `node --check` **3/3** JS; ASCII-safety **0/0/0**; `express_check` **PASS** (22 FAIL preexistentes, delta 0); balance de divs de `admin.html` **1174/1174**. **Pendiente de red automatica:** las **dos direcciones** contra Neon (un `[]` no resucita / un NULL si hereda el espejo) quedan en la deuda **TSK-229 / D4** (`@qa-auditor`), porque hoy la prueba es de codigo y no de datos.
+
 
 

@@ -30,6 +30,7 @@ var SUBCAT_LABEL = {
   naturaleza:'Naturaleza', museo:'Museo', cultura:'Cultura', bar:'Bar',
   parque:'Parque', 'espacio-publico':'Espacio Publico',
   'sitio-historico':'Sitio Historico', religioso:'Religioso', aventura:'Aventura',
+  ciudad:'Ciudad / Pueblo',
   restaurante:'Restaurante', cafe:'Cafe', gastrobar:'Gastrobar',
   'comida-rapida':'Comida Rapida', dulces:'Dulces',
   concierto:'Concierto', festival:'Festival', teatro:'Teatro',
@@ -57,7 +58,8 @@ var SITIO_SECCIONES_POR_SUBCATEGORIA = {
   parque:          ['descripcion','entradas','tours','checklist','atracciones','horarios_zona','accesibilidad','actividades_gratis'],
   'espacio-publico': ['descripcion','entradas','atracciones','horarios_zona','accesibilidad','actividades_gratis','programacion'],
   'sitio-historico': ['descripcion','entradas','recorridos','horarios_zona','accesibilidad','secretos','contexto'],
-  religioso:       ['descripcion','entradas','recorridos','horarios_zona','accesibilidad','contexto']
+  religioso:       ['descripcion','entradas','recorridos','horarios_zona','accesibilidad','contexto'],
+  ciudad:          ['descripcion','atracciones','actividades_gratis','programacion','accesibilidad','contexto','barrios','transporte','seguridad','presupuesto','gastronomia','cuando_ir']
 };
 
 function esc(s) {
@@ -815,6 +817,13 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var actividadesGratis = safeJSON(tags.actividades_gratis); if(!Array.isArray(actividadesGratis)) actividadesGratis=[];
   var queVer          = safeJSON(tags.que_ver);          if(!Array.isArray(queVer))          queVer=[];
   var contexto        = tags.contexto || '';
+  // Subcategoria ciudad: seis listas propias. tags.transporte NO se duplica
+  // aqui: es la misma clave JSONB que consume hostal (transporteHostal).
+  var barrios         = safeJSON(tags.barrios);         if(!Array.isArray(barrios))         barrios=[];
+  var seguridadCiudad = safeJSON(tags.seguridad);       if(!Array.isArray(seguridadCiudad)) seguridadCiudad=[];
+  var gastronomia    = safeJSON(tags.gastronomia);      if(!Array.isArray(gastronomia))     gastronomia=[];
+  var presupuesto    = safeJSON(tags.presupuesto);      if(!Array.isArray(presupuesto))     presupuesto=[];
+  var cuandoIr       = safeJSON(tags.cuando_ir);        if(!Array.isArray(cuandoIr))        cuandoIr=[];
 
   // Resolver set efectivo de secciones habilitadas.
   // Si no hay subcategoria: fallback = todas las secciones de sitio (regresion cero).
@@ -1805,6 +1814,109 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + '</div></section>';
   }
 
+  // -- SECCIONES: subcategoria ciudad (barrios, transporte, seguridad, --
+  // -- presupuesto, gastronomia, cuando ir). Cero CSS nuevo: barrios,      --
+  // -- transporte, seguridad y gastronomia reutilizan .acces-row;          --
+  // -- presupuesto y cuando_ir reutilizan .zona-row y sus colores.         --
+
+  // -- SECCION: Barrios --
+  var secBarrios = '';
+  if (cat === 'sitio' && subcatActiva('barrios') && barrios.length) {
+    var barriosRows = barrios.map(function(br){
+      var brTipo = br.tipo ? '<b>' + esc(br.tipo) + '</b>' : '';
+      var brDesc = esc(br.descripcion || br.desc || '');
+      var brBody = brTipo && brDesc ? brTipo + ' \u00b7 ' + brDesc : (brTipo || brDesc);
+      return '<div class="acces-row">'
+        + '<div class="acces-icon">' + esc(br.icono || br.icon || '\u25C6') + '</div>'
+        + '<div><div class="acces-name">' + esc(br.nombre || br.name || '') + '</div>'
+        + (brBody ? '<div class="acces-desc">' + brBody + '</div>' : '')
+        + '</div></div>';
+    }).join('');
+    secBarrios = '<section class="ssec bwhite" id="barrios"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Barrios</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + barriosRows + '</div></section>';
+  }
+
+  // -- SECCION: Como moverse (transporte urbano) --
+  var secTransporte = '';
+  if (cat === 'sitio' && subcatActiva('transporte') && transporteHostal.length) {
+    var transRows = transporteHostal.map(function(tr){
+      return '<div class="acces-row">'
+        + '<div class="acces-icon">' + esc(tr.icono || tr.icon || '\uD83D\uDE8C') + '</div>'
+        + '<div><div class="acces-name">' + esc(tr.nombre || tr.title || '') + '</div>'
+        + (tr.descripcion || tr.detalle || tr.detail
+          ? '<div class="acces-desc">' + esc(tr.descripcion || tr.detalle || tr.detail || '') + '</div>'
+          : '')
+        + '</div></div>';
+    }).join('');
+    secTransporte = '<section class="ssec bwarm" id="transporte"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Como moverse</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + transRows + '</div></section>';
+  }
+
+  // -- SECCION: Seguridad --
+  var secSeguridad = '';
+  if (cat === 'sitio' && subcatActiva('seguridad') && seguridadCiudad.length) {
+    var segRows = seguridadCiudad.map(function(sg){
+      return '<div class="acces-row">'
+        + '<div class="acces-icon">' + esc(sg.icono || sg.icon || '\u26A0') + '</div>'
+        + '<div><div class="acces-name">' + esc(sg.nombre || sg.name || '') + '</div>'
+        + (sg.descripcion || sg.desc ? '<div class="acces-desc">' + esc(sg.descripcion || sg.desc || '') + '</div>' : '')
+        + '</div></div>';
+    }).join('');
+    secSeguridad = '<section class="ssec bwhite" id="seguridad"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Seguridad</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + segRows + '</div></section>';
+  }
+
+  // -- SECCION: Presupuesto (rango por tipo de viajero) --
+  var secPresupuesto = '';
+  if (cat === 'sitio' && subcatActiva('presupuesto') && presupuesto.length) {
+    var presRows = presupuesto.map(function(pr){
+      var prDet = pr.detalle || pr.descripcion || '';
+      return '<div class="zona-row">'
+        + '<div class="zona-dia">' + esc(pr.tipo || pr.nombre || '') + '</div>'
+        + '<div class="zona-horas">' + esc(pr.rango || pr.precio || '')
+        + (prDet ? '<div class="acces-desc">' + esc(prDet) + '</div>' : '')
+        + '</div></div>';
+    }).join('');
+    secPresupuesto = '<section class="ssec bwarm" id="presupuesto"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Presupuesto</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + presRows + '</div></section>';
+  }
+
+  // -- SECCION: Que comer (gastronomia local) --
+  var secGastronomia = '';
+  if (cat === 'sitio' && subcatActiva('gastronomia') && gastronomia.length) {
+    var gasRows = gastronomia.map(function(gs){
+      return '<div class="acces-row">'
+        + '<div class="acces-icon">' + esc(gs.icono || gs.icon || '\uD83C\uDF7D') + '</div>'
+        + '<div><div class="acces-name">' + esc(gs.nombre || gs.name || '') + '</div>'
+        + (gs.descripcion || gs.desc ? '<div class="acces-desc">' + esc(gs.descripcion || gs.desc || '') + '</div>' : '')
+        + '</div></div>';
+    }).join('');
+    secGastronomia = '<section class="ssec bwhite" id="gastronomia"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Que comer</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + gasRows + '</div></section>';
+  }
+
+  // -- SECCION: Cuando ir (estado: ideal / posible / no) --
+  var secCuandoIr = '';
+  if (cat === 'sitio' && subcatActiva('cuando_ir') && cuandoIr.length) {
+    var ciRows = cuandoIr.map(function(ci){
+      var ciEst = (ci.estado || '').toLowerCase();
+      var ciCls = ciEst === 'ideal' ? ' zona-abierto' : (ciEst === 'no' ? ' zona-cerrado' : '');
+      return '<div class="zona-row">'
+        + '<div class="zona-dia">' + esc(ci.periodo || ci.mes || '') + '</div>'
+        + '<div class="zona-horas">' + esc(ci.nota || ci.descripcion || '') + '</div>'
+        + (ciEst ? '<span class="zona-estado' + ciCls + '">' + esc(ciEst) + '</span>' : '')
+        + '</div>';
+    }).join('');
+    secCuandoIr = '<section class="ssec bwarm" id="cuando_ir"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Cuando ir</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + ciRows + '</div></section>';
+  }
+
   // -- Helper: verificar si una seccion esta activa segun subcategoria --
   function subcatActiva(sectionId) {
     // Si no hay gating (sin subcategoria), todo activo -> regresion cero
@@ -2148,18 +2260,24 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<div class="cgrid">'+rbtns.join('')+'</div></div></section>' : '';
 
   // -- SECCION UNIFICADA: Como llegar + Ubicacion (transporte + mapa) --
+  // En sitio+subcategoria ciudad la LISTA de transporte urbano ya la pinta la
+  // seccion propia #transporte (subcatActiva('transporte')): aqui se omite solo
+  // esa lista para no duplicarla. La seccion #como-llegar (direccion, mapa y
+  // ancla #mapa) se conserva intacta en todas las categorias.
+  var transporteEnSeccionPropia = (cat === 'sitio' && subcatActiva('transporte'));
+  var mostrarListaTransporte = transporteHostal.length && !transporteEnSeccionPropia;
   var secComoLlegar = '';
-  if (transporteHostal.length || hasLatLng) {
-    var bloqueTransporte = transporteHostal.length ?
+  if (mostrarListaTransporte || hasLatLng) {
+    var bloqueTransporte = mostrarListaTransporte ?
       (barrioDescripcion ? '<p style="margin-bottom:16px;color:var(--muted)">'+esc(barrioDescripcion)+'</p>' : '')
       + '<div class="igrid">'+transporteHostal.map(function(t){
-          return '<div class="icard"><div class="iico">'+esc(t.icon||'\uD83D\uDE8C')+'</div><div class="ilbl">'+esc(t.title||'')+'</div>'
-            + (t.detail ? '<div class="ival" style="font-size:12px;font-weight:400">'+esc(t.detail)+'</div>' : '')
+          return '<div class="icard"><div class="iico">'+esc(t.icono||t.icon||'\uD83D\uDE8C')+'</div><div class="ilbl">'+esc(t.nombre||t.title||'')+'</div>'
+            + (t.descripcion||t.detalle||t.detail ? '<div class="ival" style="font-size:12px;font-weight:400">'+esc(t.descripcion||t.detalle||t.detail)+'</div>' : '')
             + '</div>';
         }).join('')+'</div>'
       : '';
     var bloqueMapa = hasLatLng ?
-      '<div id="mapel"'+(transporteHostal.length?' style="margin-top:20px"':'')+'><iframe loading="lazy" src="https://www.google.com/maps?q='+esc(d.lat)+','+esc(d.lng)+'&z=15&output=embed"></iframe></div>'
+      '<div id="mapel"'+(mostrarListaTransporte?' style="margin-top:20px"':'')+'><iframe loading="lazy" src="https://www.google.com/maps?q='+esc(d.lat)+','+esc(d.lng)+'&z=15&output=embed"></iframe></div>'
       + (comoLlegar ? '<p class="stext" style="margin-top:14px">'+esc(comoLlegar)+'</p>' : '')
       + '<div class="mapacts"><a class="mabtn gold" href="https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'" target="_blank">\u2316 Google Maps</a></div>'
       : '';
@@ -2479,6 +2597,12 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     {id:'actividades-gratis', label:'Gratis', has:!!sitioSeccionesActivas && !!secActividadesGratis},
     {id:'que-ver',     label:'Que ver',     has:!!sitioSeccionesActivas && !!secQueVer},
     {id:'contexto',    label:'Contexto',    has:!!sitioSeccionesActivas && !!secContexto},
+    {id:'barrios',     label:'Barrios',     has:!!sitioSeccionesActivas && !!secBarrios},
+    {id:'transporte',  label:'Como moverse',has:!!sitioSeccionesActivas && !!secTransporte},
+    {id:'seguridad',   label:'Seguridad',   has:!!sitioSeccionesActivas && !!secSeguridad},
+    {id:'presupuesto', label:'Presupuesto', has:!!sitioSeccionesActivas && !!secPresupuesto},
+    {id:'gastronomia', label:'Que comer',   has:!!sitioSeccionesActivas && !!secGastronomia},
+    {id:'cuando_ir',   label:'Cuando ir',   has:!!sitioSeccionesActivas && !!secCuandoIr},
     {id:'musica',      label:'Musica',      has:!!sitioSeccionesActivas && !!secMusicaVivo},
     {id:'cover',       label:'Cover',       has:!!sitioSeccionesActivas && !!secCover},
     {id:'vestimenta',  label:'Vestimenta',  has:!!sitioSeccionesActivas && !!secCodigoVestimenta},
@@ -2669,6 +2793,12 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
         + secActividadesGratis + '\n'
         + secQueVer + '\n'
         + secContexto + '\n'
+        + secBarrios + '\n'
+        + secTransporte + '\n'
+        + secSeguridad + '\n'
+        + secPresupuesto + '\n'
+        + secGastronomia + '\n'
+        + secCuandoIr + '\n'
         + secMusicaVivo + '\n'
         + secCover + '\n'
         + secCodigoVestimenta + '\n'
@@ -3140,15 +3270,24 @@ module.exports = async function handler(req, res) {
     var det = detRows.length ? detRows[0] : {};
 
     // Fallback: si destinos_detalles no tiene datos, usar tags JSONB de destinos
-    if (!det.amenidades && d.tags) {
-      var tg = safeJSON(d.tags);
-      if (!Array.isArray(tg) && typeof tg === 'object') {
-        det.amenidades   = tg.amenidades;
-        det.habitaciones = tg.habitaciones;
-        det.faqs         = tg.faqs;
-        det.checkin      = tg.checkin;
-        det.checkout     = tg.checkout;
-      }
+    var tgLegado = null;
+    if (d.tags) {
+      var tgParse = safeJSON(d.tags);
+      if (!Array.isArray(tgParse) && typeof tgParse === 'object') tgLegado = tgParse;
+    }
+    if (!det.amenidades && tgLegado) {
+      det.amenidades   = tgLegado.amenidades;
+      det.habitaciones = tgLegado.habitaciones;
+      det.checkin      = tgLegado.checkin;
+      det.checkout     = tgLegado.checkout;
+    }
+    // FAQ: destinos_detalles.faqs es la fuente canonica; tags.faqs es espejo
+    // legado. Solo se rellena si la columna es NULL/undefined (nunca escrita).
+    // Un '[]' es un borrado explicito desde el admin y NO se sobrescribe:
+    // antes este fallback resucitaba FAQs borradas (borrado silencioso que
+    // fallaba) y ademas convertia un NULL en '[]' al guardar.
+    if ((det.faqs === null || det.faqs === undefined) && tgLegado) {
+      det.faqs = tgLegado.faqs;
     }
 
     // TSK-106 fix R10: sin LIMIT artificial. galAll puede tener >24 fotos;

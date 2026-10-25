@@ -390,6 +390,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       'sitio-historico': 'Sitio Hist\u00f3rico',
       'religioso': 'Religioso',
       'aventura': 'Aventura',
+      'ciudad': 'Ciudad / Pueblo',
       'restaurante': 'Restaurante',
       'cafe': 'Caf\u00e9',
       'gastrobar': 'Gastrobar',

@@ -56,7 +56,7 @@ const BLOG_TEMAS = ['aventura', 'gastro', 'cultura', 'naturaleza', 'tips'];
 // categoria final (catSlug); si el slug no pertenece a la lista se
 // descarta (fallback = comportamiento actual sin subcategoria).
 const SUBCAT_LISTA = {
-  sitio: ['naturaleza','museo','cultura','bar','parque','espacio-publico','sitio-historico','religioso','aventura'],
+  sitio: ['naturaleza','museo','cultura','bar','parque','espacio-publico','sitio-historico','religioso','aventura','ciudad'],
   comida: ['restaurante','cafe','gastrobar','comida-rapida','dulces'],
   evento: ['concierto','festival','teatro','exposicion','deporte','cine','fiesta'],
 };
@@ -312,11 +312,40 @@ var LIMITE_SEMILLAS_ORIGEN = 3;
 var LIMITE_SEMILLAS_DIA = 20;
 
 // D6.1 -- claves que el cliente SI puede escribir en tags (POST y PATCH).
+// Contrato de contenido v2 (GEMINI_MASTER_PROMPT seccion 6): toda clave de
+// TAGS que el motor pinta y que el cliente puede rellenar tiene que estar
+// aqui, o el PATCH la descarta EN SILENCIO (filtro de la linea 1288). Lo que
+// NO entra: las claves de BASE (son columnas, no tags) ni cover_valor /
+// cover_nota (forma plana legacy: el contrato exige el objeto cover).
 var CLAVES_CLIENTE = [
-  'tema', 'subcategoria', 'amenidades', 'habitaciones', 'faqs',
-  'checkin', 'checkout', 'contacto_nombre', 'tipo_actividad', 'dificultad',
-  'duracion', 'horario_visita', 'precio_entrada', 'distancia', 'como_llegar',
-  'permisos', 'equipamiento', 'temporada', 'video_url', 'estado_envio'
+  // identidad de la ficha
+  'tema', 'subcategoria', 'tipo_actividad',
+  // comunes (contacto, multimedia, ciclo de vida)
+  'contacto_nombre', 'video_url', 'estado_envio', 'faqs',
+  // hostal
+  'amenidades', 'habitaciones', 'checkin', 'checkout', 'tipo_alojamiento',
+  'recepcion', 'edad_minima', 'mascotas', 'cocina_compartida',
+  'barrio_descripcion', 'politica_cancelacion', 'reglas_casa', 'actividades',
+  'que_incluye', 'eventos_hostal',
+  // comida
+  'tipo_comida', 'cocina', 'ambiente', 'precio_promedio', 'terraza', 'reservas',
+  'domicilio', 'menu_destacado', 'opciones_dieta', 'horario_detallado',
+  'domicilio_plataformas',
+  // sitio -- naturaleza / aventura / parque / juego legacy del validador
+  'dificultad', 'dificultad_desc', 'duracion', 'altitud', 'temporada',
+  'temporada_nota', 'temporada_matriz', 'precio_entrada', 'distancia',
+  'como_llegar', 'permisos', 'regulaciones', 'checklist_tip', 'horario_visita',
+  'entradas', 'tours', 'equipamiento', 'itinerario', 'dificultad_tags',
+  'fauna_flora', 'secretos', 'que_ver',
+  // sitio -- museo / cultura / historico / religioso / bar / espacio-publico
+  'colecciones', 'recorridos', 'horarios_zona', 'accesibilidad', 'programacion',
+  'contexto', 'musica_vivo', 'cover', 'codigo_vestimenta', 'happy_hour',
+  'atracciones', 'actividades_gratis',
+  // sitio -- ciudad / pueblo
+  'barrios', 'transporte', 'seguridad', 'presupuesto', 'gastronomia', 'cuando_ir',
+  // evento
+  'fecha_inicio', 'fecha_fin', 'edicion', 'sede', 'organiza', 'lema', 'lineup',
+  'agenda', 'categorias_entrada', 'que_llevar', 'prohibido'
 ];
 
 // D6.1 -- claves SOLO de servidor. Si llegan por POST o PATCH: 400 y no se
@@ -472,11 +501,30 @@ function resolverTema(cat, temaRaw) {
   return null;
 }
 
-// Tags de cliente del POST: SOLO lista blanca. El servidor construye el
-// objeto; nunca se fusiona el body entero (D6.1). Los sitio_* del formulario
-// se mapean a su clave de tags.
+// Tags de cliente del POST y de la simetria del PATCH: SOLO lista blanca. El
+// servidor construye el objeto; nunca se fusiona el body entero (D6.1).
+// Contrato v2: si el body trae tags (objeto), se siembra desde ahi quedandose
+// SOLO con claves de CLAVES_CLIENTE -- el resto se descarta EN SILENCIO,
+// incluidas todas las de CLAVES_SOLO_SERVIDOR (pub_*, autor_id, ip_hash,
+// origen_envio, semilla_huerfana), que ni siquiera estan en la lista blanca.
+// tags malformado (string, array, null) se ignora sin romper.
+// Despues se aplican los mapeos planos del formulario legacy (sitio_*, form):
+// mantienen su precedencia actual, para no romper el alta de siempre.
 function construirTagsCliente(b, catSlug) {
   var tags = {};
+  var tIn = (b && b.tags !== undefined && b.tags !== null) ? b.tags : null;
+  if (tIn && typeof tIn === 'object' && !Array.isArray(tIn)) {
+    for (var kIn in tIn) {
+      if (!Object.prototype.hasOwnProperty.call(tIn, kIn)) continue;
+      // tema y estado_envio los resuelve el servidor (resolverTema y la
+      // maquina de estados): misma simetria que el delta del PATCH, que
+      // valida el tema contra BLOG_TEMAS y descarta el estado del cliente.
+      if (kIn === 'tema' || kIn === 'estado_envio') continue;
+      if (CLAVES_CLIENTE.indexOf(kIn) === -1) continue;
+      if (CLAVES_SOLO_SERVIDOR.indexOf(kIn) !== -1) continue;
+      tags[kIn] = tIn[kIn];
+    }
+  }
   if (b.amenidades && b.amenidades.length) tags.amenidades = b.amenidades;
   if (b.habitaciones && b.habitaciones.length) tags.habitaciones = b.habitaciones;
   if (b.faqs && b.faqs.length) tags.faqs = b.faqs;
