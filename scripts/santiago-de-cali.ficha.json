@@ -1,0 +1,308 @@
+{
+  "BASE": {
+    "slug": "santiago-de-cali",
+    "nombre": "Santiago de Cali",
+    "categoria_slug": "sitio",
+    "subcategoria": "ciudad",
+    "zona": "pacifico",
+    "sintro": "La Sucursal del Cielo y Capital Mundial de la Salsa, famosa por su alegria, clima tropical y sabor.",
+    "lead": "Santiago de Cali cautiva a sus visitantes con su ritmo inconfundible, su rica herencia afrodescendiente y una vibrante oferta cultural enmarcada por los majestuosos Farallones.",
+    "descripcion": "Fundada el 25 de julio de 1536 por el conquistador Sebastian de Belalcazar, Santiago de Cali se consolido rapidamente como un punto estrategico del suroccidente colombiano y hoy en dia ostenta el titulo indiscutible de la Capital Mundial de la Salsa. La ciudad respira musica, baile y alegria en cada uno de sus rincones, destacandose internacionalmente por eventos masivos de gran magnitud como la Feria de Cali y el Festival de Musica del Pacifico Petronio Alvarez, que congregan a miles de cultores y turistas cada ano.\n\nRodeada por los imponentes cerros de los Farallones y abrazada por las aguas del rio Cali, la ciudad ofrece un clima tropical calido y una atmosfera cosmopolita inigualable. Su tejido urbano combina la tradicion historica de casonas coloniales y templos seculares en barrios tradicionales como San Antonio con una infraestructura moderna, caracterizada por centros comerciales, una desarrollada red de gastronomia mestiza y extensos corredores peatonales como el celebre Boulevard del Rio.\n\nAdemas de su riqueza ritmica y arquitectonica, Cali es un polo de desarrollo economico, educativo y de servicios para toda la region del Pacifico. Con una oferta hotelera diversa, espacios publicos renovados para el disfrute ciudadano y una calidez humana caracteristica de su gente, la capital vallecaucana se posiciona como un destino imperdible para quienes buscan experimentar la verdadera esencia festiva, cultural y natural de Colombia.",
+    "highlight": "Capital Mundial de la Salsa \u00b7 Sucursal del Cielo",
+    "ciudad": "Santiago de Cali",
+    "region": "Valle del Cauca",
+    "barrio": "",
+    "lat": 3.4516,
+    "lng": -76.532,
+    "whatsapp": "",
+    "telefono": "",
+    "email": "",
+    "web": "https://www.colombia.travel/es/cali",
+    "instagram": "",
+    "precio_desde": "Presupuesto mochilero desde $100.000 COP/dia",
+    "horario": "Acceso libre a espacios publicos 24/7",
+    "emoji": "\ud83d\udc83",
+    "hero_bg": "linear-gradient(135deg, #111111, #E8A020)",
+    "foto_hero": "File:Iglesia de San Antonio Cali 01.JPG",
+    "tipo": "Destino Cultural \u00b7 Musica y Salsa",
+    "capacidad": "",
+    "como_llegar": "Llegada a traves del Aeropuerto Internacional Alfonso Bonilla Aragon (CLO) y conexion terrestre nacional.",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Ciudad",
+    "duracion": "3-4 dias",
+    "precio_entrada": "Sin entrada",
+    "distancia": "Ubicada en el valle del rio Cauca; aeropuerto a 30-40 min del centro",
+    "como_llegar": "Vuelos nacionales e internacionales al Aeropuerto Alfonso Bonilla Aragon; transporte en taxi, MIO o apps de movilidad.",
+    "permisos": "No requiere",
+    "temporada": [
+      "Diciembre a Enero",
+      "Julio a Agosto"
+    ],
+    "temporada_nota": "Epocas de grandes eventos como la Feria de Cali y el Festival Petronio Alvarez.",
+    "entradas": [],
+    "atracciones": [
+      {
+        "icono": "\u26ea",
+        "nombre": "Colina y Capilla de San Antonio",
+        "descripcion": "Barrio tradicional e historico con una capilla colonial y vista panoramica."
+      },
+      {
+        "icono": "\ud83d\udda4",
+        "nombre": "El Gato del Rio y sus Novias",
+        "descripcion": "Monumento artistico a la orilla del rio Cali rodeado de esculturas de gatas."
+      },
+      {
+        "icono": "\ud83d\udeb2",
+        "nombre": "Boulevard del Rio",
+        "descripcion": "Paseo peatonal urbano a lo largo del rio Cali, ideal para caminar de noche."
+      },
+      {
+        "icono": "\ud83d\uddfd",
+        "nombre": "Monumento a Cristo Rey",
+        "descripcion": "Imponente estatua en los cerros tutelares con vista de toda la ciudad."
+      },
+      {
+        "icono": "\ud83c\udfed",
+        "nombre": "Hacienda El Paraiso",
+        "descripcion": "Escenario literario de la novela Maria de Jorge Isaacs, ubicada en El Cerrito."
+      }
+    ],
+    "actividades_gratis": [
+      {
+        "icono": "\ud83d\udeb6",
+        "nombre": "Caminata por el Barrio San Antonio",
+        "descripcion": "Recorrer sus calles coloniales, casonas y artesanias."
+      },
+      {
+        "icono": "\ud83c\udf03",
+        "nombre": "Paseo nocturno por el Boulevard",
+        "descripcion": "Disfrutar del ambiente urbano, brisa y artistas callejeros."
+      },
+      {
+        "icono": "\ud83d\udcf8",
+        "nombre": "Ruta de Monumentos del Rio",
+        "descripcion": "Fotografia junto al Gato del Rio y las obras del parque lineal."
+      }
+    ],
+    "programacion": [
+      {
+        "dia": "Agosto",
+        "eventos": "Festival de Musica del Pacifico Petronio Alvarez"
+      },
+      {
+        "dia": "Diciembre",
+        "eventos": "Feria de Cali"
+      }
+    ],
+    "accesibilidad": [
+      {
+        "icono": "\u267f",
+        "nombre": "Boulevard del Rio",
+        "descripcion": "Zona completamente peatonal y adaptada para movilidad reducida."
+      },
+      {
+        "icono": "\ud83d\ude8c",
+        "nombre": "Sistema MIO",
+        "descripcion": "Estaciones y buses articulados con rampas de acceso adaptadas."
+      }
+    ],
+    "contexto": "Cali es la capital salsera de Colombia, un crisol cultural marcado por la influencia del Pacifico y un desarrollo industrial dinamico en el corredor del Valle.",
+    "barrios": [
+      {
+        "icono": "\ud83c\udfe0",
+        "nombre": "San Antonio",
+        "tipo": "Alojamiento",
+        "descripcion": "Bohemio, gastronomico y colonial, la mejor zona para hospedarse."
+      },
+      {
+        "icono": "\ud83c\udf77",
+        "nombre": "Granada",
+        "tipo": "Gastronomico",
+        "descripcion": "Zona exclusiva de restaurantes de alta cocina, bares y cafes."
+      },
+      {
+        "icono": "\ud83c\udfa4",
+        "nombre": "Obrero",
+        "tipo": "Vida nocturna",
+        "descripcion": "El corazon de la salsa tradicional e historica en Cali."
+      }
+    ],
+    "transporte": [
+      {
+        "icono": "\u2708\ufe0f",
+        "nombre": "Aeropuerto Alfonso Bonilla Aragon",
+        "descripcion": "Ubicado en Palmira, conecta a Cali con servicios de taxi y buses integrados."
+      },
+      {
+        "icono": "\ud83d\ude8c",
+        "nombre": "MIO (Masivo Integrado de Occidente)",
+        "descripcion": "Sistema de transporte masivo de bus rapido que cubre la ciudad."
+      },
+      {
+        "icono": "\ud83d\ude95",
+        "nombre": "Taxis y Apps",
+        "descripcion": "Amplia disponibilidad de taxis amarillos y plataformas de transporte privado."
+      }
+    ],
+    "seguridad": [
+      {
+        "icono": "\ud83d\udea1",
+        "nombre": "Nivel de riesgo por zona",
+        "descripcion": "Zonas turisticas (San Antonio, Granada, Oeste) vigiladas; precaucion en sectores del centro extendido y periferia."
+      },
+      {
+        "icono": "\u26a0\ufe0f",
+        "nombre": "Recomendaciones nocturnas",
+        "descripcion": "Utilizar transporte formal o aplicaciones al salir de establecimientos nocturnos."
+      }
+    ],
+    "presupuesto": [
+      {
+        "tipo": "Mochilero",
+        "rango": "$100.000 - $200.000 COP",
+        "detalle": "Hostales en San Antonio, transporte en MIO y comida en plazas de mercado."
+      },
+      {
+        "tipo": "Medio",
+        "rango": "$300.000 - $550.000 COP",
+        "detalle": "Hoteles boutique, cenas en Granada y entradas a espectaculos de salsa."
+      },
+      {
+        "tipo": "Alto",
+        "rango": "$900.000+ COP",
+        "detalle": "Hoteles de alta gama, experiencias privadas y alta cocina internacional."
+      }
+    ],
+    "gastronomia": [
+      {
+        "icono": "\ud83e\udd53",
+        "nombre": "Sancocho de Gallina",
+        "descripcion": "Caldo tradicional cocinado a lena con platano verde, yuca y gallina criolla."
+      },
+      {
+        "icono": "\ud83c\udf74",
+        "nombre": "Aborrajado Vallecaucano",
+        "descripcion": "Platano maduro relleno de queso, rebosado y frito."
+      },
+      {
+        "icono": "\ud83c\udf79",
+        "nombre": "Lulada y Champus",
+        "descripcion": "Bebidas tipicas refrescantes a base de lulo o maiz, lulo, pina y hojas de naranjo agrio."
+      }
+    ],
+    "cuando_ir": [
+      {
+        "periodo": "Dic - Ene",
+        "estado": "ideal",
+        "nota": "Epoca de la Feria de Cali, clima calido y ambiente festivo total."
+      },
+      {
+        "periodo": "Ago",
+        "estado": "ideal",
+        "nota": "Celebracion del Festival Petronio Alvarez, imperdible para amantes de la cultura afro."
+      }
+    ],
+    "dificultad": "Facil",
+    "dificultad_desc": "Destino urbano accesible con amplia oferta turistica y cultural desarrollada.",
+    "altitud": "1.018 m s. n. m.",
+    "regulaciones": "Uso de protector solar e hidratacion constante debido al clima tropical de sabana.",
+    "checklist_tip": "Llevar ropa fresca, zapatos comodos para caminatas y muchas ganas de aprender a bailar salsa.",
+    "tours": [],
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad_tags": [],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "posible",
+      "Mar": "posible",
+      "Abr": "posible",
+      "May": "posible",
+      "Jun": "posible",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "posible",
+      "Oct": "posible",
+      "Nov": "posible",
+      "Dic": "ideal"
+    }
+  },
+  "FAQS": [
+    {
+      "pregunta": "Por que se le conoce a Cali como la Capital de la Salsa?",
+      "respuesta": "Porque cuenta con una profunda cultura salsera, cientos de escuelas de baile, coleccionistas y eventos mundiales dedicados a este genero."
+    },
+    {
+      "pregunta": "Como llegar desde el aeropuerto al centro de la ciudad?",
+      "respuesta": "Mediante taxis autorizados ubicados en la terminal o servicios de buses articulados y aplicaciones de movilidad."
+    },
+    {
+      "pregunta": "Cual es la mejor epoca para visitar Cali?",
+      "respuesta": "En diciembre para vivir la Feria de Cali o en agosto para el Festival Petronio Alvarez."
+    },
+    {
+      "pregunta": "Cual es el presupuesto diario recomendado?",
+      "respuesta": "Un viajero promedio puede gastar entre $300.000 y $550.000 COP diarios cubriendo alojamiento, gastronomia y entretenimiento."
+    },
+    {
+      "pregunta": "Donde es mejor alojarse en Cali?",
+      "respuesta": "El barrio San Antonio es el favorito por su ambiente bohemio, historico y seguro."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Santiago de Cali San Antonio church skyline",
+      "caption": "Iglesia de San Antonio y vista panoramica de Cali",
+      "nombres_archivo_wikimedia": [
+        "File:Iglesia de San Antonio Cali 01.JPG"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "El Gato del Rio Cali sculpture",
+      "caption": "Monumento El Gato del Rio a la orilla del rio Cali",
+      "nombres_archivo_wikimedia": [
+        "File:Gato de Tejada Cali.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Puente Ortiz sobre el rio Cali",
+      "caption": "El Puente Ortiz sobre el rio Cali, epicentro del centro historico de la ciudad",
+      "nombres_archivo_wikimedia": [
+        "File:Puente Ortiz Cali.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Monumento a Cristo Rey Cali hill",
+      "caption": "Monumento a Cristo Rey en los cerros tutelares",
+      "nombres_archivo_wikimedia": [
+        "File:Cristo Rey Cali.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "San Antonio Cali colonial street",
+      "caption": "Calle colonial tipica en el barrio San Antonio",
+      "nombres_archivo_wikimedia": [
+        "File:Barrio San Antonio, Cali 09.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.colombia.travel/es/cali",
+      "que_respalda": "Datos generales, atractivos turisticos y descripcion de la ciudad."
+    },
+    {
+      "tipo": "oficial",
+      "url": "https://www.cali.gov.co/",
+      "que_respalda": "Informacion institucional y oficial de Santiago de Cali."
+    }
+  ]
+}

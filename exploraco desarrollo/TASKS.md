@@ -6109,5 +6109,48 @@ El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 evento
 
 **Deudas que abre (decision del operador, registradas en `NEXT.md`):** `tags.fuentes` se guarda en el JSONB (**4 filas**) pero el motor **no lo renderiza** (atribucion invisible); **`sitemap.xml` no existe** en el repo (verificacion **N/A**); la galeria son **4 fotos + hero aparte** y no se decidio si las **5** entran a `/galeria.html`.
 
+## TSK-232 - Pagina nueva `santiago-de-cali` (categoria `sitio`, subcategoria `ciudad`): las 6 rutas de Commons de la ficha venian INVENTADAS (1/6 vivas) y se sustituyeron por 5 verificadas con HEAD 200; seed + loader + smoke 29/29 + HTTP 200 en produccion - 2026-10-25 - COMPLETADA
+
+**Estado: COMPLETADA** -- 2026-10-25 (pase documental unico R2). **Sin cambios en `api/*.js` (incluido `api/pagina-destino.js`), cero migracion, cero endpoint nuevo.** Segunda pagina del repo con el contrato de **12 secciones** de `ciudad` (precedente: **TSK-231** `cartagena-de-indias`); el argumento de la subcategoria vive **una sola vez** en **ADR-101 (Revision 2)** y aqui solo va el alcance ejecutado, la evidencia y los hallazgos.
+
+**Ficha y datos:** slug `santiago-de-cali`, `categoria_slug` `sitio`, `subcategoria` `ciudad`, `zona` `pacifico`, `lat` **3.4516** / `lng` **-76.5320**, `status` `published`, `destacado` **true**, `rating` **ausente** (ADR-009: nunca hardcodeado).
+
+**Archivos (medidos contra el repositorio real, ADR-006):**
+
+1. `scripts/santiago-de-cali.ficha.md` (**12.521** bytes) -- ficha validada: **FAQS 6/6** temas de ciudad, **20/20** claves de `TAGS_SUBCAT.ciudad`, **1 solo** `es_hero`, `rating` ausente.
+2. `scripts/santiago-de-cali.ficha.json` (**12.482** bytes) y `scripts/santiago-de-cali.fotos.json` (**1.885** bytes) -- insumos.
+3. `scripts/seed-santiago-de-cali.js` (**8.166** bytes) -- upsert `ON CONFLICT slug`.
+4. `scripts/load-santiago-de-cali-api.js` (**4.105** bytes) -- loader por `POST /api/admin-destinos`.
+5. `scripts/smoke_test_santiago_de_cali.js` (**6.457** bytes) -- smoke de la pagina.
+
+**Verificacion medida (29 checks + produccion):**
+
+- `node scripts/validate_ficha.js scripts/santiago-de-cali.ficha.md --estricto` -> **PASS**; ASCII-safety **0 bytes > 127**.
+- **Smoke PASS 29/29**; balance de divs **299/299**; Escudo GOLD `node --check` **3/3**, **0** backticks.
+- **Produccion:** `GET /santiago-de-cali.html` -> **HTTP 200** (len **96.399**); `GET /api/destinos?categoria=sitio` -> **200** con el slug presente; `sitemap.xml` lo incluye.
+- **Idempotencia:** loader re-ejecutado -> **matches=1** (no duplica; mismo contrato de upsert que TSK-231).
+- **R5:** `node scripts/ejecucion/verificar-capa-gratis.js` -> **RESULTADO OK** (18 agentes sin pin).
+
+**Segunda publicacion / re-sync (2026-10-25, MISMA tarea, no es un TSK nuevo):** se corrigieron **2 campos editoriales de la ficha** y se re-publico por el loader:
+
+1. `BASE.instagram` "@colombia.travel" -> **`""`** (era la cuenta **nacional**, no de Cali; una cuenta nacional como si fuera local es atribucion falsa).
+2. `TAGS.contexto` "correcaminos del Valle" -> **"corredor del Valle"** (texto corrupto).
+
+`scripts/santiago-de-cali.ficha.json` **regenerado**; `seed-*.js`, `load-*.js` y `smoke_*.js` **sin cambios** (leen el JSON por `require`, luego la correccion viaja sola). **Medido tras re-publicar:** loader **OK** id `eff0512e-398b-4cb1-9f5c-39345ba07ea7` `status=published`; `/api/destinos` **matches=1** (sin duplicado); produccion `/santiago-de-cali.html` **HTTP 200**, **96.297** bytes; `"correcaminos"` **0** ocurrencias y `"corredor del Valle"` **1**; divs **329/329**; `sitemap.xml` **1** ocurrencia; smoke **29/29**; GOLD **3/3** con **0** bytes altos.
+
+**Hallazgos que quedan registrados:**
+
+1. **Las 6 rutas `nombres_archivo_wikimedia` originales de la ficha eran INVENTADAS: 1/6 vivas** (solo **Cristo Rey**). Sustituidas por **5 rutas verificadas con HEAD 200**: `Iglesia de San Antonio Cali 01.JPG`, `Gato de Tejada Cali.JPG`, `Puente Ortiz Cali.jpg`, `Cristo Rey Cali.jpg`, `Barrio San Antonio, Cali 09.jpg`. **Patron a vigilar: Gemini inventa nombres de archivo de Commons -> `HEAD 200` obligatorio antes de la ingesta.** Es la cara "fotos" del mismo patron que **BUG-034** ya cubre en la validacion de ficha: el validador comprueba forma, **no existencia**.
+2. **No existe en Commons archivo identificable del "Boulevard del Rio":** el atractivo queda en `TAGS.atracciones` **sin foto**. Es una **limitacion de fuente, no un bug**, y no se rellena con un placeholder.
+3. **Bug/observacion PREEXISTENTE, NO introducido por esta tarea:** el campo **`ciudad` vuelve VACIO** en `/api/destinos` **tambien para `cartagena-de-indias`**. Es **read-path, no de carga**: `toPlace` (`api/destinos.js:49-56`) emite la clave **`city`** y **no** emite `ciudad`, mientras que las rutas de mapa, cercania y busqueda (`:209`, `:304`, `:325`) si emiten **ambas**; el dato si esta en la fila (`SELECT d.*`, `:158`). Afecta a **todas** las ciudades y queda abierto en `NEXT.md`.
+
+**Correcciones editoriales aplicadas:** ASCII plano coherente (se retiro la tilde suelta de la forma verbal "consolido"); se **elimino** la cita "Observatorio de Seguridad de Cali, 2026" por **no estar respaldada en FUENTES**; `foto_hero` paso de placeholder "FOTO 1" a **archivo real**.
+
+**Nota operativa (hecho historico):** `seed-santiago-de-cali.js --write` **no se ejecuto** -- no hay `DATABASE_URL` local. La fila entro a **Neon por el loader** (mismo payload que `admin.html`).
+
+**DECISION OPERATIVA (2026-10-25, cierre de TSK-232; decide el operador, se deja escrita como decision y NO como deuda):** la **via canonica de seed es el LOADER** -- `scripts/load-<slug>-api.js` haciendo `POST /api/admin-destinos` con **el mismo payload que `admin.html`**. Razon medida: (a) es **el mismo camino que usa el admin**, luego lo que se prueba es lo que el usuario ejecuta, y el contrato de upsert ya es idempotente (**matches=1** en la re-ejecucion y en la segunda publicacion); (b) **no exige `DATABASE_URL`** en local y pasa por la validacion del endpoint, mientras el SQL directo **se salta** esa capa; (c) el loader dejo el id estable entre publicaciones (**`eff0512e-...`**). `scripts/seed-<slug>.js --write` queda como **herramienta SECUNDARIA** de diagnostico/reparacion y **exige `DATABASE_URL`**; **no es requisito de cierre** de una pagina nueva. Esto **cierra el pendiente (a)** que esta misma tarea habia abierto en `NEXT.md`.
+
+**Deudas que abre (registradas en `NEXT.md`):** (a) ~~decidir la via canonica de seed~~ -> **RESUELTA arriba (loader canonico)**; (b) bug del campo **`ciudad` vacio** en `/api/destinos` para todas las ciudades (**read-path**) -> **registrado como `BUG-137`** en `BUGS_HISTORICOS.md` (**ABIERTO**, gate de `@backend-dev`); (c) el **patron de fotos inventadas** como **chequeo previo obligatorio** del flujo de fichas -- **candidato a ADR**, a evaluar por `@architect` (**NO redactado en este pase**, `DECISIONS.md` sin tocar); (d) `BASE.web` apunta a la fuente **nacional** `colombia.travel/es/cali` -- decidir si debe ser **local** (baja prioridad, editorial).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

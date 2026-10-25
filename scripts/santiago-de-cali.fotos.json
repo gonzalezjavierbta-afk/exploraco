@@ -1,0 +1,44 @@
+{
+  "fotos": [
+    {
+      "tema": "Santiago de Cali San Antonio church skyline",
+      "caption": "Iglesia de San Antonio y vista panoramica de Cali",
+      "archivo_wikimedia": "File:Iglesia de San Antonio Cali 01.JPG",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Iglesia_de_San_Antonio_Cali_01.JPG/1280px-Iglesia_de_San_Antonio_Cali_01.JPG",
+      "status": 200,
+      "es_hero": true
+    },
+    {
+      "tema": "El Gato del Rio Cali sculpture",
+      "caption": "Monumento El Gato del Rio a la orilla del rio Cali",
+      "archivo_wikimedia": "File:Gato de Tejada Cali.JPG",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Gato_de_Tejada_Cali.JPG/1280px-Gato_de_Tejada_Cali.JPG",
+      "status": 200,
+      "es_hero": false
+    },
+    {
+      "tema": "Puente Ortiz sobre el rio Cali",
+      "caption": "El Puente Ortiz sobre el rio Cali, epicentro del centro historico de la ciudad",
+      "archivo_wikimedia": "File:Puente Ortiz Cali.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Puente_Ortiz_Cali.jpg/1280px-Puente_Ortiz_Cali.jpg",
+      "status": 200,
+      "es_hero": false
+    },
+    {
+      "tema": "Monumento a Cristo Rey Cali hill",
+      "caption": "Monumento a Cristo Rey en los cerros tutelares",
+      "archivo_wikimedia": "File:Cristo Rey Cali.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/e/ec/Cristo_Rey_Cali.jpg",
+      "status": 200,
+      "es_hero": false
+    },
+    {
+      "tema": "San Antonio Cali colonial street",
+      "caption": "Calle colonial tipica en el barrio San Antonio",
+      "archivo_wikimedia": "File:Barrio San Antonio, Cali 09.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Barrio_San_Antonio%2C_Cali_09.jpg/1280px-Barrio_San_Antonio%2C_Cali_09.jpg",
+      "status": 200,
+      "es_hero": false
+    }
+  ]
+}

@@ -2407,5 +2407,23 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **Verificacion:** `smoke_completitud` **74/74**; `smoke_zona_paridad --sin-neon` **46/46**; `smoke_016` **52/52**; `node --check` **3/3** JS; ASCII-safety **0/0/0**; `express_check` **PASS** (22 FAIL preexistentes, delta 0); balance de divs de `admin.html` **1174/1174**. **Pendiente de red automatica:** las **dos direcciones** contra Neon (un `[]` no resucita / un NULL si hereda el espejo) quedan en la deuda **TSK-229 / D4** (`@qa-auditor`), porque hoy la prueba es de codigo y no de datos.
 
+## BUG-137: `/api/destinos` no emite el campo **`ciudad`** en el listado (`toPlace`) ni en la proyeccion de mapa (`:209`), luego `ciudad` llega vacia para **TODAS** las ciudades -- **ABIERTO (2026-10-25, detectado en TSK-232)**
+
+**Severidad: MEDIA (read-path, degradacion silenciosa: el dato esta en la fila y no se pierde, pero el consumidor recibe la clave ausente). Estado: ABIERTO el 2026-10-25. Sin cambios de codigo en este registro.**
+
+**Sintoma:** `GET /api/destinos?categoria=sitio` devuelve las fichas con `subcategoria: "ciudad"` con el campo **`ciudad` vacio o ausente**, y le pasa **igual a `cartagena-de-indias`** (TSK-231) que a `santiago-de-cali` (TSK-232). `slug`, `name` y el resto del payload llegan bien; no hay error HTTP.
+
+**Causa (medida en el archivo real, ADR-006):** el payload se construye **a mano en cuatro sitios** y dos de ellos **no emiten el alias `ciudad`**: (1) `toPlace`, `api/destinos.js:49-56`, emite **`city`** (`row.ciudad || ''`) y **no** emite `ciudad`; (2) la proyeccion de mapa, `api/destinos.js:203-215` (linea **`:209`**: `city: d.ciudad || '',`), tampoco. En cambio busqueda y recomendacion (**`:304`** y **`:325`**) emiten **ambas**: `city: r.ciudad || '', ciudad: r.ciudad || '', ...`. El dato **si existe** en la fila porque la consulta es `SELECT d.*` (`:158`). No es fallo de carga, ni de SQL, ni de Neon.
+
+**Correccion de una premisa del encargo:** el brief daba `:209` como emisor de **ambas** claves. **Es falso**: medido con `Select-String` sobre `api/destinos.js`, `:209` solo emite `city`. Los unicos dos puntos que emiten `ciudad` son `:304` y `:325`.
+
+**Patron de falla (el que hay que recordar):** **un mismo DTO copiado a mano en N sitios deriva y el sintoma solo aparece en la ruta que el cliente consulta.** `city` y `ciudad` son el mismo dato con dos nombres; mientras el alias no se aplique **en un unico punto** (o al final, sobre el objeto ya construido), cada copia se desincroniza y la prueba de humo que mira una sola ruta da verde.
+
+**Alcance:** **todas las categorias** que pasan por `toPlace`; se hace visible en `subcategoria: "ciudad"` y en cualquier consumidor que filtre u ordene por `ciudad` leyendo el listado en vez del mapa (ver filtros en `:348`).
+
+**Correccion propuesta (NO ejecutada; requiere gate de `@backend-dev`):** anadir `ciudad: row.ciudad || ''` junto a `city` en `toPlace` (`:49-56`) y lo mismo en la proyeccion de mapa (`:209`), dejando los cuatro productores con la **misma forma** de payload. El pase documental **no toco `api/*.js`**.
+
+**Verificacion pendiente (al cerrar el bug):** (1) `GET /api/destinos?categoria=sitio` -> el objeto de `santiago-de-cali` y el de `cartagena-de-indias` con **`ciudad` no vacio**; (2) paridad `city == ciudad` en las **4** rutas (listado, mapa, cercania, busqueda) **4/4**.
+
 
 
