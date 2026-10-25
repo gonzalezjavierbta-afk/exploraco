@@ -928,6 +928,51 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   [data-ma-voto],[data-ma-voto] .ma-estrella{transition:none;animation:none}
   [data-ma-voto].is-busy .ma-estrella{opacity:.55}
 }
+
+/* =========================================================
+   MOBILE TYPE SCALE + TAP TARGETS - mi-perfil.html (max-width:768px)
+   Escala: micro 12 / meta 14 / cuerpo 16 / tarjeta 18 / seccion 22
+   Solo font-size, line-height, font-weight y min-height.
+   No toca layout, color, iconos, textos ni markup. Cada bloque
+   repite el prefijo de silo de la regla base (ADR-004).
+   Va al final del ultimo style para ganar por orden de cascada.
+   ========================================================= */
+@media(max-width:768px){
+
+/* --- 1. TITULARES DE SECCION Y CABECERAS DE MODAL: 22px / 900 / 1.15 --- */
+.mp-picker-head,.pf-museo-modal-head h3{font-size:22px;font-weight:900;line-height:1.15}
+
+/* --- 2. TITULOS DE TARJETA: 18px / 900 / 1.2 --- */
+.nivel-detail-title,.pf-reg-titulo,.pf-bono-title,.pf-uso-title,.pf-completa .pf-comp-titulo,.pf-origen .pf-org-city,.dm-bandeja .dm-chat-titulo,.tabla-destino .td-send-nombre,.ref-net-title,.facc-name,.pf-v61 .v61-gate-info-t{font-size:18px;font-weight:900;line-height:1.2}
+
+/* --- 3. CUERPO Y DESCRIPCIONES: 16px / 1.5 --- */
+.pf-email,.nivel-nombre,.nivel-mis-name,.bg-name,#pf-misiones .mis-nombre,.pf-uso-item,.inv-name,.cromo-name,.dm-bandeja,.dm-bandeja .dm-texto,.dm-bandeja .dm-burbuja,.arbol-clases .arbol-rama-nombre,.pf-datos .pf-dato-val,.pf-pas-val,.pf-bil-vacio,.pf-gal-vacio,.pf-slots .sl-vacio,.pf-completa .pf-comp-feliz,.pf-origen .pf-org-row-name,.pf-museo-msg,.pf-museo-drop,.pf-museo-preview .pf-mp-bio,.verify-banner-txt,#xp-toast{font-size:16px;line-height:1.5}
+
+/* --- 4. METADATOS, FECHAS, LABELS, AVISOS: 14px / 1.4 --- */
+.pf-level,.pf-stat-l,.nivel-meta,.nivel-detail-lbl,.nivel-detail-empty,.nivel-mis-meta,.nivel-mis-desc,.bg-desc,#pf-misiones .mis-meta,#pf-misiones .mis-desc,#pf-lugares .pf-lugar-msg,.pf-uso-help,.pf-uso-vacio,.pf-museo-line,.pf-bono-desc,.pf-reg-xp,.pf-reg-vacio,.pf-datos .pf-dato-lbl,.pf-pas-ok,.pf-pas-pend,.pf-pas-item,.pf-pas-lbl,.pf-pasaporte .pf-pas-sello-txt,.pf-bil-k,.pf-slots .sl-err,.pf-slots .sl-saldo-k,.pf-slots .sl-saldo-av,.pf-slots .sl-curva,.pf-slots .sl-precio-lbl,.pf-slots .sl-precio-base,.pf-slots .sl-motivo,.pf-slots .sl-motivo-tec,.pf-slots .sl-ref,.pf-slots .sl-crece,.pf-slots .sl-hielo,.pf-subida-txt span,.pf-completa .pf-comp-sub,.pf-completa .pf-comp-cargando,.pf-completa .pf-comp-vacio,.pf-origen .pf-org-lbl,.pf-origen .pf-org-row-desc,.pf-origen .pf-org-row-fx,.pf-origen .pf-org-note,.pf-casa .pf-casa-meta,.pf-casa .pf-casa-nota,.pf-casa .pf-casa-actual,.pf-casa .pf-casa-dato,.pf-museo-preview .pf-mp-cargando,.pf-museo-preview .pf-mp-vacio,.pf-museo-preview .pf-mp-privado,.pf-museo-preview .pf-mp-pie,.pf-museo-preview .pf-mp-stat-l,.pf-cuenta .pf-cta-lbl,.pf-cuenta .pf-switch,.pf-museo-lbl,.pf-museo-check,.pf-museo-hint,.pf-museo-form-msg,.pf-museo-preview .pf-museo-ph,.pf-v61 .v61-note,.pf-v61 .v61-empty,.pf-v61 .v61-meta,.pf-v61 .v61-gate-l,.pf-v61 .v61-row-d,.pf-v61 .v61-row-x,.pf-v61 .v61-gate-info p,.tabla-destino .td-nota,.tabla-destino .td-send-desc,.tabla-destino .td-meta,.tabla-destino .td-total-l,.tabla-destino .td-rango,.tabla-destino .td-fama,.tabla-destino .td-cargando,.tabla-destino .td-vacio,.ref-stat-l,.ref-net-label,.ref-insumo-lbl,.ref-qr-fallback,.ref-empty,.facc-desc,.facc-current,.dm-bandeja .dm-hint,.dm-bandeja .dm-cargando,.dm-bandeja .dm-vacio,.dm-bandeja .dm-hilo-ultimo,.dm-bandeja .dm-aviso,.arbol-clases .arbol-cargando,.arbol-clases .arbol-nota,.arbol-clases .arbol-tab-nombre,.arbol-clases .arbol-bono-txt,.arbol-clases .arbol-rama-meta,.arbol-clases .arbol-tip-ef,.arbol-clases .arbol-tip-req,.ma-rating-texto,[data-ma-voto] .ma-rating-texto,[data-ma-voto] [data-ma-rating-texto]{font-size:14px;line-height:1.4}
+
+/* --- 5. MICROCOPIA, BADGES, CONTADORES: 12px / 500 / 1.3 --- */
+.pf-level-num,.pf-xp-text,.pf-counter,.nav-label,.nav-back,.nivel-era,.nivel-badge,.nivel-caret,.nivel-detail-era,.nivel-detail-range,.nivel-detail-estado,.nivel-cap-chip b,.nivel-cap-chip span,.nivel-mis-xp,#pf-misiones .mis-lock,#pf-misiones .mis-xp,#pf-lugares .pf-lugar-badge,.pf-uso-item .pf-uso-item-n,.pf-uso-cont,.cromo-rareza,.cromo-set,.cromo-qty,.ref-net-xp,.ref-net-pct,.dm-bandeja .dm-hilo-fecha,.dm-bandeja .dm-no-leidos,.dm-bandeja .dm-msg-fecha,.dm-bandeja .dm-contador,.arbol-clases .arbol-tab-mio,.arbol-clases .arbol-prog-txt,.arbol-clases .arbol-estado,.arbol-clases .arbol-fac-chip,.pf-pas-ok-txt,.pf-bil-chip,.pf-bil-cod,.pf-gal-star,.inv-era,.pf-slots .sl-bar,.pf-slots .sl-chip,.pf-slots .sl-mios-l,.pf-slots .sl-top,.pf-slots .sl-pick-lbl,.pf-slots .sl-siguiente,.pf-slots .sl-siguiente b,.pf-slots .sl-curva code,.pf-slots .sl-auto,.pf-completa .pf-comp-xp,.pf-completa .pf-comp-ok,.pf-origen .pf-org-chip,.pf-origen .pf-org-foot,.pf-casa .pf-casa-tag,.pf-museo-preview .pf-mp-badge,.pf-museo-preview .pf-mp-chip,.pf-cuenta .pf-cta-badge,.pf-museo-cont,.pf-museo-badge,#profile .pf-grupo-flecha,#profile .pf-grupo-count,.mp-picker-coords,.pf-v61 .v61-err,.pf-v61 .v61-rareza,.pf-v61 .v61-chip,.pf-v61 .v61-saldo-l,.tabla-destino .td-estado,.tabla-destino .td-nd,.pf-reg-fuente,[data-ma-voto] [data-ma-count],[data-ma-voto] .ma-votos-num{font-size:12px;font-weight:500;line-height:1.3}
+
+/* --- 6. BOTONES, TABS, CHIPS, ACCIONES: 16px / min-height 44 --- */
+.pf-btn,.pf-uso-btn,.pf-bono-btn,.pf-reg-btn,.pf-gal-btn,.pf-pas-btn,.pf-mkt-btn,.inv-use,.pf-museo-btn,.pf-museo-mini-btn,.pf-museo-move,.mp-album-com-btn,.pf-tab,.pf-datos .pf-dato-btn,.pf-origen .pf-org-btn,.pf-completa .pf-comp-btn,.pf-slots .sl-btn,.pf-subida-btn,.pf-museo-preview .pf-mp-btn,.pf-v61 .v61-btn,#profile .pf-grupo-btn,#pf-lugares .pf-lugar-accion,.arbol-clases .arbol-btn,.dm-bandeja .dm-bloq-btn,.dm-bandeja .dm-volver,.dm-bandeja .dm-enviar,.verify-banner-btn,.ref-copy-btn,.facc-btn,.gate-btn{font-size:16px;min-height:44px}
+
+/* CTA principal de la pagina (publicar / completar album): 48px de alto tactil */
+.mp-album-com-btn,.pf-completa .pf-comp-btn,.pf-museo-btn{font-size:16px;min-height:48px;line-height:1.2}
+
+/* --- 7. FORMULARIOS: 16px (evita el zoom automatico de iOS) --- */
+#profile input:not([type=checkbox]):not([type=radio]),#profile select,#profile textarea,.pf-museo-preview input:not([type=checkbox]):not([type=radio]),.pf-museo-preview textarea,.dm-bandeja input:not([type=checkbox]):not([type=radio]),.dm-bandeja textarea,.arbol-clases input:not([type=checkbox]):not([type=radio]),.arbol-clases select,.tabla-destino input:not([type=checkbox]):not([type=radio]),[data-ma-voto] input:not([type=checkbox]):not([type=radio]){font-size:16px;min-height:44px;line-height:1.35}
+.pf-uso-input,.pf-museo-input,.ref-input,.pf-v61 .v61-inp,.pf-slots .sl-sel,.arbol-clases .arbol-bono-sel{font-size:16px;min-height:44px}
+
+/* Excepcion por tamano inline en controles: el style= gana al selector base y baja de 16px */
+input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="font-size:13px"],select[style*="font-size:14px"],textarea[style*="font-size:13px"],textarea[style*="font-size:14px"]{font-size:16px!important}
+
+/* Unica excepcion con !important: el tamano llega por style inline
+   en markup y en plantillas generadas por JS (museo, misiones, logros,
+   inventario, cromos, red, guardados, mapa). Piso duro de 12px. */
+[style*="font-size:11px"],[style*="font-size:10px"],[style*="font-size:9px"],[style*="font-size:8px"]{font-size:12px!important}
+
+}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">

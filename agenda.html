@@ -150,6 +150,65 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
   .sec-nav-inner{padding:0 16px}
 }
 
+/* ===================================================================== */
+/* ESCALA TIPOGRAFICA MOVIL (<=768px) - espejo de la certificada en index */
+/* Solo tamano de texto y area tactil. Layout, grid, color y markup       */
+/* intactos. Va al final del ultimo <style>: gana por orden de cascada a  */
+/* las bases (lineas 13-151) y a las @media de L112, L132 y L148.         */
+/* ===================================================================== */
+@media(max-width:768px){
+
+  /* --- NAV (base: .tbc 9px, .back-btn 10px) ---
+     .tbc queda fuera: la regla base L134 lo oculta con display:none!important. */
+  .back-btn{font-size:14px;line-height:1.4;min-height:44px;display:inline-flex;align-items:center}
+
+  /* --- HERO (base: .ah-eyebrow 9px, .ah-stat-l 9px) --- */
+  .ah-eyebrow{font-size:12px;line-height:1.3}
+  .ah-title{font-size:32px;line-height:1.1;font-weight:900}
+  .ah-sub{font-size:16px;line-height:1.5}
+  .ah-stat-n{font-size:28px;line-height:1.1;font-weight:900}
+  .ah-stat-l{font-size:14px;line-height:1.4}
+
+  /* --- FILTROS (base: .fb-label 9px, .fb-btn 11px, .search-inp 12px) ---
+     .search-inp es input de texto: 16px o Safari iOS hace zoom al enfocar. */
+  .fb-label{font-size:14px;line-height:1.4}
+  .fb-btn{font-size:16px;line-height:1.2;min-height:44px}
+  .search-inp{font-size:16px;line-height:1.2;min-height:44px}
+  .search-icon{font-size:16px}
+  .count-bar{font-size:14px;line-height:1.4}
+  .month-name{font-size:22px;line-height:1.15;font-weight:900}
+  .month-count{font-size:14px;line-height:1.4}
+
+  /* --- TARJETA DE EVENTO (base: .ev-name 17px, mes 8px, pill 9px, badges 8px) --- */
+  .ev-name{font-size:18px;line-height:1.2;font-weight:900}
+  .ev-day{font-size:22px;line-height:1.05;font-weight:900}
+  .ev-month-lbl{font-size:12px;line-height:1.3}
+  .ev-cover .ev-cover-cat{font-size:12px;line-height:1.3}
+  .ev-cat-pill{font-size:12px;line-height:1.3}
+  .ev-featured-badge{font-size:12px;line-height:1.3}
+  .ev-curso{font-size:12px;line-height:1.3}
+  .ev-city{font-size:14px;line-height:1.4}
+  .ev-detail{font-size:14px;line-height:1.4}
+  .ev-range{font-size:14px;line-height:1.4}
+  .ev-cta{font-size:16px;line-height:1.3;font-weight:900}
+  .ev-cta.external{font-size:14px;line-height:1.4}
+
+  /* --- TABS DE MES, DE DIA Y DE SECCION (base 12px / 11px / 10px) --- */
+  .ms-btn,.ds-btn{font-size:16px;line-height:1.2;min-height:44px}
+  .ds-nav{font-size:16px;width:44px;height:44px}
+  .sn-link{font-size:16px;line-height:1.2;min-height:44px;display:inline-flex;align-items:center}
+
+  /* --- SELECT DE CIUDAD: el tamano viene del style inline del markup (L231),
+     el CSS no le gana sin !important. Caso unico en este archivo. --- */
+  #city-sel{font-size:16px!important;line-height:1.2;min-height:44px}
+
+  /* --- ESTADOS --- */
+  .ne-text{font-size:16px;line-height:1.5}
+
+  /* --- DRAWER MOVIL (base: .md-link 15px, .md-back-btn 12px) --- */
+  .md-link{font-size:16px;line-height:1.4;min-height:44px}
+  .md-back-btn{font-size:16px;line-height:1.2;min-height:44px;display:flex;align-items:center;justify-content:center}
+}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">

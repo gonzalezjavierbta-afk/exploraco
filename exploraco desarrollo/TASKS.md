@@ -5788,5 +5788,75 @@ Nuevos del delta de mezcla: **N** 1 activa + comunidad -> **6 items** (el del mo
 
 Codigo (working tree, **sin commit; NO desplegado**): `db/migrations/056_home_hero_fotos.sql` (nueva, **ya aplicada en Neon**), `api/utilidades.js` (`v2` -> `v3`, +126/-1), `admin.html` (+317, 0 borradas; y en el delta de mezcla **1 linea de texto visible** en `admin.html:2429`, fuera de cualquier `<script>`), `index-api-connector.js` (+89/-7 + delta de mezcla en `heroMezclar`), `scripts/smoke_hero_home_connector.js` (8 -> 17 casos) e `index.html` (**unica linea funcional del delta**: cache-buster `?v=6` -> `?v=7`). Documentacion (este pase, unico): `TASKS.md` (esta seccion) y `NEXT.md` (relevo + pendientes + riesgos). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**: el modulo es configuracion de presentacion); `BUGS_HISTORICOS.md` **NO se toco** (**no hay bug nuevo**); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron**.
 
+## TSK-219 - Hero movil de la home (CTA dentro de la tarjeta, "Cerca de ti" en la linea del buscador, chips a 2 columnas, hero sin `100vh` fijo) + escala tipografica movil global del resto de la home - 2026-10-24 - IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar)** -- 2026-10-24 (pase documental unico R2). **Sin ADR** (una escala tipografica movil y un reflow de media query no son decision de arquitectura) y **sin bug nuevo**. Alcance: **1 fichero** (`index.html`), **cero** cambios de markup y **cero** cambios en escritorio. **Tanda 2 (2026-10-24):** el alcance se amplia a **10 ficheros** de codigo (ver **5. Tanda 2**), siempre **sin commit y sin desplegar**.
+
+### Motivo
+
+En movil el CTA del hero se salia de la tarjeta: `#sinp` tenia `flex:1` **sin `min-width:0`**, asi que su ancho intrinseco empujaba `.sbtn` fuera del contenedor. Encima, el resto de la home heredaba tamanos de escritorio (texto visible por debajo de 12px) y `#sinp`/`.sgeo-ciudad` por debajo de 16px, lo que disparaba el **zoom automatico de Safari iOS** al enfocar.
+
+### 1. Hero movil (`index.html:273-309`, `@media(max-width:768px)`; `:310-317`, `@media(max-width:400px)`)
+
+- `.swrap` pasa a **grid de 4 pistas** (`auto minmax(0,1fr) auto auto`) y `.sbox` a `display:contents`; la tarjeta visual vive en `.swrap`, que replica el `:focus-within`. La causa raiz se ataca en el `minmax(0,1fr)`, no con un `overflow:hidden` que habria ocultado el sintoma.
+- "Cerca de ti" queda **alineado a la derecha en la misma fila del campo**; el CTA "Buscar ahora" pasa a **ancho completo bajo la fila**, 48px de alto y 16px de texto, **dentro de la misma tarjeta**.
+- Chips de categoria (`.hcats`) a **2 columnas exactas** (`1fr 1fr`, max 320px, celdas de 44px, 12px).
+- `#sinp` y `.sgeo-ciudad` a **16px**: elimina el zoom automatico de Safari iOS al enfocar.
+- El hero deja de ser `100vh` fijo en movil: `height:auto` + `min-height:100svh` (**con fallback `100vh`**) + `padding-bottom:88px`, para no recortar contenido.
+
+### 2. Escala tipografica movil global (`index.html:1068-1115`; `:1117-1121`, `@media(max-width:400px)`)
+
+- Micro **12px** / metadatos **14px** / cuerpo **16px** con `line-height:1.5` / titulos de tarjeta **18px** / titulos de seccion **22px** / botones y CTA **16px** con `min-height:44px` (**48px** en los principales). **Cero texto visible por debajo de 12px.**
+- Los **15** inputs de texto/email/tel/url a **16px**; los que traen tamano por `style` inline o por plantilla JS se fuerzan con **una unica excepcion `!important`**, documentada en el propio CSS.
+
+### 3. Verificacion
+
+| Control | Resultado |
+|---|---|
+| `node --check` de los **2** `<script>` inline | **2/2 PASS** |
+| Balance de divs (`express_check.js`) | **375/375** |
+| ASCII de las lineas nuevas | **limpio** (0 bytes >127) |
+| Selectores fantasma | **cero** |
+| Inputs revisados | **18/18** |
+| Escritorio | **intacto**: todo el cambio vive dentro de media queries; `git diff` **no borra ni una linea de markup** |
+
+### 4. Pendientes abiertos
+
+1. **Smoke visual en dispositivo real** a **320 / 360 / 390px**: comprobar el CTA completo dentro de la tarjeta, "Cerca de ti" en la fila del campo, chips 2xN sin desbordar y ausencia de zoom al enfocar el buscador.
+2. **Decidir** si la misma escala se replica en `directorio*.html`, `mi-perfil.html`, `comunidad.html`, `galeria.html` y `agenda.html` (**NO se tocaron** en esta tanda). **RESUELTO en la Tanda 2** (ver seccion 5).
+
+### 5. Tanda 2 (2026-10-24): escala movil replicada a 9 paginas + 2 microajustes del hero
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL (sin commit, sin desplegar).** Cierra el pendiente 2 de la seccion 4: la escala ya cubre **10 paginas** (la home + 9). **Sin ADR** (misma escala, ya justificada; ninguna decision de arquitectura nueva) y **sin bug nuevo**. **Cero markup borrado**; `git diff` de la tanda = **703 inserciones / 2 eliminaciones** (ambas CSS conocidas de `index.html`).
+
+**Paginas escaladas (9), cada una con un bloque nuevo unico `@media(max-width:768px)` al final de su ultimo `<style>`:**
+
+| Pagina | Rango (lineas) | Silo respetado (ADR-004) |
+|---|---|---|
+| `directorio.html` | `98-145` | -- |
+| `directorio-hostal.html` | `135-190` | `.tpl-hostal` |
+| `directorio-comida.html` | `124-172` | `.tpl-comida` |
+| `directorio-evento.html` | `124-172` | `.tpl-evento` |
+| `directorio-sitio.html` | `124-172` | `.tpl-sitio` |
+| `mi-perfil.html` | `933-976` | -- (11 inputs con excepcion `!important`) |
+| `comunidad.html` | `606-743` | `#cpanel-mapa`, `#cpanel-mercado`, `.cm-v61` (**14 secciones**) |
+| `galeria.html` | `240-298` | -- |
+| `agenda.html` | `153-211` | -- |
+
+**Escala comun (identica a la de `index.html`):** microcopia **12px** / metadatos **14px** / cuerpo **16px** con `line-height:1.5` / titulo de tarjeta **18px** / titulo de seccion **22px** / botones, chips e inputs **16px** con `min-height:44px` (**48px** en el CTA principal). **Cero texto visible por debajo de 12px** y **ningun** input de texto/email/tel/url por debajo de 16px (**elimina el zoom automatico de iOS**). Donde existia prefijo de plantilla, el bloque vive bajo su `.tpl-*`: nada suelto en `:root`.
+
+**Microajustes del hero (`index.html`, Tanda 2):**
+
+1. `.scat` (**badge flotante**) **oculto en movil**: se solapaba con el logo vertical.
+2. `.hdd` (**autocompletado**) con **`max-height:60vh` + scroll interno** para no desbordar la pantalla.
+
+**Verificacion de la tanda:** `node --check` de los `<script>` inline **13/13** en **10 archivos**; balance de divs **sin desbalance nuevo** (**0**, ver observacion de conteo preexistente en `BUGS_HISTORICOS.md`); **ASCII puro** en los **13 rangos** nuevos; `!important` **100% limitado** a `font-size`/`line-height`/`min-height`/`padding` (**cero** sobre color, background, display, position, width, grid o font-family).
+
+**Pendiente abierto (unico):** **smoke visual en dispositivo real** a **320 / 360 / 390px** sobre las 10 paginas.
+
+### Archivos tocados
+
+`index.html` (unico fichero de codigo; **sin commit; NO desplegado**). Documentacion (este pase, unico): `TASKS.md` (esta seccion) y `NEXT.md` (linea de estado). `DECISIONS.md` **NO se toco** (**no hay ADR nuevo**); `BUGS_HISTORICOS.md` **NO se toco** (**no hay bug nuevo**: el solapamiento era un fallo de layout en un solo breakpoint, corregido en el mismo turno); `PROJECT.md` y `BLUEPRINT.md` **NO se tocaron**.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

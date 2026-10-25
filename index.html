@@ -225,12 +225,11 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .hlogo2 img{display:block;width:auto;margin:0 auto;filter:drop-shadow(0 4px 20px rgba(0,0,0,.5))}
 .hlogo2 .ltw-hero-h{height:clamp(94px,13vw,172px)}
 .hlogo2 .ltw-hero-v{display:none;height:clamp(192px,54vw,288px)}
-@media(max-width:768px){.hlogo2 .ltw-hero-h{display:none}.hlogo2 .ltw-hero-v{display:block}}
 .swrap{width:100%;max-width:660px;position:relative}
 .sbox{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.42);border:1.5px solid rgba(255,255,255,.28);border-radius:4px;padding:12px 18px;transition:border-color .2s,background .2s;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .sbox:focus-within{background:rgba(255,255,255,.13);border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,74,0,.14)}
 .sico{font-size:16px;color:rgba(255,255,255,.25);flex-shrink:0}
-#sinp{flex:1;border:none;outline:none;background:transparent;font-family:'Outfit',sans-serif;font-size:15px;color:#fff}
+#sinp{flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:'Outfit',sans-serif;font-size:15px;color:#fff}
 #sinp::placeholder{color:rgba(255,255,255,.28)}
 .scl{background:none;border:none;cursor:pointer;font-size:14px;color:rgba(255,255,255,.35);padding:4px;border-radius:50%;display:none}
 .scl.vis{display:block}
@@ -271,6 +270,53 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .hdot.on{background:var(--gold);width:22px;border-radius:3px}
 .hcap{position:absolute;bottom:28px;left:4%;z-index:4;font-size:10px;color:rgba(255,255,255,.45);display:flex;align-items:center;gap:5px;font-family:'Outfit',sans-serif}
 .hcap::before{content:'📍'}
+@media(max-width:768px){
+  .hlogo2 .ltw-hero-h{display:none}
+  .hlogo2 .ltw-hero-v{display:block}
+  /* HERO movil: altura automatica (sin recorte) y tipografia legible */
+  .hero-home{height:auto;min-height:100vh;min-height:100svh;padding-bottom:88px}
+  .hstrip{gap:10px}
+  /* Badge flotante oculto en movil: se solapa con el logo vertical */
+  .scat{display:none}
+  .hsey{font-size:12px;font-weight:700;line-height:1.3;letter-spacing:1.5px;text-align:center}
+  /* Tarjeta unica: buscador y Cerca de ti en la misma fila, CTA a ancho completo */
+  .swrap{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;column-gap:8px;row-gap:10px;background:rgba(0,0,0,.42);border:1.5px solid rgba(255,255,255,.28);border-radius:6px;padding:12px 14px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:border-color .2s,background .2s}
+  .swrap:focus-within{background:rgba(255,255,255,.13);border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,74,0,.14)}
+  .sbox{display:contents}
+  #sinp{font-size:16px;line-height:1.5;padding:6px 0}
+  .sico{font-size:18px}
+  .scl{font-size:16px;min-width:40px;min-height:40px;padding:0;align-items:center;justify-content:center}
+  .scl.vis{display:flex}
+  .sbtn{grid-column:1/-1;grid-row:2;width:100%;min-height:48px;font-size:16px;font-weight:900;border-radius:4px;padding:12px 20px;letter-spacing:1px}
+  .sgeorow{grid-column:4;grid-row:1;margin-top:0;min-height:0;min-width:0;max-width:100%;gap:6px;flex-wrap:nowrap;justify-content:flex-end}
+  .sgeo{font-size:14px;font-weight:600;min-height:40px;padding:6px 10px;gap:5px;border-radius:4px;white-space:nowrap}
+  .sgeo-ciudad{font-size:16px;min-height:40px;padding:6px 10px;border-radius:4px;max-width:100%;min-width:0}
+  .sgeost{font-size:12px}
+  /* Si se despliega la ciudad o el estado, la fila geo baja a linea propia */
+  .sgeorow:has(.sgeo-ciudad[style*="inline-block"]),.sgeorow:has(.sgeost:not(:empty)){grid-column:1/-1;grid-row:3;justify-content:flex-start;flex-wrap:wrap}
+  /* Autocompletado con scroll interno propio: nunca desborda la pantalla */
+  .hdd{top:calc(100% + 8px);max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .ddlbl{font-size:12px}
+  .ddi{min-height:44px;padding:10px 16px}
+  .hdd .ddi>div:last-child>div:first-child{font-size:16px!important;line-height:1.35}
+  .hdd .ddi>div:last-child>div:last-child{font-size:12px!important}
+  .hdd-empty{font-size:14px;padding:18px 16px}
+  .hcats{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:320px}
+  .hcat{justify-content:center;text-align:center;min-height:44px;font-size:12px;font-weight:700;letter-spacing:.6px;padding:8px 10px}
+  .hstats{gap:12px;flex-wrap:wrap;justify-content:center}
+  .hstl{font-size:12px;letter-spacing:1px}
+  .hstdiv{height:18px}
+  .hcap{font-size:12px;bottom:50px}
+  .hdots{bottom:18px}
+}
+@media(max-width:400px){
+  .hstats .hstdiv{display:none}
+  .hstats{gap:16px}
+  /* 320-400px: chip geo y tarjeta de busqueda comprimidos para que #sinp
+     conserve al menos ~90px utiles con la X visible, sin scroll horizontal */
+  .sgeo{font-size:12px;padding:6px 8px;gap:4px}
+  .swrap{padding:10px 12px;column-gap:6px;row-gap:8px}
+}
 /* ── BANDS: modulo retirado (redundante con los filtros del hero, el mapa y Destacados) ── */
 /* ── SECTIONS ── */
 .hsect{padding:36px 4%}
@@ -1017,6 +1063,64 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .wl-registro:hover{color:#9CA3AF}
 .wl-registro:focus-visible{outline:2px solid #FF4A00;outline-offset:2px}
 @keyframes wlFade{from{opacity:0}to{opacity:1}}
+
+/* =========================================================
+   MOBILE TYPE SCALE + TAP TARGETS - index.html (max-width:768px)
+   Escala: micro 12 / meta 14 / cuerpo 16 / tarjeta 18 / seccion 22
+   Solo font-size, line-height, font-weight, padding vertical y
+   min-height. No toca layout, color, iconos, textos ni markup.
+   Va al final del ultimo style para ganar por orden de cascada.
+   ========================================================= */
+@media(max-width:768px){
+
+/* --- 1. TITULARES DE SECCION: 22px / 900 / 1.15 --- */
+.hsec-title,.mapa-title,.ctatitle{font-size:22px;font-weight:900;line-height:1.15}
+
+/* --- 2. TITULOS DE TARJETA: 18px / 900 / 1.2 --- */
+.fcard-name,.ename,.rvname,.rvname2,.nbname,.mapa-li-name,.dcard-name,.pcard-name,.lp-name,.trophy-name,.badge-name,.ag-ev-name,.v360-cap-name,.v360-thumb-name,.md-media h4,.md-no-media .md-nm-t,.md-mcard-t,.md-audio-t,.insp-hl-title{font-size:18px;font-weight:900;line-height:1.2}
+
+/* --- 3. CUERPO Y DESCRIPCIONES: 16px / 1.5 --- */
+.fdesc,.mdesc,.rvtx,.rvtx2,.pcard-desc,.v360-desc,.md-lead,.insp-main-desc,.dest-empty-sub,.planes-create-text,.ctasub,.reco-sec .reco-sub,.wl-sub,.wl-tip-desc,.gsrv,.mapa-note{font-size:16px;line-height:1.5}
+
+/* --- 4. METADATOS, FECHAS, LABELS: 14px / 1.4 --- */
+.hsec-more,.planes-more,.hqi,.gsprice,.gsdate,.hblbl,.isub,.rbcnt,.rbbl,.rbbn,.rvdate,.rvdate2,.cicnt,.wrlbl,.fctl,.fcard-cat,.fcard-loc,.rcard-city,.rcard-rv,.rcard-price,.rcard-price b,.rst,.rvst,.rvs2,.nbst,.edate,.eloc,.nbloc,.v360-cap-loc,.v360-thumb-loc,.v360-play-label,.v360-thumbs-title,.pcard-meta-item,.mapa-filters .mf-range-out,.mapa-li-loc,.mapa-li-stars,.lp-loc,.lp-stars,.md-meta,.md-price,.md-thumb .md-thb-ico,.md-mcard-v,.md-audio-a,.md-no-media .md-nm-s,.md-lb-cap,.md-album-loading,.md-album-empty,.md-author,.md-album-loc,.ag-ev-meta,.ag-ev-range,.insp-main-meta,.insp-main-read,.insp-hl-meta,.dest-results-count,.dst,.dcard-loc,.dcard-rv,.dcard-price,.dcard-price b,.agenda-count-lbl,.ddl,.lu-origen,.lu-title,.lu-xp,.badges-head,.trophy-desc,.badge-desc,.lbcp{font-size:14px;line-height:1.4}
+
+/* --- 5. MICROCOPIA Y BADGES: 12px / 500 / 1.3 --- */
+.tbc,.hew,.pbadge,.pexp,.tpill,.ilbl,.rvtag,.rvpl,.fcopy,.fb-links,.nbbdg,.efree,.fcard-rating,.rcard-badge,.rcard-media,.mmct2,.v360-badge-main,.v360-gyro,.v360-thumb-badge,.pcard-feat-badge,.pcard-cupos,.mlt-ico,.mapa-filters .mf-caret,.mapa-filters .mf-tick,.md-badge,.md-subcat-chip,.md-mcard-type,.insp-eyebrow,.insp-main-badge,.insp-main-cat,.insp-hl-cat,.agenda-eyebrow,.dest-eyebrow,.planes-eyebrow,.reco-sec .reco-eyebrow,.reco-sec .reco-why,.cal-day-label,.ag-ev-mon,.ag-ev-cat,.dcard-badge,.dcard-feat-star,.dcard-media,.qp-badge,.origen-badge,.trophy-card .tier,.trophy-meta,.wl-badge{font-size:12px;font-weight:500;line-height:1.3}
+
+/* Avatares apilados (circulo de 22px): suben a 12px sin tocar el peso */
+.pcard-av,.pcard-av-more{font-size:12px}
+
+/* --- 6. BOTONES, CTAS, TABS, CHIPS: 16px / min-height 44 --- */
+.tact,.nl,.hnsb,.hncta,.flink,.gscta,.mabtn,.mmcta,.v360-cta-text,.v360-cta-btn,.planes-create-btn,.mf-btn,.mapa-filters .mf-drop-btn,.mapa-filters .mf-item,.mapa-list-toggle,.mapa-list-item,.lp-btn,.lp-save-btn,.lp-li-go,.citag,.md-link,.md-tab,.md-mcard-a,.md-album-com-btn,.md-admin-btn,.af-btn,.if-btn,.dc-btn,.cal-today,.ag-ev-cta,.dcard-cta,.dcard-save,.dest-clear-btn,.agenda-more-btn,.dest-more-btn,.lu-btn,.wrok,.agenda-city-select{font-size:16px;min-height:44px}
+
+/* CTA principal de cada seccion: 48px de alto tactil */
+.cbtn,.wrsub,.mbtn2,.ctabtn,.wl-cta{font-size:16px;min-height:48px;line-height:1.2}
+
+/* Links con texto en linea: necesitan caja para el target */
+.lp-li-go,.md-mcard-a,.flink{display:inline-flex;align-items:center}
+
+/* Footer y links en linea: interlineado que evita el apelotonamiento en columnas estrechas */
+.flink,.fb-links{line-height:1.4}
+
+/* --- 7. FORMULARIOS: 16px (evita el zoom automatico de iOS) --- */
+.wrinp,#dest-input{font-size:16px}
+.wrinp{min-height:44px}
+
+/* Unica excepcion con !important: el tamano llega por style inline
+   (#blog-*, #pub-*) o por plantilla generada en JS (#mapa-*). */
+#blog-title,#blog-dest,#blog-cat,#blog-text,#blog-name,#blog-email,#pub-name,#pub-cat,#pub-city,#pub-desc,#pub-wa,#pub-contact,#pub-price,#pub-photo,#mapa-nombre,#mapa-emoji,#mapa-desc{font-size:16px!important;min-height:44px;padding-top:11px;padding-bottom:11px}
+
+/* --- 8. FILAS Y TABS DE MODAL: target tactil --- */
+.mapa-list-item,.md-tab,.citag,.mf-btn,.mapa-filters .mf-drop-btn{min-height:44px}
+
+}
+
+/* --- 320px: evita desborde horizontal del titular y del nombre de tarjeta --- */
+@media(max-width:400px){
+.hsec-title{letter-spacing:1px}
+.fcard-name{font-size:17px}
+}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">

@@ -2271,3 +2271,13 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 - **Pendiente de la tanda:** `db_url` (hallazgo anexo, hallado al auditar la rama de diagnostico) quedo **CERRADO** en el mismo commit: `api/utilidades.js:883` devuelve **`db_url_presente`**, booleano de presencia, en vez de los 45 caracteres de `DATABASE_URL`.
 - **NO DESPLEGADO:** el commit es **local**; falta `push` + build de Vercel y la **prueba end-to-end del dueno** (foto principal + foto de galeria con sesion activa, con URL bajo `publico/destino/foto/`).
 
+## Observacion PREEXISTENTE (no es bug nuevo): balance de `<div>` en `agenda.html` (75 vs 76) -- identico en `HEAD`; `mi-perfil.html` se midio **578/578** (la cifra 576/578 no reprodujo)
+
+**Severidad:** INFORMATIVA (registro de conteo para que **no se re-audite en cada pasada**; no hay regresion y no hay bug nuevo).
+**Contexto:** verificacion de la **Tanda 2** de **TSK-219** (2026-10-24), escala tipografica movil replicada en 9 paginas. Se registran **dos filas** de observacion; ninguna la introdujo esa tanda (**cero markup borrado**; `git diff` de la tanda = **703 inserciones / 2 eliminaciones**, ambas CSS conocidas de `index.html`).
+**Fila (a) -- `agenda.html`:** **75** aperturas `<div` frente a **76** cierres `</div>` (**delta -1**: un cierre huerfano). Medido en el arbol de trabajo y en `git show HEAD:agenda.html`: **identico (75/76 en ambos)**, luego es **preexistente** y **no** lo introdujo la escala movil. El bloque nuevo (`agenda.html:153-211`) esta balanceado por si mismo y no hay sintoma visual conocido.
+**Fila (b) -- `mi-perfil.html`:** el brief de la tanda citaba **576/578**; medido contra el archivo real (ADR-006) da **578 aperturas / 578 cierres** tanto en el arbol de trabajo como en `git show HEAD:mi-perfil.html` -> **balanceado en `HEAD`, sin delta nuevo ni preexistente**. Se registra igual para **cerrar la duda**: si una auditoria futura vuelve a citar "576/578", esa cifra **no se reproduce** con el conteo literal de `<div` / `</div>` sobre el fichero.
+**Verificacion (ADR-006):** conteo literal con `([regex]::Matches($c,'<div')).Count` frente a `'</div>'` sobre el archivo real y sobre `git show HEAD:<archivo>`. En `mi-perfil.html` se probaron variantes (`<div\s` = 573; antes del primer `<script` = 224/224) y **ninguna** arroja 576/578.
+**Archivos:** `agenda.html`, `mi-perfil.html` (**sin cambios de markup en esta tanda**).
+**Estado:** **OBSERVACION ABIERTA (preexistente, sin tarea asignada).** No se corrige aqui: en `agenda.html` el desbalance es de **conteo** (posible `<div` dentro de un string JS, una plantilla o un comentario) y no tiene sintoma visual; corregirlo exige su propia tarea para no tocar markup sin motivo. **No re-auditar en cada pasada.**
+

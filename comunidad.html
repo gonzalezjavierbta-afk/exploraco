@@ -603,6 +603,144 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
   [data-ma-voto],[data-ma-voto] .ma-estrella{transition:none;animation:none}
   [data-ma-voto].is-busy .ma-estrella{opacity:.55}
 }
+
+/* ===================================================================== */
+/* ESCALA TIPOGRAFICA MOVIL (<=768px) - espejo de la certificada en index */
+/* Solo tamano de texto y area tactil. Layout, grid, color y markup       */
+/* intactos. Va al final del ultimo <style>: gana por orden de cascada a  */
+/* las bases (lineas 13-605) y a las @media de L204, L241, L301, L369,    */
+/* L444, L562, L570 y L602. Los silos replican su prefijo (ADR-004).      */
+/* ===================================================================== */
+@media(max-width:768px){
+
+  /* --- NAV (base: .nav-label 11px, .nav-back 10px) --- */
+  .nav-label{font-size:14px;line-height:1.4}
+  .nav-back{font-size:14px;line-height:1.4;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+
+  /* --- GATE / LOGIN (base: .gate-badge 10px, .gp-desc 11px, .gp-xp 9px) --- */
+  .gate-badge{font-size:12px;line-height:1.3}
+  .gate-sub{font-size:16px;line-height:1.5}
+  .gp-desc{font-size:14px;line-height:1.4}
+  .gp-xp{font-size:12px;line-height:1.3}
+  .gate-level{font-size:14px;line-height:1.4}
+  .gate-btn{font-size:16px;line-height:1.2;min-height:48px}
+
+  /* --- CABECERA DE COMUNIDAD (base: .comm-level 11px, .comm-stat-l 9px) --- */
+  .comm-level{font-size:14px;line-height:1.4}
+  .comm-stat-l{font-size:12px;line-height:1.3}
+  .ctab{font-size:16px;line-height:1.2;min-height:44px}
+  .cr-last{font-size:14px;line-height:1.4}
+  .cr-badge{font-size:12px;line-height:1.3}
+
+  /* --- CHAT (base: .msg-bubble 11px, .msg-time 9px, .chat-inp 12px) ---
+     .chat-inp es input/textarea/select: 16px o Safari iOS hace zoom. */
+  .msg-av{font-size:12px;line-height:1.3}
+  .msg-bubble{font-size:16px;line-height:1.5}
+  .msg-time{font-size:12px;line-height:1.3}
+  .msg-mod button{font-size:16px;line-height:1.2;min-height:44px}
+  .chat-inp{font-size:16px;line-height:1.3;min-height:44px}
+
+  /* --- PLANES (base: .plan-dates 10px, .plan-av 9px, .plan-join-btn 10px) --- */
+  .plan-dates{font-size:14px;line-height:1.4}
+  .plan-av{font-size:12px;line-height:1.3}
+  .plan-meta{font-size:14px;line-height:1.4}
+  .plan-join-btn{font-size:16px;line-height:1.2;min-height:44px}
+
+  /* --- RANKING (base: .lb-sub 11px, .lb-level 10px, .lb-xp small 9px) --- */
+  .lb-sub{font-size:14px;line-height:1.4}
+  .lb-level{font-size:12px;line-height:1.3}
+  .lb-stats{font-size:14px;line-height:1.4}
+  .lb-xp small{font-size:12px;line-height:1.3}
+
+  /* --- BADGES Y XP (base: .bgc-name 10px, .bgc-desc 9px, .xph-label 11px) --- */
+  .bgc-name{font-size:14px;line-height:1.4}
+  .bgc-desc{font-size:12px;line-height:1.3}
+  .xph-label{font-size:14px;line-height:1.4}
+
+  /* --- AVATAR, ALBUMES Y FEED (base: 9-11px) --- */
+  .av-popup-type{font-size:12px;line-height:1.3}
+  .av-album-meta{font-size:14px;line-height:1.4}
+  .av-album-photo-title{font-size:14px;line-height:1.4}
+  .av-album-photo-author{font-size:14px;line-height:1.4}
+  .av-album-photo-votos{font-size:14px;line-height:1.4}
+  .av-album-com-btn{font-size:16px;line-height:1.2;min-height:44px}
+  .av-album-card-meta{font-size:14px;line-height:1.4}
+  .av-album-card-stats{font-size:14px;line-height:1.4}
+  .av-feed-title{font-size:14px;line-height:1.4}
+  .av-feed-meta{font-size:14px;line-height:1.4}
+  .av-feed-votos{font-size:14px;line-height:1.4}
+  .av-act{font-size:16px;line-height:1.2;min-height:44px}
+
+  /* --- PANDILLAS Y TODOS CONTRA TODOS (base: 9-10px) --- */
+  .pand-meta{font-size:14px;line-height:1.4}
+  .pand-fama{font-size:12px;line-height:1.3}
+  .pand-rol{font-size:12px;line-height:1.3}
+  .pand-reto-meta{font-size:14px;line-height:1.4}
+  .pand-reto-done{font-size:12px;line-height:1.3}
+  .ao-voto,.ao-voto-contra{font-size:12px;line-height:1.3}
+  .mm-personal-lbl{font-size:12px;line-height:1.3}
+  .mm-personal-check{font-size:14px;line-height:1.4}
+
+  /* --- SILO #cpanel-mapa (base: .mmx-* y .mapa-filters .mf-* a 9-11px) --- */
+  .mmx-pill{font-size:16px;line-height:1.2;min-height:44px}
+  .mmx-pill-n{font-size:12px;line-height:1.3}
+  .mmx-media-lbl{font-size:14px;line-height:1.4}
+  .mmx-mbtn,.mmx-cbtn{font-size:16px;line-height:1.2;min-height:44px}
+  .mmx-ebtn{font-size:16px;line-height:1.2;min-height:44px}
+  .mmx-list-title{font-size:14px;line-height:1.4}
+  .mmx-li-city{font-size:14px;line-height:1.4}
+  .mmx-pop-meta{font-size:14px;line-height:1.4}
+  .mmx-empty{font-size:14px;line-height:1.4}
+  .mmx-login{font-size:16px;line-height:1.2;min-height:44px}
+  #cpanel-mapa .mapa-filters .mf-drop-btn{font-size:16px;line-height:1.2;min-height:44px}
+  #cpanel-mapa .mapa-filters .mf-caret{font-size:12px;line-height:1.3}
+  #cpanel-mapa .mapa-filters .mf-panel .mf-item{font-size:16px;line-height:1.2;min-height:44px}
+  #cpanel-mapa .mapa-filters .mf-btn{font-size:16px;line-height:1.2;min-height:44px}
+  #cpanel-mapa .mapa-filters .mf-range-out{font-size:14px;line-height:1.4}
+  #cpanel-mapa .mapa-filters .mf-range-scale{font-size:12px;line-height:1.3}
+
+  /* --- SILO #cpanel-mercado (base: .mk-* a 9-11px) --- */
+  #cpanel-mercado .mk-sub{font-size:14px;line-height:1.4}
+  #cpanel-mercado .mk-mia{font-size:12px;line-height:1.3}
+  #cpanel-mercado .mk-lbl{font-size:12px;line-height:1.3}
+  #cpanel-mercado .mk-dato{font-size:14px;line-height:1.4}
+  #cpanel-mercado .mk-puntos{font-size:14px;line-height:1.4}
+  #cpanel-mercado .mk-btn-ghost{font-size:16px;line-height:1.2;min-height:44px}
+  #cpanel-mercado .mk-msg{font-size:14px;line-height:1.4}
+  #cpanel-mercado .mk-of-meta{font-size:14px;line-height:1.4}
+  #cpanel-mercado .mk-of-propia{font-size:12px;line-height:1.3}
+  #cpanel-mercado .mk-gate-d{font-size:14px;line-height:1.4}
+
+  /* --- SILO .cm-v61 GAMING (base: 9-11px) --- */
+  .cm-v61 .cv-note,.cm-v61 .cv-empty,.cm-v61 .cv-err{font-size:14px;line-height:1.4}
+  .cm-v61 .cv-desc{font-size:16px;line-height:1.5}
+  .cm-v61 .cv-meta{font-size:14px;line-height:1.4}
+  .cm-v61 .cv-voto{font-size:14px;line-height:1.4}
+  .cm-v61 .cv-chipst,.cm-v61 .cv-lbl{font-size:12px;line-height:1.3}
+  .cm-v61 .cv-row-d{font-size:14px;line-height:1.4}
+  .cm-v61 .cv-saldo-l{font-size:12px;line-height:1.3}
+  .cm-v61 .cv-gate-t{font-size:14px;line-height:1.4}
+  .cm-v61 .cv-gate-ok,.cm-v61 .cv-gate-no{font-size:12px;line-height:1.3}
+  .cm-v61 .cv-inp{font-size:16px;line-height:1.3;min-height:44px}
+  .cm-v61 .cv-btn{font-size:16px;line-height:1.2;min-height:44px}
+  #cm-modal .cm-modal-msg{font-size:14px;line-height:1.4}
+
+  /* --- SILO MEDIA-ACTIONS: prefijo [data-ma-voto] replicado (ADR-004) --- */
+  [data-ma-voto] .ma-rating-texto,[data-ma-voto] [data-ma-rating-texto]{font-size:14px;line-height:1.4}
+  [data-ma-voto] [data-ma-count],[data-ma-voto] .ma-votos-num{font-size:12px;line-height:1.3}
+
+  /* --- PISO 12px PARA TAMANOS EN style INLINE (85 casos del markup y de */
+  /* las plantillas JS de este archivo: nav, CTA de mapas, guia XP, chat,  */
+  /* planes, ranking, avatar, pandillas y modales). El inline gana al CSS  */
+  /* por especificidad, de ahi el !important: sin el, el override muere.   */
+  :is(#gate,#community,#av-album-modal,#plan-chat-modal,#cm-modal) [style*="font-size:11px"]{font-size:12px!important;line-height:1.3}
+  :is(#gate,#community,#av-album-modal,#plan-chat-modal,#cm-modal) [style*="font-size:10px"]{font-size:12px!important;line-height:1.3}
+  :is(#gate,#community,#av-album-modal,#plan-chat-modal,#cm-modal) [style*="font-size:9px"]{font-size:12px!important;line-height:1.3}
+  :is(#gate,#community,#av-album-modal,#plan-chat-modal,#cm-modal) [style*="font-size:8px"]{font-size:12px!important;line-height:1.3}
+  /* CTA dorados inline con font-size:10px en el markup (L668, L706, L732): */
+  /* son botones reales, no microcopia, y van a 16px con 44px de alto.      */
+  :is(#gate,#community) [style*="background:var(--gold)"][style*="font-size:10px"]{font-size:16px!important;line-height:1.2;min-height:44px}
+}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
