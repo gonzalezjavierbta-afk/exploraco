@@ -1,0 +1,161 @@
+{
+  "BASE": {
+    "slug": "teatro-metropolitano-jose-gutierrez-gomez",
+    "nombre": "Teatro Metropolitano Jose Gutierrez Gomez",
+    "categoria_slug": "sitio",
+    "lead": "El gran escenario sinfonico e internacional de Medellin, sede de la Orquesta Filarmonica de Medellin.",
+    "descripcion": "Inaugurado en 1987, el Teatro Metropolitano es el recinto de mayor capacidad y especificaciones acusticas para la musica culta y espectaculos internacionales en la ciudad. Cuenta con aforo para cerca de 1.600 espectadores.\n\nEs la sede oficial de la Orquesta Filarmonica de Medellin (Filarmed) y de temporadas anuales de opera, ballet clasico, teatro musical y conciertos pop-rock de gran formato.",
+    "highlight": "4.8/10 \u00b7 Musica Sinfonica \u00b7 Ballet \u00b7 Gran Formato",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "La Candelaria / Alpujarra",
+    "lat": 6.2411,
+    "lng": -75.5769,
+    "whatsapp": "",
+    "telefono": "5742324200",
+    "email": "info@teatrometropolitano.com",
+    "web": "https://www.teatrometropolitano.com",
+    "instagram": "@teatrometropolitano",
+    "precio_desde": "Segun evento (Desde $35.000 COP hasta $350.000 COP)",
+    "horario": "Segun cartelera de eventos",
+    "emoji": "\ud83c\udfbb",
+    "hero_bg": "linear-gradient(135deg, #111111 0%, #3f51b5 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Teatro Sinfonico \u00b7 Auditorio",
+    "capacidad": "1.634 sillas",
+    "como_llegar": "Estacion Exposiciones de la Linea A del Metro (5 minutos a pie).",
+    "status": "published",
+    "destacado": false
+  },
+  "TAGS": {
+    "tipo_actividad": "Conciertos Sinf\u00f3nicos \u00b7 Opera \u00b7 Espectaculos",
+    "dificultad": "Facil",
+    "dificultad_desc": "Instalaciones completamente accesibles.",
+    "duracion": "2-3 horas",
+    "altitud": "1495 msnm",
+    "temporada": [
+      "Todo el a\u00f1o"
+    ],
+    "precio_entrada": "Segun espectaculo",
+    "distancia": "Sector Alpujarra",
+    "como_llegar": "Metro Exposiciones.",
+    "permisos": "Boleta en TuBoleta o taquilla",
+    "temporada_nota": "Temporada sinfonica permanente entre febrero y noviembre.",
+    "fauna_flora": [],
+    "secretos": [],
+    "regulaciones": "Exigencia de puntualidad; no se permite el ingreso una vez iniciada la funcion.",
+    "checklist_tip": "Consultar la cartelera de Filarmed para conciertos educativos con entrada con descuento.",
+    "entradas": [],
+    "tours": [],
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad_tags": [],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "ideal",
+      "Jun": "ideal",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    },
+    "subcategoria": "cultura"
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfCuenta con parqueadero propio?",
+      "respuesta": "Si, el teatro tiene parqueadero cubierto vigilado para los asistentes."
+    },
+    {
+      "pregunta": "\u00bfCual es el aforo del Teatro Metropolitano?",
+      "respuesta": "1.634 sillas; la ficha lo describe como el recinto de mayor capacidad y especificaciones acusticas para la musica culta en la ciudad."
+    },
+    {
+      "pregunta": "\u00bfCuando fue inaugurado?",
+      "respuesta": "En 1987."
+    },
+    {
+      "pregunta": "\u00bfQue compania tiene sede en el teatro?",
+      "respuesta": "Es la sede oficial de la Orquesta Filarmonica de Medellin (Filarmed)."
+    },
+    {
+      "pregunta": "\u00bfCuanto cuestan las boletas?",
+      "respuesta": "Depende del espectaculo: desde $35.000 hasta $350.000 COP. Se consiguen en TuBoleta o en taquilla."
+    },
+    {
+      "pregunta": "\u00bfCual es la politica de ingreso?",
+      "respuesta": "Se exige puntualidad: no se permite el ingreso una vez iniciada la funcion."
+    },
+    {
+      "pregunta": "\u00bfComo se llega y donde queda?",
+      "respuesta": "En la Linea A del Metro hasta la estacion Exposiciones, a unos 5 minutos a pie; el teatro esta en el sector Alpujarra, barrio La Candelaria."
+    },
+    {
+      "pregunta": "\u00bfHay programacion todo el a\u00f1o?",
+      "respuesta": "La temporada sinfonica es permanente entre febrero y noviembre; el resto de la programacion depende de la cartelera de cada evento."
+    },
+    {
+      "pregunta": "\u00bfHay entradas con descuento?",
+      "respuesta": "La ficha recomienda consultar la cartelera de Filarmed para los conciertos educativos con entrada con descuento."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Fachada del teatro",
+      "caption": "Fachada del Teatro Metropolitano de Medellin",
+      "nombres_archivo_wikimedia": [
+        "File:Teatro Metropolitano de Medell\u00edn.JPG"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Entrada principal",
+      "caption": "Acceso principal del Teatro Metropolitano",
+      "nombres_archivo_wikimedia": [
+        "File:Teatro Metropolitano-Entrada-Medellin.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Fachada este",
+      "caption": "Fachada este del Teatro Metropolitano de Medellin",
+      "nombres_archivo_wikimedia": [
+        "File:Teatro Metropolitano-FachadaEste-Medellin.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Vista de costado",
+      "caption": "Vista de costado del recinto en el sector Alpujarra",
+      "nombres_archivo_wikimedia": [
+        "File:Teatro Metropolitano de Medell\u00edn - vista de costado.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Filarmed",
+      "caption": "La Orquesta Filarmonica de Medellin, compania residente del teatro",
+      "nombres_archivo_wikimedia": [
+        "File:Orquesta Filarm\u00f3nica de Medell\u00edn.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.teatrometropolitano.com",
+      "que_respalda": "capacidad y programacion"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/w/index.php?search=Teatro+Metropolitano+Medellin&title=Special:MediaSearch&type=image",
+      "que_respalda": "archivos de Wikimedia Commons usados en FOTOS_SUGERIDAS, verificados con HEAD 200 sobre la miniatura de 1280 px"
+    }
+  ]
+}

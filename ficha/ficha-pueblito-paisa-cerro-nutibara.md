@@ -1,0 +1,167 @@
+# Ficha: Pueblito Paisa y Cerro Nutibara
+
+- Slug: `pueblito-paisa-cerro-nutibara`
+- Categoria: `sitio`
+- Ciudad: Medellin, Antioquia
+- Coordenadas: 6.2364, -75.5803
+- Estado editorial: `published`
+
+Ficha de datos del pipeline de ExploraCO. El bloque JSON es la fuente
+de verdad y es el que valida `scripts/validate_ficha.js`; el archivo
+`ficha-pueblito-paisa-cerro-nutibara.json` es el mismo contenido en bruto para los cargadores.
+```json
+{
+  "BASE": {
+    "slug": "pueblito-paisa-cerro-nutibara",
+    "nombre": "Pueblito Paisa y Cerro Nutibara",
+    "categoria_slug": "sitio",
+    "lead": "Replica de un pueblo tradicional antioqueno construida en la cima del Cerro Nutibara con vista panoramica de 360 grados sobre Medellin.",
+    "descripcion": "El Pueblito Paisa es una representacion a escala real de una plaza tradicional de los municipios antioque\u00f1os de comienzos del siglo XX. Cuenta con iglesia, alcaldia, escuela, barberia y casas de arquitectura colonial con balcones floridos.\n\nUbicado en la cima del Cerro Nutibara (uno de los siete cerros tutelares de la ciudad), ofrece un mirador excepcional sobre todo el Valle de Aburra, asi como senderos ecologicos y el Parque de las Esculturas.",
+    "highlight": "4.6/10 \u00b7 Vista Panoramica \u00b7 Arquitectura \u00b7 Mirador",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "Bel\u00e9n / Cerro Nutibara",
+    "lat": 6.2364,
+    "lng": -75.5803,
+    "whatsapp": "",
+    "telefono": "5744444144",
+    "email": "turismo@medellin.gov.co",
+    "web": "https://www.medellin.travel",
+    "instagram": "@medellintravel",
+    "precio_desde": "Gratis",
+    "horario": "Lun-Dom 06:00 AM - 11:00 PM",
+    "emoji": "\ud83c\udfd8\ufe0f",
+    "hero_bg": "linear-gradient(135deg, #e8a020 0%, #8d6e63 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Mirador \u00b7 Replica Colonial \u00b7 Cerro Tutelar",
+    "capacidad": "Abierto al publico",
+    "como_llegar": "Estacion Exposiciones del Metro Linea A + caminata o taxi hasta la cima.",
+    "status": "published",
+    "destacado": false
+  },
+  "TAGS": {
+    "tipo_actividad": "Mirador \u00b7 Fotografia \u00b7 Gastronomia Tradicional",
+    "dificultad": "Facil",
+    "dificultad_desc": "Acceso vehicular hasta la cima o ascenso peatonal por sendero.",
+    "duracion": "1-2 horas",
+    "altitud": "1580 msnm",
+    "temporada": [
+      "Todo el a\u00f1o"
+    ],
+    "precio_entrada": "Gratis",
+    "distancia": "Suroccidente del centro",
+    "como_llegar": "Metro Exposiciones + Taxi.",
+    "permisos": "Libre",
+    "temporada_nota": "Ideal para visitar al atardecer.",
+    "fauna_flora": [],
+    "secretos": [],
+    "regulaciones": "Estacionamiento tarifado en la cima.",
+    "checklist_tip": "Probar las empanadas y la mazamorra con panela en los locales de la plaza.",
+    "entradas": [],
+    "tours": [],
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad_tags": [],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "ideal",
+      "Jun": "ideal",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    },
+    "subcategoria": "cultura"
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfSe puede subir en vehiculo hasta la cima?",
+      "respuesta": "Si, el cerro cuenta con via asfaltada y parqueadero supervisado; el estacionamiento en la cima es tarifado."
+    },
+    {
+      "pregunta": "\u00bfCuanto cuesta la entrada al Pueblito Paisa?",
+      "respuesta": "El ingreso es gratuito. El unico costo asociado es el estacionamiento tarifado en la cima."
+    },
+    {
+      "pregunta": "\u00bfQue se puede ver dentro del Pueblito Paisa?",
+      "respuesta": "Una replica a escala real de una plaza antioquena de comienzos del siglo XX, con iglesia, alcaldia, escuela, barberia y casas de arquitectura colonial con balcones floridos."
+    },
+    {
+      "pregunta": "\u00bfQue ofrece el Cerro Nutibara ademas del Pueblito?",
+      "respuesta": "Es uno de los siete cerros tutelares de Medellin y ofrece un mirador panoramico sobre todo el Valle de Aburra, senderos ecologicos y el Parque de las Esculturas."
+    },
+    {
+      "pregunta": "\u00bfCual es el mejor momento para visitar?",
+      "respuesta": "El atardecer es el momento ideal. El sitio abre todos los dias de 06:00 AM a 11:00 PM."
+    },
+    {
+      "pregunta": "\u00bfComo se llega y que se puede comer en la plaza?",
+      "respuesta": "Desde la estacion Exposiciones del Metro Linea A se toma caminata o taxi hasta la cima, o se asciende por el sendero peatonal. En los locales de la plaza se consiguen empanadas y mazamorra con panela."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Plaza principal del Pueblito Paisa",
+      "caption": "Plaza principal con la iglesia y las casas coloniales del Pueblito Paisa",
+      "nombres_archivo_wikimedia": [
+        "File:Plaza Pueblito Paisa-Medellin.JPG"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Iglesia del Pueblito Paisa",
+      "caption": "Iglesia de la replica de pueblo antioqueno en la cima del Cerro Nutibara",
+      "nombres_archivo_wikimedia": [
+        "File:Pueblito Paisa, Medell\u00edn.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Barberia tradicional",
+      "caption": "Barberia de la replica de pueblo tradicional antioqueno",
+      "nombres_archivo_wikimedia": [
+        "File:Barberia Pueblito Paisa-Medellin.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Mirador del Cerro Nutibara",
+      "caption": "Turistas en el mirador con vista panoramica sobre el Valle de Aburra",
+      "nombres_archivo_wikimedia": [
+        "File:Turistas en el mirador del Cerro Nutibara, 2019.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Senderos y bosque del cerro",
+      "caption": "Senderos ecologicos entre el bosque del Cerro Nutibara",
+      "nombres_archivo_wikimedia": [
+        "File:Cerro Nutibara-Bosque1-Medellin.JPG"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.medellin.travel",
+      "que_respalda": "horarios, ubicacion y acceso al Cerro Nutibara"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/Category:Pueblito_Paisa",
+      "que_respalda": "archivos fotograficos de Wikimedia Commons usados en FOTOS_SUGERIDAS"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/Category:Cerro_Nutibara",
+      "que_respalda": "mirador, senderos y bosque del cerro"
+    }
+  ]
+}
+```

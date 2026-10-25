@@ -1,0 +1,763 @@
+{
+  "generado": "2026-10-25T15:21:26.176Z",
+  "resolucion": "https://upload.wikimedia.org/wikipedia/commons/thumb/<h0>/<h0h1>/<archivo>/<ancho>px-<archivo>",
+  "metodo": "HEAD a la miniatura de 1280 px de upload.wikimedia.org (redirect follow); url_real = URL final 200",
+  "ancho": 1280,
+  "pausa_ms": 12000,
+  "intentos": 3,
+  "total_fichas": 6,
+  "total_archivos": 31,
+  "total_fotos": 31,
+  "archivos_pass": 31,
+  "archivos_fail": 0,
+  "archivos_fail_404": 0,
+  "archivos_fail_429": 0,
+  "archivos_fail_otro": 0,
+  "fotos_pass": 31,
+  "fotos_fail": 0,
+  "fichas_pass": 6,
+  "fichas_fail": 0,
+  "fichas": [
+    {
+      "slug": "festival-internacional-de-poesia-medellin",
+      "archivo": "ficha/ficha-festival-internacional-de-poesia-medellin.json",
+      "pass": true,
+      "pass_estricto": true,
+      "fotos_pass": 5,
+      "fotos_total": 5,
+      "archivos_ok": 5,
+      "archivos_total": 5,
+      "archivos_404": 0,
+      "archivos_429": 0,
+      "archivos_otro": 0,
+      "fotos": [
+        {
+          "indice": 0,
+          "tema": "Publico en la inauguracion del festival",
+          "es_hero": true,
+          "archivos": [
+            {
+              "nombre": "File:P\u00fablico inauguraci\u00f3n XVIII FdPdM bajo la lluvia.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/P%C3%BAblico_inauguraci%C3%B3n_XVIII_FdPdM_bajo_la_lluvia.JPG/1280px-P%C3%BAblico_inauguraci%C3%B3n_XVIII_FdPdM_bajo_la_lluvia.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/P%C3%BAblico_inauguraci%C3%B3n_XVIII_FdPdM_bajo_la_lluvia.JPG/1280px-P%C3%BAblico_inauguraci%C3%B3n_XVIII_FdPdM_bajo_la_lluvia.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/P%C3%BAblico_inauguraci%C3%B3n_XVIII_FdPdM_bajo_la_lluvia.JPG/1280px-P%C3%BAblico_inauguraci%C3%B3n_XVIII_FdPdM_bajo_la_lluvia.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/P%C3%BAblico_inauguraci%C3%B3n_XVIII_FdPdM_bajo_la_lluvia.JPG/1280px-P%C3%BAblico_inauguraci%C3%B3n_XVIII_FdPdM_bajo_la_lluvia.JPG"
+        },
+        {
+          "indice": 1,
+          "tema": "Actividad del 27 festival",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:En el marco del 27\u00ba Festival Internacional de Poes\u00eda de Medell\u00edn.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/En_el_marco_del_27%C2%BA_Festival_Internacional_de_Poes%C3%ADa_de_Medell%C3%ADn.jpg/1280px-En_el_marco_del_27%C2%BA_Festival_Internacional_de_Poes%C3%ADa_de_Medell%C3%ADn.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/En_el_marco_del_27%C2%BA_Festival_Internacional_de_Poes%C3%ADa_de_Medell%C3%ADn.jpg/1280px-En_el_marco_del_27%C2%BA_Festival_Internacional_de_Poes%C3%ADa_de_Medell%C3%ADn.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/En_el_marco_del_27%C2%BA_Festival_Internacional_de_Poes%C3%ADa_de_Medell%C3%ADn.jpg/1280px-En_el_marco_del_27%C2%BA_Festival_Internacional_de_Poes%C3%ADa_de_Medell%C3%ADn.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/En_el_marco_del_27%C2%BA_Festival_Internacional_de_Poes%C3%ADa_de_Medell%C3%ADn.jpg/1280px-En_el_marco_del_27%C2%BA_Festival_Internacional_de_Poes%C3%ADa_de_Medell%C3%ADn.jpg"
+        },
+        {
+          "indice": 2,
+          "tema": "Poeta invitada en lectura publica",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:XVIII FdPdM Mamta Sagar.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/XVIII_FdPdM_Mamta_Sagar.JPG/1280px-XVIII_FdPdM_Mamta_Sagar.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/XVIII_FdPdM_Mamta_Sagar.JPG/1280px-XVIII_FdPdM_Mamta_Sagar.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/XVIII_FdPdM_Mamta_Sagar.JPG/1280px-XVIII_FdPdM_Mamta_Sagar.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/XVIII_FdPdM_Mamta_Sagar.JPG/1280px-XVIII_FdPdM_Mamta_Sagar.JPG"
+        },
+        {
+          "indice": 3,
+          "tema": "Poeta invitado en lectura publica",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:XVIII FdPdM Obi Nwakanma.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/XVIII_FdPdM_Obi_Nwakanma.JPG/1280px-XVIII_FdPdM_Obi_Nwakanma.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/XVIII_FdPdM_Obi_Nwakanma.JPG/1280px-XVIII_FdPdM_Obi_Nwakanma.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/XVIII_FdPdM_Obi_Nwakanma.JPG/1280px-XVIII_FdPdM_Obi_Nwakanma.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/XVIII_FdPdM_Obi_Nwakanma.JPG/1280px-XVIII_FdPdM_Obi_Nwakanma.JPG"
+        },
+        {
+          "indice": 4,
+          "tema": "Poeta invitado en lectura publica",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:XVIII FdPdM Frank Chipasula.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/XVIII_FdPdM_Frank_Chipasula.jpg/1280px-XVIII_FdPdM_Frank_Chipasula.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/XVIII_FdPdM_Frank_Chipasula.jpg/1280px-XVIII_FdPdM_Frank_Chipasula.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/XVIII_FdPdM_Frank_Chipasula.jpg/1280px-XVIII_FdPdM_Frank_Chipasula.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/XVIII_FdPdM_Frank_Chipasula.jpg/1280px-XVIII_FdPdM_Frank_Chipasula.jpg"
+        }
+      ]
+    },
+    {
+      "slug": "desfile-de-autos-clasicos-y-antiguos-medellin",
+      "archivo": "ficha/ficha-desfile-de-autos-clasicos-y-antiguos-medellin.json",
+      "pass": true,
+      "pass_estricto": true,
+      "fotos_pass": 5,
+      "fotos_total": 5,
+      "archivos_ok": 5,
+      "archivos_total": 5,
+      "archivos_404": 0,
+      "archivos_429": 0,
+      "archivos_otro": 0,
+      "fotos": [
+        {
+          "indice": 0,
+          "tema": "Caravana de autos clasicos",
+          "es_hero": true,
+          "archivos": [
+            {
+              "nombre": "File:Desfile de Autos Clasicos y Antiguos(1).JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Desfile_de_Autos_Clasicos_y_Antiguos(1).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(1).JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Desfile_de_Autos_Clasicos_y_Antiguos(1).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(1).JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Desfile_de_Autos_Clasicos_y_Antiguos(1).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(1).JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Desfile_de_Autos_Clasicos_y_Antiguos(1).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(1).JPG"
+        },
+        {
+          "indice": 1,
+          "tema": "Autos antiguos en el recorrido",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Desfile de Autos Clasicos y Antiguos(12).JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Desfile_de_Autos_Clasicos_y_Antiguos(12).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(12).JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Desfile_de_Autos_Clasicos_y_Antiguos(12).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(12).JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Desfile_de_Autos_Clasicos_y_Antiguos(12).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(12).JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Desfile_de_Autos_Clasicos_y_Antiguos(12).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(12).JPG"
+        },
+        {
+          "indice": 2,
+          "tema": "Joyas automotrices en movimiento",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Desfile de Autos Clasicos y Antiguos(23).JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Desfile_de_Autos_Clasicos_y_Antiguos(23).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(23).JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Desfile_de_Autos_Clasicos_y_Antiguos(23).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(23).JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Desfile_de_Autos_Clasicos_y_Antiguos(23).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(23).JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Desfile_de_Autos_Clasicos_y_Antiguos(23).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(23).JPG"
+        },
+        {
+          "indice": 3,
+          "tema": "Publico en el recorrido",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Desfile de Autos Clasicos y Antiguos(38).JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Desfile_de_Autos_Clasicos_y_Antiguos(38).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(38).JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Desfile_de_Autos_Clasicos_y_Antiguos(38).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(38).JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Desfile_de_Autos_Clasicos_y_Antiguos(38).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(38).JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Desfile_de_Autos_Clasicos_y_Antiguos(38).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(38).JPG"
+        },
+        {
+          "indice": 4,
+          "tema": "Museo rodante",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Desfile de Autos Clasicos y Antiguos(65).JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Desfile_de_Autos_Clasicos_y_Antiguos(65).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(65).JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Desfile_de_Autos_Clasicos_y_Antiguos(65).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(65).JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Desfile_de_Autos_Clasicos_y_Antiguos(65).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(65).JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Desfile_de_Autos_Clasicos_y_Antiguos(65).JPG/1280px-Desfile_de_Autos_Clasicos_y_Antiguos(65).JPG"
+        }
+      ]
+    },
+    {
+      "slug": "festival-nacional-de-la-trova-medellin",
+      "archivo": "ficha/ficha-festival-nacional-de-la-trova-medellin.json",
+      "pass": true,
+      "pass_estricto": true,
+      "fotos_pass": 5,
+      "fotos_total": 5,
+      "archivos_ok": 5,
+      "archivos_total": 5,
+      "archivos_404": 0,
+      "archivos_429": 0,
+      "archivos_otro": 0,
+      "fotos": [
+        {
+          "indice": 0,
+          "tema": "Plaza Mayor, sede de la final",
+          "es_hero": true,
+          "archivos": [
+            {
+              "nombre": "File:Plaza Mayor-interior1.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Plaza_Mayor-interior1.JPG/1280px-Plaza_Mayor-interior1.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Plaza_Mayor-interior1.JPG/1280px-Plaza_Mayor-interior1.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Plaza_Mayor-interior1.JPG/1280px-Plaza_Mayor-interior1.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Plaza_Mayor-interior1.JPG/1280px-Plaza_Mayor-interior1.JPG"
+        },
+        {
+          "indice": 1,
+          "tema": "Plaza Mayor, sede de la final",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Plaza Mayor-interior2.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Plaza_Mayor-interior2.JPG/1280px-Plaza_Mayor-interior2.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Plaza_Mayor-interior2.JPG/1280px-Plaza_Mayor-interior2.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Plaza_Mayor-interior2.JPG/1280px-Plaza_Mayor-interior2.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Plaza_Mayor-interior2.JPG/1280px-Plaza_Mayor-interior2.JPG"
+        },
+        {
+          "indice": 2,
+          "tema": "Plaza Mayor en evento masivo",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Medell\u00edn Marca Ciudad, Plaza Mayor, 2023.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Medell%C3%ADn_Marca_Ciudad%2C_Plaza_Mayor%2C_2023.jpg/1280px-Medell%C3%ADn_Marca_Ciudad%2C_Plaza_Mayor%2C_2023.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Medell%C3%ADn_Marca_Ciudad%2C_Plaza_Mayor%2C_2023.jpg/1280px-Medell%C3%ADn_Marca_Ciudad%2C_Plaza_Mayor%2C_2023.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Medell%C3%ADn_Marca_Ciudad%2C_Plaza_Mayor%2C_2023.jpg/1280px-Medell%C3%ADn_Marca_Ciudad%2C_Plaza_Mayor%2C_2023.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Medell%C3%ADn_Marca_Ciudad%2C_Plaza_Mayor%2C_2023.jpg/1280px-Medell%C3%ADn_Marca_Ciudad%2C_Plaza_Mayor%2C_2023.jpg"
+        },
+        {
+          "indice": 3,
+          "tema": "Parque de los Deseos, sede alterna",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Parque de los Deseos-Medellin.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Parque_de_los_Deseos-Medellin.JPG/1280px-Parque_de_los_Deseos-Medellin.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Parque_de_los_Deseos-Medellin.JPG/1280px-Parque_de_los_Deseos-Medellin.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Parque_de_los_Deseos-Medellin.JPG/1280px-Parque_de_los_Deseos-Medellin.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Parque_de_los_Deseos-Medellin.JPG/1280px-Parque_de_los_Deseos-Medellin.JPG"
+        },
+        {
+          "indice": 4,
+          "tema": "Parque de los Deseos, sede alterna",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Parque de los Deseos(1)-Medellin.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Parque_de_los_Deseos(1)-Medellin.JPG/1280px-Parque_de_los_Deseos(1)-Medellin.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Parque_de_los_Deseos(1)-Medellin.JPG/1280px-Parque_de_los_Deseos(1)-Medellin.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Parque_de_los_Deseos(1)-Medellin.JPG/1280px-Parque_de_los_Deseos(1)-Medellin.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Parque_de_los_Deseos(1)-Medellin.JPG/1280px-Parque_de_los_Deseos(1)-Medellin.JPG"
+        }
+      ]
+    },
+    {
+      "slug": "parque-de-los-pies-descalzos-medellin",
+      "archivo": "ficha/ficha-parque-de-los-pies-descalzos-medellin.json",
+      "pass": true,
+      "pass_estricto": true,
+      "fotos_pass": 6,
+      "fotos_total": 6,
+      "archivos_ok": 6,
+      "archivos_total": 6,
+      "archivos_404": 0,
+      "archivos_429": 0,
+      "archivos_otro": 0,
+      "fotos": [
+        {
+          "indice": 0,
+          "tema": "Parque de los Pies Descalzos",
+          "es_hero": true,
+          "archivos": [
+            {
+              "nombre": "File:Parque de los Pies Descalzos 01.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Parque_de_los_Pies_Descalzos_01.jpg/1280px-Parque_de_los_Pies_Descalzos_01.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Parque_de_los_Pies_Descalzos_01.jpg/1280px-Parque_de_los_Pies_Descalzos_01.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Parque_de_los_Pies_Descalzos_01.jpg/1280px-Parque_de_los_Pies_Descalzos_01.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Parque_de_los_Pies_Descalzos_01.jpg/1280px-Parque_de_los_Pies_Descalzos_01.jpg"
+        },
+        {
+          "indice": 1,
+          "tema": "Parque de los Pies Descalzos",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Parque de los Pies Descalzos 02.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Parque_de_los_Pies_Descalzos_02.jpg/1280px-Parque_de_los_Pies_Descalzos_02.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Parque_de_los_Pies_Descalzos_02.jpg/1280px-Parque_de_los_Pies_Descalzos_02.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Parque_de_los_Pies_Descalzos_02.jpg/1280px-Parque_de_los_Pies_Descalzos_02.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Parque_de_los_Pies_Descalzos_02.jpg/1280px-Parque_de_los_Pies_Descalzos_02.jpg"
+        },
+        {
+          "indice": 2,
+          "tema": "Arenales y pozos de agua",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Parque Pies Descalzos-Arenal-Medellin.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Parque_Pies_Descalzos-Arenal-Medellin.JPG/1280px-Parque_Pies_Descalzos-Arenal-Medellin.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Parque_Pies_Descalzos-Arenal-Medellin.JPG/1280px-Parque_Pies_Descalzos-Arenal-Medellin.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Parque_Pies_Descalzos-Arenal-Medellin.JPG/1280px-Parque_Pies_Descalzos-Arenal-Medellin.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Parque_Pies_Descalzos-Arenal-Medellin.JPG/1280px-Parque_Pies_Descalzos-Arenal-Medellin.JPG"
+        },
+        {
+          "indice": 3,
+          "tema": "Bosque de guaduas",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Parque Pies Descalzos.Bosqueguaduas.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Parque_Pies_Descalzos.Bosqueguaduas.JPG/1280px-Parque_Pies_Descalzos.Bosqueguaduas.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Parque_Pies_Descalzos.Bosqueguaduas.JPG/1280px-Parque_Pies_Descalzos.Bosqueguaduas.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Parque_Pies_Descalzos.Bosqueguaduas.JPG/1280px-Parque_Pies_Descalzos.Bosqueguaduas.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Parque_Pies_Descalzos.Bosqueguaduas.JPG/1280px-Parque_Pies_Descalzos.Bosqueguaduas.JPG"
+        },
+        {
+          "indice": 4,
+          "tema": "Calle de arboles",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Parque Pies Descalzos-CalleArboles-Medellin.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Parque_Pies_Descalzos-CalleArboles-Medellin.JPG/1280px-Parque_Pies_Descalzos-CalleArboles-Medellin.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Parque_Pies_Descalzos-CalleArboles-Medellin.JPG/1280px-Parque_Pies_Descalzos-CalleArboles-Medellin.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Parque_Pies_Descalzos-CalleArboles-Medellin.JPG/1280px-Parque_Pies_Descalzos-CalleArboles-Medellin.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Parque_Pies_Descalzos-CalleArboles-Medellin.JPG/1280px-Parque_Pies_Descalzos-CalleArboles-Medellin.JPG"
+        },
+        {
+          "indice": 5,
+          "tema": "Parque de los Pies Descalzos",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Parque de los Pies Descalzos 03.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Parque_de_los_Pies_Descalzos_03.jpg/1280px-Parque_de_los_Pies_Descalzos_03.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Parque_de_los_Pies_Descalzos_03.jpg/1280px-Parque_de_los_Pies_Descalzos_03.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Parque_de_los_Pies_Descalzos_03.jpg/1280px-Parque_de_los_Pies_Descalzos_03.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Parque_de_los_Pies_Descalzos_03.jpg/1280px-Parque_de_los_Pies_Descalzos_03.jpg"
+        }
+      ]
+    },
+    {
+      "slug": "plaza-de-la-libertad-medellin",
+      "archivo": "ficha/ficha-plaza-de-la-libertad-medellin.json",
+      "pass": true,
+      "pass_estricto": true,
+      "fotos_pass": 5,
+      "fotos_total": 5,
+      "archivos_ok": 5,
+      "archivos_total": 5,
+      "archivos_404": 0,
+      "archivos_429": 0,
+      "archivos_otro": 0,
+      "fotos": [
+        {
+          "indice": 0,
+          "tema": "Plaza de la Libertad",
+          "es_hero": true,
+          "archivos": [
+            {
+              "nombre": "File:Medell\u00edn - Plaza de la Libertad 1.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Medell%C3%ADn_-_Plaza_de_la_Libertad_1.jpg/1280px-Medell%C3%ADn_-_Plaza_de_la_Libertad_1.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Medell%C3%ADn_-_Plaza_de_la_Libertad_1.jpg/1280px-Medell%C3%ADn_-_Plaza_de_la_Libertad_1.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Medell%C3%ADn_-_Plaza_de_la_Libertad_1.jpg/1280px-Medell%C3%ADn_-_Plaza_de_la_Libertad_1.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Medell%C3%ADn_-_Plaza_de_la_Libertad_1.jpg/1280px-Medell%C3%ADn_-_Plaza_de_la_Libertad_1.jpg"
+        },
+        {
+          "indice": 1,
+          "tema": "Plaza de la Libertad",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Medell\u00edn - Plaza de la Libertad 2.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Medell%C3%ADn_-_Plaza_de_la_Libertad_2.jpg/1280px-Medell%C3%ADn_-_Plaza_de_la_Libertad_2.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Medell%C3%ADn_-_Plaza_de_la_Libertad_2.jpg/1280px-Medell%C3%ADn_-_Plaza_de_la_Libertad_2.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Medell%C3%ADn_-_Plaza_de_la_Libertad_2.jpg/1280px-Medell%C3%ADn_-_Plaza_de_la_Libertad_2.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Medell%C3%ADn_-_Plaza_de_la_Libertad_2.jpg/1280px-Medell%C3%ADn_-_Plaza_de_la_Libertad_2.jpg"
+        },
+        {
+          "indice": 2,
+          "tema": "Plaza de la Libertad",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Plaza libertad.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Plaza_libertad.jpg/1280px-Plaza_libertad.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Plaza_libertad.jpg/1280px-Plaza_libertad.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Plaza_libertad.jpg/1280px-Plaza_libertad.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Plaza_libertad.jpg/1280px-Plaza_libertad.jpg"
+        },
+        {
+          "indice": 3,
+          "tema": "Homenaje a la libertad de prensa",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Homenaje a la libertad de prensa - Plaza de la libertad - Medell\u00edn.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Homenaje_a_la_libertad_de_prensa_-_Plaza_de_la_libertad_-_Medell%C3%ADn.JPG/1280px-Homenaje_a_la_libertad_de_prensa_-_Plaza_de_la_libertad_-_Medell%C3%ADn.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Homenaje_a_la_libertad_de_prensa_-_Plaza_de_la_libertad_-_Medell%C3%ADn.JPG/1280px-Homenaje_a_la_libertad_de_prensa_-_Plaza_de_la_libertad_-_Medell%C3%ADn.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Homenaje_a_la_libertad_de_prensa_-_Plaza_de_la_libertad_-_Medell%C3%ADn.JPG/1280px-Homenaje_a_la_libertad_de_prensa_-_Plaza_de_la_libertad_-_Medell%C3%ADn.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Homenaje_a_la_libertad_de_prensa_-_Plaza_de_la_libertad_-_Medell%C3%ADn.JPG/1280px-Homenaje_a_la_libertad_de_prensa_-_Plaza_de_la_libertad_-_Medell%C3%ADn.JPG"
+        },
+        {
+          "indice": 4,
+          "tema": "Instalacion floral en la plaza",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Regala una flor - Plaza de la Libertad - Medell\u00edn.JPG",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Regala_una_flor_-_Plaza_de_la_Libertad_-_Medell%C3%ADn.JPG/1280px-Regala_una_flor_-_Plaza_de_la_Libertad_-_Medell%C3%ADn.JPG",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Regala_una_flor_-_Plaza_de_la_Libertad_-_Medell%C3%ADn.JPG/1280px-Regala_una_flor_-_Plaza_de_la_Libertad_-_Medell%C3%ADn.JPG",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Regala_una_flor_-_Plaza_de_la_Libertad_-_Medell%C3%ADn.JPG/1280px-Regala_una_flor_-_Plaza_de_la_Libertad_-_Medell%C3%ADn.JPG",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Regala_una_flor_-_Plaza_de_la_Libertad_-_Medell%C3%ADn.JPG/1280px-Regala_una_flor_-_Plaza_de_la_Libertad_-_Medell%C3%ADn.JPG"
+        }
+      ]
+    },
+    {
+      "slug": "parques-del-rio-medellin",
+      "archivo": "ficha/ficha-parques-del-rio-medellin.json",
+      "pass": true,
+      "pass_estricto": true,
+      "fotos_pass": 5,
+      "fotos_total": 5,
+      "archivos_ok": 5,
+      "archivos_total": 5,
+      "archivos_404": 0,
+      "archivos_429": 0,
+      "archivos_otro": 0,
+      "fotos": [
+        {
+          "indice": 0,
+          "tema": "Ciclovia en el soterrado",
+          "es_hero": true,
+          "archivos": [
+            {
+              "nombre": "File:Parques del R\u00edo Medell\u00edn - ciclov\u00eda en soterrado, 2019.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Parques_del_R%C3%ADo_Medell%C3%ADn_-_ciclov%C3%ADa_en_soterrado%2C_2019.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn_-_ciclov%C3%ADa_en_soterrado%2C_2019.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Parques_del_R%C3%ADo_Medell%C3%ADn_-_ciclov%C3%ADa_en_soterrado%2C_2019.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn_-_ciclov%C3%ADa_en_soterrado%2C_2019.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Parques_del_R%C3%ADo_Medell%C3%ADn_-_ciclov%C3%ADa_en_soterrado%2C_2019.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn_-_ciclov%C3%ADa_en_soterrado%2C_2019.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Parques_del_R%C3%ADo_Medell%C3%ADn_-_ciclov%C3%ADa_en_soterrado%2C_2019.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn_-_ciclov%C3%ADa_en_soterrado%2C_2019.jpg"
+        },
+        {
+          "indice": 1,
+          "tema": "Alumbrados navidenos en Parques del Rio",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Parques del R\u00edo Medell\u00edn, decoraci\u00f3n navide\u00f1a (enero de 2021) - Monta\u00f1a Medell\u00edn.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_Monta%C3%B1a_Medell%C3%ADn.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_Monta%C3%B1a_Medell%C3%ADn.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_Monta%C3%B1a_Medell%C3%ADn.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_Monta%C3%B1a_Medell%C3%ADn.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_Monta%C3%B1a_Medell%C3%ADn.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_Monta%C3%B1a_Medell%C3%ADn.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_Monta%C3%B1a_Medell%C3%ADn.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_Monta%C3%B1a_Medell%C3%ADn.jpg"
+        },
+        {
+          "indice": 2,
+          "tema": "Alumbrados navidenos en Parques del Rio",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Parques del R\u00edo Medell\u00edn, decoraci\u00f3n navide\u00f1a (enero de 2021) - artistas.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_artistas.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_artistas.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_artistas.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_artistas.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_artistas.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_artistas.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_artistas.jpg/1280px-Parques_del_R%C3%ADo_Medell%C3%ADn%2C_decoraci%C3%B3n_navide%C3%B1a_(enero_de_2021)_-_artistas.jpg"
+        },
+        {
+          "indice": 3,
+          "tema": "Alumbrado navideno 2022",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Alumbrado navide\u00f1o en Medell\u00edn, 2022 - Parques del R\u00edo Medell\u00edn - 57.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_57.jpg/1280px-Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_57.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_57.jpg/1280px-Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_57.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_57.jpg/1280px-Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_57.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_57.jpg/1280px-Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_57.jpg"
+        },
+        {
+          "indice": 4,
+          "tema": "Alumbrado navideno 2022",
+          "es_hero": false,
+          "archivos": [
+            {
+              "nombre": "File:Alumbrado navide\u00f1o en Medell\u00edn, 2022 - Parques del R\u00edo Medell\u00edn - 82.jpg",
+              "url_consulta": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_82.jpg/1280px-Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_82.jpg",
+              "url_miniatura": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_82.jpg/1280px-Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_82.jpg",
+              "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_82.jpg/1280px-Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_82.jpg",
+              "status": 200,
+              "intentos": 1,
+              "estado": "PASS",
+              "ok": true,
+              "motivo": ""
+            }
+          ],
+          "ok": 1,
+          "pass": true,
+          "url_real": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_82.jpg/1280px-Alumbrado_navide%C3%B1o_en_Medell%C3%ADn%2C_2022_-_Parques_del_R%C3%ADo_Medell%C3%ADn_-_82.jpg"
+        }
+      ]
+    }
+  ]
+}

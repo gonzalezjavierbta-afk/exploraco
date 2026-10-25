@@ -1,0 +1,162 @@
+# Ficha: Parque de las Luces (Plaza Cisneros)
+
+- Slug: parque-de-las-luces-plaza-cisneros
+- Categoria: sitio
+- Ciudad: Medellin, Antioquia
+- Coordenadas: 6.2447, -75.5714
+- Estado editorial: published
+
+Ficha de datos del pipeline de ExploraCO. El bloque JSON es la fuente
+de verdad y es el que valida scripts/validate_ficha.js; el archivo
+ficha-parque-de-las-luces-plaza-cisneros.json es el mismo contenido en bruto para los cargadores.
+```json
+{
+  "BASE": {
+    "slug": "parque-de-las-luces-plaza-cisneros",
+    "nombre": "Parque de las Luces (Plaza Cisneros)",
+    "categoria_slug": "sitio",
+    "lead": "Intervencion urbana e iluminada compuesta por 300 faros de luz que simbolizan la transformacion del centro administrativo.",
+    "descripcion": "El Parque de las Luces, ubicado en la antigua Plaza Cisneros, es un ejemplo de renovacion del espacio publico en el centro de Medellin. Dise\u00f1ado por los arquitectos Juan Manuel Pelaez y Mauricio Gaviria, cuenta con 300 torres de luz de hasta 24 metros de altura.\n\nDurante el dia, las columnas proporcionan sombra y un paisaje arquitectonico abstracto; por la noche, reflejan las fases de la luna mediante un juego de luces integradas. Se encuentra flanqueada por la Biblioteca EPM y los antiguos Vasquez y Carre.",
+    "highlight": "4.5/10 \u00b7 Arquitectura \u00b7 Fotografia \u00b7 Luz Nocturna",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "La Candelaria / Centro",
+    "lat": 6.2447,
+    "lng": -75.5714,
+    "whatsapp": "",
+    "telefono": "",
+    "email": "",
+    "web": "https://www.medellin.travel",
+    "instagram": "@medellintravel",
+    "precio_desde": "Gratis",
+    "horario": "Acceso libre 24 horas (Iluminacion nocturna de 06:00 PM a 12:00 AM)",
+    "emoji": "\ud83d\udca1",
+    "hero_bg": "linear-gradient(135deg, #fbc02d 0%, #111111 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Plaza Urbana \u00b7 Intervencion Lum\u00ednica",
+    "capacidad": "Abierto",
+    "como_llegar": "Estacion Alpujarra o San Antonio de la Linea A del Metro.",
+    "status": "published",
+    "destacado": false
+  },
+  "TAGS": {
+    "tipo_actividad": "Fotografia Nocturna \u00b7 Paseo Arquitectonico",
+    "subcategoria": "espacio-publico",
+    "dificultad": "Facil",
+    "dificultad_desc": "Plaza peatonal pavimentada.",
+    "duracion": "30-45 minutos",
+    "altitud": "1495 msnm",
+    "temporada": [
+      "Todo el a\u00f1o"
+    ],
+    "precio_entrada": "Gratis",
+    "distancia": "Centro Administrativo Alpujarra",
+    "como_llegar": "Metro Alpujarra.",
+    "permisos": "Libre",
+    "temporada_nota": "Se aprecia en su m\u00e1ximo esplendor despues del atardecer.",
+    "fauna_flora": [],
+    "secretos": [],
+    "regulaciones": "",
+    "checklist_tip": "Combinar con la visita a los Edificios Vasquez y Carre adyacentes.",
+    "entradas": [],
+    "tours": [],
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad_tags": [],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "ideal",
+      "Jun": "ideal",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    }
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfA que hora encienden las luces del parque?",
+      "respuesta": "Las torres de luz se encienden automaticamente al atardecer, alrededor de las 06:15 PM; la iluminacion nocturna se extiende de 06:00 PM a 12:00 AM."
+    },
+    {
+      "pregunta": "\u00bfCuanto cuesta entrar al Parque de las Luces?",
+      "respuesta": "Nada: el acceso es gratuito y la plaza permanece abierta las 24 horas."
+    },
+    {
+      "pregunta": "\u00bfQue son las columnas del parque?",
+      "respuesta": "Son 300 torres de luz de hasta 24 metros de altura, dise\u00f1adas por los arquitectos Juan Manuel Pelaez y Mauricio Gaviria, que por la noche reflejan las fases de la luna mediante un juego de luces integradas."
+    },
+    {
+      "pregunta": "\u00bfComo se llega a la Plaza Cisneros?",
+      "respuesta": "Por la Linea A del Metro hasta la estacion Alpujarra o San Antonio; la plaza se ubica en el centro administrativo de Medellin, en La Candelaria."
+    },
+    {
+      "pregunta": "\u00bfCuanto tiempo hay que dedicarle y que hay cerca?",
+      "respuesta": "Basta con 30 a 45 minutos; la plaza esta flanqueada por la Biblioteca EPM y los antiguos edificios Vasquez y Carre, que se pueden sumar al paseo arquitectonico."
+    },
+    {
+      "pregunta": "\u00bfCuando es el mejor momento para visitarlo?",
+      "respuesta": "Despues del atardecer, cuando la plaza alcanza su m\u00e1ximo esplendor; la temporada es ideal durante todo el a\u00f1o y el recorrido es facil sobre pavimento plano."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Parque de las Luces",
+      "caption": "Torres de luz del Parque de las Luces en la antigua Plaza Cisneros",
+      "nombres_archivo_wikimedia": [
+        "File:Parque de las Luces.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Plaza Cisneros 2023",
+      "caption": "Vista de la Plaza Cisneros y sus columnas iluminadas",
+      "nombres_archivo_wikimedia": [
+        "File:Medell\u00edn, Plaza Cisneros, 2023-07 CN-01.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Bosque de columnas",
+      "caption": "Columnas del Parque de las Luces vistas desde la plaza",
+      "nombres_archivo_wikimedia": [
+        "File:Medell\u00edn, Plaza Cisneros, 2023-07 CN-03.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Bosque de columnas nocturno",
+      "caption": "Bosque de columnas del Parque de las Luces en el centro de Medellin",
+      "nombres_archivo_wikimedia": [
+        "File:Plaza Cisneros-BosqueColumnas-Medellin.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Edificio Vasquez",
+      "caption": "Edificio Vasquez visto desde la Plaza Cisneros",
+      "nombres_archivo_wikimedia": [
+        "File:2018 Medell\u00edn Edificio V\u00e1squez desde la Plaza Cisneros - Medell\u00edn.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.medellin.travel",
+      "que_respalda": "informacion urbana"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/Category:Plaza_Cisneros",
+      "que_respalda": "archivos fotograficos de Wikimedia Commons usados en FOTOS_SUGERIDAS"
+    }
+  ]
+}
+```

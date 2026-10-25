@@ -1,0 +1,184 @@
+# Ficha: Calle de la Buena Mesa (Envigado)
+
+- Slug: calle-de-la-buena-mesa-envigado
+- Categoria: comida
+- Ciudad: Envigado, Antioquia
+- Coordenadas: 6.1731, -75.5861
+- Estado editorial: published
+
+Ficha de datos del pipeline de ExploraCO. El bloque JSON es la fuente
+de verdad y es el que valida scripts/validate_ficha.js; el archivo
+ficha-calle-de-la-buena-mesa-envigado.json es el mismo contenido en bruto para los cargadores.
+```json
+{
+  "BASE": {
+    "slug": "calle-de-la-buena-mesa-envigado",
+    "nombre": "Calle de la Buena Mesa (Envigado)",
+    "categoria_slug": "comida",
+    "lead": "Tradicional corredor gastronomico del municipio vecino de Envigado, famoso por carnes a la parrilla y bistros acogedores.",
+    "descripcion": "La Calle de la Buena Mesa es el epicentro culinario del municipio de Envigado, colindante con Medellin. Este barrio de casas tradicionales convertidas en restaurantes ofrece una atmosfera acogedora y familiar.\n\nSu oferta abarca desde tradicionales parrillas antioque\u00f1as y trattorias italianas, hasta propuestas contemporaneas de mariscos, hamburguesas de autor y reposteria artesanal.",
+    "highlight": "4.7/10 \u00b7 Gastronomia \u00b7 Parrilla \u00b7 Ambiente Familiar",
+    "ciudad": "Envigado",
+    "region": "Antioquia",
+    "barrio": "Jard\u00edn / Envigado",
+    "lat": 6.1731,
+    "lng": -75.5861,
+    "whatsapp": "",
+    "telefono": "",
+    "email": "",
+    "web": "https://www.turismoenvigado.gov.co",
+    "instagram": "@buenamesaenvigado",
+    "precio_desde": "Platos desde $28.000 hasta $85.000 COP",
+    "horario": "Lun-Dom 12:00 PM - 10:30 PM",
+    "emoji": "\ud83e\udd69",
+    "hero_bg": "linear-gradient(135deg, #8d6e63 0%, #111111 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Distrito Culinario \u00b7 Restaurantes de Barrio",
+    "capacidad": "Multiples locales",
+    "como_llegar": "Estacion Envigado del Metro Linea A + bus integrado o taxi corto.",
+    "status": "published",
+    "destacado": false
+  },
+  "TAGS": {
+    "tipo_comida": "Parrilla, Italiana, Reposteria, Marisco",
+    "cocina": "PARRILLA \u00b7 TRADICIONAL",
+    "ambiente": "Familiar, Agradable, De Barrio",
+    "precio_promedio": "$45.000 - $75.000 COP",
+    "terraza": "Si",
+    "reservas": "Si",
+    "domicilio": "Si",
+    "menu_destacado": [
+      {
+        "nombre": "Punta de Ancho a la Parrilla",
+        "precio": "$58.000 COP",
+        "badge": "popular"
+      }
+    ],
+    "opciones_dieta": [
+      "Vegetariano"
+    ],
+    "horario_detallado": {
+      "Lunes": {
+        "abre": "12:00",
+        "cierra": "22:00"
+      },
+      "Martes": {
+        "abre": "12:00",
+        "cierra": "22:00"
+      },
+      "Miercoles": {
+        "abre": "12:00",
+        "cierra": "22:00"
+      },
+      "Jueves": {
+        "abre": "12:00",
+        "cierra": "22:30"
+      },
+      "Viernes": {
+        "abre": "12:00",
+        "cierra": "23:00"
+      },
+      "Sabado": {
+        "abre": "12:00",
+        "cierra": "23:00"
+      },
+      "Domingo": {
+        "abre": "12:00",
+        "cierra": "20:00"
+      }
+    },
+    "domicilio_plataformas": [
+      "Rappi"
+    ],
+    "subcategoria": "restaurante"
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfEsta cerca de la estacion del Metro?",
+      "respuesta": "Se encuentra a unos 10 minutos en taxi desde la Estacion Envigado."
+    },
+    {
+      "pregunta": "\u00bfQue tipo de cocina se encuentra en el corredor?",
+      "respuesta": "Parrilla antioque\u00f1a, trattorias italianas, mariscos, hamburguesas de autor y reposteria artesanal; la ficha clasifica la cocina como parrilla y tradicional."
+    },
+    {
+      "pregunta": "\u00bfCuanto cuesta comer en la Calle de la Buena Mesa?",
+      "respuesta": "Los platos van desde $28.000 hasta $85.000 COP, con un promedio de $45.000 a $75.000 COP. La Punta de Ancho a la Parrilla, el plato destacado, cuesta $58.000 COP."
+    },
+    {
+      "pregunta": "\u00bfCual es el horario de atencion?",
+      "respuesta": "Abre todos los dias a las 12:00; cierra a las 22:00 de lunes a miercoles, 22:30 el jueves, 23:00 viernes y sabado, y 20:00 el domingo."
+    },
+    {
+      "pregunta": "\u00bfSe puede reservar y hay terraza?",
+      "respuesta": "Si: el corredor admite reservas y sus locales cuentan con terraza."
+    },
+    {
+      "pregunta": "\u00bfHay servicio a domicilio?",
+      "respuesta": "Si, ofrece domicilio y pedidos a traves de la plataforma Rappi."
+    },
+    {
+      "pregunta": "\u00bfHay opciones para vegetarianos?",
+      "respuesta": "Si, la ficha registra opcion vegetariana entre las alternativas de dieta."
+    },
+    {
+      "pregunta": "\u00bfQue ambiente tiene el sector?",
+      "respuesta": "Es un barrio de casas tradicionales convertidas en restaurantes, con ambiente familiar y acogedor, en el barrio Jardin de Envigado, municipio colindante con Medellin."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Bandeja paisa",
+      "caption": "Bandeja paisa, el plato bandera de la cocina antioque\u00f1a",
+      "nombres_archivo_wikimedia": [
+        "File:Bandeja paisa antioque\u00f1a, Colombia.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Chorizo a la parrilla",
+      "caption": "Chorizo antioque\u00f1o a la parrilla, habitual en las parrillas del corredor",
+      "nombres_archivo_wikimedia": [
+        "File:Chorizo antioque\u00f1o.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Combinado antioqueno",
+      "caption": "Combinado antioque\u00f1o con carnes y acompa\u00f1amientos",
+      "nombres_archivo_wikimedia": [
+        "File:Combinado antioque\u00f1o.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Envigado urbano",
+      "caption": "Vista del casco urbano de Envigado, municipio donde se ubica el corredor gastronomico",
+      "nombres_archivo_wikimedia": [
+        "File:Envigado above.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Estacion del ferrocarril",
+      "caption": "Antigua estacion del ferrocarril de Envigado, referente del sector",
+      "nombres_archivo_wikimedia": [
+        "File:Estaci\u00f3n del Ferrocarril Envigado. Vista frontal. Envigado, Antioquia. Colombia.JPG"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.turismoenvigado.gov.co",
+      "que_respalda": "directorio gastronomico"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/w/index.php?search=Envigado+gastronomia&title=Special:MediaSearch&type=image",
+      "que_respalda": "archivos de Wikimedia Commons usados en FOTOS_SUGERIDAS, verificados con HEAD 200 sobre la miniatura de 1280 px"
+    }
+  ]
+}
+```

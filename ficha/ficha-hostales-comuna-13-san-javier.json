@@ -1,0 +1,156 @@
+{
+  "BASE": {
+    "slug": "hostales-comuna-13-san-javier",
+    "nombre": "Alojamientos Comunitarios de la Comuna 13",
+    "categoria_slug": "hostal",
+    "lead": "Hospedajes emergentes atendidos por familias locales con vistas espectaculares sobre la ladera occidental.",
+    "descripcion": "Como parte del fenomeno de turismo comunitario, en la Comuna 13 han surgido hostales y casas de familia adaptadas para recibir a viajeros internacionales. Hospedarse en la ladera permite experimentar la calidez de la comunidad, disfrutar de atardeceres sobre la ciudad y apoyar directamente la economia local.\n\nLos alojamientos destacan por sus terrazas con mirador, decoracion inspirada en el grafiti y talleres interactivos con los vecinos del barrio.",
+    "highlight": "4.8/10 \u00b7 Turismo Comunitario \u00b7 Mirador \u00b7 Autenticidad",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "San Javier / Independencias",
+    "lat": 6.252,
+    "lng": -75.614,
+    "whatsapp": "",
+    "telefono": "",
+    "email": "",
+    "web": "https://www.medellin.travel",
+    "instagram": "@comuna13medellin",
+    "precio_desde": "Dorms desde $45.000; Privadas desde $120.000 COP",
+    "horario": "Recepcion familiar",
+    "emoji": "\ud83c\udfe1",
+    "hero_bg": "linear-gradient(135deg, #e8a020 0%, #111111 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Hostal Comunitario \u00b7 Casa de Familia",
+    "capacidad": "Habitaciones limitadas",
+    "como_llegar": "Metro San Javier + bus o transporte comunitario.",
+    "status": "published",
+    "destacado": false
+  },
+  "TAGS": {
+    "tipo_alojamiento": "Hostal Comunitario",
+    "checkin": "14:00",
+    "checkout": "11:00",
+    "recepcion": "Hasta las 21:00",
+    "edad_minima": "18",
+    "mascotas": "Pet Friendly",
+    "cocina_compartida": "Si",
+    "barrio_descripcion": "Barrio popular de ladera lleno de dinamismo y galerias urbanas.",
+    "politica_cancelacion": "Cancelacion flexible 24 horas antes.",
+    "reglas_casa": "Respetar la convivencia comunitaria.",
+    "habitaciones": [
+      {
+        "tipo": "Cama en Dormitorio Mixto",
+        "subtitulo": "Vista panor\u00e1mica a la ciudad",
+        "badge": "popular",
+        "camas": "1 Cama litera",
+        "precio": "$45.000 COP"
+      }
+    ],
+    "amenidades": [
+      "Wi-Fi",
+      "Mirador en Terraza",
+      "Desayuno Local"
+    ],
+    "actividades": [
+      {
+        "icono": "\ud83c\udfa8",
+        "nombre": "Taller de Grafiti",
+        "descripcion": "Clase basica de pintado con aerosol con artistas del barrio."
+      }
+    ],
+    "que_incluye": [
+      "Desayuno tipico"
+    ],
+    "transporte": [],
+    "eventos_hostal": []
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfC\u00f3mo se sube el equipaje hasta los hostales de la monta\u00f1a?",
+      "respuesta": "Existen mototaxis y servicios comunitarios de apoyo desde la estaci\u00f3n del Metro."
+    },
+    {
+      "pregunta": "\u00bfQu\u00e9 tipo de alojamiento se ofrece?",
+      "respuesta": "Hostales y casas de familia adaptadas, atendidas por familias locales de la ladera."
+    },
+    {
+      "pregunta": "\u00bfCu\u00e1nto cuesta dormir en la Comuna 13?",
+      "respuesta": "Los dormitorios compartidos arrancan en $45.000 COP y las habitaciones privadas desde $120.000 COP."
+    },
+    {
+      "pregunta": "\u00bfQu\u00e9 vistas tienen los alojamientos?",
+      "respuesta": "Terrazas con mirador sobre la ladera occidental y la ciudad, con atardeceres."
+    },
+    {
+      "pregunta": "\u00bfCu\u00e1les son los horarios de check-in y check-out?",
+      "respuesta": "Check-in desde las 14:00, check-out hasta las 11:00 y recepci\u00f3n hasta las 21:00."
+    },
+    {
+      "pregunta": "\u00bfQu\u00e9 actividades ofrecen los hostales?",
+      "respuesta": "Talleres de grafiti con artistas del barrio y decoraci\u00f3n inspirada en el grafiti local."
+    },
+    {
+      "pregunta": "\u00bfQu\u00e9 incluye la estad\u00eda y qu\u00e9 reglas hay?",
+      "respuesta": "Incluye desayuno t\u00edpico, Wi-Fi y mirador en terraza; se pide respetar la convivencia comunitaria y hay cancelaci\u00f3n flexible 24 horas antes."
+    },
+    {
+      "pregunta": "\u00bfC\u00f3mo se llega a los alojamientos?",
+      "respuesta": "Metro San Javier y luego bus o transporte comunitario hasta la ladera."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Comuna 13",
+      "caption": "Ladera y viviendas de la Comuna 13 en San Javier",
+      "nombres_archivo_wikimedia": [
+        "File:Comuna 13, Medell\u00edn 05.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Escaleras electricas",
+      "caption": "Escaleras electricas de la comuna 13, acceso mecanico a la ladera",
+      "nombres_archivo_wikimedia": [
+        "File:Escaleras el\u00e9ctricas de la comuna 13, Medell\u00edn - 01.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Grafiti",
+      "caption": "Murales de grafiti en la Comuna 13",
+      "nombres_archivo_wikimedia": [
+        "File:Graffiti in Comuna 13, Medell\u00edn 03.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Calles de la ladera",
+      "caption": "Calles y miradores de la Comuna 13",
+      "nombres_archivo_wikimedia": [
+        "File:Comuna 13, Medell\u00edn 02.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Galeria urbana",
+      "caption": "Galeria urbana de grafiti en la Comuna 13",
+      "nombres_archivo_wikimedia": [
+        "File:Graffiti in Comuna 13, Medell\u00edn 09.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.medellin.travel",
+      "que_respalda": "turismo comunitario"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/File:Comuna_13,_Medell\u00edn_05.jpg",
+      "que_respalda": "archivo fotografico verificado en Wikimedia Commons (HEAD 200 en miniatura 1280 px)"
+    }
+  ]
+}

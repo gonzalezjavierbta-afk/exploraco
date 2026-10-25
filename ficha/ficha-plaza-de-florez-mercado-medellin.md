@@ -1,0 +1,183 @@
+# Ficha: Plaza de Mercado de Florez
+
+- Slug: `plaza-de-florez-mercado-medellin`
+- Categoria: `comida`
+- Ciudad: Medellin, Antioquia
+- Coordenadas: 6.2442, -75.5583
+- Estado editorial: `published`
+
+Ficha de datos del pipeline de ExploraCO. El bloque JSON es la fuente
+de verdad y es el que valida `scripts/validate_ficha.js`; el archivo
+`ficha-plaza-de-florez-mercado-medellin.json` es el mismo contenido en bruto para los cargadores.
+```json
+{
+  "BASE": {
+    "slug": "plaza-de-florez-mercado-medellin",
+    "nombre": "Plaza de Mercado de Florez",
+    "categoria_slug": "comida",
+    "lead": "Mercado tradicional del centro fundado en 1891, famoso por sus puestos de flores frescas, frutas exoticas y fondas de cocina tipica.",
+    "descripcion": "La Plaza de Florez es un monumento historico y comercial en el oriente del centro de Medellin. Fue la primera plaza de mercado cubierta de la ciudad y el punto historico donde los silleteros descendian desde Santa Elena a vender sus flores.\n\nHoy en dia es un hervidero de color con pasillos dedicados a flores tropicales, frutas campesinas colombianas, hierbas medicinales y fondas tipicas donde se sirven desayunos paisas tradicionales.",
+    "highlight": "4.7/10 \u00b7 Mercado Tradicional \u00b7 Flores \u00b7 Gastronomia de Plaza",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "Buenos Aires / Centro",
+    "lat": 6.2442,
+    "lng": -75.5583,
+    "whatsapp": "",
+    "telefono": "5742392525",
+    "email": "",
+    "web": "https://www.medellin.travel",
+    "instagram": "@plazadeflorez",
+    "precio_desde": "Platos tipicos desde $15.000 COP",
+    "horario": "Lun-Sab 06:00 AM - 05:00 PM / Dom 06:00 AM - 01:00 PM",
+    "emoji": "\ud83e\udd5d",
+    "hero_bg": "linear-gradient(135deg, #e8a020 0%, #4caf50 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Plaza de Mercado \u00b7 Comida Tipica",
+    "capacidad": "Abierto al publico",
+    "como_llegar": "Tranvia de Ayacucho Estacion Bicentenario (frente a la plaza).",
+    "status": "published",
+    "destacado": false
+  },
+  "TAGS": {
+    "tipo_comida": "Comida Tipica Antioque\u00f1a, Jugos Naturales, Caldos",
+    "cocina": "TRADICIONAL \u00b7 POPULAR",
+    "ambiente": "Popular, Autentico, Tradicional",
+    "precio_promedio": "$15.000 - $25.000 COP",
+    "terraza": "No",
+    "reservas": "No",
+    "domicilio": "No",
+    "menu_destacado": [
+      {
+        "nombre": "Caldo de Costilla Paisa",
+        "precio": "$14.000 COP",
+        "badge": "popular"
+      },
+      {
+        "nombre": "Jugo Natural en Agua/Leche",
+        "precio": "$6.000 COP",
+        "badge": "popular"
+      }
+    ],
+    "opciones_dieta": [
+      "Frutas Frescas"
+    ],
+    "horario_detallado": {
+      "Lunes": {
+        "abre": "06:00",
+        "cierra": "17:00"
+      },
+      "Martes": {
+        "abre": "06:00",
+        "cierra": "17:00"
+      },
+      "Miercoles": {
+        "abre": "06:00",
+        "cierra": "17:00"
+      },
+      "Jueves": {
+        "abre": "06:00",
+        "cierra": "17:00"
+      },
+      "Viernes": {
+        "abre": "06:00",
+        "cierra": "17:00"
+      },
+      "Sabado": {
+        "abre": "06:00",
+        "cierra": "17:00"
+      },
+      "Domingo": {
+        "abre": "06:00",
+        "cierra": "13:00"
+      }
+    },
+    "domicilio_plataformas": [],
+    "subcategoria": "restaurante"
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfC\u00f3mo se llega en transporte p\u00fablico?",
+      "respuesta": "El Tranv\u00eda de Ayacucho tiene una estaci\u00f3n llamada Bicentenario justo al frente de la plaza."
+    },
+    {
+      "pregunta": "\u00bfQu\u00e9 se puede comprar en la plaza?",
+      "respuesta": "Flores tropicales, frutas campesinas colombianas y hierbas medicinales en pasillos especializados."
+    },
+    {
+      "pregunta": "\u00bfQu\u00e9 se puede comer y a qu\u00e9 precio?",
+      "respuesta": "Fondas t\u00edpicas con desayunos paisas: el caldo de costilla cuesta $14.000 COP y el jugo natural $6.000 COP, con promedio de $15.000 a $25.000 COP."
+    },
+    {
+      "pregunta": "\u00bfCu\u00e1l es el horario de la plaza?",
+      "respuesta": "De lunes a s\u00e1bado de 06:00 a 17:00 y los domingos de 06:00 a 13:00."
+    },
+    {
+      "pregunta": "\u00bfDesde cu\u00e1ndo funciona la plaza?",
+      "respuesta": "Fue fundada en 1891 y fue la primera plaza de mercado cubierta de la ciudad."
+    },
+    {
+      "pregunta": "\u00bfSe puede reservar o pedir a domicilio?",
+      "respuesta": "No: la plaza no recibe reservas y no ofrece servicio a domicilio."
+    },
+    {
+      "pregunta": "\u00bfQu\u00e9 relaci\u00f3n tiene con los silleteros?",
+      "respuesta": "Fue el punto hist\u00f3rico donde los silleteros descend\u00edan desde Santa Elena a vender sus flores."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Frutas de plaza de mercado",
+      "caption": "Canasta de guayaba verde en una plaza de mercado de Medellin",
+      "nombres_archivo_wikimedia": [
+        "File:Canasta de guayaba verde en la plaza de mercado Minorista de Medell\u00edn.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Archivo historico",
+      "caption": "Postal de la plaza de mercado de Medellin",
+      "nombres_archivo_wikimedia": [
+        "File:Postal Plaza de Mercado Medell\u00edn.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Estacion Bicentenario",
+      "caption": "Estacion Bicentenario del Tranvia de Ayacucho, frente a la plaza",
+      "nombres_archivo_wikimedia": [
+        "File:Estaci\u00f3n Bicentenario del Tranv\u00eda de Ayachucho.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Tranvia de Ayacucho",
+      "caption": "Tranvia de Ayacucho por la avenida, corredor de acceso a la plaza",
+      "nombres_archivo_wikimedia": [
+        "File:2018 tranv\u00eda por la avenida Ayacucho, cerca de la carrera 39 (Medell\u00edn).jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Silleteros y flores",
+      "caption": "Desfile de silleteros, origen de la tradicion de flores de la plaza",
+      "nombres_archivo_wikimedia": [
+        "File:Desfile de Silleteros2007-(40)Medellin.JPG"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.medellin.travel",
+      "que_respalda": "historia y ubicacion"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/File:Canasta_de_guayaba_verde_en_la_plaza_de_mercado_Minorista_de_Medell\u00edn.jpg",
+      "que_respalda": "archivo fotografico verificado en Wikimedia Commons (HEAD 200 en miniatura 1280 px)"
+    }
+  ]
+}
+```

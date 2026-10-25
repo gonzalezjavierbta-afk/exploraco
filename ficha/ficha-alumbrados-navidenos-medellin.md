@@ -1,0 +1,168 @@
+# Ficha: Alumbrados Navidenos de Medellin
+
+- Slug: alumbrados-navidenos-medellin
+- Categoria: evento
+- Ciudad: Medellin, Antioquia
+- Coordenadas: 6.2422, -75.5761
+- Estado editorial: published
+
+Ficha de datos del pipeline de ExploraCO. El bloque JSON es la fuente
+de verdad y es el que valida scripts/validate_ficha.js; el archivo
+ficha-alumbrados-navidenos-medellin.json es el mismo contenido en bruto para los cargadores.
+```json
+{
+  "BASE": {
+    "slug": "alumbrados-navidenos-medellin",
+    "nombre": "Alumbrados Navidenos de Medellin",
+    "categoria_slug": "evento",
+    "lead": "Uno de los espectaculos de iluminacion navide\u00f1a mas famosos del mundo, transformando el Parques del Rio y el centro urbano.",
+    "descripcion": "Los Alumbrados Navide\u00f1os de Medellin, organizados por Empresas Publicas de Medellin (EPM), son una tradicion con mas de 55 a\u00f1os de historia. Durante los meses de diciembre y enero, millones de bombillas LED y gigantescas figuras tejidas a mano por artesanas locales decoran el Parque del Rio, el Paseo del Rio y los parques principales de las 16 comunas.\n\nReconocidos por publicaciones globales como National Geographic entre los mejores alumbrados del mundo, atraen a mas de un millon de visitantes cada temporada.",
+    "highlight": "5.0/10 \u00b7 Luces Navide\u00f1as \u00b7 Tradicion \u00b7 Parques del Rio",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "Parques del Rio / Rio Medellin",
+    "lat": 6.2422,
+    "lng": -75.5761,
+    "whatsapp": "",
+    "telefono": "5743808080",
+    "email": "epm@epm.com.co",
+    "web": "https://www.epm.com.co",
+    "instagram": "@epmestamosahi",
+    "precio_desde": "Gratis",
+    "horario": "06:00 PM - 12:00 AM desde diciembre hasta principios de enero",
+    "emoji": "\ud83c\udf84",
+    "hero_bg": "linear-gradient(135deg, #1565c0 0%, #e8a020 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Espectaculo de Luces \u00b7 Tradicion Navide\u00f1a",
+    "capacidad": "Mas de 1.500.000 de visitantes por temporada",
+    "como_llegar": "Estacion Exposiciones o Alpujarra de la Linea A del Metro.",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "fecha_inicio": "2026-12-01",
+    "fecha_fin": "2027-01-11",
+    "edicion": "Edicion 59",
+    "sede": "Parques del Rio y Rio Medellin",
+    "organiza": "EPM - Empresas Publicas de Medellin",
+    "lema": "Medellin Ilumina la Navidad",
+    "tipo_evento": "cultura",
+    "lineup": [],
+    "agenda": [
+      {
+        "dia": "2026-12-01",
+        "hora": "18:30",
+        "actividad": "Ritual de Encendido de los Alumbrados"
+      }
+    ],
+    "categorias_entrada": [
+      {
+        "tipo": "Acceso libre a todos los corredores iluminados",
+        "precio": "Gratis",
+        "disponibilidad": "Disponible"
+      }
+    ],
+    "que_llevar": [
+      "Calzado comodo",
+      "Camara fotogr\u00e1fica",
+      "Sombrilla por lluvias nocturnas"
+    ],
+    "prohibido": [
+      "Ventas ambulantes no autorizadas en el corredor central"
+    ],
+    "subcategoria": "festival"
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfA que hora encienden las luces de Navidad?",
+      "respuesta": "El encendido es diario a las 06:00 PM y permanecen encendidas hasta las 12:00 AM."
+    },
+    {
+      "pregunta": "\u00bfCual es la fecha de inicio y de cierre de los alumbrados?",
+      "respuesta": "La temporada indexada va del 1 de diciembre de 2026 al 11 de enero de 2027, dentro de la Edicion 59 organizada por EPM."
+    },
+    {
+      "pregunta": "\u00bfCuanto cuesta entrar a los alumbrados?",
+      "respuesta": "El acceso es gratuito: la unica categoria de entrada registrada es el acceso libre a todos los corredores iluminados."
+    },
+    {
+      "pregunta": "\u00bfQuien organiza el espectaculo y donde se realiza?",
+      "respuesta": "Lo organiza EPM (Empresas Publicas de Medellin) y la sede es Parques del Rio y el Rio Medellin, con el lema Medellin Ilumina la Navidad."
+    },
+    {
+      "pregunta": "\u00bfCuantas personas visitan los alumbrados por temporada?",
+      "respuesta": "La ficha registra una capacidad de mas de 1.500.000 de visitantes por temporada."
+    },
+    {
+      "pregunta": "\u00bfQue debo llevar a la visita nocturna?",
+      "respuesta": "Se recomienda calzado comodo, camara fotografica y sombrilla por las lluvias nocturnas."
+    },
+    {
+      "pregunta": "\u00bfComo se llega a los corredores iluminados?",
+      "respuesta": "En la Linea A del Metro hasta la estacion Exposiciones o Alpujarra."
+    },
+    {
+      "pregunta": "\u00bfHay actividades de apertura de la temporada?",
+      "respuesta": "La agenda registra el Ritual de Encendido de los Alumbrados el 1 de diciembre de 2026 a las 18:30."
+    },
+    {
+      "pregunta": "\u00bfQue esta prohibido en el recorrido?",
+      "respuesta": "Las ventas ambulantes no autorizadas en el corredor central."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Parques del Rio iluminado",
+      "caption": "Figuras luminosas junto al Rio Medellin en Parques del Rio durante los alumbrados de 2022",
+      "nombres_archivo_wikimedia": [
+        "File:Alumbrado navide\u00f1o en Medell\u00edn, 2022 - Parques del R\u00edo Medell\u00edn - 57.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Montana navidena",
+      "caption": "Montana navidena instalada en Parques del Rio en enero de 2021",
+      "nombres_archivo_wikimedia": [
+        "File:Parques del R\u00edo Medell\u00edn, decoraci\u00f3n navide\u00f1a (enero de 2021) - Monta\u00f1a Medell\u00edn.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Alumbrado sobre el rio",
+      "caption": "Alumbrado navideno sobre el Rio Medellin en la edicion de 2011",
+      "nombres_archivo_wikimedia": [
+        "File:Alumbrados 2011 - Rio Medellin-01.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Luces de 2004",
+      "caption": "Luces navidenas desplegadas en Medellin en la temporada de 2004",
+      "nombres_archivo_wikimedia": [
+        "File:Christmas2004inMedell\u00edn.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Recorrido nocturno",
+      "caption": "Recorrido por el alumbrado navideno de Medellin fotografiado en enero de 2020",
+      "nombres_archivo_wikimedia": [
+        "File:20200105 182407Medellin.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.epm.com.co",
+      "que_respalda": "fechas e informacion de EPM"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/w/index.php?search=Alumbrados+navidenos+Medellin&title=Special:MediaSearch&type=image",
+      "que_respalda": "archivos de Wikimedia Commons usados en FOTOS_SUGERIDAS, verificados con HEAD 200 sobre la miniatura de 1280 px"
+    }
+  ]
+}
+```

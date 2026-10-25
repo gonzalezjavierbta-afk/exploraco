@@ -1,0 +1,179 @@
+# Ficha: Parque de los Pies Descalzos
+
+- Slug: parque-de-los-pies-descalzos-medellin
+- Categoria: sitio
+- Ciudad: Medellin, Antioquia
+- Coordenadas: 6.2439, -75.5753
+- Estado editorial: published
+
+Ficha de datos del pipeline de ExploraCO. El bloque JSON es la fuente
+de verdad y es el que valida scripts/validate_ficha.js; el archivo
+ficha-parque-de-los-pies-descalzos-medellin.json es el mismo contenido en bruto para los cargadores.
+```json
+{
+  "BASE": {
+    "slug": "parque-de-los-pies-descalzos-medellin",
+    "nombre": "Parque de los Pies Descalzos",
+    "categoria_slug": "sitio",
+    "lead": "Oasis urbano dise\u00f1ado para la relajacion sensorial en medio del centro administrativo de la ciudad.",
+    "descripcion": "El Parque de los Pies Descalzos es un espacio publico dise\u00f1ado por el arquitecto Felipe Uribe de Bedout y administrado por EPM. Concebido bajo la filosofia oriental del contacto directo con la naturaleza, invita a los visitantes a descalzarse y recorrer senderos de arena, bambusales y pozos de agua refrescante.\n\nUbicado frente al Edificio Inteligente de EPM y el Museo del Agua, es un lugar perfecto para hacer una pausa de relajacion en la ciudad.",
+    "highlight": "4.6/10 \u00b7 Experiencia Sensorial \u00b7 Relax \u00b7 Parque Urbano",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "Alpujarra / Centro",
+    "lat": 6.2439,
+    "lng": -75.5753,
+    "whatsapp": "",
+    "telefono": "5743808080",
+    "email": "",
+    "web": "https://www.epm.com.co",
+    "instagram": "@epmestamosahi",
+    "precio_desde": "Gratis",
+    "horario": "Mar-Dom 08:00 AM - 07:00 PM",
+    "emoji": "\ud83e\uddb6",
+    "hero_bg": "linear-gradient(135deg, #00acc1 0%, #111111 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Parque Sensorial \u00b7 Espacio Publico",
+    "capacidad": "Abierto",
+    "como_llegar": "Estacion Alpujarra de la Linea A del Metro.",
+    "status": "published",
+    "destacado": false
+  },
+  "TAGS": {
+    "tipo_actividad": "Relax Sensorial \u00b7 Hidroterapia \u00b7 Paseo Familiar",
+    "dificultad": "Facil",
+    "dificultad_desc": "Superficies de arena y piedra pulida.",
+    "duracion": "1-2 horas",
+    "altitud": "1495 msnm",
+    "temporada": [
+      "Todo el a\u00f1o"
+    ],
+    "precio_entrada": "Gratis",
+    "distancia": "Sector EPM / Alpujarra",
+    "como_llegar": "Metro Alpujarra.",
+    "permisos": "Libre",
+    "temporada_nota": "Cuenta con guias ambientales que orientan los recorridos sensoriales.",
+    "fauna_flora": [],
+    "secretos": [],
+    "regulaciones": "Descalzarse antes de ingresar a los arenales y pozos de agua.",
+    "checklist_tip": "Llevar una toalla peque\u00f1a para secarse los pies tras el recorrido.",
+    "entradas": [],
+    "tours": [],
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad_tags": [],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "ideal",
+      "Jun": "ideal",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    },
+    "subcategoria": "parque"
+  },
+  "FAQS": [
+    {
+      "pregunta": "Hay lockers para guardar los zapatos?",
+      "respuesta": "Si, el parque cuenta con areas de casilleros y guias para dejar el calzado."
+    },
+    {
+      "pregunta": "Cuanto cuesta la entrada?",
+      "respuesta": "El ingreso es gratuito, segun su ficha."
+    },
+    {
+      "pregunta": "Cual es el horario de atencion?",
+      "respuesta": "Abre de martes a domingo, de 08:00 AM a 07:00 PM."
+    },
+    {
+      "pregunta": "Como se llega y donde queda?",
+      "respuesta": "Esta en el sector de Alpujarra, frente al Edificio Inteligente de EPM y el Museo del Agua; se llega con la estacion Alpujarra de la Linea A del Metro."
+    },
+    {
+      "pregunta": "Quien lo diseno y quien lo administra?",
+      "respuesta": "Fue disenado por el arquitecto Felipe Uribe de Bedout y es administrado por EPM."
+    },
+    {
+      "pregunta": "Que se debe llevar?",
+      "respuesta": "Se recomienda llevar una toalla pequena para secarse los pies tras el recorrido sensorial."
+    },
+    {
+      "pregunta": "Cuanto dura la visita y que dificultad tiene?",
+      "respuesta": "El recorrido toma entre 1 y 2 horas y es de dificultad facil, sobre superficies de arena y piedra pulida."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Parque de los Pies Descalzos",
+      "caption": "Senderos y zonas verdes del Parque de los Pies Descalzos en Medellin",
+      "nombres_archivo_wikimedia": [
+        "File:Parque de los Pies Descalzos 01.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Parque de los Pies Descalzos",
+      "caption": "Segunda vista del Parque de los Pies Descalzos",
+      "nombres_archivo_wikimedia": [
+        "File:Parque de los Pies Descalzos 02.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Arenales y pozos de agua",
+      "caption": "Arenal del Parque de los Pies Descalzos, espacio para caminar descalzo",
+      "nombres_archivo_wikimedia": [
+        "File:Parque Pies Descalzos-Arenal-Medellin.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Bosque de guaduas",
+      "caption": "Bosque de guaduas dentro del Parque de los Pies Descalzos",
+      "nombres_archivo_wikimedia": [
+        "File:Parque Pies Descalzos.Bosqueguaduas.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Calle de arboles",
+      "caption": "Calle de arboles del parque, junto al sector de EPM",
+      "nombres_archivo_wikimedia": [
+        "File:Parque Pies Descalzos-CalleArboles-Medellin.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Parque de los Pies Descalzos",
+      "caption": "Tercera vista del parque y sus recorridos sensoriales",
+      "nombres_archivo_wikimedia": [
+        "File:Parque de los Pies Descalzos 03.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.epm.com.co",
+      "que_respalda": "administracion del parque por EPM, instalaciones y guias ambientales"
+    },
+    {
+      "tipo": "oficial",
+      "url": "https://www.medellin.travel",
+      "que_respalda": "ubicacion en el sector de Alpujarra y contexto turistico del parque"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/Category:Parque_de_los_Pies_Descalzos",
+      "que_respalda": "archivos fotograficos de Wikimedia Commons usados en FOTOS_SUGERIDAS"
+    }
+  ]
+}
+```

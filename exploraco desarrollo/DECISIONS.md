@@ -9092,3 +9092,88 @@ Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Se
 ```
 
 Debe devolver **`## ADR-099:`** y el conteo **98**. El cierre documental (`TASKS.md`, `NEXT.md`, `BLUEPRINT.md`) corresponde al **pase unico R2** de `@docs-keeper`, no a este ADR.
+
+---
+
+## ADR-100: El seed masivo curado sigue siendo valido tras ADR-099 y ADR-097 **solo con condicion de admision**: escribe `status='published'` unicamente si calcula la completitud OFFLINE con `lib/completitud.js` (umbral 40 y guardas duras) y deriva `region`/`zona` del catalogo, por debajo del umbral entra como `draft`, y un evento con `fecha_fin` pasada queda en `draft` salvo anuncio oficial verificable [NO deroga ADR-099 D1/D6 ni ADR-097 D1-D3; **cierra parcialmente** la Deuda 1 de ADR-097 solo para filas NUEVAS]
+
+**ID:** ADR-100
+**Fecha:** 2026-10-25
+**Autor:** `@architect` (diseno y verificacion contra el archivo real). Gate de riesgo CONFIRMADO explicitamente por el operador al encargar la decision.
+**Estado:** **ACEPTADO.** ADR de **decision operativa**: no propone endpoint nuevo, no toca `api/*.js`, no crea migracion. Su unico artefacto exigible es la condicion de admision del seed (`D1`-`D6`) y el criterio de verificacion final.
+
+### Premisas (fijadas por el operador, no se re-abren)
+
+1. Se cargan **36 fichas** de Medellin en formato Gemini (`BASE` / `TAGS` / `FAQS` / `FOTOS_SUGERIDAS` / `FUENTES`) desde `prompt.txt`.
+2. El pipeline del repo es `scripts/seed-<slug>.js` + `scripts/load-<slug>-api.js` + `scripts/smoke_test_<slug>.js`.
+3. Presupuesto de Vercel Hobby **8/8**: prohibido endpoint nuevo.
+4. Los 6 eventos del lote tienen fechas **2026** y **5 ya pasaron** a la fecha de esta decision; refechar a 2027 **solo** con anuncio oficial verificable.
+5. Esta decision no toca `api/`, HTML, seeds existentes ni `package.json`.
+
+### Problema
+
+ADR-099 declaro un **embudo unico de alta** (`publicar.html` -> `POST /api/publicar-lugar`) con borrador semilla, cola `draft` y XP recalculado al aprobar. ADR-097 declaro que la **geografia es derivada** (`ciudad -> departamento -> zona`) y que `zona` no se confia al cliente. Un seed masivo historico **no pasa por ese embudo**: escribe SQL directo con `status='published'`. La pregunta abierta es si eso sigue siendo legitimo o si el seed debe entrar como `draft` y esperar la cola, lo que para 36 fichas de curacion equivaldria a 36 revisiones manuales sin valor anadido.
+
+### Datos medidos (2026-10-25, contra el archivo real; el codigo gana a la documentacion, ADR-006)
+
+1. **El seed historico publica directo y NO envia `zona`:** `116` archivos `scripts/seed-*.js`; el patron vigente escribe `status: 'published'` en la fila BASE (`scripts/seed-la-redada-miscelanea-cultural.js:64`) y su `INSERT` lista `ciudad, region, barrio` (`:198`) sin `zona`. El payload del lote trae `ciudad` y `region` y **cero** `zona` en las 36 fichas.
+2. **`api/admin-destinos.js` acepta `status` libre y no calcula nada:** `status` por defecto `'draft'` (`:317`), `region` se escribe tal cual llega (`:295`), `zona` se escribe tal cual (`:297`), `tags` se mezcla con `COALESCE(tags,'{}'::jsonb) || $N::jsonb` (`:448`). **No** hay llamada a `lib/completitud.js` ni a `publicar_lugar_otorgar` en todo el archivo.
+3. **`lib/completitud.js` es offline y `require`able:** expone `normalizarFila(row, fotos)`, `calcular(entrada)` y `persistible(resultado)` (`lib/completitud.js:504`, `:550`, `:47`). `normalizarFila` mapea `departamento: txt(r.region || r.departamento)` (`:513`): **si el seed escribe `region`, el peso de departamento se cumple solo**. `zona` se valida contra la lista cerrada `ZONAS = ['andina','amazonica','caribe','pacifico','llanos']` (`:112`).
+4. **Los pesos hacen que `zona` decida el tier:** `PESOS.zona = 2` (`lib/completitud.js:78`) y los umbrales son `UMBRAL_INTERMEDIO = 40` / `UMBRAL_COMPLETO = 75` (`:59-60`). Una ficha rica sin video y con 2-4 fotos suma **70**; con `zona` en NULL y sin video **se queda en 70 y no alcanza `completo`**, con `zona` correcta y 5+ fotos pasa a **75**. Es decir: **omitir `zona` no es cosmetico, baja el tier**.
+5. **La via HTTP sancionada existe pero NO sirve para este lote:** `publicar_directo=true` + `ADMIN_SECRET` sin fallback (`api/publicar-lugar.js:632`, `:647-649`) crea `status='published'` (`:846`) y **si** persiste `pub_completitud` (`:834`). Pero el `POST` construye `tags` solo desde `CLAVES_CLIENTE` (`:315-320`, 20 claves) y descarta el resto: de las claves reales del lote se perderian `itinerario`, `temporada_matriz`, `entradas`, `tours`, `altitud`, `dificultad_tags`, `fauna_flora`, `secretos`, `regulaciones`, `checklist_tip`, `temporada_nota` y `dificultad_desc`. **Una migracion de fichas ricas por esa via es una perdida silenciosa de contenido.**
+6. **El camino `load-*-api.js` es destructivo:** `api/admin-destinos.js:509-512` borra `destinos_fotos`, `destinos_detalles`, `interacciones` y `destinos` antes de reinsertar, y los tres primeros `DELETE` van con `.catch(function(){})` (fallo silencioso). Re-ejecutar un `load-*` sobre un slug con votos, comentarios o media destruye interaccion de usuarios reales. El `seed-*.js` (upsert `ON CONFLICT slug`) **no** borra: es el unico camino idempotente no destructivo.
+7. **`--dry` NO es el modo por defecto:** el patron real es `var dry = process.argv.indexOf('--dry') !== -1;` (`scripts/seed-la-redada-miscelanea-cultural.js:182`). La premisa "modo `--dry` por defecto" del encargo es **falsa**: sin la bandera el script **escribe**.
+8. **ADR-097 ya previo el hueco y lo dejo fuera de alcance:** su **Deuda 1** dice literalmente que los `load-*-api.js` no envian `zona`, que la columna es `NULL` a proposito y que la remediacion es "un ADR posterior" con esta decision como condicion de entrada. Este es ese ADR.
+9. **La CHECK de `zona` acepta NULL y rechaza `''`:** `db/migrations/028_destinos_zona.sql:11-29` (`destinos_zona_chk`, nullable a proposito "para no romper seeds"). Un `''` provoca **500**, no un 400 util (ADR-097 D3).
+10. **El catalogo derivado es un unico artefacto y cubre las dos ciudades del lote:** `geo-ciudades.js` es generado (`scripts/generar-geo-ciudades.js`) y trae `['MEDELL\u00CDN','ANTIOQUIA','andina',...]` (`:89`) y `['ENVIGADO','ANTIOQUIA','andina',...]` (`:66`). El mapa `departamento -> zona` vive **solo** en el generador (`ZONA_POR_DEPARTAMENTO`, `:69`, con `andes` -> `andina` via `ZONAS_ZG_A_DESTINOS`, `:60`).
+11. **Riesgo de partir el filtro de ciudad:** los seeds existentes escriben `'Medell\u00edn'` (con tilde, escapado en fuente) y el lote trae `"Medellin"` (sin tilde). `api/destinos.js` filtra por ciudad exacta: dos grafias = dos ciudades.
+12. **Nada caduca los eventos:** `api/destinos.js:123` solo exige `d.status='published'`; no hay filtro por `fecha_fin` ni `CURRENT_DATE` en `api/destinos.js`, y `api/pagina-destino.js:846` lee `fecha_fin` solo para pintarlo. Un evento con fecha pasada publicado **queda listado para siempre**.
+13. **Fechas reales del lote (medidas sobre `prompt.txt`):** 6 fichas con `TAGS.fecha_inicio`/`fecha_fin`; **pasadas** 2026-07-11/07-18, 2026-07-31/08-09, 2026-08-01/08-08, 2026-08-06/08-06, 2026-09-04/09-13; **vigente** 2026-12-01 -> 2027-01-11.
+
+### Opciones
+
+**A. El seed debe entrar siempre como `draft` y esperar la cola de ADR-099.** Coherente al maximo con el embudo unico, pero convierte una migracion de 36 fichas verificadas en 36 revisiones manuales, y **no aporta ninguna garantia nueva**: el admin revisaria exactamente el mismo `BASE`/`TAGS` que el seed ya valido con `validate_ficha.js` y con `curl -I` de fotos. Rechazada por coste sin beneficio.
+
+**B. El seed mantiene `published` sin condiciones (statu quo).** Cero trabajo, pero deja el lote con `zona = NULL` (tier deprimido por D4), sin `pub_completitud` y con **5 eventos caducados publicados** que ningun proceso va a retirar (dato 12). Rechazada: el statu quo ya es un fallo silencioso, no una linea base neutra.
+
+**C. El seed mantiene `published` con CONDICION DE ADMISION verificable: completitud calculada offline con `lib/completitud.js`, geografia derivada del catalogo, cero claves de XP y evento caducado a `draft`.** Conserva la unica virtud del seed (escribe el `tags` completo, dato 5) y le anade la unica garantia que ADR-099 pide (que la fila publicada tenga una completitud **calculada por la fuente unica**, no inventada). Elegida.
+
+### Decision
+
+**D1 -- El seed masivo directo SIGUE SIENDO VALIDO, pero como herramienta de CURACION, no como via publica.** Su legitimidad no viene del `status` que escribe sino de que el operador responde por la ficha; por eso la condicion de admision es de **contenido y trazabilidad**, no de estado. La puerta unica de ADR-099 D1 sigue siendo la del **usuario**; el seed no es una sexta via de alta de usuario, es el mismo tipo de actor que `publicar_directo` (ADR-099 D1, alta directa del admin) ejecutado en lote y sin la perdida de `tags` del dato 5.
+
+**D2 -- `status='published'` solo se escribe si la completitud, CALCULADA OFFLINE, alcanza `UMBRAL_INTERMEDIO` (40) con las guardas duras cumplidas.** Regla operativa en una linea: **el seed hace `require('../lib/completitud.js')`, llama `normalizarFila(row, fotos)` + `calcular()` + `persistible()` sobre la fila que va a insertar, y con `< 40`, o sin `descripcion_corta >= 30`, o sin coords validas, o sin `foto_hero`, escribe `status='draft'` y lo reporta en el resumen del `--dry`.** Prohibido escribir un numero de completitud a mano: la aritmetica tiene una sola fuente (ADR-099 D4) y el seed la **consume**, no la reimplementa.
+
+**D3 -- El seed escribe las cinco claves `pub_*` que `persistible()` devuelve, y NINGUNA clave de XP.** `pub_tier`, `pub_completitud`, `pub_faltantes`, `pub_fotos_total`, `pub_fotos_no_hero` se escriben con el objeto de `persistible()` (`lib/completitud.js:550`, listo para `COALESCE(tags,'{}') || $N::jsonb`, ADR-003). **No** se escriben `pub_geo`, `pub_geo_dist_m`, `pub_foto`, `pub_xp_estado` ni `autor_id`: una fila de seed **no tiene autor**, luego no hay XP que acreditar y `publicar_lugar_otorgar` devolveria `sin_autor` de todas formas (ADR-099 D6.4). Escribir `pub_xp_estado` desde el seed seria exactamente la escalada que ADR-099 D6.1 cierra; el hecho de que el seed no pase por HTTP **no** lo autoriza.
+
+**D4 -- La geografia se DERIVA en el seed desde el catalogo, nunca se copia del texto libre.** `region` se resuelve por `ciudad` contra `geo-ciudades.js` (cargado en `node` con un shim de `window`, que es el unico modo de consumir el artefacto sin duplicar el mapa de ADR-097 D2) y `zona` se toma del **mismo** registro; `zona` vacia o fuera de la lista cerrada se normaliza a **NULL**, nunca a `''` (dato 9). Ademas, `ciudad` se escribe en la **grafia canonica con tilde** (`Medellín`, `Envigado`), igual que los seeds existentes y que el catalogo: dos grafias parten el filtro de ciudad (dato 11). Prohibido hornear `'Antioquia'`/`'andina'` como constante del seed cuando el catalogo ya lo dice: para este lote el resultado es el mismo (dato 10), pero la constante se corrompe en el primer lote que no sea de Antioquia.
+
+**D5 -- Camino de escritura: `seed-<slug>.js` (upsert por slug) como via por defecto; `load-<slug>-api.js` (DELETE + POST) solo sobre slugs que NO existan o que no tengan interacciones.** Antes de ejecutar un `load-*`, el operador verifica con un `SELECT count(*) FROM interacciones WHERE destino_id = ...`; con conteo mayor que cero **no se ejecuta** (dato 6: el `DELETE` arrastra votos, comentarios y media, y con `.catch(function(){})` el fallo es invisible). El modo `--dry` se pasa **siempre** explicito y su resumen debe incluir, por ficha: `slug`, `status` decidido, `tier`, `completitud`, `zona` y `faltantes` (dato 7: sin la bandera el script escribe).
+
+**D6 -- Eventos: `published` solo si `fecha_fin >= hoy`; un evento con fecha pasada queda en `draft` y NO se refecha sin anuncio oficial verificable.** Criterio del operador **CONFIRMADO**, con dos correcciones:
+- **Correccion 1 (alcance):** el evento **vigente** 2026-12-01 -> 2027-01-11 **no se toca**: es futuro y se publica tal cual. El criterio aplica solo a los **5** caducados (dato 13).
+- **Correccion 2 (forma del refechado):** refechar exige **anuncio oficial verificable** (fuente primaria de la edicion siguiente) y consiste en reescribir `fecha_inicio` **y** `fecha_fin` a la edicion nueva, dejando constancia en `tags` de la procedencia (`tags.fuente_fechas` con la URL y `tags.edicion_verificada` con el identificador de la edicion). **Prohibido** mover solo `fecha_inicio`, publicar una edicion pasada con fecha futura, o deducir la fecha de la edicion siguiente por patron historico. Sin anuncio verificable: `status='draft'`, la fila existe y se revisa, **no se borra** (ADR-003) y **no** se marca `archived` (reservado al barrido de semillas huerfanas, ADR-099 D6.6).
+- **Justificacion (unica):** no existe ninguna caducidad en el codigo (dato 12), asi que `published` es irreversible en la practica; y un directorio que anuncia como vigente un festival que ya ocurrio es peor que la ausencia de la ficha.
+
+**D7 -- Cero impacto en el presupuesto y cero deroga.** No hay endpoint nuevo (`8/8` intacto), no hay migracion, no se toca `api/*.js` ni `lib/completitud.js`. Este ADR **no deroga** ADR-099 D1/D6 ni ADR-097 D1-D3: los acota por el lado del **cargador de curacion**.
+
+### Consecuencias y deudas
+
+- **Consecuencia buena:** las filas nuevas entran con `zona` y `region` derivadas, `pub_completitud` calculada por la fuente unica y `status` coherente con su contenido; la tarjeta del admin (ADR-099 D10) puede priorizar ampliaciones sobre datos reales, no sobre `null`.
+- **Consecuencia buena:** los 5 eventos caducados no se publican nunca, y los que se refechen llevan la fuente en `tags`, asi que la decision es auditable sin preguntar al operador.
+- **Deuda 1 (heredada, NO cerrada aqui):** las ~100 filas historicas con `zona = NULL` y sin `pub_completitud` siguen igual. Este ADR fija la regla para filas **nuevas**; el backfill de las antiguas requiere su propio ADR (sigue abierta la Deuda 1 de ADR-097 en su parte retroactiva).
+- **Deuda 2:** el seed no dispara `publicar_lugar_otorgar`, luego una fila publicada por seed **no genera XP** aunque el admin la edite despues. Es correcto mientras no tenga autor, pero si un dia se quiere atribuir el alta curada a un usuario, esa atribucion necesita su propia decision (autor + claim + recalculado en aprobacion).
+- **Riesgo residual aceptado:** la condicion D2 se cumple **porque el script lo hace**, no porque el backend lo impida: `api/admin-destinos.js` sigue aceptando cualquier `status` (dato 2). Un seed nuevo que ignore D2 no sera rechazado por la base. Cerrar ese hueco exigiria tocar `api/`, fuera de alcance de esta decision.
+
+### Criterio de verificacion
+
+1. `node --check` sobre el `seed-<slug>.js` del lote y sobre su `smoke_test_<slug>.js`; **0 errores de sintaxis**. ASCII-safety (ADR-002) **no aplica** al seed (no es `api/*.js` ni artefacto de navegador).
+2. El `--dry` imprime, por ficha, `slug | status decidido | pub_tier | pub_completitud | zona | faltantes`, y su resumen cuadra: **36** fichas, **31** publicado y **5** en `draft` (los 5 eventos caducados), salvo que exista anuncio verificable para alguno.
+3. La completitud del `--dry` coincide con la que devolveria el servidor para la misma fila: el script **importa** `lib/completitud.js` (`require`), no reimplementa la formula. Se verifica comparando el `pub_completitud` del seed con `ECCompletitud.calcular(normalizarFila(row, fotos))` en un `node -e` sobre la misma fila.
+4. Tras la carga, `SELECT count(*) FROM destinos WHERE ciudad IN ('Medellín','Envigado') AND (region IS NULL OR zona IS NULL)` devuelve **0** para las filas nuevas, y `select count(*) ... where ciudad='Medellin'` (sin tilde) devuelve **0**.
+5. `SELECT count(*) FROM destinos WHERE categoria_slug='evento' AND status='published' AND (tags->>'fecha_fin') < to_char(now(),'YYYY-MM-DD')` devuelve **0** (dato 12: nada mas caduca eventos).
+6. `SELECT count(*) FROM destinos WHERE tags ? 'autor_id' OR tags ? 'pub_xp_estado'` sobre las filas nuevas devuelve **0** (D3).
+7. `SELECT count(*) FROM interacciones WHERE destino_id = <slug ya existente>` es **igual antes y despues** de la carga: prueba de que no se uso el camino destructivo (D5).
+8. `Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-" | Select-Object -Last 1` devuelve **`## ADR-100:`** y el conteo **99**.
+
+**Cierre documental:** `TASKS.md` / `NEXT.md` / `BLUEPRINT.md` se actualizan en el **pase unico R2** de `@docs-keeper`, no en este ADR (Regla de Oro 9).

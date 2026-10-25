@@ -2325,3 +2325,35 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 - **(b) El ledger de XP se escribe DESPUES de la CTE atomica.** El `claim` de idempotencia y el saldo van en **una** sentencia (`EXISTS (SELECT 1 FROM usr)`), pero `registrarXpLedger`, `acreditarClaseYCofre` y `repartirXpReferidos` van **detras**, cada uno con su `catch` (swallow). **Consecuencia:** un fallo del ledger deja **saldo acreditado sin fila de auditoria** (nunca al reves: **no se paga dos veces**). Se eligio esta asimetria a proposito -- el dinero se cobra una sola vez y la auditoria es **best-effort** -- y `XP_FORCE_FAIL=ledger` es **inerte sin variable de entorno**, luego **no corre en Vercel** (ADR-099 D5.3).
 - **(c) `COALESCE(d.tags->>'estado_envio','enviado') = 'enviado'` en la cola.** `api/admin.js:368` (listado) y `:374` (`COUNT`) usan el `COALESCE` para que las **filas legacy** (creadas antes de `estado_envio`, sin la clave en `tags`) **sigan entrando** en la cola. **Consecuencia:** el filtro **no** es una igualdad literal y una fila sin la clave se trata como enviada; es lo correcto para no perder solicitudes historicas, pero **deja una rama implicita** que hay que recordar al leer el SQL. Se retirara cuando no queden filas sin la clave.
 
+## BUG-132: el motor de render **sobrescribe las FAQ de `destinos_detalles`** con `tags.faqs` cuando no hay `det.amenidades` -- **ABIERTO** (motor de render, todas las categorias)
+
+**Severidad: MEDIA-ALTA (perdida silenciosa de una seccion entera).** Detectado el **2026-10-25** durante el lote Medellin/Envigado (**TSK-221**). **NO corregido** en esa tanda: el arreglo vive en `api/` y exige gate + Escudo GOLD (**`@renderer-dev`**).
+
+**Localizacion exacta:** `api/pagina-destino.js:3122`, dentro del bloque `if (!det.amenidades && d.tags) { ... }` (`:3117-3126`):
+
+```
+3117:     if (!det.amenidades && d.tags) {
+3118:       var tg = safeJSON(d.tags);
+3119:       if (!Array.isArray(tg) && typeof tg === 'object') {
+3120:         det.amenidades   = tg.amenidades;
+3121:         det.habitaciones = tg.habitaciones;
+3122:         det.faqs         = tg.faqs;      <-- ASIGNACION SIN PRECEDENCIA
+```
+
+**Que falla:** `det.faqs` suele venir ya hidratado desde `destinos_detalles`. La linea `:3122` lo **pisa sin comprobar si ya traia valor** (a diferencia de un `if (!det.faqs)`, que seria la precedencia correcta). Si la ficha tiene las FAQ **solo** en `destinos_detalles` y `tags` no las trae, `det.faqs` queda **`undefined`** y la **seccion FAQ no se pinta**. El bug esta **acoplado a la guarda de `amenidades`**: solo dispara cuando `det.amenidades` es falsy, lo que lo hace depender de otra columna y explicar por que pasa inadvertido en hostales (que si traen `amenidades`).
+
+**Impacto:** **cualquier pagina cuyas FAQ solo vivan en `destinos_detalles` pierde la seccion FAQ.** No es un problema del lote de Medellin: es del **motor**, y afecta a **otras ciudades y a las categorias que no rellenan `amenidades`**. Reduce el contenido indexable y deja la ficha sin las respuestas que el usuario busca (horarios, como llegar, precios).
+
+**Estado en el lote de TSK-221:** las **36 fichas** de Medellin/Envigado lo **compensan** persistiendo las FAQ **tambien** en `destinos.tags` (los 6 seeds escriben `tags.faqs`), de modo que las paginas pintan su seccion. **Eso es un rodeo por el lado de los DATOS, no un arreglo del motor:** la deuda sigue abierta y el siguiente lote de otra ciudad volvera a morderla si no se corrige antes.
+
+**Arreglo esperado (criterio de cierre):** dar **precedencia real** a `destinos_detalles` (`if (!det.faqs) det.faqs = tg.faqs;`) o **fusionar** por `id`/pregunta cuando ambas fuentes traigan entradas, y cubrirlo con un **smoke de `buildHTML()`** de fixture con FAQ **solo** en detalles -> la seccion debe aparecer. **Gate obligatorio:** `@renderer-dev`.
+
+## BUG-133: los seeds del lote resolvian las fotos desde un **artefacto compartido** (`ficha/_informe-fotos.json`), luego regenerarlo con otro lote dejaba **0 fotos** y tumbaba las fichas a `draft` -- **CERRADO (misma tanda, 2026-10-25)**
+
+**Severidad: ALTA mientras duro (6 fichas caidas a `draft` por falta de fotos). Estado: CERRADO el 2026-10-25.**
+
+**Patron de falla (el que hay que recordar):** la fuente de verdad de las fotos era un **artefacto derivado y mutable** generado para **otro** subconjunto de slugs. Al regenerarse con solo los slugs del lote 1, los lotes 2-6 **no encontraban su entrada**, la lista de fotos salia vacia y la completitud caia por debajo del umbral -> `status='draft'`. **Un derivado del lote no puede ser la fuente de un lote distinto:** el fallo es **invisible** (no lanza excepcion, solo degrada).
+
+**Correccion aplicada:** en los **6** seeds la fuente **primaria** es ahora la propia ficha (`FOTOS_SUGERIDAS` + `urlMiniatura()` a 1280 px); `ficha/_informe-fotos.json` queda como **override OPCIONAL** y, si **no existe, es ilegible o no indexa el slug**, las URLs se recomponen y la ficha **nunca** queda en 0 fotos (`scripts/seed-medellin-lote1.js:155-196`). El `--dry` imprime `fotos_resueltas` y `fuente` (**`informe`** / **`wikimedia`**) como **control visible**: si `fotos_resueltas=0` salta a la vista antes de escribir. Cero Borrado: ninguna ficha se borro, se regeneraron las URLs.
+
+

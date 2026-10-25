@@ -1,202 +1,2464 @@
-El Sistema Económico Integral de ExploraCO / LATAWEL es un modelo circular, bimonetaria y progresivo diseñado para convertir las acciones de exploración cultural en reputación digital, intercambio comunitario y valor económico real en el sector turístico de Colombia (Drive-to-Store).🌐 1. Arquitectura Económica en 3 Capas (Layered Economy)La economía evoluciona a medida que el jugador asciende en los 40 Niveles del juego, pasando de una emisión inflacionaria básica a un mercado dinámico de Casas y un ecosistema financiero avanzado.                       ┌─────────────────────────────────────────────────────────┐
-                       │          CAPA 1: MINTING INFLACIONARIO (XP)             │
-                       │  • Reseñas, Visitas GPS, Fotos, Wayfarer, Misiones      │
-                       └────────────┬────────────────────────────────────────────┘
-                                    │ (Early Game / Niveles 1 - 10)
-                                    ▼
-                       ┌─────────────────────────────────────────────────────────┐
-                       │    CAPA 2: MONEDAS FLOTANTES POR CASAS (BONDING CURVE)  │
-                       │  • $cCDR (Cóndor) | $cJAG (Jaguar) | $cDLF (Delfín)    │
-                       │  • Encarecimiento Progresivo y Contratos P2P            │
-                       └────────────┬────────────────────────────────────────────┘
-                                    │ (Middle & Late Game / Niveles 11 - 24)
-                                    ▼
-                       ┌─────────────────────────────────────────────────────────┐
-                       │           CAPA 3: TRI-TOKEN WEB3 / ON-CHAIN             │
-                       ├────────────────────┬──────────────────┬─────────────────┤
-                       │  1. STABLECOIN     │  2. FLOTANTE     │  3. AHORRO      │
-                       │     ($eCOP)        │     ($EXCO)      │     ($sEXCO)    │
-                       │  • Billetera QR    │  • Gobernanza y  │  • Staking y    │
-                       │  • Comercio Real   │    Banner Hero   │    Rendimiento  │
-                       └────────────────────┴──────────────────┴─────────────────┘
-Capa 1: Minting Inflacionario por Acciones (Early Game: N1 – N10)Propósito: Incentivar la exploración inicial, la recolección de datos y la creación de contenido.Mecánica: Cada acción física o digital (visita GPS, reseña, foto, guardado) emite XP Total (reputación inmutable) y Puntos Canjeables (moneda líquida inicial).Función Económica: Otorga la liquidez inicial para dinamizar la plataforma.Capa 2: Monedas Flotantes de las Casas (Middle Game: N11 – N24)Propósito: Descentralizar la economía e introducir dinámicas de mercado regional.Las 3 Monedas de Casa:$cCDR (Cóndor): Moneda enfocada en patrimonio, eventos culturales y contenido editorial.$cJAG (Jaguar): Moneda enfocada en expediciones, mapas temáticos y rutas de larga distancia.$cDLF (Delfín): Moneda enfocada en ecoturismo, rincones secretos y crowdsourcing Wayfarer.Tasa Cambiaria Flotante (Bonding Curve): La conversión $\text{XP} \rightarrow \text{Moneda de Casa}$ se ajusta según la población activa de la Casa (factor anti-monopolio), el saldo del Cofre Colectivo y el volumen comercial interno.Capa 3: Ecosistema Tri-Token Web3 / On-Chain (Late & End Game: N25 – N40)Stablecoin ($eCOP / $eUSD): Moneda con paridad 1:1 respaldada por comercios e inversores. Se vincula a la Billetera Digital QR para pagar y canjear productos en el mundo real sin riesgo de volatilidad.Token Flotante ($EXCO): Token de gobernanza y especulación con oferta controlada. Se utiliza para compras globales, transacciones inter-Casas y pujas en el Promotor Turístico (Banner Hero).Token de Ahorro y Rendimiento ($sEXCO / Spark): Token deflacionario obtenido únicamente al bloquear capital (Staking) en las Bóvedas de Destino o en el Cofre del Clan. Genera rendimientos pasivos sobre las comisiones de la zona y otorga poder para validar nuevos Activos Ocultos.🧮 2. Emisión, Multiplicadores y Doble Cap SecuencialCada interacción genera una cantidad de experiencia y puntos base, los cuales son procesados por el motor de multiplicadores:AcciónXP / Puntos BaseRegla Anti-Farming y DeduplicaciónReseña Larga (>50 chars)+30Deduplicación simétrica con rating. Máximo 1 por destino.Reseña Corta ($\le$50 chars)+101 por usuario/destino.Quick-Rating (1–5★)+5Voto rápido. Bloquea la opción de reseña posterior.Visita Confirmada (GPS)+20Geolocalización Haversine + Cooldown 90s (+25 extra en zonas rurales).Foto a Galería+20Foto verificada por usuario (+5 por votar en foto).Crear Álbum+20Límite inicial de 5 álbumes al mes.Guardar Destino+5Se otorga únicamente la primera vez.Wayfarer (Activo Oculto)+30Directo al proponer (+50 si es aprobado por moderación).Referidos Multinivel5% / 2.5% / 1.5% / 0.5% / 0.5%Comisiones sobre la XP de la red (Tope: 500 XP por referido).Fórmula del Motor de Multiplicadores:$$\text{XP Final} = \text{Base} \times \Big( M_{\text{nivel}} \times \text{Bono Clase} \times \text{Factor Casa} \times \text{Multiplicador Origen} \times \text{Stack Temp} \Big)$$Multiplicador por Nivel ($M_{\text{nivel}}$): Escala linealmente desde x1.000 (Nivel 1) hasta x3.000 (Nivel 40).Bono de Clase (Rising Star): Cartógrafo (+8%), Cronista (+10%), Explorador (+7%) por cada nivel de clase.Factor de Casa: Rezagada (x1.30), Equilibrada (x1.00), Dominante (x0.85).Multiplicador de Origen por Lejanía: Local (x1.00), Nómada (hasta x1.20), Extranjero (hasta x1.40 según distancia Haversine).Doble Cap Secuencial Anti-Inflación:Cap de Progresión Estructural: $\le \mathbf{5.0x}$ (Nivel + Clase + Casa).Cap Global Absoluto: $\le \mathbf{10.0x}$ (incluyendo Origen y Amuletos Temporales).📈 3. Encarecimiento Progresivo (XP Sinks) y Punto de InflexiónA medida que el jugador avanza de nivel, expandir su presencia o capacidad de publicación se encarece bajo una curva exponencial:$$\text{Costo}(\text{Slot}_k) = \text{Costo}_{\text{Base}} \times \left(1 + \alpha \times k\right)^{\gamma}$$Acciones Afectadas: Publicar fotografías extra en galerías públicas, abrir slots adicionales de álbumes, fijar contenido en la portada de destinos o destacar eventos.Punto de Inflexión (Nivel 15+): El costo en Puntos para seguir expandiéndose se vuelve superior a la cantidad máxima de XP que un solo usuario puede producir físicamente en un día. Esto obliga a pasar del juego solitario a la cooperación.🤝 4. Gig Economy P2P: Delegación Cruzada y ContratosPara superar el Punto de Inflexión, los jugadores veteranos utilizan el sistema de Contratos P2P (/api/interacciones.js): [JUGADOR VETERANO / MARCA] ──► Crea Contrato P2P (Fianza Puntos) ──► [OFERTA PÚBLICA]
-                                                                            │
- [JUGADOR NOVATO / MEDIO]   ◄── Completa encargo físico (GPS/Foto) ◄────────┘
-            │
-            └──► Otorga: XP/Puntos al Novato + Expansión Territorial al Veterano
-Mecánica:El Empleador (Veterano Nivel 15+): Dispone de capital acumulado pero no de tiempo para desplazarse. Crea un encargo remunerado con sus Puntos/Monedas.El Contratista (Novato / Nivel Medio): Necesita XP/Puntos para subir de nivel. Acepta y ejecuta la tarea física en terreno.Tipos de Encargos:Auditoría Wayfarer: Visitar un punto específico y validar coordenadas GPS/horarios (Paga +80 Puntos).Curaduría Audiovisual: Aportar 5 fotografías HD de un establecimiento (Paga +150 Puntos).Reseña de Zona: Escribir una evaluación técnica de accesibilidad en un destino (Paga +100 Puntos).Resultado: El novato obtiene la liquidez y XP requeridas para subir de nivel, mientras el veterano expande su control en el mapa sin tener que viajar físicamente.🛍️ 5. El Dilema Estratégico y Conversión Real (Drive-to-Store)El valor económico se conecta con la economía física a través de los Cupones QR con Sponsors:Consumo de Saldo (De-nivel Real): Canjear un descuento del 10% al 20% en un hostal o restaurante consume Puntos/XP del saldo activo.Protección de Insignia (nivel_max): Gastar Puntos puede reducir temporalmente el nivel derivado en tiempo real, pero la medalla e insignia visible en el perfil del usuario no se pierde, quedando protegida en la columna usuarios.nivel_max.El Dilema del Jugador: $$\text{¿Guardar Puntos para mantener una posición alta en el Ranking?} \quad \longleftrightarrow \quad \text{¿Gastar Puntos para obtener un descuento/producto real?}$$🏰 6. Sistema de Clanes, Impuesto y Upgrades TerritorialesLos Parches (Clanes de hasta 10 miembros) operan como pequeñas corporaciones turísticas:Impuesto de Clan (Tithe): El líder configura una tasa del 1% al 10% sobre la XP/Puntos generados por los miembros. El monto retenido genera un duplicado que alimenta el Cofre Colectivo del Parche.Upgrades de Zona (Soberanía Territorial): El Parche dominante en un municipio puede gastar fondos de su Cofre Colectivo para activar mejoras regionales por 7 días:Buff de Experiencia: +10% de XP adicional para los miembros que hagan check-in en la ciudad.Convenio Sponsor: Descuentos comerciales exclusivos con aliados locales.Identidad Visual Neón: Marco estético del clan proyectado en el mapa de la zona.🏆 7. Fórmula del Ranking Combinado (Leaderboard Score)Para equilibrar la trayectoria histórica con la liquidez activa y el trabajo en equipo, la tabla de posiciones ordena a los jugadores mediante un Score Compuesto:$$\text{Score}_{\text{Ranking}} = \text{XP}_{\text{Total}} + \left( \beta \times \text{Saldo}_{\text{Monedas/Puntos}} \right) + \text{Fama}_{\text{Parche}}$$XP_Total (Reputación Inmutable): Reconoce todo el trabajo histórico realizado por el viajero desde su registro.Saldo_Monedas (Liquidez Activa): Premia la acumulación de capital y la salud económica actual del usuario.$\beta$ (Ponderador de Liquidez = 0.50): Ajusta el peso de la moneda frente a la experiencia acumulada.Estructura de Premiación Estacional:Top 1 (Señor Nacional): Estancia gratuita en hostal aliado + Marco estético Oro Neón permanente + Badge de Prestigio Inmune.Top 2 – 5: Cupones VIP de gastronomía + Título de "Embajador de Zona".Top 6 – 10: Amuletos de Doble XP (x2.0) + Drops de Cromos Raros.🛠️ 8. Estructura de Persistencia en Base de Datos (Neon PostgreSQL)La arquitectura backend en Vercel Serverless (/api/) respalda este flujo bimonetaria con las siguientes tablas relacionales auditadas:-- Ledger auditado de transacciones de XP/Puntos
-CREATE TABLE IF NOT EXISTS xp_ledger (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  usuario_id UUID REFERENCES usuarios(id),
-  tipo_accion VARCHAR(50) NOT NULL,
-  xp_base NUMERIC(10,2) NOT NULL,
-  mult_aplicado NUMERIC(5,2) NOT NULL,
-  xp_final NUMERIC(10,2) NOT NULL,
-  creado_en TIMESTAMP DEFAULT NOW()
-);
-
--- Escrow para la Gig Economy P2P
-CREATE TABLE IF NOT EXISTS contratos_p2p (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  empleador_id UUID REFERENCES usuarios(id),
-  tipo_encargo VARCHAR(50) NOT NULL, -- 'verificacion' | 'fotos' | 'resena'
-  destino_id UUID,
-  recompensa_puntos INT NOT NULL,
-  contratado_id UUID REFERENCES usuarios(id),
-  estado VARCHAR(20) DEFAULT 'disponible', -- 'disponible' | 'en_progreso' | 'completado'
-  expira_en TIMESTAMP
-);
-
--- Banderas y Upgrades de Zona por Parche
-CREATE TABLE IF NOT EXISTS parche_upgrades (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  parche_id UUID REFERENCES pandillas(id),
-  ciudad_slug VARCHAR(100) NOT NULL,
-  tipo_upgrade VARCHAR(50) NOT NULL, -- 'buff_xp' | 'descuento_sponsor'
-  puntos_invertidos INT NOT NULL,
-  activo_hasta TIMESTAMP NOT NULL
-);
-Este diseño garantiza una economía sostenible, libre de hiperinflación y con utilidad real, donde el progreso individual impulsa el comercio local y la colaboración entre viajeros.keep_pinGuardar en una notakeep_pincopythumb_upthumb_down sábado, 3 de octubre quiero hacer correcciones en el hero de la web: Quitar la info de arribde del buscador "Hospedaje, comida, lugares eventos culturales). abajo corregir "comidanomia" por "comida" quitar los iconos y cuando se pase el cursor se debe de poner del color que se estan marcando esa categoria de item en el directorio. cambiar el "directorio turistico oficial de colombia " por "plataforma de turismo interactivo" Dar el prompt con todo el contexto e indicaciones puntuales para hacer estos cambios y que no deba explorar tanto Thoughts expand_moreAquí tienes el prompt quirúrgico con contexto ampliado, estructurado bajo el framework AI-DOS v1.2 y las Reglas de Oro v5/v6 (ASCII-Safe & Vanilla Web), listo para copiar y enviar a Claude / OpenCode (@frontend-tpl / @js-silo-dev):@frontend-tpl @js-silo-dev
-### TAREA: Correcciones Específicas de UX/UI en el Hero Principal (`index.html`)
-
-#### 🎯 OBJETIVO
-Ajustar y limpiar la sección Hero en `index.html` (y sus estilos asociados en CSS/JS), eliminando etiquetas redundantes sobre el buscador, corrigiendo errores tipográficos en las categorías inferiores, quitando íconos de píldoras, aplicando los colores oficiales de directorio en estado `:hover`, y actualizando la bajada de marca oficial.
-
----
-
-#### 📁 ARCHIVOS A MODIFICAR
-- `index.html` (Sección `<section class="hero">` o `#hero-search`)
-- `public/css/style.css` (o el archivo CSS donde residan los estilos del buscador e ítems del hero)
-- `public/js/index-api-connector.js` (si las categorías o etiquetas del hero se hidratan dinámicamente)
-
----
-
-#### 🛠️ INSTRUCCIONES QUIRÚRGICAS DE CÓDIGO
-
-1. **Actualizar el Subtítulo / Bajada Oficial de Marca:**
-   - En el encabezado del Hero, localizar el texto *"Directorio turístico oficial de Colombia"* (o equivalente).
-   - Reemplazarlo por la bajada oficial: **"Plataforma de turismo interactivo"**.
-
-2. **Limpieza Superior del Buscador:**
-   - En la estructura HTML sobre la barra de búsqueda principal, eliminar la fila/contenedor de texto descriptivo que lista *"Hospedaje, comida, lugares, eventos culturales"*. Dejar el buscador limpio en su parte superior.
-
-3. **Ajuste de Píldoras de Categoría (Debajo del Buscador):**
-   - **Corrección de Texto:** Cambiar la etiqueta erronea `"comidanomia"` por **"comida"**.
-   - **Eliminación de Íconos:** Quitar los elementos `<i>`, `<svg>` o íconos FontAwesome integrados dentro de cada botón/píldora de categoría abajo del buscador (dejar únicamente el texto plano de la categoría).
-   - **Efecto Hover con Colores Oficiales del Directorio:**
-     Configurar los estilos CSS de las píldoras de categoría (utilizando atributos como `data-categoria="hospedaje"`, `data-categoria="comida"`, `data-categoria="lugares"`, `data-categoria="eventos"`) para que al pasar el cursor (`:hover`) el texto y/o borde adopte el color distintivo asignado a cada categoría en el directorio:
-     - **Hospedaje:** Azul / Turquesa (`#0EA5E9` / `#0284C7`)
-     - **Comida:** Naranja LATAWEL (`#FF4A00`)
-     - **Lugares:** Verde Esmeralda (`#10B981`)
-     - **Eventos:** Morado / Violeta (`#8B5CF6`)
-
-   *Ejemplo de CSS limpio a implementar:*
-   ```css
-   /* Píldoras del Hero sin íconos y con hover cromático por categoría */
-   .hero-cat-btn {
-     display: inline-block;
-     padding: 6px 14px;
-     border-radius: 20px;
-     background: rgba(255, 255, 255, 0.15);
-     color: #FFFFFF;
-     text-decoration: none;
-     transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-   }
-
-   .hero-cat-btn[data-categoria="hospedaje"]:hover {
-     background-color: #0EA5E9;
-     color: #FFFFFF;
-   }
-
-   .hero-cat-btn[data-categoria="comida"]:hover {
-     background-color: #FF4A00;
-     color: #FFFFFF;
-   }
-
-   .hero-cat-btn[data-categoria="lugares"]:hover {
-     background-color: #10B981;
-     color: #FFFFFF;
-   }
-
-   .hero-cat-btn[data-categoria="eventos"]:hover {
-     background-color: #8B5CF6;
-     color: #FFFFFF;
-   }
-🛡️ REGLAS DE ORO OBLIGATORIAS (GOLD SHIELD)Mandato ASCII-Safe Absoluto: Cero caracteres con código ordinal > 127 en archivos de código JS o CSS. Utilizar escapes Unicode para tildes o caracteres especiales (ej. \u00f3 para 'ó').Cero Dependencias Nuevas: Usar Vanilla JS y CSS nativo sin incluir frameworks o plugins adicionales.Validación del DOM: Verificar el balance estricto de etiquetas HTML en index.html tras remover los elementos del buscador.
-***
-
-💡 **Siguiente paso recomendado:** Puedes copiar y pegar este bloque directamente en tu entorno de trabajo para que el subagente ejecute los cambios sin hacer exploraciones de código innecesarias.
-keep_pinGuardar en una notakeep_pincopythumb_upthumb_down domingo, 4 de octubre en la seccion de planes, tiene que mostrarse los planes vigentes, cuando un plan pasa su fecha limite, debe salir de ahi. La idea es simplificar todas las pestañas que existen en mi perfil y comunidad. Solo se le debe  mostrar al usuario, las que tiene activas y puede participar De esa forma  cuando va avanzando de nivel se van abriendo pestañas con tutorial, explicando la nueva dinamica del juego que se activa
-quiero el prompt para que opencode genere estos arreglos Thoughts expand_moreAquí tienes el prompt quirúrgico completo, estructurado bajo el framework AI-DOS v1.2 y las Reglas de Oro v5/v6 (ASCII-Safe & Vanilla Web), listo para copiar y enviar a OpenCode / Claude (@js-silo-dev / @frontend-tpl / @backend-dev):@js-silo-dev @frontend-tpl @backend-dev
-### TAREA: Filtrado de Planes Vigentes y Sistema de Desbloqueo Progresivo de Pestañas por Nivel con Tutoriales (Level-Gate)
-
-#### 🎯 OBJETIVOS Y REQUERIMIENTOS
-
- Implementar dos mejoras fundamentales en el flujo de usuario de `comunidad.html` y `mi-perfil.html`:
-
-1. **Filtrado Automático de Planes Vigentes:**
-   - En la sección/pestaña de **Planes de Viaje** (`comunidad.html`), garantizar que solo se muestren los planes cuya fecha límite o de realización sea mayor o igual a la fecha actual (`fecha_plan >= NOW()`).
-   - Los planes expirados deben filtrarse automáticamente desde la consulta a la API (`/api/interacciones.js?tipo=planes_listar`) o mediante condicional de fecha en el cliente.
-
-2. **Simplificación y Ocultamiento de Pestañas Bloqueadas (Level-Gate):**
-   - Simplificar las pestañas visuales de `mi-perfil.html` y `comunidad.html` para que el usuario **solo vea las pestañas que tiene activas y en las que puede participar según su Nivel actual**.
-   - Ocultar del DOM (o marcar como deshabilitadas/bloqueadas) las funciones de niveles superiores.
-
-   *Matriz de Desbloqueo por Nivel / Era:*
-   - **Nivel 1 al 5 (Era Mundana):** Pestañas básicas de Perfil (Progreso, Mis Guardados/Álbumes, Configuración) y Comunidad básica (Chat, Mapa).
-   - **Nivel 6 (Era Patrocinada):** Se habilita la pestaña/módulo de **Planes Colectivos** y **Tienda de Cupones QR**.
-   - **Nivel 11 (Capacidad Organizar):** Se habilita el botón `#btn-organizar` y la **Tabla de Destino (Árbol SVG)**.
-   - **Nivel 14 (Era Explorador):** Se habilita la pestaña de **Parches / Pandillas** (Clanes).
-   - **Nivel 15+ (Wayfarer / Facciones):** Se habilita la pestaña de **Activo Oculto (Wayfarer)** y **Facciones**.
-
-3. **Tutorial de Desbloqueo al Subir de Nivel (Modal / Toast Informativo):**
-   - Cuando el usuario alcanza el nivel requerido para una nueva dinámica o entra por primera vez a la vista con la pestaña recién desbloqueada, el sistema debe desplegar un **Modal / Toast Tutorial** explicativo.
-   - *Ejemplo de mensaje:* *"¡Felicidades, alcanzaste el Nivel 6! Has desbloqueado la pestaña de 'Planes Colectivos'. Ahora puedes crear e invitar a otros viajeros a tus rutas."*
-
----
-
-#### 📁 ARCHIVOS A MODIFICAR
-- `comunidad.html` (Estructura de pestañas y contenedor de planes)
-- `mi-perfil.html` (Estructura de pestañas del perfil)
-- `public/js/comunidad-session.js` (o conector JS de la comunidad)
-- `public/js/usuario-session.js` (Evaluación de nivel y visibilidad de tabs)
-- `api/interacciones.js` (Filtro SQL de fechas en `planes_listar`)
-
----
-
-#### 🛠️ INSTRUCCIONES QUIRÚRGICAS DE CÓDIGO
-
-1. **Filtro de Fecha en Backend / API (`api/interacciones.js`):**
-   - En la rama `tipo === 'planes_listar'`, agregar la condición SQL para omitir registros pasados:
-     `WHERE (datos->>'fecha_plan')::timestamp >= NOW()` (o filtrar en JS si es JSONB estático).
-
-2. **Lógica de Visibilidad de Pestañas por Nivel (`usuario-session.js`):**
-   - Crear la rutina `actualizarPestanasDisponibles(usuario)` que lea `usuario.xp_total` para derivar `nivelActual = calcularNivel(usuario.xp_total)`.
-   - Iterar sobre las pestañas con atributo `data-nivel-requerido="X"`:
-     ```javascript
-     var nivelActual = calcularNivel(usuario.xp_total || 0);
-     var pestanas = document.querySelectorAll('[data-nivel-requerido]');
-
-     for (var i = 0; i < pestanas.length; i++) {
-       var req = parseInt(pestanas[i].getAttribute('data-nivel-requerido'), 10);
-       if (nivelActual < req) {
-         pestanas[i].style.display = 'none'; // Ocultar pestaña bloqueada
-       } else {
-         pestanas[i].style.display = ''; // Mostrar pestaña activa
-       }
-     }
-     ```
-
-3. **Modal Tutorial de Nueva Dinámica:**
-   - Guardar en `localStorage` las funciones ya explicadas (ej. `tutorial_planes_visto: true`).
-   - Si `nivelActual >= 6` y `!localStorage.getItem('tutorial_planes_visto')`, abrir un modal sencillo explicando la nueva dinámica y registrar el flag como visto.
-
----
-
-#### 🛡️ REGLAS DE ORO OBLIGATORIAS (GOLD SHIELD)
-- **Mandato ASCII-Safe Absoluto:** Cero caracteres con código ordinal > 127 en archivos JS/HTML/CSS. Codificar caracteres especiales con escapes Unicode (ej. `\u00f3` para 'ó', `\u00f1` para 'ñ').
-- **Cero Nuevos Endpoints:** Mantenerse estrictamente dentro del presupuesto de 8 endpoints serverless en `/api/`.
-- **Vanilla JS Estricto:** Sin frameworks ni librerías pesadas adicionales.
-
-
-Quiero que se evalue  el sistema economico y se adapte lo que haga falta
+[
+  {
+    "BASE": {
+      "slug": "comuna-13-san-javier-medellin",
+      "nombre": "Comuna 13 (San Javier) - Graffitour y Escaleras Electricas",
+      "categoria_slug": "sitio",
+      "lead": "Epicentro de la transformacion social y cultural de Medellin a traves del arte urbano, el hip-hop y las innovadoras escaleras electricas al aire libre.",
+      "descripcion": "La Comuna 13 (San Javier) es el simbolo mas potente de la resiliencia y renovacion urbana de Medellin. En las ultimas dos decadas, esta ladera de la ciudad paso de ser uno de los sectores mas impactados por el conflicto urbano a convertirse en una galeria de arte al aire libre visitada por viajeros de todo el mundo.\n\nEl recorrido principal, conocido como Graffitour, es liderado por artistas, raperos y lideres comunitarios locales que relatan la historia del barrio a traves de decenas de murales de gran formato. Las seis tramos de escaleras electricas al aire libre, construidas en el sector Las Independencias, reemplazaron mas de 350 escalones de concreto, integrando a la comunidad y facilitando la movilidad diaria.\n\nDurante la visita, los viajeros pueden disfrutar de muestras de breakdance en vivo, galerias de arte independiente, miradores sobre el Valle de Aburra, y probar productos locales emblematicos como las tradicionales cremas de mango con sal y limon.",
+      "highlight": "4.9/10 \u00b7 Arte Urbano \u00b7 Escaleras Electricas \u00b7 Resiliencia",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "San Javier / Las Independencias",
+      "lat": 6.2517,
+      "lng": -75.6139,
+      "whatsapp": "573000000000",
+      "telefono": "5744444144",
+      "email": "info@medellin.travel",
+      "web": "https://www.medellin.travel",
+      "instagram": "@comuna13medellin",
+      "precio_desde": "Aporte voluntario sugerido $20.000 - $40.000 COP",
+      "horario": "Lun-Dom 08:00 AM - 07:00 PM",
+      "emoji": "\ud83c\udfa8",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Sitio Turistico \u00b7 Galeria Urbana \u00b7 Mirador",
+      "capacidad": "Abierto al publico",
+      "como_llegar": "Metro Linea B hasta la estacion final San Javier. Desde alli, bus integrando C23i o caminata de 15 min.",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_actividad": "Arte Urbano \u00b7 Graffitour \u00b7 Cultura Hip-Hop",
+      "dificultad": "Facil",
+      "dificultad_desc": "Recorrido peatonal con apoyo de escaleras electricas; rampas y senderos pavimentados.",
+      "duracion": "2-3 horas",
+      "altitud": "1550 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis (Aporte voluntario sugerido para guias comunitarios)",
+      "distancia": "Ladera occidental de Medellin",
+      "como_llegar": "Estacion San Javier (Metro Linea B) + Bus alimentador o caminata.",
+      "permisos": "Libre acceso. Se recomienda hacer el recorrido con guias locales.",
+      "temporada_nota": "Abierto todo el a\u00f1o. Preferible visitar en horas de la ma\u00f1ana o primera hora de la tarde.",
+      "fauna_flora": [],
+      "secretos": [
+        {
+          "icono": "\ud83c\udfbc",
+          "titulo": "Cuna del Hip-Hop",
+          "texto": "La Comuna 13 cuenta con sus propias escuelas de rap y lirica que impulsan proyectos de paz.",
+          "tag": "Cultura",
+          "tag_color": "purple"
+        }
+      ],
+      "regulaciones": "Respetar la tranquilidad de los residentes locales y apoyar la economia comunitaria.",
+      "checklist_tip": "Llevar calzado comodo, proteccion solar y dinero en efectivo para artesanias y snacks.",
+      "entradas": [
+        {
+          "tipo": "Acceso libre",
+          "precio": "Gratis",
+          "incluye": "Uso de escaleras electricas y espacio publico",
+          "link": "https://www.medellin.travel"
+        }
+      ],
+      "tours": [
+        {
+          "nombre": "Graffitour Comunitario Comuna 13",
+          "precio": "35000",
+          "precio_sub": "por persona",
+          "duracion": "2.5 horas",
+          "tipo_tour": "Grupal",
+          "idioma": "Espa\u00f1ol / Ingles",
+          "max_personas": "15",
+          "rating": "4.9",
+          "review_count": 3200,
+          "descripcion": "Recorrido narrado por artistas locales con degustacion de crema de mango e interpretacion de murales.",
+          "incluye": ["Guia local", "Snack tipico", "Muestra de baile"],
+          "no_incluye": ["Transporte privado"],
+          "link_reserva": "https://www.medellin.travel",
+          "featured": true
+        }
+      ],
+      "equipamiento": [
+        { "item": "Zapatos deportivos", "prioridad": "Obligatorio" },
+        { "item": "Protector solar", "prioridad": "Recomendado" }
+      ],
+      "itinerario": [
+        { "dia": "Dia 1", "hora": "09:00", "titulo": "Estacion San Javier", "icono": "\ud83d\ude86", "detalle": "Llegada en Metro y conexion con el barrio.", "tags": ["Metro"] },
+        { "dia": "Dia 1", "hora": "10:00", "titulo": "Escaleras Electricas", "icono": "\ud83d\udebd", "detalle": "Recorrido por tramos de escaleras y galerias de grafiti.", "tags": ["Arte"] }
+      ],
+      "dificultad_tags": [
+        { "texto": "Apto para personas de todas las edades", "apto": true }
+      ],
+      "temporada_matriz": {
+        "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal",
+        "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal",
+        "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal"
+      }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfEs seguro visitar la Comuna 13?", "respuesta": "Si, es una zona turistica muy acogedora y segura acompañando las rutas locales." },
+      { "pregunta": "\u00bfCuanto cuestan las escaleras electricas?", "respuesta": "El uso de las escaleras electricas es totalmente gratuito." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Escaleras electricas Comuna 13",
+        "caption": "Tramo de las escaleras electricas al aire libre en la Comuna 13",
+        "nombres_archivo_wikimedia": ["File:Medellin_Comuna_13_escaleras.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "horarios y rutas de acceso" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "feria-de-las-flores-medellin",
+      "nombre": "Feria de las Flores de Medellin 2026",
+      "categoria_slug": "evento",
+      "lead": "La maxima fiesta cultural y tradicional de Antioquia que celebra la herencia de los silleteros campesinos y la floricultura regional.",
+      "descripcion": "La Feria de las Flores es el evento magno de la ciudad de Medellin, celebrado anualmente durante diez dias entre finales de julio y principios de agosto. Su origen se remonta a 1957 como tributo a la pujanza paisa y a la tradicion floricultora del corregimiento de Santa Elena.\n\nEl evento cumbre es el clasico Desfile de Silleteros, donde cientos de campesinos de todas las edades caminan por las avenidas principales cargando monumentales estructuras de madera (silletas) decoradas con mas de 80 variedades de flores. Estas obras pueden pesar entre 50 y 90 kilogramos.\n\nAdemas del desfile, la feria incluye la Plaza de las Flores, el Desfile de Autos Clasicos y Antiguos, el Festival Nacional de la Trova, conciertos masivos en escenarios publicos y fondas con gastronomia tipica.",
+      "highlight": "5.0/10 \u00b7 Patrimonio Cultural \u00b7 Silleteros \u00b7 Tradicion",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Toda la ciudad / Santa Elena",
+      "lat": 6.2442,
+      "lng": -75.5812,
+      "whatsapp": "",
+      "telefono": "5744444144",
+      "email": "feriaflores@medellin.gov.co",
+      "web": "https://www.medellin.gov.co",
+      "instagram": "@nosmuevelaflor",
+      "precio_desde": "Eventos gratuitos y graderias con boleta",
+      "horario": "Todo el dia durante 10 dias de festival",
+      "emoji": "\ud83c\udf3a",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #008000 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Festival Cultural \u00b7 Tradicion \u00b7 Musica",
+      "capacidad": "Mas de 1.000.000 de asistentes",
+      "como_llegar": "Conexion total mediante la Red Metro de Medellin y rutas especiales de buses.",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "fecha_inicio": "2026-07-31",
+      "fecha_fin": "2026-08-09",
+      "edicion": "Edicion 69",
+      "sede": "Avenida del Rio, Plaza Mayor, Jardin Botanico y Santa Elena",
+      "organiza": "Alcaldia de Medellin",
+      "lema": "Medellin Te Quiere Flor",
+      "tipo_evento": "festival",
+      "lineup": [
+        { "nombre": "Silleteros de Santa Elena", "escenario": "Avenida del Rio" },
+        { "nombre": "Orquesta Filarmonica de Medellin", "escenario": "Teatro Metropolitano" }
+      ],
+      "agenda": [
+        { "dia": "2026-07-31", "hora": "18:00", "actividad": "Concierto Inaugural en la Obelisco" },
+        { "dia": "2026-08-09", "hora": "14:00", "actividad": "Desfile de Silleteros" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "Acceso libre a calles y plazas", "precio": "Gratis", "disponibilidad": "Disponible" },
+        { "tipo": "Graderia Desfile Silleteros", "precio": "$120.000 COP", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Sombrero o gorra", "Ropa fresca", "Hidratacion"],
+      "prohibido": ["Envases de vidrio", "Armas de fuego", "Mascotas en eventos masivos"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfEn que fecha se realiza la Feria de las Flores 2026?", "respuesta": "Del 31 de julio al 9 de agosto de 2026." },
+      { "pregunta": "\u00bfEl Desfile de Silleteros es gratuito?", "respuesta": "Si, en las zonas de pie a lo largo de todo el recorrido autorizado." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Desfile de Silleteros Medellin",
+        "caption": "Silletero campesino desfilando con silleta monumental",
+        "nombres_archivo_wikimedia": ["File:Silleteros_Feria_de_las_Flores_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.gov.co", "que_respalda": "fechas oficiales y programacion" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "plaza-botero-medellin",
+      "nombre": "Plaza Botero",
+      "categoria_slug": "sitio",
+      "lead": "Museo a cielo abierto que exhibe 23 majestuosas esculturas de bronce donadas por el artista antioqueno Fernando Botero.",
+      "descripcion": "Ubicada en el corazon financiero y cultural de Medellin, la Plaza Botero es uno de los hitos urbanos mas icocnicos de Colombia. Este parque de 7.000 metros cuadrados alberga 23 esculturas de bronce monumentales caracterizadas por el estilo figurativo y las proporciones volumétricas del famoso maestro Fernando Botero.\n\nFlanqueada por el imponente edificio neogotico del Palacio de la Cultura Rafael Uribe Uribe y el Museo de Antioquia, la plaza es un punto de encuentro lleno de vida donde conviven turistas, fotografos tradicionales, vendedores ambulantes y locales.\n\nEntre las esculturas mas representativas destacan 'Maternidad', 'El Hombre a Caballo', 'La Mujer con Espejo' y 'El Perro'. Es el punto de partida ideal para recorrer el centro historico de la ciudad.",
+      "highlight": "4.8/10 \u00b7 Esculturas \u00b7 Arte al Aire Libre \u00b7 Centro",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "La Candelaria / Centro",
+      "lat": 6.2519,
+      "lng": -75.5686,
+      "whatsapp": "",
+      "telefono": "5742513636",
+      "email": "info@museodeantioquia.co",
+      "web": "https://www.museodeantioquia.co",
+      "instagram": "@museodeantioquia",
+      "precio_desde": "Gratis",
+      "horario": "Acceso libre 24 horas (Sugerido 08:00 AM - 06:00 PM)",
+      "emoji": "\ud83d\uddfd",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #2b2b2b 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Plaza Publica \u00b7 Museo al Aire Libre",
+      "capacidad": "Abierto al publico",
+      "como_llegar": "Estacion Parque Berrio del Metro Linea A (a solo 100 metros).",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_actividad": "Fotografia \u00b7 Arte Clasico \u00b7 Recorrido Historico",
+      "dificultad": "Facil",
+      "dificultad_desc": "Superficie totalmente plana y peatonal.",
+      "duracion": "1-2 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Centro Historico de Medellin",
+      "como_llegar": "Estacion Parque Berrio (Metro Linea A).",
+      "permisos": "Libre acceso",
+      "temporada_nota": "Ideal para visitar durante la mañana.",
+      "fauna_flora": [],
+      "secretos": [
+        {
+          "icono": "\ud83d\udcf7",
+          "titulo": "Fotografos Minuto",
+          "texto": "En la plaza aun laboran fotografos con camaras analogicas e impresion instantanea tradicional.",
+          "tag": "Tradicion",
+          "tag_color": "gold"
+        }
+      ],
+      "regulaciones": "No subirse a las esculturas para evitar el deterioro del bronce.",
+      "checklist_tip": "Visitar en las mañanas para tomar las mejores fotografias sin sol directo.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [{ "texto": "100% Accesible para personas en silla de ruedas", "apto": true }],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfCobran por tomar fotos a las esculturas?", "respuesta": "No, el acceso a la plaza y las fotografias son completamente libres." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Plaza Botero Medellin",
+        "caption": "Esculturas de bronce de Fernando Botero frente al Palacio de la Cultura",
+        "nombres_archivo_wikimedia": ["File:Plaza_Botero_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.museodeantioquia.co", "que_respalda": "informacion de esculturas" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "museo-de-antioquia",
+      "nombre": "Museo de Antioquia",
+      "categoria_slug": "sitio",
+      "lead": "El museo mas importante del departamento, hogar de salas permanentes dedicadas a Fernando Botero y arte contemporaneo.",
+      "descripcion": "Fundado en 1881, el Museo de Antioquia es la institucion cultural mas antigua del departamento y la segunda del pais. Ubicado en el antiguo Palacio Municipal de arquitectura Art Deco frente a la Plaza Botero, alberga mas de 5.000 piezas artisticas e historicas.\n\nSu atractivo principal es la Sala Botero, que exhibe mas de 100 oleos, dibujos y esculturas donados directamente por el artista. Asimismo, cuenta con salas dedicadas a la historia precolombina, el arte colonial, republicano y vanguardias contemporaneas nacionales e internacionales.",
+      "highlight": "4.7/10 \u00b7 Arte \u00b7 Historia \u00b7 Fernando Botero",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Centro",
+      "lat": 6.2522,
+      "lng": -75.5689,
+      "whatsapp": "",
+      "telefono": "5742513636",
+      "email": "info@museodeantioquia.co",
+      "web": "https://www.museodeantioquia.co",
+      "instagram": "@museodeantioquia",
+      "precio_desde": "$24.000 COP Extranjeros / $15.000 COP Nacionales",
+      "horario": "Lun-Sab 10:00 AM - 05:30 PM",
+      "emoji": "\ud83c\udfa8",
+      "hero_bg": "linear-gradient(135deg, #111111 0%, #e8a020 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Museo de Arte \u00b7 Historia",
+      "capacidad": "Salas de exposicion multiples",
+      "como_llegar": "Estacion Parque Berrio del Metro Linea A.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Exposiciones de Arte \u00b7 Historia \u00b7 Recorridos Guiados",
+      "dificultad": "Facil",
+      "dificultad_desc": "Edificio equipado con ascensores y rampas.",
+      "duracion": "2-3 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "$24.000 COP Extranjeros",
+      "distancia": "Frente a la Plaza Botero",
+      "como_llegar": "Metro Parque Berrio.",
+      "permisos": "Boleto en taquilla",
+      "temporada_nota": "Cerrado domingos y festivos segun temporada.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "No tomar fotos con flash dentro de las salas de pintura.",
+      "checklist_tip": "Aprovechar la tienda del museo para comprar reproducciones de arte.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfCual es la tarifa para estudiantes?", "respuesta": "Presentando carnet vigente aplica descuento especial del 50%." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Museo de Antioquia Fachada",
+        "caption": "Fachada Art Deco del Museo de Antioquia en el centro de Medellin",
+        "nombres_archivo_wikimedia": ["File:Museo_de_Antioquia_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.museodeantioquia.co", "que_respalda": "precios y horarios" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "parque-explora-medellin",
+      "nombre": "Parque Explora",
+      "categoria_slug": "sitio",
+      "lead": "Centro interactivo para la divulgacion cientifica con el acuario de agua dulce mas grande de Sudamerica y un moderno Planetario.",
+      "descripcion": "El Parque Explora es un parque tematico de ciencia y tecnologia compuesto por cuatro cajas rojas flotantes diseñadas por el arquitecto Alejandro Echeverri. Es uno de los centros educativos interactivos mas avanzados de America Latina.\n\nAlberga mas de 300 experiencias interactivas repartidas en salas dedicadas a la Fisica, Mente, Musica y Tiempo. Su principal atractivo es el Acuario de Agua Dulce, que simula los ecosistemas de los rios Amazonas, Orinoco y Magdalena con mas de 4.000 ejemplares de especies acuaticas.",
+      "highlight": "4.9/10 \u00b7 Ciencia \u00b7 Acuario \u00b7 Interactivo",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Zona Norte / Aranjuez",
+      "lat": 6.2708,
+      "lng": -75.5656,
+      "whatsapp": "573000000000",
+      "telefono": "5745168300",
+      "email": "comunicaciones@parqueexplora.org",
+      "web": "https://www.parqueexplora.org",
+      "instagram": "@parqueexplora",
+      "precio_desde": "$40.000 COP por persona",
+      "horario": "Mar-Dom 08:30 AM - 05:30 PM (Lunes cerrado por mantenimiento)",
+      "emoji": "\ud83d\udc2a",
+      "hero_bg": "linear-gradient(135deg, #e53935 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Centro de Ciencia \u00b7 Acuario \u00b7 Planetario",
+      "capacidad": "Aforo amplio para mas de 2.000 visitantes diarios",
+      "como_llegar": "Estacion Universidad del Metro Linea A.",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_actividad": "Acuario \u00b7 Experimentos Interactivos \u00b7 Planetario",
+      "dificultad": "Facil",
+      "dificultad_desc": "Instalaciones completamente accesibles.",
+      "duracion": "3-4 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "$40.000 COP General",
+      "distancia": "Zona Norte de Medellin",
+      "como_llegar": "Metro Estacion Universidad.",
+      "permisos": "Boleta individual en taquilla o web",
+      "temporada_nota": "Cerrado los dias lunes no festivos.",
+      "fauna_flora": [
+        { "emoji": "\ud83d\udc1f", "nombre": "Pirañas e Pirarucus", "hecho": "Especies gigantesicas del Amazonas alojadas en el acuario principal." }
+      ],
+      "secretos": [],
+      "regulaciones": "No usar flash en la zona del acuario para no estresar a los peces.",
+      "checklist_tip": "Comprar el combo Parque Explora + Planetario para descuento especial.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfEs apto para niños pequeños?", "respuesta": "Si, cuenta con salas y talleres con experiencias sensoriales adaptadas para todas las edades." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Parque Explora Medellin",
+        "caption": "Edificios de cajas rojas del Parque Explora en la Zona Norte",
+        "nombres_archivo_wikimedia": ["File:Parque_Explora_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.parqueexplora.org", "que_respalda": "tarifas y horarios oficiales" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "jardin-botanico-medellin",
+      "nombre": "Jardin Botanico Joaquin Antonio Uribe",
+      "categoria_slug": "sitio",
+      "lead": "Oasis ambiental de 14 hectareas dedicado a la conservacion vegetal, famoso por la imponente arquitectura de su Orquideorama.",
+      "descripcion": "El Jardin Botanico de Medellin es un referente ambiental y un espacio verde publico icónico en la Zona Norte de la ciudad. Protege mas de 1.000 especies vegetales y una rica biodiversidad urbana que incluye iguanas, aves silvestres y ardillas.\n\nSu hito arquitectonico mas importante es el Orquideorama, una estructura modular de panales de madera de pino cultivado que combina la floricultura con la arquitectura bioclimatica. Es la sede principal de exposiciones botanicas durante la Feria de las Flores y de la Fiesta del Libro.",
+      "highlight": "4.8/10 \u00b7 Naturaleza \u00b7 Orquideorama \u00b7 Pulmon Verde",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Aranjuez / Zona Norte",
+      "lat": 6.2703,
+      "lng": -75.5639,
+      "whatsapp": "",
+      "telefono": "5742128111",
+      "email": "contacto@jbotanico.org",
+      "web": "https://www.botanicomedellin.org",
+      "instagram": "@jardinbotanicodemedellin",
+      "precio_desde": "Gratis",
+      "horario": "Mar-Dom 09:00 AM - 05:00 PM",
+      "emoji": "\ud83c\udf3f",
+      "hero_bg": "linear-gradient(135deg, #2e7d32 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Jardin Botanico \u00b7 Reserva Natural Urbano",
+      "capacidad": "Abierto al publico",
+      "como_llegar": "Estacion Universidad de la Linea A del Metro.",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_actividad": "Avistamiento de Aves \u00b7 Botánica \u00b7 Picnics Culturales",
+      "dificultad": "Facil",
+      "dificultad_desc": "Caminos pavimentados y boscosos planos.",
+      "duracion": "2-3 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Zona Norte",
+      "como_llegar": "Metro Universidad.",
+      "permisos": "Libre ingreso",
+      "temporada_nota": "Ideal para caminatas mañaneras.",
+      "fauna_flora": [
+        { "emoji": "\ud83e\udd8e", "nombre": "Iguanas Silvestres", "hecho": "Habitan libremente en la zona del lago central." }
+      ],
+      "secretos": [],
+      "regulaciones": "Prohibido ingresar con mascotas o plásticos de un solo uso.",
+      "checklist_tip": "Almorzar en el restaurante In Situ dentro del Jardin Botanico.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfSe cobra la entrada al Jardin Botanico?", "respuesta": "No, el ingreso es totalmente gratuito para el publico general." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Orquideorama Jardin Botanico",
+        "caption": "Estructura arquitectonica del Orquideorama en Medellin",
+        "nombres_archivo_wikimedia": ["File:Orquideorama_Jardin_Botanico_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.botanicomedellin.org", "que_respalda": "horarios e ingreso" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "pueblito-paisa-cerro-nutibara",
+      "nombre": "Pueblito Paisa y Cerro Nutibara",
+      "categoria_slug": "sitio",
+      "lead": "Replica de un pueblo tradicional antioqueno construida en la cima del Cerro Nutibara con vista panoramica de 360 grados sobre Medellin.",
+      "descripcion": "El Pueblito Paisa es una representacion a escala real de una plaza tradicional de los municipios antioqueños de comienzos del siglo XX. Cuenta con iglesia, alcaldia, escuela, barberia y casas de arquitectura colonial con balcones floridos.\n\nUbicado en la cima del Cerro Nutibara (uno de los siete cerros tutelares de la ciudad), ofrece un mirador excepcional sobre todo el Valle de Aburra, asi como senderos ecologicos y el Parque de las Esculturas.",
+      "highlight": "4.6/10 \u00b7 Vista Panoramica \u00b7 Arquitectura \u00b7 Mirador",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Belén / Cerro Nutibara",
+      "lat": 6.2364,
+      "lng": -75.5803,
+      "whatsapp": "",
+      "telefono": "5744444144",
+      "email": "turismo@medellin.gov.co",
+      "web": "https://www.medellin.travel",
+      "instagram": "@medellintravel",
+      "precio_desde": "Gratis",
+      "horario": "Lun-Dom 06:00 AM - 11:00 PM",
+      "emoji": "\ud83c\udfd8\ufe0f",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #8d6e63 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Mirador \u00b7 Replica Colonial \u00b7 Cerro Tutelar",
+      "capacidad": "Abierto al publico",
+      "como_llegar": "Estacion Exposiciones del Metro Linea A + caminata o taxi hasta la cima.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Mirador \u00b7 Fotografia \u00b7 Gastronomia Tradicional",
+      "dificultad": "Facil",
+      "dificultad_desc": "Acceso vehicular hasta la cima o ascenso peatonal por sendero.",
+      "duracion": "1-2 horas",
+      "altitud": "1580 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Suroccidente del centro",
+      "como_llegar": "Metro Exposiciones + Taxi.",
+      "permisos": "Libre",
+      "temporada_nota": "Ideal para visitar al atardecer.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "Estacionamiento tarifado en la cima.",
+      "checklist_tip": "Probar las empanadas y la mazamorra con panela en los locales de la plaza.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfSe puede subir en vehiculo hasta la cima?", "respuesta": "Si, el cerro cuenta con via asfaltada y parqueadero supervisado." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Pueblito Paisa Cerro Nutibara",
+        "caption": "Plaza principal del Pueblito Paisa en la cima del Cerro Nutibara",
+        "nombres_archivo_wikimedia": ["File:Pueblito_Paisa_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "horarios y ubicacion" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "parque-arvi-medellin",
+      "nombre": "Parque Arvi",
+      "categoria_slug": "sitio",
+      "lead": "Reserva forestal ecoturistica de mas de 16.000 hectareas en el corregimiento de Santa Elena, conectada directamente por Metrocable.",
+      "descripcion": "El Parque Arvi es un parque natural ecoturistico ubicado en la vertiente oriental del Valle de Aburra. Protege bosques de niebla, plantaciones forestales y antiguos caminos precolombinos (Camino Cieza de Leon).\n\nEs un espacio ideal para el senderismo guiado, el avistamiento de aves, recorridos en bicicleta y el picnic. En la estacion del Metrocable Arvi funciona el Mercado Arvi, donde campesinos locales ofrecen hortalizas, flores, artesanias y gastronomia artesanal.",
+      "highlight": "4.9/10 \u00b7 Senderismo \u00b7 Bosque de Niebla \u00b7 Metrocable",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Corregimiento de Santa Elena",
+      "lat": 6.2813,
+      "lng": -75.5019,
+      "whatsapp": "573206770281",
+      "telefono": "5744441328",
+      "email": "corporacion@parquearvi.org",
+      "web": "https://www.parquearvi.org",
+      "instagram": "@parquearvi",
+      "precio_desde": "Ingreso gratis / Metrocable $13.500 COP por trayecto",
+      "horario": "Mar-Dom 09:00 AM - 06:00 PM",
+      "emoji": "\ud83c\udf33",
+      "hero_bg": "linear-gradient(135deg, #1b5e20 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Parque Natural \u00b7 Reserva Forestal",
+      "capacidad": "Abierto al publico",
+      "como_llegar": "Metro Linea A hasta Acevedo -> Metrocable Linea K hasta Santo Domingo -> Metrocable Arvi Linea L.",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_actividad": "Senderismo \u00b7 Ciclismo \u00b7 Avistamiento de Aves",
+      "dificultad": "Media",
+      "dificultad_desc": "Senderos naturales de tierra con pendientes moderadas.",
+      "duracion": "4-6 horas",
+      "altitud": "2500 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Entrada al parque gratuita; senderos guiados desde $20.000 COP",
+      "distancia": "Santa Elena",
+      "como_llegar": "Metrocable Linea L.",
+      "permisos": "Recomendado contratar guia para adentrarse en los senderos forestales.",
+      "temporada_nota": "Clima frio y templado de montaña (12\u00b0C - 18\u00b0C).",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "Prohibido hacer fogatas o dejar basura en la reserva.",
+      "checklist_tip": "Llevar chaqueta abrigada e impermeable.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfEl Metrocable Arvi opera todos los dias?", "respuesta": "No, la Linea L hace mantenimiento los dias lunes no festivos." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Parque Arvi Metrocable",
+        "caption": "Cabina del Metrocable sobrevolando el bosque de pinares del Parque Arvi",
+        "nombres_archivo_wikimedia": ["File:Parque_Arvi_Metrocable_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.parquearvi.org", "que_respalda": "senderos y recomendaciones" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "mamm-museo-arte-moderno-medellin",
+      "nombre": "Museo de Arte Moderno de Medellin (MAMM)",
+      "categoria_slug": "sitio",
+      "lead": "Espacio cultural e industrial recuperado en Ciudad del Rio dedicado al arte contemporaneo y manifestaciones audiovisuales.",
+      "descripcion": "El MAMM esta ubicado en el antiguo edificio de Talleres Robledo, una estructura siderurgica de 1938 rehabilitada e intervenida con una moderna expansion arquitectonica en bloques escalonados. Es el corazon cultural del barrio Ciudad del Rio.\n\nAlberga exposiciones temporales de arte contemporaneo, una sala de cine independiente, plazoletas abiertas y terrazas con vistas sobre los parques del sector.",
+      "highlight": "4.7/10 \u00b7 Arte Contemporaneo \u00b7 Cine \u00b7 Arquitectura",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Ciudad del Rio / El Poblado",
+      "lat": 6.2238,
+      "lng": -75.5752,
+      "whatsapp": "",
+      "telefono": "5744442622",
+      "email": "info@elmamm.org",
+      "web": "https://www.elmamm.org",
+      "instagram": "@elmamm",
+      "precio_desde": "$18.000 COP General / $12.000 COP Estudiantes",
+      "horario": "Mar-Vie 11:00 AM - 07:00 PM / Sab-Dom 11:00 AM - 06:00 PM",
+      "emoji": "\ud83c\udfa0",
+      "hero_bg": "linear-gradient(135deg, #424242 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Museo \u00b7 Centro Cultural",
+      "capacidad": "Salas de exhibicion y cine",
+      "como_llegar": "Estacion Industriales del Metro Linea A (10 minutos a pie).",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Arte Contemporaneo \u00b7 Cine de Autor \u00b7 Conciertos en Plazoleta",
+      "dificultad": "Facil",
+      "dificultad_desc": "Accesibilidad total.",
+      "duracion": "1-2 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "$18.000 COP",
+      "distancia": "Ciudad del Rio",
+      "como_llegar": "Metro Industriales.",
+      "permisos": "Boleta en taquilla",
+      "temporada_nota": "Entrada libre el ultimo viernes de cada mes entre 06:00 PM y 10:00 PM.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "",
+      "checklist_tip": "Disfrutar de un picnic en la plazoleta de Ciudad del Rio frente al museo.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfEl MAMM tiene proyecciones de cine?", "respuesta": "Si, la Sala de Cine MAMM ofrece cartelera independiente semanal." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "MAMM Ciudad del Rio",
+        "caption": "Edificio del Museo de Arte Moderno de Medellin en Ciudad del Rio",
+        "nombres_archivo_wikimedia": ["File:Museo_de_Arte_Moderno_de_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.elmamm.org", "que_respalda": "programacion y tarifas" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "mercado-del-rio-medellin",
+      "nombre": "Mercado del Rio",
+      "categoria_slug": "comida",
+      "lead": "El primer mercado gastronomico de Colombia, con mas de 40 propuestas culinarias en una nave industrial restaurada.",
+      "descripcion": "Mercado del Rio revoluciono la escena gastronomica de Medellin al transformar un antiguo deposito de trenes en un vibrante hall gastronomico. Cuenta con dos niveles equipados con mas de 40 restaurantes, cava de vinos, barras de cocteleria y cervecerias artesanales.\n\nEl concepto permite a grupos de comensales pedir de diferentes barras y compartir en mesas comunales de madera, creando un ambiente festivo ideal para almuerzos de negocios, cenas informales y copas de noche.",
+      "highlight": "4.8/10 \u00b7 Gastronomia \u00b7 Vinos \u00b7 Ambiente Urbano",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Ciudad del Rio",
+      "lat": 6.2231,
+      "lng": -75.5739,
+      "whatsapp": "573100000000",
+      "telefono": "5742611500",
+      "email": "contacto@mercadodelrio.com.co",
+      "web": "https://www.mercadodelrio.com.co",
+      "instagram": "@mercadodelrio",
+      "precio_desde": "Platos desde $25.000 hasta $80.000 COP",
+      "horario": "Lun-Dom 12:00 PM - 11:00 PM",
+      "emoji": "\ud83c\udf77",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #8d6e63 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Mercado Gastronomico \u00b7 Restaurante \u00b7 Cerveceria",
+      "capacidad": "Capacidad para mas de 800 personas sentadas",
+      "como_llegar": "Estacion Industriales del Metro Linea A.",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_comida": "Internacional, Parrilla, Tapas, Sushi, Cocina Colombiana",
+      "cocina": "FUSION \u00b7 INTERNACIONAL",
+      "ambiente": "Moderno, Cosmopolita, Industrial",
+      "precio_promedio": "$50.000 - $80.000 COP",
+      "terraza": "Si",
+      "reservas": "Si",
+      "domicilio": "Si",
+      "menu_destacado": [
+        { "nombre": "Tapas Ibericas", "precio": "$32.000 COP", "badge": "popular" },
+        { "nombre": "Corte de Carne Angus", "precio": "$65.000 COP", "badge": null },
+        { "nombre": "Ceviche Mixto", "precio": "$38.000 COP", "badge": "popular" }
+      ],
+      "opciones_dieta": ["Vegetariano", "Sin Gluten", "Opciones Veganas"],
+      "horario_detallado": {
+        "Lunes": { "abre": "12:00", "cierra": "22:00" },
+        "Martes": { "abre": "12:00", "cierra": "22:00" },
+        "Miercoles": { "abre": "12:00", "cierra": "23:00" },
+        "Jueves": { "abre": "12:00", "cierra": "23:00" },
+        "Viernes": { "abre": "12:00", "cierra": "00:00" },
+        "Sabado": { "abre": "12:00", "cierra": "00:00" },
+        "Domingo": { "abre": "12:00", "cierra": "21:00" }
+      },
+      "domicilio_plataformas": ["Rappi"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfHay parqueadero disponible?", "respuesta": "Si, el edificio cuenta con parqueadero privado tarifado." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Mercado del Rio Interior",
+        "caption": "Ambiente interior con barras gastronómicas en Mercado del Rio",
+        "nombres_archivo_wikimedia": ["File:Mercado_del_Rio_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.mercadodelrio.com.co", "que_respalda": "locales y horarios" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "barrio-provenza-el-poblado",
+      "nombre": "Barrio Provenza (El Poblado)",
+      "categoria_slug": "comida",
+      "lead": "El distrito mas exclusivo de gastronomia, cafes de especialidad, vida nocturna y moda urbana de Medellin.",
+      "descripcion": "Provenza es un sector arbolado y peatonalizado en la comuna de El Poblado reconocido internacionalmente por su ambiente vibrante. Sus calles estan bordeadas por arboles frondosos, quebradas naturales y fachadas intervenidas con vegetacion y neón.\n\nAbriga la mayor densidad de restaurantes de autor, cafes de origen antioqueño, bistroes con terrazas al aire libre, speakeasies y discotecas de renombre.",
+      "highlight": "4.9/10 \u00b7 Gastronomia de Autor \u00b7 Vida Nocturna \u00b7 Cafes",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Provenza / El Poblado",
+      "lat": 6.2089,
+      "lng": -75.5653,
+      "whatsapp": "",
+      "telefono": "",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@provenzamedellin",
+      "precio_desde": "Platos desde $30.000 hasta $120.000 COP",
+      "horario": "Abierto 24 horas (Locales 08:00 AM - 03:00 AM)",
+      "emoji": "\ud83c\udf78",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #e91e63 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Zona Gastronomica \u00b7 Bulevar Peatonal \u00b7 Vida Nocturna",
+      "capacidad": "Zona comercial abierta",
+      "como_llegar": "Estacion Poblado del Metro Linea A + bus integrado o caminata ascendente por la Calle 10.",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_comida": "Cocina de Autor, Cafes de Origen, Cocteleria, Internacional",
+      "cocina": "VARIDA \u00b7 AUTOR",
+      "ambiente": "Bohemio Chic, Fiesta, Exclusivo",
+      "precio_promedio": "$60.000 - $120.000 COP",
+      "terraza": "Si",
+      "reservas": "Si",
+      "domicilio": "Si",
+      "menu_destacado": [
+        { "nombre": "Cafe Filtrado de Origen", "precio": "$12.000 COP", "badge": "popular" },
+        { "nombre": "Cocteles de Autor", "precio": "$42.000 COP", "badge": "popular" }
+      ],
+      "opciones_dieta": ["Vegetariano", "Vegano", "Sin Gluten"],
+      "horario_detallado": {
+        "Lunes": { "abre": "08:00", "cierra": "02:00" },
+        "Martes": { "abre": "08:00", "cierra": "02:00" },
+        "Miercoles": { "abre": "08:00", "cierra": "02:00" },
+        "Jueves": { "abre": "08:00", "cierra": "03:00" },
+        "Viernes": { "abre": "08:00", "cierra": "03:00" },
+        "Sabado": { "abre": "08:00", "cierra": "03:00" },
+        "Domingo": { "abre": "08:00", "cierra": "00:00" }
+      },
+      "domicilio_plataformas": ["Rappi"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfCual es la mejor hora para visitar Provenza?", "respuesta": "Por la tarde para cafes y bistroes; a partir de las 08:00 PM para gastronomia y bares." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Provenza Medellin Calle Peatonal",
+        "caption": "Calle peatonal arbolada con neones y restaurantes en Provenza",
+        "nombres_archivo_wikimedia": ["File:Provenza_El_Poblado_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "guia turistica de Provenza" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "manila-hostal-boutique-poblado",
+      "nombre": "Distrito Manila (Hostales Boutique y Cafes)",
+      "categoria_slug": "hostal",
+      "lead": "El barrio mas tranquilo y caminable de El Poblado, preferido por nomadas digitales y viajeros independientes.",
+      "descripcion": "Manila es un sector residencial tradicional de casas bajas que ha evolucionado hacia un encantador distrito de alojamientos boutique, hostales de diseño, espacios de coworking y restaurantes independientes.\n\nA diferencia del bullicio nocturno de Provenza, Manila mantiene una escala comunitaria relajada donde es posible trabajar en remoto, disfrutar de panaderias artesanales y descansar en alojamientos sostenibles.",
+      "highlight": "4.8/10 \u00b7 Nomadas Digitales \u00b7 Hostales \u00b7 Tranquilidad",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Manila / El Poblado",
+      "lat": 6.2133,
+      "lng": -75.5711,
+      "whatsapp": "",
+      "telefono": "",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@manilamedellin",
+      "precio_desde": "Dorms desde $55.000; Privadas desde $180.000 COP",
+      "horario": "Recepcion 24/7 en la mayoria de hostales",
+      "emoji": "\ud83c\udfe8",
+      "hero_bg": "linear-gradient(135deg, #009688 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Distrito de Alojamiento \u00b7 Coworking \u00b7 Hostales",
+      "capacidad": "Multiples hostales y hoteles boutique",
+      "como_llegar": "A 5 minutos a pie de la Estacion Poblado del Metro Linea A.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_alojamiento": "Hostal Boutique / Co-living",
+      "checkin": "15:00",
+      "checkout": "11:00",
+      "recepcion": "24 horas",
+      "edad_minima": "18",
+      "mascotas": "Pet Friendly en zonas comunes",
+      "cocina_compartida": "Si",
+      "barrio_descripcion": "Barrio residencial plano, muy seguro para caminar de dia y de noche.",
+      "politica_cancelacion": "Cancelacion gratuita hasta 24 horas antes.",
+      "reglas_casa": "Silencio a partir de las 23:00 en zonas de descanso.",
+      "habitaciones": [
+        { "tipo": "Dormitorio Compartido 6 Camas", "subtitulo": "Aire Acondicionado y Lockers", "badge": "popular", "camas": "1 Cama en litera", "precio": "$55.000 COP" },
+        { "tipo": "Habitacion Privada Queen", "subtitulo": "Baño privado y escritorio", "badge": "privada", "camas": "1 Cama Queen", "precio": "$180.000 COP" }
+      ],
+      "amenidades": ["Wi-Fi de Alta Velocidad", "Espacio Coworking", "Cocina Equipada", "Cafe Gratis"],
+      "actividades": [
+        { "icono": "\ud83d\udcbb", "nombre": "Mesa de Coworking", "descripcion": "Espacio silencioso para trabajo remoto con enchufes dedicados." }
+      ],
+      "que_incluye": ["Wi-Fi", "Cafe matutino", "Mapa de la ciudad"],
+      "transporte": [
+        { "icon": "\ud83d\ude86", "title": "Metro Poblado", "detail": "A solo 400 metros de distancia caminable." }
+      ],
+      "eventos_hostal": []
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfManila es seguro de noche?", "respuesta": "Si, es uno de los sectores residenciales mas seguros y patrullados de la Comuna 14." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Barrio Manila El Poblado",
+        "caption": "Calles tranquilas con hostales boutique en el Barrio Manila",
+        "nombres_archivo_wikimedia": ["File:Barrio_Manila_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "guia de barrios" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "barrio-laureles-medellin",
+      "nombre": "Barrio Laureles (Primer y Segundo Parque)",
+      "categoria_slug": "sitio",
+      "lead": "El tradicional sector residencial de calles arboladas, gastronomia de barrio y la famosa Avenida Nutibara.",
+      "descripcion": "Elegido por publicaciones internacionales como uno de los barrios mas 'cool' del mundo, Laureles destaca por su trazado urbano en circulos concéntricos diseñado por Pedro Nel Gomez, sus parques arbolados y sus amplias aceras peatonales.\n\nEs el centro de la vida cotidiana paisa, ofreciendo una equilibrada combinacion entre tradicion, cafes de autor, cervecerias artesanales y una animada vida nocturna en la Avenida Nutibara y la Carrera 70.",
+      "highlight": "4.9/10 \u00b7 Vida Local \u00b7 Cafes \u00b7 Parques Arbolados",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Laureles",
+      "lat": 6.2425,
+      "lng": -75.5897,
+      "whatsapp": "",
+      "telefono": "",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@laurelesmedellin",
+      "precio_desde": "Gratis",
+      "horario": "Acceso libre 24 horas",
+      "emoji": "\ud83c\udf33",
+      "hero_bg": "linear-gradient(135deg, #388e3c 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Barrio Turistico \u00b7 Corredor Gastronomico",
+      "capacidad": "Abierto",
+      "como_llegar": "Estacion Estadio de la Linea B del Metro + caminata por la Carrera 70.",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_actividad": "Paseo Peatonal \u00b7 Cafes de Especialidad \u00b7 Gastronomia",
+      "dificultad": "Facil",
+      "dificultad_desc": "Terreno completamente plano ideal para bicicleta o caminatas.",
+      "duracion": "2-4 horas",
+      "altitud": "1490 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Zona Centro-Occidental",
+      "como_llegar": "Metro Linea B Estacion Estadio.",
+      "permisos": "Libre",
+      "temporada_nota": "Excelente ambiente durante los fines de semana.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "",
+      "checklist_tip": "Alquilar una bicicleta del sistema EnCicla para recorrer las circulares de Laureles.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfCual es la diferencia entre Laureles y El Poblado?", "respuesta": "Laureles es un barrio totalmente plano, mas residencial y con un ambiente de vida local autentica." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Primer Parque de Laureles",
+        "caption": "Parque arbolado y cafes en el Primer Parque de Laureles",
+        "nombres_archivo_wikimedia": ["File:Parque_Laureles_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "guia turistica" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "fincas-silleteras-santa-elena",
+      "nombre": "Fincas Silleteras de Santa Elena",
+      "categoria_slug": "sitio",
+      "lead": "El hogar campesino donde se cultiva y elabora el arte inmaterial de las silletas florales durante todo el año.",
+      "descripcion": "Ubicadas en las veredas montañosas del corregimiento de Santa Elena, las fincas silleteras tradicionales abren sus puertas a los visitantes para transmitir el oficio ancestral de la floricultura y el armado de silletas.\n\nLos visitantes pueden recorrer cultivos de mas de 80 especies de flores, escuchar de boca de las familias campesinas las historias del desfile, probar gastronomia montañera y aprender a elaborar una mini-silleta propia.",
+      "highlight": "5.0/10 \u00b7 Silleteros \u00b7 Flores \u00b7 Tradicion Ancestral",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Corregimiento de Santa Elena",
+      "lat": 6.2115,
+      "lng": -75.4981,
+      "whatsapp": "573100000000",
+      "telefono": "5744444144",
+      "email": "santaelena@medellin.travel",
+      "web": "https://www.santaelena.com.co",
+      "instagram": "@santaelenasilletera",
+      "precio_desde": "Visitas guiadas desde $25.000 COP",
+      "horario": "Lun-Dom 08:00 AM - 05:00 PM (Con reserva previa)",
+      "emoji": "\ud83c\udf3b",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #2e7d32 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Finca Campesina \u00b7 Taller Cultural",
+      "capacidad": "Atencion a grupos pequenos y medianos",
+      "como_llegar": "Buses desde el centro de Medellin (Tranvia San Jose) o via Metrocable Arvi + transporte local.",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_actividad": "Ecoturismo \u00b7 Talleres de Flores \u00b7 Gastronomia Montañera",
+      "dificultad": "Facil",
+      "dificultad_desc": "Caminatas cortas por jardines rurales.",
+      "duracion": "3-5 horas",
+      "altitud": "2400 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "$25.000 COP con recorrido guiado",
+      "distancia": "Corregimiento Santa Elena",
+      "como_llegar": "Bus Santa Elena desde el centro de Medellin.",
+      "permisos": "Se exige reserva previa directa con la finca.",
+      "temporada_nota": "Alta ocupacion durante las semanas previas a la Feria de las Flores.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "No arrancar las flores de los cultivos sin autorizacion.",
+      "checklist_tip": "Llevar ropa de abrigo ligera y abrigo impermeable.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfSe pueden visitar las fincas silleteras fuera de la Feria de Flores?", "respuesta": "Si, las fincas estan abiertas durante todo el año ofreciendo talleres culturales." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Finca Silletera Santa Elena",
+        "caption": "Cultivos de flores y silleta tradicional en finca de Santa Elena",
+        "nombres_archivo_wikimedia": ["File:Finca_Silletera_Santa_Elena.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.santaelena.com.co", "que_respalda": "fincas y actividades" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "cerro-el-volador-medellin",
+      "nombre": "Parque Natural Cerro El Volador",
+      "categoria_slug": "sitio",
+      "lead": "El parque natural metropolitano mas grande dentro del area urbana de Medellin y sitio de valor arqueologico.",
+      "descripcion": "El Cerro El Volador es un parque natural metropolitano de mas de 106 hectareas ubicado en medio del valle urbano. Declarado Patrimonio Historico y Natural de la Nacion, fue un lugar de asentamiento de comunidades indigenas precolombinas (Aburraes).\n\nEs el lugar favorito de la ciudad para volar cometas, hacer caminatas entre senderos arbolados, practicar ciclismo de montaña y avistar mas de 100 especies de aves silvestres.",
+      "highlight": "4.6/10 \u00b7 Naturaleza Urbano \u00b7 Arqueologia \u00b7 Avistamiento",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Robledo / Universidad de Antioquia",
+      "lat": 6.2625,
+      "lng": -75.5828,
+      "whatsapp": "",
+      "telefono": "5744444144",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@medellintravel",
+      "precio_desde": "Gratis",
+      "horario": "Lun-Dom 06:00 AM - 05:00 PM",
+      "emoji": "\ud83e\udd85",
+      "hero_bg": "linear-gradient(135deg, #2e7d32 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Parque Natural \u00b7 Sitio Arqueologico",
+      "capacidad": "Abierto",
+      "como_llegar": "Estacion Universidad o Hospital del Metro Linea A + caminata o taxi corto.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Avistamiento de Aves \u00b7 Ciclismo \u00b7 Mirador",
+      "dificultad": "Facil",
+      "dificultad_desc": "Vias pavimentadas y senderos demarcados.",
+      "duracion": "2-3 horas",
+      "altitud": "1620 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Zona Noroccidental",
+      "como_llegar": "Metro Estacion Universidad.",
+      "permisos": "Libre acceso",
+      "temporada_nota": "Muy concurrido los domingos por deportistas.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "",
+      "checklist_tip": "Llevar prismaticos para observar aves en la cima.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfHay estacionamiento dentro del cerro?", "respuesta": "Si, en el centro de visitantes de la cima hay area de parqueadero." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Cerro El Volador Vista",
+        "caption": "Vista panorámica de Medellín desde la cima del Cerro El Volador",
+        "nombres_archivo_wikimedia": ["File:Cerro_El_Volador_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "horarios y ecoturismo" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "teatro-pablo-tobon-uribe",
+      "nombre": "Teatro Pablo Tobon Uribe",
+      "categoria_slug": "sitio",
+      "lead": "Escenario emblematico de las artes escenicas, conciertos de formato medio y la cultura del centro de la ciudad.",
+      "descripcion": "Inaugurado en 1952, el Teatro Pablo Tobon Uribe es una de las salas de espectaculos mas queridas de Medellin. Ubicado en el tradicional bulevar de La Playa, cuenta con una sala principal para 880 espectadores y la vibrante 'Cafeteria del Teatro'.\n\nSu programacion incluye obras de teatro, festivales de jazz, conciertos de musica nacional e internacional, y mercadillos culturales al aire libre.",
+      "highlight": "4.7/10 \u00b7 Teatro \u00b7 Musica en Vivo \u00b7 Cultura Centro",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "La Candelaria / Centro",
+      "lat": 6.2483,
+      "lng": -75.5606,
+      "whatsapp": "",
+      "telefono": "5742397500",
+      "email": "info@teatropablotobon.com",
+      "web": "https://www.teatropablotobon.com",
+      "instagram": "@teatropablotobon",
+      "precio_desde": "Entradas a eventos desde $20.000 COP / Varios eventos gratis",
+      "horario": "Segun funcion programada (Cafeteria 09:00 AM - 08:00 PM)",
+      "emoji": "\ud83c\udfad",
+      "hero_bg": "linear-gradient(135deg, #111111 0%, #e8a020 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Teatro \u00b7 Escenario de Espectaculos",
+      "capacidad": "880 sillas",
+      "como_llegar": "Tranvia de Ayacucho Estacion Bicentenario (a 2 cuadras).",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Teatro \u00b7 Conciertos \u00b7 Exposiciones",
+      "dificultad": "Facil",
+      "dificultad_desc": "Instalaciones adaptadas.",
+      "duracion": "2 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Segun cartelera",
+      "distancia": "Centro de Medellin",
+      "como_llegar": "Tranvia Bicentenario.",
+      "permisos": "Boleta por taquilla o TuBoleta",
+      "temporada_nota": "Consultar cartelera mensual en la web oficial.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "",
+      "checklist_tip": "Tomar un cafe en la plazoleta exterior antes de la funcion.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfDonde se compran las boletas?", "respuesta": "Directamente en la taquilla del teatro o en su plataforma web oficial." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Teatro Pablo Tobon Uribe Fachada",
+        "caption": "Fachada e ingreso del Teatro Pablo Tobon Uribe en La Playa",
+        "nombres_archivo_wikimedia": ["File:Teatro_Pablo_Tobon_Uribe.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.teatropablotobon.com", "que_respalda": "cartelera oficial" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "parque-de-las-luces-plaza-cisneros",
+      "nombre": "Parque de las Luces (Plaza Cisneros)",
+      "categoria_slug": "sitio",
+      "lead": "Intervencion urbana e iluminada compuesta por 300 faros de luz que simbolizan la transformacion del centro administrativo.",
+      "descripcion": "El Parque de las Luces, ubicado en la antigua Plaza Cisneros, es un ejemplo de renovacion del espacio publico en el centro de Medellin. Diseñado por los arquitectos Juan Manuel Pelaez y Mauricio Gaviria, cuenta con 300 torres de luz de hasta 24 metros de altura.\n\nDurante el dia, las columnas proporcionan sombra y un paisaje arquitectonico abstracto; por la noche, reflejan las fases de la luna mediante un juego de luces integradas. Se encuentra flanqueada por la Biblioteca EPM y los antiguos Vasquez y Carre.",
+      "highlight": "4.5/10 \u00b7 Arquitectura \u00b7 Fotografia \u00b7 Luz Nocturna",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "La Candelaria / Centro",
+      "lat": 6.2447,
+      "lng": -75.5714,
+      "whatsapp": "",
+      "telefono": "",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@medellintravel",
+      "precio_desde": "Gratis",
+      "horario": "Acceso libre 24 horas (Iluminacion nocturna de 06:00 PM a 12:00 AM)",
+      "emoji": "\ud83d\udca1",
+      "hero_bg": "linear-gradient(135deg, #fbc02d 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Plaza Urbana \u00b7 Intervencion Lumínica",
+      "capacidad": "Abierto",
+      "como_llegar": "Estacion Alpujarra o San Antonio de la Linea A del Metro.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Fotografia Nocturna \u00b7 Paseo Arquitectonico",
+      "dificultad": "Facil",
+      "dificultad_desc": "Plaza peatonal pavimentada.",
+      "duracion": "30-45 minutos",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Centro Administrativo Alpujarra",
+      "como_llegar": "Metro Alpujarra.",
+      "permisos": "Libre",
+      "temporada_nota": "Se aprecia en su máximo esplendor despues del atardecer.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "",
+      "checklist_tip": "Combinar con la visita a los Edificios Vasquez y Carre adyacentes.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfA que hora encienden las luces del parque?", "respuesta": "Las torres de luz se encienden automaticamente al atardecer, alrededor de las 06:15 PM." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Parque de las Luces Noche",
+        "caption": "Torres iluminadas en el Parque de las Luces en el centro de Medellin",
+        "nombres_archivo_wikimedia": ["File:Parque_de_las_Luces_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "informacion urbana" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "fiesta-del-libro-y-la-cultura-medellin",
+      "nombre": "Fiesta del Libro y la Cultura de Medellin",
+      "categoria_slug": "evento",
+      "lead": "El evento literario y ciudadano mas importante del occidente colombiano, celebrado en el Jardin Botanico.",
+      "descripcion": "La Fiesta del Libro y la Cultura de Medellin es un encuentro cultural de diez dias de duracion que se celebra cada septiembre en la Zona Norte. Con sede principal en el Jardin Botanico, reune a mas de 500 autores e ilustradores nacionales e internacionales.\n\nEl evento destaca por su caracter publico e incluyente, ofreciendo talleres de lectura para ninos en el Jardin Lectura Viva, conversatorios, presentaciones de libros, lanzamientos editoriales y una feria comercial de librerias independientes.",
+      "highlight": "4.9/10 \u00b7 Literatura \u00b7 Cultura \u00b7 Entrada Gratuita",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Zona Norte / Jardin Botanico",
+      "lat": 6.2703,
+      "lng": -75.5639,
+      "whatsapp": "",
+      "telefono": "5744444144",
+      "email": "fiestadellibro@medellin.gov.co",
+      "web": "https://www.fiestadellibroylacultura.com",
+      "instagram": "@fiestalibromed",
+      "precio_desde": "Gratis",
+      "horario": "10:00 AM - 09:00 PM durante los 10 dias del evento",
+      "emoji": "\ud83d\udcda",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #1565c0 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Feria Literaria \u00b7 Festival Cultural",
+      "capacidad": "Mas de 500.000 visitantes acumulados",
+      "como_llegar": "Estacion Universidad del Metro Linea A.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "fecha_inicio": "2026-09-04",
+      "fecha_fin": "2026-09-13",
+      "edicion": "18a Edicion",
+      "sede": "Jardin Botanico Joaquin Antonio Uribe y Parque Explora",
+      "organiza": "Secretaria de Cultura Ciudadana de Medellin",
+      "lema": "Un espacio para las historias",
+      "tipo_evento": "cultura",
+      "lineup": [
+        { "nombre": "Escritores Invitados Internacionales", "escenario": "Orquideorama" },
+        { "nombre": "Ilustradores e Editoriales Independientes", "escenario": "Jardin Lectura Viva" }
+      ],
+      "agenda": [
+        { "dia": "2026-09-04", "hora": "10:00", "actividad": "Apertura de carpas comerciales de librerias" },
+        { "dia": "2026-09-04", "hora": "17:00", "actividad": "Charlas Magistrales en el Orquideorama" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "Acceso libre a todos los espacios", "precio": "Gratis", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Bolsa de tela para libros", "Calzado comodo", "Ganas de leer"],
+      "prohibido": ["Mascotas en zonas restringidas del jardin"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfSe cobra el ingreso a la Fiesta del Libro?", "respuesta": "No, absolutamente todas las actividades y conversatorios son de entrada libre." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Fiesta del Libro Medellin Orquideorama",
+        "caption": "Muestra editorial bajo el Orquideorama durante la Fiesta del Libro",
+        "nombres_archivo_wikimedia": ["File:Fiesta_del_Libro_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.fiestadellibroylacultura.com", "que_respalda": "fechas y programacion oficial" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "alumbrados-navidenos-medellin",
+      "nombre": "Alumbrados Navidenos de Medellin",
+      "categoria_slug": "evento",
+      "lead": "Uno de los espectaculos de iluminacion navideña mas famosos del mundo, transformando el Parques del Rio y el centro urbano.",
+      "descripcion": "Los Alumbrados Navideños de Medellin, organizados por Empresas Publicas de Medellin (EPM), son una tradicion con mas de 55 años de historia. Durante los meses de diciembre y enero, millones de bombillas LED y gigantescas figuras tejidas a mano por artesanas locales decoran el Parque del Rio, el Paseo del Rio y los parques principales de las 16 comunas.\n\nReconocidos por publicaciones globales como National Geographic entre los mejores alumbrados del mundo, atraen a mas de un millon de visitantes cada temporada.",
+      "highlight": "5.0/10 \u00b7 Luces Navideñas \u00b7 Tradicion \u00b7 Parques del Rio",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Parques del Rio / Rio Medellin",
+      "lat": 6.2422,
+      "lng": -75.5761,
+      "whatsapp": "",
+      "telefono": "5743808080",
+      "email": "epm@epm.com.co",
+      "web": "https://www.epm.com.co",
+      "instagram": "@epmestamosahi",
+      "precio_desde": "Gratis",
+      "horario": "06:00 PM - 12:00 AM desde diciembre hasta principios de enero",
+      "emoji": "\ud83c\udf84",
+      "hero_bg": "linear-gradient(135deg, #1565c0 0%, #e8a020 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Espectaculo de Luces \u00b7 Tradicion Navideña",
+      "capacidad": "Mas de 1.500.000 de visitantes por temporada",
+      "como_llegar": "Estacion Exposiciones o Alpujarra de la Linea A del Metro.",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "fecha_inicio": "2026-12-01",
+      "fecha_fin": "2027-01-11",
+      "edicion": "Edicion 59",
+      "sede": "Parques del Rio y Rio Medellin",
+      "organiza": "EPM - Empresas Publicas de Medellin",
+      "lema": "Medellin Ilumina la Navidad",
+      "tipo_evento": "cultura",
+      "lineup": [],
+      "agenda": [
+        { "dia": "2026-12-01", "hora": "18:30", "actividad": "Ritual de Encendido de los Alumbrados" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "Acceso libre a todos los corredores iluminados", "precio": "Gratis", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Calzado comodo", "Camara fotográfica", "Sombrilla por lluvias nocturnas"],
+      "prohibido": ["Ventas ambulantes no autorizadas en el corredor central"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfA que hora encienden las luces de Navidad?", "respuesta": "El encendido es diario a las 06:00 PM y permanecen encendidas hasta las 12:00 AM." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Alumbrados Navideños Medellin Parques del Rio",
+        "caption": "Figura gigante iluminada sobre el Rio Medellin en Parques del Rio",
+        "nombres_archivo_wikimedia": ["File:Alumbrados_Navidenos_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.epm.com.co", "que_respalda": "fechas e informacion de EPM" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "calle-de-la-buena-mesa-envigado",
+      "nombre": "Calle de la Buena Mesa (Envigado)",
+      "categoria_slug": "comida",
+      "lead": "Tradicional corredor gastronomico del municipio vecino de Envigado, famoso por carnes a la parrilla y bistros acogedores.",
+      "descripcion": "La Calle de la Buena Mesa es el epicentro culinario del municipio de Envigado, colindante con Medellin. Este barrio de casas tradicionales convertidas en restaurantes ofrece una atmosfera acogedora y familiar.\n\nSu oferta abarca desde tradicionales parrillas antioqueñas y trattorias italianas, hasta propuestas contemporaneas de mariscos, hamburguesas de autor y reposteria artesanal.",
+      "highlight": "4.7/10 \u00b7 Gastronomia \u00b7 Parrilla \u00b7 Ambiente Familiar",
+      "ciudad": "Envigado",
+      "region": "Antioquia",
+      "barrio": "Jardín / Envigado",
+      "lat": 6.1731,
+      "lng": -75.5861,
+      "whatsapp": "",
+      "telefono": "",
+      "email": "",
+      "web": "https://www.turismoenvigado.gov.co",
+      "instagram": "@buenamesaenvigado",
+      "precio_desde": "Platos desde $28.000 hasta $85.000 COP",
+      "horario": "Lun-Dom 12:00 PM - 10:30 PM",
+      "emoji": "\ud83e\udd69",
+      "hero_bg": "linear-gradient(135deg, #8d6e63 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Distrito Culinario \u00b7 Restaurantes de Barrio",
+      "capacidad": "Multiples locales",
+      "como_llegar": "Estacion Envigado del Metro Linea A + bus integrado o taxi corto.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_comida": "Parrilla, Italiana, Reposteria, Marisco",
+      "cocina": "PARRILLA \u00b7 TRADICIONAL",
+      "ambiente": "Familiar, Agradable, De Barrio",
+      "precio_promedio": "$45.000 - $75.000 COP",
+      "terraza": "Si",
+      "reservas": "Si",
+      "domicilio": "Si",
+      "menu_destacado": [
+        { "nombre": "Punta de Ancho a la Parrilla", "precio": "$58.000 COP", "badge": "popular" }
+      ],
+      "opciones_dieta": ["Vegetariano"],
+      "horario_detallado": {
+        "Lunes": { "abre": "12:00", "cierra": "22:00" },
+        "Martes": { "abre": "12:00", "cierra": "22:00" },
+        "Miercoles": { "abre": "12:00", "cierra": "22:00" },
+        "Jueves": { "abre": "12:00", "cierra": "22:30" },
+        "Viernes": { "abre": "12:00", "cierra": "23:00" },
+        "Sabado": { "abre": "12:00", "cierra": "23:00" },
+        "Domingo": { "abre": "12:00", "cierra": "20:00" }
+      },
+      "domicilio_plataformas": ["Rappi"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfEsta cerca de la estacion del Metro?", "respuesta": "Se encuentra a unos 10 minutos en taxi desde la Estacion Envigado." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Calle de la Buena Mesa Envigado",
+        "caption": "Fachadas de restaurantes en la Calle de la Buena Mesa en Envigado",
+        "nombres_archivo_wikimedia": ["File:Calle_Buena_Mesa_Envigado.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.turismoenvigado.gov.co", "que_respalda": "directorio gastronomico" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "uva-la-esperanza-epm-medellin",
+      "nombre": "UVA La Esperanza (Unidad de Vida Articulada)",
+      "categoria_slug": "sitio",
+      "lead": "Ejemplo galardonado de arquitectura social que transformo un tanque de agua en parque comunitario intercurtural.",
+      "descripcion": "Las Unidades de Vida Articulada (UVA) son intervenciones urbanisticas impulsadas por EPM para tumbar las mallas que rodeaban los tanques de agua en los barrios periféricos y devolver el espacio a la comunidad. La UVA La Esperanza, en la Comuna 1 (Popular), es una de las mas emblematicas.\n\nCuenta con juegos de agua interactivos, senderos peatonales, miradores y aulas para talleres culturales y digitales gratuitos.",
+      "highlight": "4.8/10 \u00b7 Arquitectura Social \u00b7 Comunidad \u00b7 Mirador",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Comuna 1 - Popular",
+      "lat": 6.2922,
+      "lng": -75.5531,
+      "whatsapp": "",
+      "telefono": "5743808080",
+      "email": "",
+      "web": "https://www.epm.com.co",
+      "instagram": "@epmestamosahi",
+      "precio_desde": "Gratis",
+      "horario": "Mar-Dom 09:00 AM - 06:00 PM",
+      "emoji": "\ud83d\udca7",
+      "hero_bg": "linear-gradient(135deg, #0288d1 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Parque Comunitario \u00b7 Arquitectura Social",
+      "capacidad": "Abierto",
+      "como_llegar": "Metrocable Linea K hasta la estacion Popular.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Fotografia \u00b7 Arquitectura \u00b7 Vista Panoramica",
+      "dificultad": "Facil",
+      "dificultad_desc": "Espacio peatonal con rampas.",
+      "duracion": "1 hora",
+      "altitud": "1600 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Comuna Popular",
+      "como_llegar": "Metrocable Popular.",
+      "permisos": "Libre",
+      "temporada_nota": "Visita mañanera recomendada.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "",
+      "checklist_tip": "Llevar a los ninos con ropa de cambio por los chorros de agua interactivos.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfSe puede ingresar a los juegos de agua?", "respuesta": "Si, las fuentes de agua son interactivas y totalmente publicas para los visitantes." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "UVA La Esperanza EPM",
+        "caption": "Estructura de la UVA La Esperanza iluminada en la zona nororiental",
+        "nombres_archivo_wikimedia": ["File:UVA_La_Esperanza_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.epm.com.co", "que_respalda": "informacion de UVAS EPM" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "teatro-metropolitano-jose-gutierrez-gomez",
+      "nombre": "Teatro Metropolitano Jose Gutierrez Gomez",
+      "categoria_slug": "sitio",
+      "lead": "El gran escenario sinfonico e internacional de Medellin, sede de la Orquesta Filarmonica de Medellin.",
+      "descripcion": "Inaugurado en 1987, el Teatro Metropolitano es el recinto de mayor capacidad y especificaciones acusticas para la musica culta y espectaculos internacionales en la ciudad. Cuenta con aforo para cerca de 1.600 espectadores.\n\nEs la sede oficial de la Orquesta Filarmonica de Medellin (Filarmed) y de temporadas anuales de opera, ballet clasico, teatro musical y conciertos pop-rock de gran formato.",
+      "highlight": "4.8/10 \u00b7 Musica Sinfonica \u00b7 Ballet \u00b7 Gran Formato",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "La Candelaria / Alpujarra",
+      "lat": 6.2411,
+      "lng": -75.5769,
+      "whatsapp": "",
+      "telefono": "5742324200",
+      "email": "info@teatrometropolitano.com",
+      "web": "https://www.teatrometropolitano.com",
+      "instagram": "@teatrometropolitano",
+      "precio_desde": "Segun evento (Desde $35.000 COP hasta $350.000 COP)",
+      "horario": "Segun cartelera de eventos",
+      "emoji": "\ud83c\udfbb",
+      "hero_bg": "linear-gradient(135deg, #111111 0%, #3f51b5 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Teatro Sinfonico \u00b7 Auditorio",
+      "capacidad": "1.634 sillas",
+      "como_llegar": "Estacion Exposiciones de la Linea A del Metro (5 minutos a pie).",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Conciertos Sinfónicos \u00b7 Opera \u00b7 Espectaculos",
+      "dificultad": "Facil",
+      "dificultad_desc": "Instalaciones completamente accesibles.",
+      "duracion": "2-3 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Segun espectaculo",
+      "distancia": "Sector Alpujarra",
+      "como_llegar": "Metro Exposiciones.",
+      "permisos": "Boleta en TuBoleta o taquilla",
+      "temporada_nota": "Temporada sinfonica permanente entre febrero y noviembre.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "Exigencia de puntualidad; no se permite el ingreso una vez iniciada la funcion.",
+      "checklist_tip": "Consultar la cartelera de Filarmed para conciertos educativos con entrada con descuento.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfCuenta con parqueadero propio?", "respuesta": "Si, el teatro tiene parqueadero cubierto vigilado para los asistentes." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Teatro Metropolitano Medellin",
+        "caption": "Sala principal del Teatro Metropolitano Jose Gutierrez Gomez",
+        "nombres_archivo_wikimedia": ["File:Teatro_Metropolitano_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.teatrometropolitano.com", "que_respalda": "capacidad y programacion" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "sabores-de-santa-elena-restaurantes",
+      "nombre": "Corredor Gastronomico de Santa Elena",
+      "categoria_slug": "comida",
+      "lead": "Restaurantes campestres famosos por la cocina a la leña, chorizos artesanales y postres tradicionales de montaña.",
+      "descripcion": "A solo 45 minutos del centro urbano de Medellin, el corregimiento de Santa Elena ofrece un corredor culinario campestre rodeado de bosques de pino. Sus estaderos y restaurantes tradicionales son el destino dominical por excelencia para las familias paisas.\n\nLa especialidad de la zona son los sancochos de trifasico cocinados en fogon de leña, picadas antioqueñas con chorizo artesanal, mazamorra dulce con panela molida y postres a base de mora silvestre cultivada en la region.",
+      "highlight": "4.8/10 \u00b7 Fogon de Leña \u00b7 Sancocho \u00b7 Comida Campestre",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Corregimiento de Santa Elena",
+      "lat": 6.2100,
+      "lng": -75.5000,
+      "whatsapp": "",
+      "telefono": "",
+      "email": "",
+      "web": "https://www.santaelena.com.co",
+      "instagram": "@santaelenaantioquia",
+      "precio_desde": "Platos desde $25.000 hasta $55.000 COP",
+      "horario": "Vie-Dom y Festivos 09:00 AM - 06:00 PM",
+      "emoji": "\ud83c\udf72",
+      "hero_bg": "linear-gradient(135deg, #d84315 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Gastronomia Campestre \u00b7 Fogon de Leña",
+      "capacidad": "Multiples estaderos rústicos",
+      "como_llegar": "Buses Santa Elena desde la Avenida La Playa en el centro de Medellin.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_comida": "Cocina Tipica Antioqueña, Sancochos, Chorizos, Postres",
+      "cocina": "CAMPESTRE \u00b7 TRADICIONAL",
+      "ambiente": "Campestre, Rústico, Familiar",
+      "precio_promedio": "$35.000 - $50.000 COP",
+      "terraza": "Si",
+      "reservas": "No",
+      "domicilio": "No",
+      "menu_destacado": [
+        { "nombre": "Sancocho de Gallina en Fogon de Leña", "precio": "$38.000 COP", "badge": "popular" },
+        { "nombre": "Chorizo Artesanal de Santa Elena", "precio": "$18.000 COP", "badge": "popular" }
+      ],
+      "opciones_dieta": ["Vegetariano basico"],
+      "horario_detallado": {
+        "Viernes": { "abre": "10:00", "cierra": "17:00" },
+        "Sabado": { "abre": "09:00", "cierra": "18:00" },
+        "Domingo": { "abre": "09:00", "cierra": "18:00" }
+      },
+      "domicilio_plataformas": []
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfAbren entre semana?", "respuesta": "La mayoria de estaderos campestres concentran su atencion de viernes a domingo y festivos." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Sancocho Fogon de Leña Santa Elena",
+        "caption": "Sancocho tradicional cocinado a la leña en restaurante de Santa Elena",
+        "nombres_archivo_wikimedia": ["File:Sancocho_Santa_Elena_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.santaelena.com.co", "que_respalda": "gastronomia local" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "glampings-santa-elena-bosque",
+      "nombre": "Glamping y Eco-lodges en Santa Elena",
+      "categoria_slug": "hostal",
+      "lead": "Experiencia de alojamiento exclusivo entre bosques de niebla y pino a pocos minutos del Parque Arvi.",
+      "descripcion": "El corregimiento de Santa Elena se ha consolidado como el destino principal de ecoturismo y glamping de alta gama cercano a Medellin. Sus domos geodesicos y cabañas de madera ofrecen una estancia inmersa en la naturaleza sin renunciar al confort.\n\nLos alojamientos incluyen jacuzzis privados con vista a los bosques, mallas catamaran, fogatas nocturnas al aire libre y servicios de desayuno artesanal montañero.",
+      "highlight": "4.9/10 \u00b7 Glamping \u00b7 Naturaleza \u00b7 Romance \u00b7 Bosque",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Santa Elena / Vereda Mazo",
+      "lat": 6.2150,
+      "lng": -75.4950,
+      "whatsapp": "573000000000",
+      "telefono": "",
+      "email": "reserva@glampingsantaelena.co",
+      "web": "https://www.santaelena.com.co",
+      "instagram": "@glampingantaelena",
+      "precio_desde": "Cabañas/Domos desde $280.000 COP por noche",
+      "horario": "Check-in 15:00 / Check-out 11:00",
+      "emoji": "\ud83c\udfd5\ufe0f",
+      "hero_bg": "linear-gradient(135deg, #2e7d32 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Glamping \u00b7 Eco-Lodge \u00b7 Cabaña",
+      "capacidad": "Parejas y grupos reducidos",
+      "como_llegar": "Transporte privado o taxi desde el centro de Medellin / Estacion Metrocable Arvi.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_alojamiento": "Glamping / Domo Geodesico",
+      "checkin": "15:00",
+      "checkout": "11:00",
+      "recepcion": "Hasta las 20:00",
+      "edad_minima": "18",
+      "mascotas": "Pet Friendly con restriccion",
+      "cocina_compartida": "No",
+      "barrio_descripcion": "Zona rural boscosa de alta tranquilidad y seguridad.",
+      "politica_cancelacion": "Cancelacion con 48 horas de anticipacion.",
+      "reglas_casa": "Prohibido altavoces de gran volumen fuera de las cabañas.",
+      "habitaciones": [
+        { "tipo": "Domo Geodesico con Jacuzzi", "subtitulo": "Vista panorámica al bosque y malla", "badge": "popular", "camas": "1 Cama King", "precio": "$350.000 COP" }
+      ],
+      "amenidades": ["Jacuzzi Hidromasaje", "Fogata Privada", "Wi-Fi Starlink", "Desayuno Incluido"],
+      "actividades": [
+        { "icono": "\ud83d\udd25", "nombre": "Noche de Fogata", "descripcion": "Espacio para fogata con kit de malvaviscos bajo las estrellas." }
+      ],
+      "que_incluye": ["Desayuno artesanal", "Jacuzzi climatizado"],
+      "transporte": [],
+      "eventos_hostal": []
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfHace mucho frio de noche?", "respuesta": "Si, las temperaturas pueden bajar a 11\u00b0C, por lo que las cabañas cuentan con cobijas termicas y calefaccion." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Glamping Domo Santa Elena Bosque",
+        "caption": "Domo geodésico iluminado de noche en el bosque de Santa Elena",
+        "nombres_archivo_wikimedia": ["File:Glamping_Santa_Elena_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.santaelena.com.co", "que_respalda": "oferta de ecoturismo" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "parque-de-los-deseos-casa-musica",
+      "nombre": "Parque de los Deseos y Casa de la Musica",
+      "categoria_slug": "sitio",
+      "lead": "Espacio publico participativo diseñado para la ciencia al aire libre, astronomia y conciertos populares.",
+      "descripcion": "El Parque de los Deseos es una plaza publica de 12.000 metros cuadrados concebida por el arquitecto Felipe Uribe de Bedout. Diseñado para interactuar con los elementos del universo, cuenta con dispositivos acusticos, reloj solar, estanque de agua y proyecciones cinematograficas al aire libre.\n\nEn su costado oriental se erige la Casa de la Musica, sede de ensayos para orquestas juveniles e infantiles de Medellin y espacio para conciertos gratuitos.",
+      "highlight": "4.6/10 \u00b7 Ciencia Urbana \u00b7 Cine al Aire Libre \u00b7 Musica",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Zona Norte / Aranjuez",
+      "lat": 6.2689,
+      "lng": -75.5658,
+      "whatsapp": "",
+      "telefono": "5745168300",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@medellintravel",
+      "precio_desde": "Gratis",
+      "horario": "Acceso libre 24 horas",
+      "emoji": "\ud83c\udf1f",
+      "hero_bg": "linear-gradient(135deg, #1565c0 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Parque Publico \u00b7 Espacio Interactivo",
+      "capacidad": "Abierto",
+      "como_llegar": "Estacion Universidad de la Linea A del Metro.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Cine al Aire Libre \u00b7 Astronomia Urbana \u00b7 Musica",
+      "dificultad": "Facil",
+      "dificultad_desc": "Plaza completamente accesible.",
+      "duracion": "1-2 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Zona Norte",
+      "como_llegar": "Metro Universidad.",
+      "permisos": "Libre",
+      "temporada_nota": "Cine al aire libre los fines de semana al atardecer.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "",
+      "checklist_tip": "Llevar una manta para sentarse en la arena a ver proyecciones nocturnas.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfLas funciones de cine al aire libre tienen costo?", "respuesta": "No, las proyecciones en la pantalla gigante del parque son 100% gratuitas." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Parque de los Deseos Medellin",
+        "caption": "Plaza y estructura acustica en el Parque de los Deseos",
+        "nombres_archivo_wikimedia": ["File:Parque_de_los_Deseos_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "guia del parque" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "centro-cultural-moravia-medellin",
+      "nombre": "Centro Cultural Moravia",
+      "categoria_slug": "sitio",
+      "lead": "Ejemplo mundial de desarrollo comunitario e innovacion urbana en un antiguo entorno transformado.",
+      "descripcion": "Moravia es uno de los barrios con mayor densidad y vitalidad comunitaria de Medellin. En el centro del barrio se erige el Centro Cultural Moravia, un edificio de arquitectura abierta diseñado por el arquitecto Rogelio Salmona.\n\nEl centro ofrece talleres permanentes de artes, musica, danza, recorridos por el jardin comunitario del 'Morro' (antiguo botadero transformado en vivero) e iniciativas de memoria historica.",
+      "highlight": "4.8/10 \u00b7 Innovacion Social \u00b7 Rogelio Salmona \u00b7 Memoria",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Moravia / Aranjuez",
+      "lat": 6.2761,
+      "lng": -75.5650,
+      "whatsapp": "",
+      "telefono": "5742136000",
+      "email": "contacto@centroculturalmoravia.org",
+      "web": "https://www.centroculturalmoravia.org",
+      "instagram": "@centroculturalmoravia",
+      "precio_desde": "Gratis",
+      "horario": "Lun-Sab 08:00 AM - 07:00 PM",
+      "emoji": "\ud83c\udfe1",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #2e7d32 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Centro Cultural \u00b7 Desarrollo Comunitario",
+      "capacidad": "Abierto",
+      "como_llegar": "Estacion Caribe de la Linea A del Metro (5 minutos caminando).",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Recorridos Comunitarios \u00b7 Jardineria Urbana \u00b7 Talleres",
+      "dificultad": "Facil",
+      "dificultad_desc": "Instalaciones accesibles.",
+      "duracion": "2 horas",
+      "altitud": "1490 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Zona Norte",
+      "como_llegar": "Metro Caribe.",
+      "permisos": "Libre acceso",
+      "temporada_nota": "Realizar los recorridos comunitarios con guias del barrio.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "",
+      "checklist_tip": "Conocer la huerta comunitaria en la cima del Morro de Moravia.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfQuien diseño el edificio?", "respuesta": "El afamado arquitecto colombiano Rogelio Salmona." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Centro Cultural Moravia Medellin",
+        "caption": "Edificio del Centro Cultural Moravia diseñado por Rogelio Salmona",
+        "nombres_archivo_wikimedia": ["File:Centro_Cultural_Moravia.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.centroculturalmoravia.org", "que_respalda": "actividades comunitarias" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "plaza-de-florez-mercado-medellin",
+      "nombre": "Plaza de Mercado de Florez",
+      "categoria_slug": "comida",
+      "lead": "Mercado tradicional del centro fundado en 1891, famoso por sus puestos de flores frescas, frutas exoticas y fondas de cocina tipica.",
+      "descripcion": "La Plaza de Florez es un monumento historico y comercial en el oriente del centro de Medellin. Fue la primera plaza de mercado cubierta de la ciudad y el punto historico donde los silleteros descendian desde Santa Elena a vender sus flores.\n\nHoy en dia es un hervidero de color con pasillos dedicados a flores tropicales, frutas campesinas colombianas, hierbas medicinales y fondas tipicas donde se sirven desayunos paisas tradicionales.",
+      "highlight": "4.7/10 \u00b7 Mercado Tradicional \u00b7 Flores \u00b7 Gastronomia de Plaza",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Buenos Aires / Centro",
+      "lat": 6.2442,
+      "lng": -75.5583,
+      "whatsapp": "",
+      "telefono": "5742392525",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@plazadeflorez",
+      "precio_desde": "Platos tipicos desde $15.000 COP",
+      "horario": "Lun-Sab 06:00 AM - 05:00 PM / Dom 06:00 AM - 01:00 PM",
+      "emoji": "\ud83e\udd5d",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #4caf50 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Plaza de Mercado \u00b7 Comida Tipica",
+      "capacidad": "Abierto al publico",
+      "como_llegar": "Tranvia de Ayacucho Estacion Bicentenario (frente a la plaza).",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_comida": "Comida Tipica Antioqueña, Jugos Naturales, Caldos",
+      "cocina": "TRADICIONAL \u00b7 POPULAR",
+      "ambiente": "Popular, Autentico, Tradicional",
+      "precio_promedio": "$15.000 - $25.000 COP",
+      "terraza": "No",
+      "reservas": "No",
+      "domicilio": "No",
+      "menu_destacado": [
+        { "nombre": "Caldo de Costilla Paisa", "precio": "$14.000 COP", "badge": "popular" },
+        { "nombre": "Jugo Natural en Agua/Leche", "precio": "$6.000 COP", "badge": "popular" }
+      ],
+      "opciones_dieta": ["Frutas Frescas"],
+      "horario_detallado": {
+        "Lunes": { "abre": "06:00", "cierra": "17:00" },
+        "Martes": { "abre": "06:00", "cierra": "17:00" },
+        "Miercoles": { "abre": "06:00", "cierra": "17:00" },
+        "Jueves": { "abre": "06:00", "cierra": "17:00" },
+        "Viernes": { "abre": "06:00", "cierra": "17:00" },
+        "Sabado": { "abre": "06:00", "cierra": "17:00" },
+        "Domingo": { "abre": "06:00", "cierra": "13:00" }
+      },
+      "domicilio_plataformas": []
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfComo se llega en transporte publico?", "respuesta": "El Tranvia de Ayacucho tiene una estacion llamada Bicentenario justo al frente de la plaza." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Plaza de Florez Medellin Flores",
+        "caption": "Puestos de flores tropicales en el interior de la Plaza de Florez",
+        "nombres_archivo_wikimedia": ["File:Plaza_de_Florez_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "historia y ubicacion" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "la-candelaria-centro-historico-medellin",
+      "nombre": "La Candelaria (Centro Historico)",
+      "categoria_slug": "sitio",
+      "lead": "El corazon historico, comercial y administrativo de Medellin donde convergen monumentos, pasajes y tradicion.",
+      "descripcion": "La comuna de La Candelaria comprende el centro historico de Medellin. En sus calles confluyen mas de tres siglos de historia, representados en hitos como la Basílica Metropolitana, la Iglesia de la Candelaria, el Pasaje Junín y el Edificio Coltejer.\n\nEs un espacio efervescente donde el comercio tradicional, los cafes literarios clasicos (como el Cafe Salon Malaga) y la arquitectura republicana ofrecen una radiografia vibrante de la identidad paisa.",
+      "highlight": "4.6/10 \u00b7 Historia \u00b7 Pasaje Junin \u00b7 Cafe Malaga",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "La Candelaria / Centro",
+      "lat": 6.2472,
+      "lng": -75.5658,
+      "whatsapp": "",
+      "telefono": "",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@medellintravel",
+      "precio_desde": "Gratis",
+      "horario": "Acceso libre (Comercio 08:00 AM - 07:00 PM)",
+      "emoji": "\ud83d\uddfc",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Centro Historico \u00b7 Bulevar Comercial",
+      "capacidad": "Abierto",
+      "como_llegar": "Estaciones San Antonio, Parque Berrio o Parque de la Candelaria del Metro.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Caminata Historica \u00b7 Compras \u00b7 Cafes Clasicos",
+      "dificultad": "Facil",
+      "dificultad_desc": "Pasajes peatonales planos.",
+      "duracion": "3 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Centro de Medellin",
+      "como_llegar": "Metro Parque Berrio.",
+      "permisos": "Libre",
+      "temporada_nota": "Recorrer preferiblemente durante el dia.",
+      "fauna_flora": [],
+      "secretos": [
+        {
+          "icono": "\ud83d\udcfb",
+          "titulo": "Salon Malaga",
+          "texto": "Bar y cafe fundado en 1957 famoso por conservar mas de 50.000 discos de tango en vinilo.",
+          "tag": "Tango",
+          "tag_color": "gold"
+        }
+      ],
+      "regulaciones": "Estar atento a objetos personales en zonas de alta aglomeracion.",
+      "checklist_tip": "Caminar por el Pasaje Junín y pedir un buñuelo con chocolate caliente.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfCual es el edificio mas alto del centro?", "respuesta": "El Edificio Coltejer, con 175 metros de altura y forma de aguja textil." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Pasaje Junin Centro Medellin",
+        "caption": "Pasaje peatonal Junín con el Edificio Coltejer al fondo",
+        "nombres_archivo_wikimedia": ["File:Pasaje_Junin_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "guia del centro" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "hostales-comuna-13-san-javier",
+      "nombre": "Alojamientos Comunitarios de la Comuna 13",
+      "categoria_slug": "hostal",
+      "lead": "Hospedajes emergentes atendidos por familias locales con vistas espectaculares sobre la ladera occidental.",
+      "descripcion": "Como parte del fenomeno de turismo comunitario, en la Comuna 13 han surgido hostales y casas de familia adaptadas para recibir a viajeros internacionales. Hospedarse en la ladera permite experimentar la calidez de la comunidad, disfrutar de atardeceres sobre la ciudad y apoyar directamente la economia local.\n\nLos alojamientos destacan por sus terrazas con mirador, decoracion inspirada en el grafiti y talleres interactivos con los vecinos del barrio.",
+      "highlight": "4.8/10 \u00b7 Turmo Comunitario \u00b7 Mirador \u00b7 Autenticidad",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "San Javier / Independencias",
+      "lat": 6.2520,
+      "lng": -75.6140,
+      "whatsapp": "",
+      "telefono": "",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@comuna13medellin",
+      "precio_desde": "Dorms desde $45.000; Privadas desde $120.000 COP",
+      "horario": "Recepcion familiar",
+      "emoji": "\ud83c\udfe1",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Hostal Comunitario \u00b7 Casa de Familia",
+      "capacidad": "Habitaciones limitadas",
+      "como_llegar": "Metro San Javier + bus o transporte comunitario.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_alojamiento": "Hostal Comunitario",
+      "checkin": "14:00",
+      "checkout": "11:00",
+      "recepcion": "Hasta las 21:00",
+      "edad_minima": "18",
+      "mascotas": "Pet Friendly",
+      "cocina_compartida": "Si",
+      "barrio_descripcion": "Barrio popular de ladera lleno de dinamismo y galerias urbanas.",
+      "politica_cancelacion": "Cancelacion flexible 24 horas antes.",
+      "reglas_casa": "Respetar la convivencia comunitaria.",
+      "habitaciones": [
+        { "tipo": "Cama en Dormitorio Mixto", "subtitulo": "Vista panorámica a la ciudad", "badge": "popular", "camas": "1 Cama litera", "precio": "$45.000 COP" }
+      ],
+      "amenidades": ["Wi-Fi", "Mirador en Terraza", "Desayuno Local"],
+      "actividades": [
+        { "icono": "\ud83c\udfa8", "nombre": "Taller de Grafiti", "descripcion": "Clase basica de pintado con aerosol con artistas del barrio." }
+      ],
+      "que_incluye": ["Desayuno tipico"],
+      "transporte": [],
+      "eventos_hostal": []
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfComo se sube el equipaje hasta los hostales de la montaña?", "respuesta": "Existen mototaxis y servicios comunitarios de apoyo desde la estacion del Metro." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Hostal Comuna 13 Mirador",
+        "caption": "Terraza de hostal comunitario con vista sobre la Comuna 13",
+        "nombres_archivo_wikimedia": ["File:Hostal_Comuna_13_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "turismo comunitario" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "envigado-centro-jardin-alojamiento",
+      "nombre": "Envigado Zona Centro y Barrio Jardin",
+      "categoria_slug": "sitio",
+      "lead": "El municipio mas seguro y tradicional del Valle de Aburra, perfecto para una estancia tranquila con sabor local.",
+      "descripcion": "Envigado, vecino inmediato de Medellin por el sur, conserva un ritmo de vida apacible de pueblo antioqueño combinado con servicios de ciudad moderna. Su plaza principal, sombreada por ceibas centenarias y flanqueada por la Iglesia de Santa Gertrudis, es el corazon de la vida social.\n\nEs una excelente opcion de alojamiento para quienes buscan tranquilidad, excelente gastronomia en la Calle de la Buena Mesa y facil conexion al Metro.",
+      "highlight": "4.8/10 \u00b7 Vida Tradicional \u00b7 Seguridad \u00b7 Plaza Principal",
+      "ciudad": "Envigado",
+      "region": "Antioquia",
+      "barrio": "Centro / Jardin",
+      "lat": 6.1722,
+      "lng": -75.5878,
+      "whatsapp": "",
+      "telefono": "",
+      "email": "",
+      "web": "https://www.turismoenvigado.gov.co",
+      "instagram": "@alcaldiaenvigado",
+      "precio_desde": "Gratis",
+      "horario": "Acceso libre 24 horas",
+      "emoji": "\ud83c\udf33",
+      "hero_bg": "linear-gradient(135deg, #2e7d32 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Municipio \u00b7 Centro Historico",
+      "capacidad": "Abierto",
+      "como_llegar": "Estacion Envigado de la Linea A del Metro + bus integrado a la plaza.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Paseo Tradicional \u00b7 Gastronomia \u00b7 Parques",
+      "dificultad": "Facil",
+      "dificultad_desc": "Terreno plano accesible.",
+      "duracion": "2-3 horas",
+      "altitud": "1530 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Sur del Valle de Aburra",
+      "como_llegar": "Metro Envigado.",
+      "permisos": "Libre",
+      "temporada_nota": "Famoso por sus alumbrados navideños locales en diciembre.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "",
+      "checklist_tip": "Probar las morcillas tradicionales en las fondas cercanas al parque.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfEnvigado pertenece a Medellin?", "respuesta": "No, es un municipio independiente que forma parte del Area Metropolitana del Valle de Aburra." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Parque Principal Envigado",
+        "caption": "Iglesia de Santa Gertrudis y Parque Principal de Envigado",
+        "nombres_archivo_wikimedia": ["File:Parque_Principal_Envigado.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.turismoenvigado.gov.co", "que_respalda": "sitios de interes" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "festival-internacional-de-poesia-medellin",
+      "nombre": "Festival Internacional de Poesia de Medellin",
+      "categoria_slug": "evento",
+      "lead": "Uno de los encuentros poeticos mas masivos del mundo, galardonado con el Premio Nobel Alternativo.",
+      "descripcion": "Fundado en 1991 como una respuesta cultural y pacifica a la violencia urbana, el Festival Internacional de Poesia de Medellin reune anualmente a decenas de poetas de mas de 40 paises. Durante una semana, parques, teatros, universidades y bibliotecas de la ciudad se llenan de recitales de poesia masivos.\n\nEs un evento de entrada totalmente gratuita que ha congregado a mas de 10.000 personas en recitales al aire libre en el Teatro al Aire Libre Carlos Vieco.",
+      "highlight": "4.9/10 \u00b7 Poesia \u00b7 Paz \u00b7 Premio Nobel Alternativo",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Varios escenarios de la ciudad",
+      "lat": 6.2442,
+      "lng": -75.5812,
+      "whatsapp": "",
+      "telefono": "5742161600",
+      "email": "poesia@prometeo.org",
+      "web": "https://www.festivaldepoesiademedellin.org",
+      "instagram": "@poesiamedellin",
+      "precio_desde": "Gratis",
+      "horario": "Programacion variada entre julio y agosto",
+      "emoji": "\ud83d\udcdc",
+      "hero_bg": "linear-gradient(135deg, #4a148c 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Festival Literario \u00b7 Poesia",
+      "capacidad": "Mas de 50.000 asistentes globales",
+      "como_llegar": "Escenarios conectados a la Red Metro.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "fecha_inicio": "2026-07-11",
+      "fecha_fin": "2026-07-18",
+      "edicion": "Edicion 36",
+      "sede": "Teatro Carlos Vieco, Jardin Botanico, Parque de los Deseos",
+      "organiza": "Revista Prometeo",
+      "lema": "Por la paz y el canto de los pueblos",
+      "tipo_evento": "cultura",
+      "lineup": [
+        { "nombre": "Poetas de los 5 Continentes", "escenario": "Teatro Carlos Vieco" }
+      ],
+      "agenda": [
+        { "dia": "2026-07-11", "hora": "16:00", "actividad": "Recital Inaugural de Poesia" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "Entrada libre a todos los recitales", "precio": "Gratis", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Cojin para sentarse en la hierba", "Agua", "Libreta de apuntes"],
+      "prohibido": []
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfLos recitales en idiomas extranjeros tienen traduccion?", "respuesta": "Si, todos los recitales cuentan con lectura simultanea en espanol." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Festival Poesia Medellin Teatro Carlos Vieco",
+        "caption": "Publico masivo en el Teatro Carlos Vieco durante el Festival de Poesia",
+        "nombres_archivo_wikimedia": ["File:Festival_Poesia_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.festivaldepoesiademedellin.org", "que_respalda": "programacion y poetes" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "desfile-de-autos-clasicos-y-antiguos-medellin",
+      "nombre": "Desfile de Autos Clasicos y Antiguos",
+      "categoria_slug": "evento",
+      "lead": "Uno de los eventos mas concurridos de la Feria de las Flores, exhibiendo mas de 300 joyas automotrices en movimiento.",
+      "descripcion": "El Desfile de Autos Clasicos y Antiguos es un museo rodante que recorre las principales avenidas de Medellin y Envigado durante la Feria de las Flores. Reune a mas de 300 vehiculos conservados en estado original, desde modelos de comienzos del siglo XX hasta joyas deportivas de los años 70.\n\nLos tripulantes ataviados con vestimentas de la epoca de cada vehiculo saludan a cientos de miles de espectadores alineados a lo largo del recorrido.",
+      "highlight": "4.9/10 \u00b7 Autos Clasicos \u00b7 Museo Rodante \u00b7 Feria de Flores",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Envigado / Las Vegas / Medellin",
+      "lat": 6.2000,
+      "lng": -75.5800,
+      "whatsapp": "",
+      "telefono": "5744444144",
+      "email": "",
+      "web": "https://www.autosclasicos.com.co",
+      "instagram": "@autosclasicosmedellin",
+      "precio_desde": "Gratis a lo largo de las vias / Palcos pagos",
+      "horario": "10:00 AM - 03:00 PM (Un dia durante la Feria de Flores)",
+      "emoji": "\ud83d\ude97",
+      "hero_bg": "linear-gradient(135deg, #c62828 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Desfile Automovilistico \u00b7 Evento de Feria",
+      "capacidad": "Mas de 800.000 espectadores en vias",
+      "como_llegar": "Conexion vial mediante estaciones del Metro Linea A sobre la Avenida Las Vegas.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "fecha_inicio": "2026-08-06",
+      "fecha_fin": "2026-08-06",
+      "edicion": "Edicion 28",
+      "sede": "Recorrido desde El Colombiano (Envigado) hasta EAFIT / Universidad de Medellin",
+      "organiza": "Fundacion Museo del Transporte",
+      "lema": "Joyas sobre ruedas",
+      "tipo_evento": "festival",
+      "lineup": [],
+      "agenda": [
+        { "dia": "2026-08-06", "hora": "10:30", "actividad": "Salida de la caravana de vehiculos antiguos" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "Uso de espacio publico en aceras", "precio": "Gratis", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Sombrilla", "Silla plegable de playa", "Protector solar"],
+      "prohibido": ["Cruzarse en la via de desfile"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfCual es el requisito para que un auto participe?", "respuesta": "Debe tener mas de 35 años de antiguedad y conservar mas del 85% de sus piezas originales." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Desfile Autos Clasicos Medellin",
+        "caption": "Vehiculo clasico desfilando con tripulantes vestidos a la usanza antigua",
+        "nombres_archivo_wikimedia": ["File:Desfile_Autos_Clasicos_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.autosclasicos.com.co", "que_respalda": "recorrido y participantes" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "festival-nacional-de-la-trova-medellin",
+      "nombre": "Festival Nacional de la Trova Ciudad de Medellin",
+      "categoria_slug": "evento",
+      "lead": "El certamen mas importante de la troversia paisa, donde la repentizacion y el humor se disputan el titulo de Rey de la Trova.",
+      "descripcion": "La trova antioqueña es una de las expresiones folcloricas mas vivas del occidente colombiano. Consiste en un duelo de versos improvisados con rima consonante y acompanamiento de tiple sobre melodias tradicionales.\n\nEl Festival Nacional de la Trova se celebra en el marco de la Feria de las Flores en escenarios masivos como el Parque de los Deseos y la Plaza Mayor. Decenas de repentistas compiten improvisando sobre temas de actualidad, humor y cultura paisa.",
+      "highlight": "4.8/10 \u00b7 Trova \u00b7 Improvisacion \u00b7 Humor \u00b7 Tradicion",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Plaza Mayor / Parque de los Deseos",
+      "lat": 6.2422,
+      "lng": -75.5761,
+      "whatsapp": "",
+      "telefono": "5744444144",
+      "email": "",
+      "web": "https://www.medellin.gov.co",
+      "instagram": "@nosmuevelaflor",
+      "precio_desde": "Gratis",
+      "horario": "06:00 PM - 11:00 PM (Eliminatorias y Gran Final)",
+      "emoji": "\ud83c\udfb8",
+      "hero_bg": "linear-gradient(135deg, #e8a020 0%, #3f51b5 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Certamen Folclorico \u00b7 Humor \u00b7 Troversia",
+      "capacidad": "Mas de 15.000 espectadores en la final",
+      "como_llegar": "Metro Alpujarra o Universidad segun el escenario.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "fecha_inicio": "2026-08-01",
+      "fecha_fin": "2026-08-08",
+      "edicion": "Edicion 22",
+      "sede": "Parque de los Deseos y Plaza Mayor",
+      "organiza": "Alcaldia de Medellin",
+      "lema": "El verso de la tradicion",
+      "tipo_evento": "festival",
+      "lineup": [
+        { "nombre": "Los Mejores Trovadores de Colombia", "escenario": "Plaza Mayor" }
+      ],
+      "agenda": [
+        { "dia": "2026-08-08", "hora": "18:00", "actividad": "Gran Final y Coronacion del Rey de la Trova" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "Entrada libre hasta completar aforo", "precio": "Gratis", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Llegar temprano para alcanzar buena ubicacion"],
+      "prohibido": []
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfSe requiere boleta para la Gran Final?", "respuesta": "No, el ingreso es gratuito ordenado por fila hasta agotar aforo." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Festival de la Trova Medellin",
+        "caption": "Trovadores disputando la final en el Festival Nacional de la Trova",
+        "nombres_archivo_wikimedia": ["File:Festival_Trova_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.gov.co", "que_respalda": "programacion de la trova" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "parque-de-los-pies-descalzos-medellin",
+      "nombre": "Parque de los Pies Descalzos",
+      "categoria_slug": "sitio",
+      "lead": "Oasis urbano diseñado para la relajacion sensorial en medio del centro administrativo de la ciudad.",
+      "descripcion": "El Parque de los Pies Descalzos es un espacio publico diseñado por el arquitecto Felipe Uribe de Bedout y administrado por EPM. Concebido bajo la filosofia oriental del contacto directo con la naturaleza, invita a los visitantes a descalzarse y recorrer senderos de arena, bambusales y pozos de agua refrescante.\n\nUbicado frente al Edificio Inteligente de EPM y el Museo del Agua, es un lugar perfecto para hacer una pausa de relajacion en la ciudad.",
+      "highlight": "4.6/10 \u00b7 Experiencia Sensorial \u00b7 Relax \u00b7 Parque Urbano",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Alpujarra / Centro",
+      "lat": 6.2439,
+      "lng": -75.5753,
+      "whatsapp": "",
+      "telefono": "5743808080",
+      "email": "",
+      "web": "https://www.epm.com.co",
+      "instagram": "@epmestamosahi",
+      "precio_desde": "Gratis",
+      "horario": "Mar-Dom 08:00 AM - 07:00 PM",
+      "emoji": "\ud83e\uddb6",
+      "hero_bg": "linear-gradient(135deg, #00acc1 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Parque Sensorial \u00b7 Espacio Publico",
+      "capacidad": "Abierto",
+      "como_llegar": "Estacion Alpujarra de la Linea A del Metro.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Relax Sensorial \u00b7 Hidroterapia \u00b7 Paseo Familiar",
+      "dificultad": "Facil",
+      "dificultad_desc": "Superficies de arena y piedra pulida.",
+      "duracion": "1-2 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Sector EPM / Alpujarra",
+      "como_llegar": "Metro Alpujarra.",
+      "permisos": "Libre",
+      "temporada_nota": "Cuenta con guias ambientales que orientan los recorridos sensoriales.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "Descalzarse antes de ingresar a los arenales y pozos de agua.",
+      "checklist_tip": "Llevar una toalla pequeña para secarse los pies tras el recorrido.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfHay lockers para guardar los zapatos?", "respuesta": "Si, el parque cuenta con areas de casilleros y guias para dejar el calzado." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Parque Pies Descalzos Medellin",
+        "caption": "Bosque de bambues y pozo de agua en el Parque de los Pies Descalzos",
+        "nombres_archivo_wikimedia": ["File:Parque_Pies_Descalzos_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.epm.com.co", "que_respalda": "guia e instalaciones" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "plaza-de-la-libertad-medellin",
+      "nombre": "Plaza de la Libertad",
+      "categoria_slug": "sitio",
+      "lead": "Complejo civico-cultural de arquitectura contemporanea con fachadas perforadas y plazas boscosas.",
+      "descripcion": "La Plaza de la Libertad es un complejo gubernamental y cultural ubicado junto al Centro Administrativo Alpujarra. Diseñado por los arquitectos Opus e FP Arquitectura, destaca por sus dos torres con fachadas perforadas que simulan la corteza de un arbol.\n\nEl proyecto cuenta con un amplio bosque urbano interior, anfiteatros al aire libre y el canal regional Telemedellin en sus inmediaciones.",
+      "highlight": "4.5/10 \u00b7 Arquitectura \u00b7 Espacio Civico \u00b7 Fotografia",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Alpujarra / Centro",
+      "lat": 6.2440,
+      "lng": -75.5730,
+      "whatsapp": "",
+      "telefono": "",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@medellintravel",
+      "precio_desde": "Gratis",
+      "horario": "Acceso libre 24 horas",
+      "emoji": "\ud83c\udfe2",
+      "hero_bg": "linear-gradient(135deg, #111111 0%, #616161 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Plaza Civica \u00b7 Complejo Arquitectonico",
+      "capacidad": "Abierto",
+      "como_llegar": "Estacion Alpujarra del Metro Linea A.",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_actividad": "Fotografia Arquitectonica \u00b7 Paseo Urbano",
+      "dificultad": "Facil",
+      "dificultad_desc": "Accesible.",
+      "duracion": "45 minutos",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Centro Administrativo",
+      "como_llegar": "Metro Alpujarra.",
+      "permisos": "Libre",
+      "temporada_nota": "",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "",
+      "checklist_tip": "Apreciar el diseño bioclimatico de las torres de hormigon perforado.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfSe puede ingresar a la plaza boscosa interior?", "respuesta": "Si, el bosque urbano y la plataforma de peatones son de acceso publico." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Plaza de la Libertad Medellin",
+        "caption": "Torres con fachadas perforadas en la Plaza de la Libertad",
+        "nombres_archivo_wikimedia": ["File:Plaza_de_la_Libertad_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "informacion arquitectonica" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "parques-del-rio-medellin",
+      "nombre": "Parques del Rio Medellin",
+      "categoria_slug": "sitio",
+      "lead": "El mega-proyecto de infraestructura verde que soterro la autopista para reconectar la ciudad con su rio principal.",
+      "descripcion": "Parques del Rio es una de las obras urbanisticas mas ambiciosas de la historia reciente de Medellin. Mediante el soterramiento de tramos de la Autopista Sur, se creo un parque lineal continuo a ambos lados del Rio Medellin.\n\nCuenta con amplias zonas de gramilla para picnics, ciclorrutas, fuentes de agua, plazas de eventos y puentes peatonales que conectan el occidente y el oriente de la ciudad. Es el escenario central de los Alumbrados Navideños.",
+      "highlight": "4.9/10 \u00b7 Mega-Parque \u00b7 Picnics \u00b7 Ciclorruta \u00b7 Sostenibilidad",
+      "ciudad": "Medellin",
+      "region": "Antioquia",
+      "barrio": "Conquistadores / La Candelaria",
+      "lat": 6.2422,
+      "lng": -75.5761,
+      "whatsapp": "",
+      "telefono": "5744444144",
+      "email": "",
+      "web": "https://www.medellin.travel",
+      "instagram": "@parquesdelrio",
+      "precio_desde": "Gratis",
+      "horario": "Acceso libre 24 horas",
+      "emoji": "\ud83c\udf33",
+      "hero_bg": "linear-gradient(135deg, #2e7d32 0%, #0288d1 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Parque Lineal \u00b7 Espacio Verde Urbano",
+      "capacidad": "Aforo masivo abierto",
+      "como_llegar": "Estacion Exposiciones del Metro Linea A (10 minutos caminando).",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_actividad": "Picnic \u00b7 Ciclismo \u00b7 Paseo con Mascotas \u00b7 Fotografia",
+      "dificultad": "Facil",
+      "dificultad_desc": "Terreno totalmente plano y accesible.",
+      "duracion": "2-3 horas",
+      "altitud": "1495 msnm",
+      "temporada": ["Todo el a\u00f1o"],
+      "precio_entrada": "Gratis",
+      "distancia": "Corredor del Rio Medellin",
+      "como_llegar": "Metro Exposiciones.",
+      "permisos": "Libre",
+      "temporada_nota": "Cultura de picnic muy vibrante los fines de semana al atardecer.",
+      "fauna_flora": [],
+      "secretos": [],
+      "regulaciones": "Respetar la ciclorruta demarcada.",
+      "checklist_tip": "Alquilar un mantel de picnic e hidratacion en los kioscos del parque.",
+      "entradas": [],
+      "tours": [],
+      "equipamiento": [],
+      "itinerario": [],
+      "dificultad_tags": [],
+      "temporada_matriz": { "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "ideal", "May": "ideal", "Jun": "ideal", "Jul": "ideal", "Ago": "ideal", "Sep": "ideal", "Oct": "ideal", "Nov": "ideal", "Dic": "ideal" }
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfEs pet friendly?", "respuesta": "Si, es uno de los espacios con mayor cultura pet friendly y zonas caninas de la ciudad." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Parques del Rio Medellin",
+        "caption": "Puente peatonal y zonas verdes en Parques del Rio Medellin",
+        "nombres_archivo_wikimedia": ["File:Parques_del_Rio_Medellin.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.medellin.travel", "que_respalda": "informacion del parque" }
+    ]
+  }
+]

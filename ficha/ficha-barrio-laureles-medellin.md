@@ -1,0 +1,166 @@
+# Ficha: Barrio Laureles (Primer y Segundo Parque)
+
+- Slug: barrio-laureles-medellin
+- Categoria: sitio
+- Ciudad: Medellin, Antioquia
+- Coordenadas: 6.2425, -75.5897
+- Estado editorial: published
+
+Ficha de datos del pipeline de ExploraCO. El bloque JSON es la fuente
+de verdad y es el que valida scripts/validate_ficha.js; el archivo
+ficha-barrio-laureles-medellin.json es el mismo contenido en bruto para los cargadores.
+```json
+{
+  "BASE": {
+    "slug": "barrio-laureles-medellin",
+    "nombre": "Barrio Laureles (Primer y Segundo Parque)",
+    "categoria_slug": "sitio",
+    "lead": "El tradicional sector residencial de calles arboladas, gastronomia de barrio y la famosa Avenida Nutibara.",
+    "descripcion": "Elegido por publicaciones internacionales como uno de los barrios mas 'cool' del mundo, Laureles destaca por su trazado urbano en circulos conc\u00e9ntricos dise\u00f1ado por Pedro Nel Gomez, sus parques arbolados y sus amplias aceras peatonales.\n\nEs el centro de la vida cotidiana paisa, ofreciendo una equilibrada combinacion entre tradicion, cafes de autor, cervecerias artesanales y una animada vida nocturna en la Avenida Nutibara y la Carrera 70.",
+    "highlight": "4.9/10 \u00b7 Vida Local \u00b7 Cafes \u00b7 Parques Arbolados",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "Laureles",
+    "lat": 6.2425,
+    "lng": -75.5897,
+    "whatsapp": "",
+    "telefono": "",
+    "email": "",
+    "web": "https://www.medellin.travel",
+    "instagram": "@laurelesmedellin",
+    "precio_desde": "Gratis",
+    "horario": "Acceso libre 24 horas",
+    "emoji": "\ud83c\udf33",
+    "hero_bg": "linear-gradient(135deg, #388e3c 0%, #111111 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Barrio Turistico \u00b7 Corredor Gastronomico",
+    "capacidad": "Abierto",
+    "como_llegar": "Estacion Estadio de la Linea B del Metro + caminata por la Carrera 70.",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Paseo Peatonal \u00b7 Cafes de Especialidad \u00b7 Gastronomia",
+    "subcategoria": "espacio-publico",
+    "dificultad": "Facil",
+    "dificultad_desc": "Terreno completamente plano ideal para bicicleta o caminatas.",
+    "duracion": "2-4 horas",
+    "altitud": "1490 msnm",
+    "temporada": [
+      "Todo el a\u00f1o"
+    ],
+    "precio_entrada": "Gratis",
+    "distancia": "Zona Centro-Occidental",
+    "como_llegar": "Metro Linea B Estacion Estadio.",
+    "permisos": "Libre",
+    "temporada_nota": "Excelente ambiente durante los fines de semana.",
+    "fauna_flora": [],
+    "secretos": [],
+    "regulaciones": "",
+    "checklist_tip": "Alquilar una bicicleta del sistema EnCicla para recorrer las circulares de Laureles.",
+    "entradas": [],
+    "tours": [],
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad_tags": [],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "ideal",
+      "Jun": "ideal",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    }
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfCual es la diferencia entre Laureles y El Poblado?",
+      "respuesta": "Laureles es un barrio totalmente plano, mas residencial y con un ambiente de vida local autentica."
+    },
+    {
+      "pregunta": "\u00bfCuanto cuesta recorrer Laureles?",
+      "respuesta": "El acceso es gratuito y el barrio esta abierto las 24 horas; solo se paga lo que se consuma en los cafes, cervecerias y restaurantes."
+    },
+    {
+      "pregunta": "\u00bfComo se llega a Laureles en transporte publico?",
+      "respuesta": "Con la Linea B del Metro hasta la estacion Estadio y luego una caminata por la Carrera 70, el corredor gastronomico del sector."
+    },
+    {
+      "pregunta": "\u00bfQue se puede hacer en Laureles?",
+      "respuesta": "Recorrer los parques arbolados y las amplias aceras peatonales, visitar cafes de autor y cervecerias artesanales, y disfrutar la vida nocturna de la Avenida Nutibara y la Carrera 70 en un paseo de 2 a 4 horas."
+    },
+    {
+      "pregunta": "\u00bfSe puede conocer Laureles en bicicleta?",
+      "respuesta": "Si. El terreno es completamente plano y es ideal para bicicleta o caminatas; el propio barrio recomienda alquilar una bicicleta del sistema EnCicla para recorrer sus circulares."
+    },
+    {
+      "pregunta": "\u00bfCual es la mejor epoca para visitar Laureles?",
+      "respuesta": "Cualquier mes del a\u00f1o funciona, pues la temporada es ideal los doce meses; el mejor ambiente se vive los fines de semana."
+    },
+    {
+      "pregunta": "\u00bfQue tan alto esta Laureles y que lo hace reconocible?",
+      "respuesta": "El barrio esta a 1490 msnm y su sello es el trazado urbano en circulos conc\u00e9ntricos disenado por Pedro Nel Gomez, con parques arbolados y aceras peatonales amplias."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Barrio Laureles",
+      "caption": "Vista del barrio Laureles con sus calles arboladas y edificios residenciales",
+      "nombres_archivo_wikimedia": [
+        "File:Laureles.JPG"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Laureles y Estadio",
+      "caption": "Panorama de los barrios Laureles y Estadio en Medellin",
+      "nombres_archivo_wikimedia": [
+        "File:Laureles y Estadio neighborhoods Medell\u00edn.jpeg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Calles de Laureles - Estadio",
+      "caption": "Calle residencial arbolada del sector Laureles - Estadio",
+      "nombres_archivo_wikimedia": [
+        "File:Laureles - Estadio, Medell\u00edn, Antioquia, Colombia - panoramio (1).jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Aceras y arborizacion",
+      "caption": "Aceras peatonales y arborizacion del sector Laureles - Estadio",
+      "nombres_archivo_wikimedia": [
+        "File:Laureles - Estadio, Medell\u00edn, Antioquia, Colombia - panoramio (4).jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Iglesia de Santa Teresita",
+      "caption": "Fachada de la Iglesia de Santa Teresita, referente del barrio Laureles",
+      "nombres_archivo_wikimedia": [
+        "File:Iglesia de Santa Teresita-Fachada-Medellin.JPG"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.medellin.travel",
+      "que_respalda": "guia turistica"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/File:Laureles.JPG",
+      "que_respalda": "archivos fotograficos de Wikimedia Commons usados en FOTOS_SUGERIDAS"
+    }
+  ]
+}
+```

@@ -5900,5 +5900,63 @@ El alta de un lugar tenia **cinco vias** y ninguna era la puerta del producto, c
 
 `lib/completitud.js` y `scripts/smoke_completitud.js` (**NUEVOS**); `api/publicar-lugar.js`, `api/interacciones.js`, `api/admin.js`, `api/pagina-destino.js`, `publicar.html`, `admin.html`, `index.html`, `usuario-session.js`, `vercel.json`, `scripts/smoke_xp_guia.js`. **Sin commit y sin desplegar.** Documentacion (este pase, unico): `TASKS.md` (esta seccion), `DECISIONS.md` (Estado de ADR-097 y de ADR-099), `BLUEPRINT.md` (contrato del endpoint y de la cola), `BUGS_HISTORICOS.md` (BUG-128..BUG-131) y `NEXT.md`. **`PROJECT.md` NO se toco** (el alcance del producto no cambia).
 
+## TSK-221 - Lote Medellin/Envigado: 36 fichas preparadas EN LOCAL (32 `published` / 4 `draft`), tooling reutilizable de indexacion, verificacion de fotos, informe y test de paginas, y 6 seeds con la condicion de admision de ADR-100 - 2026-10-25 - PREPARADO Y VERIFICADO LOCAL (0 paginas cargadas a Neon y a produccion; sin commit, sin desplegar)
+
+**Estado: PREPARADO Y VERIFICADO LOCAL -- NADA CARGADO A NEON NI A PRODUCCION, SIN COMMIT Y SIN DESPLEGAR** -- 2026-10-25 (pase documental unico R2). **Sin endpoint nuevo** (`api/` sigue en **8/8**), **sin migracion** y **sin fichero de `api/` tocado**: el motor de render y el backend quedan **intactos**. Decision: `DECISIONS.md` **ADR-100** (ACEPTADO; el argumento vive **solo** alli, aqui no se repite). Bug abierto detectado en el motor: **BUG-132**; regresion **introducida y corregida en la misma tanda**: **BUG-133** (cerrado).
+
+### Motivo
+
+Convertir `prompt.txt` (JSON con **36 fichas** de destinos de **Medellin/Envigado** en formato Gemini: `BASE` / `TAGS` / `FAQS` / `FOTOS_SUGERIDAS` / `FUENTES`) en **36 paginas dinamicas completas** listas para siembra, sin pasar por el embudo de `publicar.html` y **sin publicar nada porque si**. Reparto por categoria de las 36 fichas: **22 sitio / 6 evento / 5 comida / 3 hostal**.
+
+### 1. Entregables (medidos contra el archivo real, ADR-006)
+
+1. **36 paginas en local:** `ficha/ficha-<slug>.json` + `ficha/ficha-<slug>.md` (ficha normalizada + su version legible), **6 seeds** `scripts/seed-medellin-lote1..6.js`, **6 loaders** `scripts/load-medellin-lote1..6-api.js` (**generados y NO ejecutados**) y **36 smokes** `scripts/smoke_test_<slug>.js`. Los **36 smokes existen con el nombre exacto** de su slug (comprobado uno a uno contra `ficha/ficha-*.json`).
+2. **Tooling reutilizable NUEVO en `scripts/ejecucion/`:** `indexar-prompt-medellin.js` (parte `prompt.txt` en fichas), `verificar-fotos-fichas.js` (HEAD de fotos), `informe-fichas-medellin.js` (informe de estado por ficha), `test-paginas-medellin.js` (suite de las 36 paginas) y `wikimedia-url.js` (`urlMiniatura()` compartido, 1280 px).
+3. **`package.json`:** script `test:paginas:medellin` -> `node scripts/ejecucion/test-paginas-medellin.js`. Es el **unico** cambio de `package.json`.
+4. **Seeds con CONDICION DE ADMISION de ADR-100:** los 6 hacen `require` de **`lib/completitud.js`** (`normalizarFila` + `calcular` + `persistible`), escriben `status='published'` **solo** con completitud **>= 40** y guardas duras, derivan **`region` y `zona`** del catalogo `geo-ciudades.js` (ADR-097, `zona` fuera de lista cerrada -> **NULL**, nunca `''`) y **no escriben claves de XP**. Confirmado por grep sobre los 6 ficheros.
+5. **Camino de escritura no destructivo:** los **6 loaders NO hacen `DELETE`** (comentario explicito en `scripts/load-medellin-lote1-api.js:6-9`); usan `POST /api/admin-destinos` = **upsert por slug**. El `DELETE` de `api/admin-destinos.js:509-512` **no se usa** (ADR-100 D5).
+6. **Fotos:** **181 fotos resueltas** con **HEAD 200** verificado sobre la **miniatura de 1280 px** y **0 falsos 404**.
+
+### 2. Verificacion (evidencia medida)
+
+| Control | Resultado |
+|---|---|
+| `scripts/validate_ficha.js` (contrato de ficha) | **PASS 36/36** |
+| `npm run test:paginas:medellin` | **PASS 36/36**, pendientes **0** |
+| `node --check` (6 seeds + 6 loaders + 36 smokes) | **48/48** (re-verificado en este pase: 12/12 + 36/36) |
+| ASCII-safety (ADR-002: bytes > 127 y backticks) | **72/72** en **0** bytes > 127 y **0** backticks |
+| `npm test` | **25/25 PASS**, exit **0** |
+| Fotos | **181** con **HEAD 200**, **0 falsos 404** |
+| Presupuesto Vercel | **8/8** funciones, **cero** endpoint nuevo |
+| `api/`, HTML, `db/` | **sin tocar** |
+
+### 3. Estado por ficha: 32 `published` / 4 `draft`
+
+Las **4 draft** son las cuatro fichas de **evento** cuya `fecha_fin` ya paso **y** que no tienen anuncio oficial verificable de la edicion 2027 (**ADR-100 D6**), con fecha medida en `ficha/ficha-<slug>.json`:
+
+| Slug | `fecha_inicio` / `fecha_fin` | Estado |
+|---|---|---|
+| `feria-de-las-flores-medellin` | 2026-07-31 / 2026-08-09 | `draft` |
+| `festival-internacional-de-poesia-medellin` | 2026-07-04 / 2026-07-11 | `draft` |
+| `desfile-de-autos-clasicos-y-antiguos-medellin` | 2026-08-06 / 2026-08-06 | `draft` |
+| `festival-nacional-de-la-trova-medellin` | 2026-08-01 / 2026-08-08 | `draft` |
+
+**Las 4 salen a `draft` por la MISMA regla, sin excepciones.** Los dos eventos que **si** se conservan publicados: `fiesta-del-libro-y-la-cultura-medellin` se **refecho a 2027-09-10 / 2027-09-19** porque **habia anuncio oficial** (ADR-100 D6, correccion 2), y `alumbrados-navidenos-medellin` conserva sus fechas futuras **2026-12-01 / 2027-01-11** sin tocarlas. Las **32 `published`** restantes son las 22 de sitio, 5 de comida, 3 de hostal y los 2 eventos vigentes/refechados.
+
+### 4. Deudas abiertas de esta tanda (no bloquean la siembra)
+
+1. **BUG-132 (motor de render, ABIERTO):** `api/pagina-destino.js:3122` (`det.faqs = tg.faqs`). Los 6 seeds lo **compensan** persistiendo las FAQ en `destinos.tags`, pero el defecto del motor **sigue abierto** y afecta a otras ciudades. Detalle e impacto en `BUGS_HISTORICOS.md`; el arreglo exige `@renderer-dev` (**gate**).
+2. **Deuda de contenido (fotos de tipologia o de entorno):** `uva-la-esperanza-epm-medellin`, `glampings-santa-elena-bosque` y `festival-nacional-de-la-trova-medellin` (recintos) usan **fotos de tipologia o del entorno con caption honesto**, no del lugar exacto, porque Commons no tiene imagenes propias. Ademas `mercado-del-rio-medellin` y `manila-hostal-boutique-poblado` usan **fotos del entorno** (Ciudad del Rio / El Poblado) por falta de interiores. **No se invento ninguna foto.**
+3. **Deuda de datos (gating ADR-016):** `SITIO_SECCIONES_POR_SUBCATEGORIA` (`api/pagina-destino.js:51-61`, bloque real en `:50-61`) **no incluye `dificultad`** para `espacio-publico` ni para `cultura`, asi que **4 fichas de sitio** con `dificultad` + `temporada_matriz` **completos** no renderizan ese bloque. Es una **lista de gating**, no un fallo de datos: el arreglo seria una linea, pero es `api/` y **exige gate + Escudo GOLD**.
+4. **Regresion cerrada (BUG-133):** los seeds resolvian las fotos **desde** `ficha/_informe-fotos.json`, un artefacto que al regenerarse **con otro lote** dejo **0 fotos** y tumbo **6 fichas a `draft`**. Ahora la fuente **primaria** es `FOTOS_SUGERIDAS` + `urlMiniatura()` y el informe es **override opcional** (si falta, es ilegible o no indexa el slug, la ficha **nunca** queda en 0 fotos); el `--dry` imprime `fotos_resueltas` y `fuente` (`informe` / `wikimedia`) como control.
+
+### 5. Pendiente operativo (NO ejecutado)
+
+**Ninguna de las 36 paginas esta en Neon ni en produccion.** La carga queda, por decision explicita, en manos del operador: `DATABASE_URL=... node scripts/seed-medellin-loteN.js --write` (**via recomendada**, upsert idempotente sin borrado) o el loader HTTP equivalente `scripts/load-medellin-loteN-api.js` (**sin `DELETE`**). Antes de cualquier `--write` conviene pasar el `--dry` del lote y leer el resumen por ficha (`slug`, `status`, `tier`, `completitud`, `zona`, `faltantes`, `fotos_resueltas`, `fuente`). **Los seeds son `--dry` por defecto** (mas estricto que ADR-100 D5, que solo exige pasar la bandera explicita): sin `--write` **no escriben**.
+
+### 6. Archivos tocados
+
+**Nuevos:** `ficha/ficha-<slug>.json` y `.md` (**36 pares**), `scripts/seed-medellin-lote1..6.js` (**6**), `scripts/load-medellin-lote1..6-api.js` (**6**), `scripts/smoke_test_<slug>.js` (**36**), `scripts/ejecucion/indexar-prompt-medellin.js`, `scripts/ejecucion/verificar-fotos-fichas.js`, `scripts/ejecucion/informe-fichas-medellin.js`, `scripts/ejecucion/test-paginas-medellin.js`, `scripts/ejecucion/wikimedia-url.js`. **Modificado:** `package.json` (script `test:paginas:medellin`). **Sin commit y sin desplegar.** Documentacion (este pase, unico): `TASKS.md` (esta seccion), `NEXT.md`, `BUGS_HISTORICOS.md` (**BUG-132** y **BUG-133**). **`PROJECT.md` y `BLUEPRINT.md` NO se tocan:** al no haber carga a produccion no cambia ninguna cifra ni afirmacion vigente de alcance ni de contrato.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

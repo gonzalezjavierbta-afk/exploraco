@@ -1,0 +1,187 @@
+# Ficha: Barrio Provenza (El Poblado)
+
+- Slug: `barrio-provenza-el-poblado`
+- Categoria: `comida`
+- Ciudad: Medellin, Antioquia
+- Coordenadas: 6.2089, -75.5653
+- Estado editorial: `published`
+
+Ficha de datos del pipeline de ExploraCO. El bloque JSON es la fuente
+de verdad y es el que valida `scripts/validate_ficha.js`; el archivo
+`ficha-barrio-provenza-el-poblado.json` es el mismo contenido en bruto para los cargadores.
+```json
+{
+  "BASE": {
+    "slug": "barrio-provenza-el-poblado",
+    "nombre": "Barrio Provenza (El Poblado)",
+    "categoria_slug": "comida",
+    "lead": "El distrito mas exclusivo de gastronomia, cafes de especialidad, vida nocturna y moda urbana de Medellin.",
+    "descripcion": "Provenza es un sector arbolado y peatonalizado en la comuna de El Poblado reconocido internacionalmente por su ambiente vibrante. Sus calles estan bordeadas por arboles frondosos, quebradas naturales y fachadas intervenidas con vegetacion y ne\u00f3n.\n\nAbriga la mayor densidad de restaurantes de autor, cafes de origen antioque\u00f1o, bistroes con terrazas al aire libre, speakeasies y discotecas de renombre.",
+    "highlight": "4.9/10 \u00b7 Gastronomia de Autor \u00b7 Vida Nocturna \u00b7 Cafes",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "Provenza / El Poblado",
+    "lat": 6.2089,
+    "lng": -75.5653,
+    "whatsapp": "",
+    "telefono": "",
+    "email": "",
+    "web": "https://www.medellin.travel",
+    "instagram": "@provenzamedellin",
+    "precio_desde": "Platos desde $30.000 hasta $120.000 COP",
+    "horario": "Abierto 24 horas (Locales 08:00 AM - 03:00 AM)",
+    "emoji": "\ud83c\udf78",
+    "hero_bg": "linear-gradient(135deg, #e8a020 0%, #e91e63 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Zona Gastronomica \u00b7 Bulevar Peatonal \u00b7 Vida Nocturna",
+    "capacidad": "Zona comercial abierta",
+    "como_llegar": "Estacion Poblado del Metro Linea A + bus integrado o caminata ascendente por la Calle 10.",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_comida": "Cocina de Autor, Cafes de Origen, Cocteleria, Internacional",
+    "cocina": "VARIDA \u00b7 AUTOR",
+    "ambiente": "Bohemio Chic, Fiesta, Exclusivo",
+    "precio_promedio": "$60.000 - $120.000 COP",
+    "terraza": "Si",
+    "reservas": "Si",
+    "domicilio": "Si",
+    "menu_destacado": [
+      {
+        "nombre": "Cafe Filtrado de Origen",
+        "precio": "$12.000 COP",
+        "badge": "popular"
+      },
+      {
+        "nombre": "Cocteles de Autor",
+        "precio": "$42.000 COP",
+        "badge": "popular"
+      }
+    ],
+    "opciones_dieta": [
+      "Vegetariano",
+      "Vegano",
+      "Sin Gluten"
+    ],
+    "horario_detallado": {
+      "Lunes": {
+        "abre": "08:00",
+        "cierra": "02:00"
+      },
+      "Martes": {
+        "abre": "08:00",
+        "cierra": "02:00"
+      },
+      "Miercoles": {
+        "abre": "08:00",
+        "cierra": "02:00"
+      },
+      "Jueves": {
+        "abre": "08:00",
+        "cierra": "03:00"
+      },
+      "Viernes": {
+        "abre": "08:00",
+        "cierra": "03:00"
+      },
+      "Sabado": {
+        "abre": "08:00",
+        "cierra": "03:00"
+      },
+      "Domingo": {
+        "abre": "08:00",
+        "cierra": "00:00"
+      }
+    },
+    "domicilio_plataformas": [
+      "Rappi"
+    ],
+    "subcategoria": "gastrobar"
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfCual es la mejor hora para visitar Provenza?",
+      "respuesta": "Por la tarde para cafes y bistros; a partir de las 08:00 PM para gastronomia y bares."
+    },
+    {
+      "pregunta": "\u00bfQue tipo de oferta gastronomica tiene Provenza?",
+      "respuesta": "La mayor densidad de restaurantes de autor de Medellin, con cafes de origen antioqueno, bistros con terrazas al aire libre, speakeasies y discotecas."
+    },
+    {
+      "pregunta": "\u00bfCuanto cuesta comer o tomar en Provenza?",
+      "respuesta": "Los platos van de $30.000 a $120.000 COP, con un promedio de $60.000 a $120.000. Un cafe filtrado de origen cuesta alrededor de $12.000 COP y un coctel de autor unos $42.000 COP."
+    },
+    {
+      "pregunta": "\u00bfHay opciones vegetarianas, veganas y sin gluten?",
+      "respuesta": "Si, los locales ofrecen opciones vegetarianas, veganas y sin gluten."
+    },
+    {
+      "pregunta": "\u00bfSe puede reservar y pedir a domicilio?",
+      "respuesta": "Si. Los locales aceptan reservas, cuentan con terraza y ofrecen domicilio a traves de Rappi."
+    },
+    {
+      "pregunta": "\u00bfComo se llega a Provenza?",
+      "respuesta": "Estacion Poblado del Metro Linea A y luego bus integrado o caminata ascendente por la Calle 10."
+    },
+    {
+      "pregunta": "\u00bfQue ambiente se vive en el barrio?",
+      "respuesta": "Un ambiente bohemio chic, exclusivo y festivo. Los locales abren desde las 08:00 AM y cierran entre la medianoche y las 03:00 AM segun el dia."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Carrera 35 en Provenza",
+      "caption": "Bulevar arbolado de la Carrera 35 en Provenza",
+      "nombres_archivo_wikimedia": [
+        "File:Provenza - Carrera 35 - Medell\u00edn - Colombia 2024.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Calles peatonales de Provenza",
+      "caption": "Calles comerciales y gastronomicas del sector",
+      "nombres_archivo_wikimedia": [
+        "File:Carrera 35 - Provenza - Medell\u00edn - Colombia 2024.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Restaurantes y terrazas",
+      "caption": "Fachadas con restaurantes y terrazas en Provenza",
+      "nombres_archivo_wikimedia": [
+        "File:Provenza, Medell\u00edn 1.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Ambiente nocturno",
+      "caption": "Vida nocturna y locales de Provenza en El Poblado",
+      "nombres_archivo_wikimedia": [
+        "File:Provenza, Medell\u00edn 2.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Zona Rosa de El Poblado",
+      "caption": "Zona rosa contigua, eje de bares y discotecas de El Poblado",
+      "nombres_archivo_wikimedia": [
+        "File:Zona Rosa El Poblado.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.medellin.travel",
+      "que_respalda": "guia turistica de Provenza y El Poblado"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/Category:Provenza,_Medell%C3%ADn",
+      "que_respalda": "archivos fotograficos de Wikimedia Commons usados en FOTOS_SUGERIDAS"
+    }
+  ]
+}
+```

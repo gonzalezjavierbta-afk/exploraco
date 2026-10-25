@@ -1,0 +1,187 @@
+# Ficha: Feria de las Flores de Medellin 2026
+
+- Slug: `feria-de-las-flores-medellin`
+- Categoria: `evento`
+- Ciudad: Medellin, Antioquia
+- Coordenadas: 6.2442, -75.5812
+- Estado editorial: `draft`
+
+Ficha de datos del pipeline de ExploraCO. El bloque JSON es la fuente
+de verdad y es el que valida `scripts/validate_ficha.js`; el archivo
+`ficha-<slug>.json` es el mismo contenido en bruto para los cargadores.
+```json
+{
+  "BASE": {
+    "slug": "feria-de-las-flores-medellin",
+    "nombre": "Feria de las Flores de Medellin 2026",
+    "categoria_slug": "evento",
+    "lead": "La maxima fiesta cultural y tradicional de Antioquia que celebra la herencia de los silleteros campesinos y la floricultura regional.",
+    "descripcion": "La Feria de las Flores es el evento magno de la ciudad de Medellin, celebrado anualmente durante diez dias entre finales de julio y principios de agosto. Su origen se remonta a 1957 como tributo a la pujanza paisa y a la tradicion floricultora del corregimiento de Santa Elena.\n\nEl evento cumbre es el clasico Desfile de Silleteros, donde cientos de campesinos de todas las edades caminan por las avenidas principales cargando monumentales estructuras de madera (silletas) decoradas con mas de 80 variedades de flores. Estas obras pueden pesar entre 50 y 90 kilogramos.\n\nAdemas del desfile, la feria incluye la Plaza de las Flores, el Desfile de Autos Clasicos y Antiguos, el Festival Nacional de la Trova, conciertos masivos en escenarios publicos y fondas con gastronomia tipica.",
+    "highlight": "5.0/10 \u00b7 Patrimonio Cultural \u00b7 Silleteros \u00b7 Tradicion",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "Toda la ciudad / Santa Elena",
+    "lat": 6.2442,
+    "lng": -75.5812,
+    "whatsapp": "",
+    "telefono": "5744444144",
+    "email": "feriaflores@medellin.gov.co",
+    "web": "https://www.medellin.gov.co",
+    "instagram": "@nosmuevelaflor",
+    "precio_desde": "Eventos gratuitos y graderias con boleta",
+    "horario": "Todo el dia durante 10 dias de festival",
+    "emoji": "\ud83c\udf3a",
+    "hero_bg": "linear-gradient(135deg, #e8a020 0%, #008000 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Festival Cultural \u00b7 Tradicion \u00b7 Musica",
+    "capacidad": "Mas de 1.000.000 de asistentes",
+    "como_llegar": "Conexion total mediante la Red Metro de Medellin y rutas especiales de buses.",
+    "status": "draft",
+    "destacado": true
+  },
+  "TAGS": {
+    "fecha_inicio": "2026-07-31",
+    "fecha_fin": "2026-08-09",
+    "edicion": "Edicion 69",
+    "subcategoria": "festival",
+    "sede": "Avenida del Rio, Plaza Mayor, Jardin Botanico y Santa Elena",
+    "organiza": "Alcaldia de Medellin",
+    "lema": "Medellin Te Quiere Flor",
+    "tipo_evento": "festival",
+    "nota_fechas": "Las fechas de 2026 (31 de julio al 9 de agosto) ya transcurrieron. Al 2026-10-25 no existe anuncio oficial de la Alcaldia de Medellin con las fechas de la edicion 70 (2027); el sitio oficial sigue publicando la programacion de 2026. La ficha queda en draft hasta que se publique el anuncio oficial.",
+    "lineup": [
+      {
+        "nombre": "Silleteros de Santa Elena",
+        "escenario": "Avenida del Rio"
+      },
+      {
+        "nombre": "Orquesta Filarmonica de Medellin",
+        "escenario": "Teatro Metropolitano"
+      }
+    ],
+    "agenda": [
+      {
+        "dia": "2026-07-31",
+        "hora": "18:00",
+        "actividad": "Concierto Inaugural en la Obelisco"
+      },
+      {
+        "dia": "2026-08-09",
+        "hora": "14:00",
+        "actividad": "Desfile de Silleteros"
+      }
+    ],
+    "categorias_entrada": [
+      {
+        "tipo": "Acceso libre a calles y plazas",
+        "precio": "Gratis",
+        "disponibilidad": "Disponible"
+      },
+      {
+        "tipo": "Graderia Desfile Silleteros",
+        "precio": "$120.000 COP",
+        "disponibilidad": "Disponible"
+      }
+    ],
+    "que_llevar": [
+      "Sombrero o gorra",
+      "Ropa fresca",
+      "Hidratacion"
+    ],
+    "prohibido": [
+      "Envases de vidrio",
+      "Armas de fuego",
+      "Mascotas en eventos masivos"
+    ]
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfEn que fecha se realiza la Feria de las Flores 2026?",
+      "respuesta": "Del 31 de julio al 9 de agosto de 2026."
+    },
+    {
+      "pregunta": "\u00bfEl Desfile de Silleteros es gratuito?",
+      "respuesta": "Si, en las zonas de pie a lo largo de todo el recorrido autorizado."
+    },
+    {
+      "pregunta": "\u00bfDonde se realiza la feria?",
+      "respuesta": "Las sedes principales son la Avenida del Rio, Plaza Mayor, el Jardin Botanico y el corregimiento de Santa Elena, con conexion por la Red Metro y rutas especiales de buses."
+    },
+    {
+      "pregunta": "\u00bfCuanto pesa una silleta y cuantas variedades de flores lleva?",
+      "respuesta": "Las silletas pueden pesar entre 50 y 90 kilogramos y se decoran con mas de 80 variedades de flores."
+    },
+    {
+      "pregunta": "\u00bfHay boletas o todo es gratis?",
+      "respuesta": "El acceso a calles y plazas es libre; las graderias del Desfile de Silleteros se compran aparte por $120.000 COP."
+    },
+    {
+      "pregunta": "\u00bfQue se puede llevar y que esta prohibido?",
+      "respuesta": "Se recomienda sombrero o gorra, ropa fresca e hidratacion. Estan prohibidos los envases de vidrio, las armas de fuego y las mascotas en eventos masivos."
+    },
+    {
+      "pregunta": "\u00bfDesde cuando se celebra la feria?",
+      "respuesta": "Su origen se remonta a 1957, como tributo a la pujanza paisa y a la tradicion floricultora de Santa Elena."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Desfile de Silleteros Medellin",
+      "caption": "Silletera desfilando con silleta monumental de flores",
+      "nombres_archivo_wikimedia": [
+        "File:Diana Grajales Silletera de Santa Elana - Desfile Silletero 2023.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Silleta tradicional",
+      "caption": "Silleta de flores cargada por un silletero durante el desfile",
+      "nombres_archivo_wikimedia": [
+        "File:Desfile de Silleteros2007-(1)Medellin.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Comparsa de silleteros",
+      "caption": "Grupo de silleteros recorriendo las avenidas principales",
+      "nombres_archivo_wikimedia": [
+        "File:Desfile de Silleteros2007-(25)Medellin.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Ninas silleteras",
+      "caption": "Nina silletera participando en el desfile",
+      "nombres_archivo_wikimedia": [
+        "File:Ni\u00f1a silletera.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Feria de las Flores en la ciudad",
+      "caption": "Ambientacion floral de la Feria de las Flores en Medellin",
+      "nombres_archivo_wikimedia": [
+        "File:Feria de las Flores by Luis Perez.png"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.medellin.gov.co/es/feria-de-flores",
+      "que_respalda": "fechas oficiales y programacion de la edicion 2026 (69)"
+    },
+    {
+      "tipo": "oficial",
+      "url": "https://www.feriadeflores.com",
+      "que_respalda": "edicion 69 del Desfile de Silleteros y eventos asociados"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/Category:Desfile_de_Silleteros",
+      "que_respalda": "archivos fotograficos de Wikimedia Commons usados en FOTOS_SUGERIDAS"
+    }
+  ]
+}
+```

@@ -1,0 +1,153 @@
+{
+  "BASE": {
+    "slug": "fincas-silleteras-santa-elena",
+    "nombre": "Fincas Silleteras de Santa Elena",
+    "categoria_slug": "sitio",
+    "lead": "El hogar campesino donde se cultiva y elabora el arte inmaterial de las silletas florales durante todo el a\u00f1o.",
+    "descripcion": "Ubicadas en las veredas monta\u00f1osas del corregimiento de Santa Elena, las fincas silleteras tradicionales abren sus puertas a los visitantes para transmitir el oficio ancestral de la floricultura y el armado de silletas.\n\nLos visitantes pueden recorrer cultivos de mas de 80 especies de flores, escuchar de boca de las familias campesinas las historias del desfile, probar gastronomia monta\u00f1era y aprender a elaborar una mini-silleta propia.",
+    "highlight": "5.0/10 \u00b7 Silleteros \u00b7 Flores \u00b7 Tradicion Ancestral",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "Corregimiento de Santa Elena",
+    "lat": 6.2115,
+    "lng": -75.4981,
+    "whatsapp": "573100000000",
+    "telefono": "5744444144",
+    "email": "santaelena@medellin.travel",
+    "web": "https://www.santaelena.com.co",
+    "instagram": "@santaelenasilletera",
+    "precio_desde": "Visitas guiadas desde $25.000 COP",
+    "horario": "Lun-Dom 08:00 AM - 05:00 PM (Con reserva previa)",
+    "emoji": "\ud83c\udf3b",
+    "hero_bg": "linear-gradient(135deg, #e8a020 0%, #2e7d32 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Finca Campesina \u00b7 Taller Cultural",
+    "capacidad": "Atencion a grupos pequenos y medianos",
+    "como_llegar": "Buses desde el centro de Medellin (Tranvia San Jose) o via Metrocable Arvi + transporte local.",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Ecoturismo \u00b7 Talleres de Flores \u00b7 Gastronomia Monta\u00f1era",
+    "subcategoria": "cultura",
+    "dificultad": "Facil",
+    "dificultad_desc": "Caminatas cortas por jardines rurales.",
+    "duracion": "3-5 horas",
+    "altitud": "2400 msnm",
+    "temporada": [
+      "Todo el a\u00f1o"
+    ],
+    "precio_entrada": "$25.000 COP con recorrido guiado",
+    "distancia": "Corregimiento Santa Elena",
+    "como_llegar": "Bus Santa Elena desde el centro de Medellin.",
+    "permisos": "Se exige reserva previa directa con la finca.",
+    "temporada_nota": "Alta ocupacion durante las semanas previas a la Feria de las Flores.",
+    "fauna_flora": [],
+    "secretos": [],
+    "regulaciones": "No arrancar las flores de los cultivos sin autorizacion.",
+    "checklist_tip": "Llevar ropa de abrigo ligera y abrigo impermeable.",
+    "entradas": [],
+    "tours": [],
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad_tags": [],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "ideal",
+      "Jun": "ideal",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    }
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfSe pueden visitar las fincas silleteras fuera de la Feria de Flores?",
+      "respuesta": "Si, las fincas estan abiertas durante todo el a\u00f1o ofreciendo talleres culturales."
+    },
+    {
+      "pregunta": "\u00bfCuanto cuesta la visita a una finca silletera?",
+      "respuesta": "El recorrido guiado se ofrece desde $25.000 COP por persona."
+    },
+    {
+      "pregunta": "\u00bfHay que reservar antes de ir?",
+      "respuesta": "Si. Se exige reserva previa directa con la finca; la atencion es de lunes a domingo de 08:00 AM a 05:00 PM y los grupos son pequenos o medianos."
+    },
+    {
+      "pregunta": "\u00bfQue se hace durante la visita?",
+      "respuesta": "Se recorren cultivos de mas de 80 especies de flores, se escuchan de boca de las familias campesinas las historias del desfile, se prueba gastronomia monta\u00f1era y se aprende a elaborar una mini-silleta propia, en jornadas de 3 a 5 horas."
+    },
+    {
+      "pregunta": "\u00bfComo se llega al corregimiento de Santa Elena?",
+      "respuesta": "En buses desde el centro de Medellin (Tranvia San Jose) o via Metrocable Arvi con transporte local hasta las veredas; el corregimiento esta a 2400 msnm."
+    },
+    {
+      "pregunta": "\u00bfQue se debe llevar y que no se debe hacer?",
+      "respuesta": "Conviene llevar ropa de abrigo ligera y abrigo impermeable, y esta prohibido arrancar las flores de los cultivos sin autorizacion."
+    },
+    {
+      "pregunta": "\u00bfCuando hay mas demanda en las fincas?",
+      "respuesta": "En las semanas previas a la Feria de las Flores la ocupacion sube; el resto del a\u00f1o la temporada es ideal y la dificultad es facil, con caminatas cortas por jardines rurales."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Monumento a los Silleteros",
+      "caption": "Monumento a los Silleteros en el corregimiento de Santa Elena",
+      "nombres_archivo_wikimedia": [
+        "File:Monumento a los Silleteros en Santa Elena (Medell\u00edn).jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Silletera de Santa Elena",
+      "caption": "Silletera de Santa Elena durante el Desfile Silletero",
+      "nombres_archivo_wikimedia": [
+        "File:Diana Grajales Silletera de Santa Elana - Desfile Silletero 2023.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Cuando pasa un silletero",
+      "caption": "Silleta floral cargada por un silletero, tradicion campesina de Santa Elena",
+      "nombres_archivo_wikimedia": [
+        "File:Cuando pasa un silletero, es medellin el que pasa.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Monumento silleteros",
+      "caption": "Homenaje escultorico a los silleteros en Santa Elena",
+      "nombres_archivo_wikimedia": [
+        "File:Monumento silleteros Santa Elena.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Paisaje nocturno de Santa Elena",
+      "caption": "Cielo estrellado sobre las monta\u00f1as de Santa Elena, Antioquia",
+      "nombres_archivo_wikimedia": [
+        "File:Una noche estrellada en Santa Elena, Antioquia, Colombia.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.santaelena.com.co",
+      "que_respalda": "fincas y actividades"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/Category:Santa_Elena,_Medell%C3%ADn",
+      "que_respalda": "archivos fotograficos de Wikimedia Commons usados en FOTOS_SUGERIDAS"
+    }
+  ]
+}

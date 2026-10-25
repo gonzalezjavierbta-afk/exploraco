@@ -1,0 +1,157 @@
+{
+  "BASE": {
+    "slug": "festival-nacional-de-la-trova-medellin",
+    "nombre": "Festival Nacional de la Trova Ciudad de Medellin",
+    "categoria_slug": "evento",
+    "lead": "El certamen mas importante de la troversia paisa, donde la repentizacion y el humor se disputan el titulo de Rey de la Trova.",
+    "descripcion": "La trova antioque\u00f1a es una de las expresiones folcloricas mas vivas del occidente colombiano. Consiste en un duelo de versos improvisados con rima consonante y acompanamiento de tiple sobre melodias tradicionales.\n\nEl Festival Nacional de la Trova se celebra en el marco de la Feria de las Flores en escenarios masivos como el Parque de los Deseos y la Plaza Mayor. Decenas de repentistas compiten improvisando sobre temas de actualidad, humor y cultura paisa.",
+    "highlight": "4.8/10 \u00b7 Trova \u00b7 Improvisacion \u00b7 Humor \u00b7 Tradicion",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "Plaza Mayor / Parque de los Deseos",
+    "lat": 6.2422,
+    "lng": -75.5761,
+    "whatsapp": "",
+    "telefono": "5744444144",
+    "email": "",
+    "web": "https://www.medellin.gov.co",
+    "instagram": "@nosmuevelaflor",
+    "precio_desde": "Gratis",
+    "horario": "06:00 PM - 11:00 PM (Eliminatorias y Gran Final)",
+    "emoji": "\ud83c\udfb8",
+    "hero_bg": "linear-gradient(135deg, #e8a020 0%, #3f51b5 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Certamen Folclorico \u00b7 Humor \u00b7 Troversia",
+    "capacidad": "Mas de 15.000 espectadores en la final",
+    "como_llegar": "Metro Alpujarra o Universidad segun el escenario.",
+    "status": "draft",
+    "destacado": false
+  },
+  "TAGS": {
+    "fecha_inicio": "2026-08-01",
+    "fecha_fin": "2026-08-08",
+    "edicion": "Edicion 22",
+    "sede": "Parque de los Deseos y Plaza Mayor",
+    "organiza": "Alcaldia de Medellin",
+    "lema": "El verso de la tradicion",
+    "tipo_evento": "festival",
+    "lineup": [
+      {
+        "nombre": "Los Mejores Trovadores de Colombia",
+        "escenario": "Plaza Mayor"
+      }
+    ],
+    "agenda": [
+      {
+        "dia": "2026-08-08",
+        "hora": "18:00",
+        "actividad": "Gran Final y Coronacion del Rey de la Trova"
+      }
+    ],
+    "categorias_entrada": [
+      {
+        "tipo": "Entrada libre hasta completar aforo",
+        "precio": "Gratis",
+        "disponibilidad": "Disponible"
+      }
+    ],
+    "que_llevar": [
+      "Llegar temprano para alcanzar buena ubicacion"
+    ],
+    "prohibido": [],
+    "fuente_fechas": "https://www.medellin.gov.co/es/eventos/festival-nacional-de-la-trova-ciudad-de-medellin/",
+    "edicion_verificada": false,
+    "nota_fechas": "Sin anuncio oficial de la edicion 2027: la Feria de las Flores 2026 se realizo del 31 de julio al 9 de agosto de 2026 y el sitio oficial no publica aun fechas 2027. Se conservan las fechas 2026 documentadas.",
+    "subcategoria": "festival"
+  },
+  "FAQS": [
+    {
+      "pregunta": "Que es la trova antioquena?",
+      "respuesta": "Es un duelo de versos improvisados con rima consonante y acompanamiento de tiple sobre melodias tradicionales, una de las expresiones folcloricas mas vivas del occidente colombiano."
+    },
+    {
+      "pregunta": "Se requiere boleta para la gran final?",
+      "respuesta": "No, el ingreso es gratuito y se ordena por fila hasta agotar aforo."
+    },
+    {
+      "pregunta": "Donde se realiza el festival?",
+      "respuesta": "En escenarios masivos como el Parque de los Deseos y Plaza Mayor, en el marco de la Feria de las Flores."
+    },
+    {
+      "pregunta": "Cuando es la gran final y la coronacion?",
+      "respuesta": "La gran final y coronacion del Rey de la Trova se programan el ultimo dia del certamen, en jornada desde las 06:00 PM. La edicion 2027 aun no tiene anuncio oficial."
+    },
+    {
+      "pregunta": "Como se llega a los escenarios?",
+      "respuesta": "Con la Red Metro: estacion Alpujarra o Universidad, segun el escenario."
+    },
+    {
+      "pregunta": "Cuantas personas caben en la final?",
+      "respuesta": "El evento reune a mas de 15.000 espectadores en la final, segun los datos del certamen."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Plaza Mayor, sede de la final",
+      "caption": "Interior de Plaza Mayor, sede de la gran final del Festival Nacional de la Trova (foto del recinto, no del certamen)",
+      "nombres_archivo_wikimedia": [
+        "File:Plaza Mayor-interior1.JPG"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Plaza Mayor, sede de la final",
+      "caption": "Segunda vista del interior de Plaza Mayor, escenario de la final de la trova",
+      "nombres_archivo_wikimedia": [
+        "File:Plaza Mayor-interior2.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Plaza Mayor en evento masivo",
+      "caption": "Plaza Mayor durante un evento ciudadano (foto del recinto, no del festival de trova)",
+      "nombres_archivo_wikimedia": [
+        "File:Medell\u00edn Marca Ciudad, Plaza Mayor, 2023.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Parque de los Deseos, sede alterna",
+      "caption": "Parque de los Deseos, uno de los escenarios del festival (foto del entorno, no del certamen)",
+      "nombres_archivo_wikimedia": [
+        "File:Parque de los Deseos-Medellin.JPG"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Parque de los Deseos, sede alterna",
+      "caption": "Zona verde del Parque de los Deseos, escenario de las eliminatorias (foto del entorno)",
+      "nombres_archivo_wikimedia": [
+        "File:Parque de los Deseos(1)-Medellin.JPG"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.medellin.gov.co/es/eventos/festival-nacional-de-la-trova-ciudad-de-medellin/",
+      "que_respalda": "existencia y programacion del Festival Nacional de la Trova Ciudad de Medellin dentro de la Feria de las Flores"
+    },
+    {
+      "tipo": "oficial",
+      "url": "https://www.medellin.gov.co/es/sala-de-prensa/noticias/medellin-corono-al-nuevo-rey-de-la-trova-2026/",
+      "que_respalda": "edicion 2026 del festival y coronacion del Rey de la Trova"
+    },
+    {
+      "tipo": "oficial",
+      "url": "https://www.feriadelasfloresmedellin.gov.co",
+      "que_respalda": "Feria de las Flores 2026 del 31 de julio al 9 de agosto (marco del certamen)"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/Category:Plaza_Mayor_(Medell%C3%ADn)",
+      "que_respalda": "archivos fotograficos de Wikimedia Commons usados en FOTOS_SUGERIDAS (recintos, no el certamen)"
+    }
+  ]
+}

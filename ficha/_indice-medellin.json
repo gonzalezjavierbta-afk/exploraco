@@ -1,0 +1,218 @@
+[
+  {
+    "slug": "comuna-13-san-javier-medellin",
+    "archivo": "ficha/ficha-comuna-13-san-javier-medellin.json",
+    "nombre": "Comuna 13 (San Javier) - Graffitour y Escaleras Electricas",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "feria-de-las-flores-medellin",
+    "archivo": "ficha/ficha-feria-de-las-flores-medellin.json",
+    "nombre": "Feria de las Flores de Medellin 2026",
+    "categoria_slug": "evento"
+  },
+  {
+    "slug": "plaza-botero-medellin",
+    "archivo": "ficha/ficha-plaza-botero-medellin.json",
+    "nombre": "Plaza Botero",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "museo-de-antioquia",
+    "archivo": "ficha/ficha-museo-de-antioquia.json",
+    "nombre": "Museo de Antioquia",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "parque-explora-medellin",
+    "archivo": "ficha/ficha-parque-explora-medellin.json",
+    "nombre": "Parque Explora",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "jardin-botanico-medellin",
+    "archivo": "ficha/ficha-jardin-botanico-medellin.json",
+    "nombre": "Jardin Botanico Joaquin Antonio Uribe",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "pueblito-paisa-cerro-nutibara",
+    "archivo": "ficha/ficha-pueblito-paisa-cerro-nutibara.json",
+    "nombre": "Pueblito Paisa y Cerro Nutibara",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "parque-arvi-medellin",
+    "archivo": "ficha/ficha-parque-arvi-medellin.json",
+    "nombre": "Parque Arvi",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "mamm-museo-arte-moderno-medellin",
+    "archivo": "ficha/ficha-mamm-museo-arte-moderno-medellin.json",
+    "nombre": "Museo de Arte Moderno de Medellin (MAMM)",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "mercado-del-rio-medellin",
+    "archivo": "ficha/ficha-mercado-del-rio-medellin.json",
+    "nombre": "Mercado del Rio",
+    "categoria_slug": "comida"
+  },
+  {
+    "slug": "barrio-provenza-el-poblado",
+    "archivo": "ficha/ficha-barrio-provenza-el-poblado.json",
+    "nombre": "Barrio Provenza (El Poblado)",
+    "categoria_slug": "comida"
+  },
+  {
+    "slug": "manila-hostal-boutique-poblado",
+    "archivo": "ficha/ficha-manila-hostal-boutique-poblado.json",
+    "nombre": "Distrito Manila (Hostales Boutique y Cafes)",
+    "categoria_slug": "hostal"
+  },
+  {
+    "slug": "barrio-laureles-medellin",
+    "archivo": "ficha/ficha-barrio-laureles-medellin.json",
+    "nombre": "Barrio Laureles (Primer y Segundo Parque)",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "fincas-silleteras-santa-elena",
+    "archivo": "ficha/ficha-fincas-silleteras-santa-elena.json",
+    "nombre": "Fincas Silleteras de Santa Elena",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "cerro-el-volador-medellin",
+    "archivo": "ficha/ficha-cerro-el-volador-medellin.json",
+    "nombre": "Parque Natural Cerro El Volador",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "teatro-pablo-tobon-uribe",
+    "archivo": "ficha/ficha-teatro-pablo-tobon-uribe.json",
+    "nombre": "Teatro Pablo Tobon Uribe",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "parque-de-las-luces-plaza-cisneros",
+    "archivo": "ficha/ficha-parque-de-las-luces-plaza-cisneros.json",
+    "nombre": "Parque de las Luces (Plaza Cisneros)",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "fiesta-del-libro-y-la-cultura-medellin",
+    "archivo": "ficha/ficha-fiesta-del-libro-y-la-cultura-medellin.json",
+    "nombre": "Fiesta del Libro y la Cultura de Medellin",
+    "categoria_slug": "evento"
+  },
+  {
+    "slug": "alumbrados-navidenos-medellin",
+    "archivo": "ficha/ficha-alumbrados-navidenos-medellin.json",
+    "nombre": "Alumbrados Navidenos de Medellin",
+    "categoria_slug": "evento"
+  },
+  {
+    "slug": "calle-de-la-buena-mesa-envigado",
+    "archivo": "ficha/ficha-calle-de-la-buena-mesa-envigado.json",
+    "nombre": "Calle de la Buena Mesa (Envigado)",
+    "categoria_slug": "comida"
+  },
+  {
+    "slug": "uva-la-esperanza-epm-medellin",
+    "archivo": "ficha/ficha-uva-la-esperanza-epm-medellin.json",
+    "nombre": "UVA La Esperanza (Unidad de Vida Articulada)",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "teatro-metropolitano-jose-gutierrez-gomez",
+    "archivo": "ficha/ficha-teatro-metropolitano-jose-gutierrez-gomez.json",
+    "nombre": "Teatro Metropolitano Jose Gutierrez Gomez",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "sabores-de-santa-elena-restaurantes",
+    "archivo": "ficha/ficha-sabores-de-santa-elena-restaurantes.json",
+    "nombre": "Corredor Gastronomico de Santa Elena",
+    "categoria_slug": "comida"
+  },
+  {
+    "slug": "glampings-santa-elena-bosque",
+    "archivo": "ficha/ficha-glampings-santa-elena-bosque.json",
+    "nombre": "Glamping y Eco-lodges en Santa Elena",
+    "categoria_slug": "hostal"
+  },
+  {
+    "slug": "parque-de-los-deseos-casa-musica",
+    "archivo": "ficha/ficha-parque-de-los-deseos-casa-musica.json",
+    "nombre": "Parque de los Deseos y Casa de la Musica",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "centro-cultural-moravia-medellin",
+    "archivo": "ficha/ficha-centro-cultural-moravia-medellin.json",
+    "nombre": "Centro Cultural Moravia",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "plaza-de-florez-mercado-medellin",
+    "archivo": "ficha/ficha-plaza-de-florez-mercado-medellin.json",
+    "nombre": "Plaza de Mercado de Florez",
+    "categoria_slug": "comida"
+  },
+  {
+    "slug": "la-candelaria-centro-historico-medellin",
+    "archivo": "ficha/ficha-la-candelaria-centro-historico-medellin.json",
+    "nombre": "La Candelaria (Centro Historico)",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "hostales-comuna-13-san-javier",
+    "archivo": "ficha/ficha-hostales-comuna-13-san-javier.json",
+    "nombre": "Alojamientos Comunitarios de la Comuna 13",
+    "categoria_slug": "hostal"
+  },
+  {
+    "slug": "envigado-centro-jardin-alojamiento",
+    "archivo": "ficha/ficha-envigado-centro-jardin-alojamiento.json",
+    "nombre": "Envigado Zona Centro y Barrio Jardin",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "festival-internacional-de-poesia-medellin",
+    "archivo": "ficha/ficha-festival-internacional-de-poesia-medellin.json",
+    "nombre": "Festival Internacional de Poesia de Medellin",
+    "categoria_slug": "evento"
+  },
+  {
+    "slug": "desfile-de-autos-clasicos-y-antiguos-medellin",
+    "archivo": "ficha/ficha-desfile-de-autos-clasicos-y-antiguos-medellin.json",
+    "nombre": "Desfile de Autos Clasicos y Antiguos",
+    "categoria_slug": "evento"
+  },
+  {
+    "slug": "festival-nacional-de-la-trova-medellin",
+    "archivo": "ficha/ficha-festival-nacional-de-la-trova-medellin.json",
+    "nombre": "Festival Nacional de la Trova Ciudad de Medellin",
+    "categoria_slug": "evento"
+  },
+  {
+    "slug": "parque-de-los-pies-descalzos-medellin",
+    "archivo": "ficha/ficha-parque-de-los-pies-descalzos-medellin.json",
+    "nombre": "Parque de los Pies Descalzos",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "plaza-de-la-libertad-medellin",
+    "archivo": "ficha/ficha-plaza-de-la-libertad-medellin.json",
+    "nombre": "Plaza de la Libertad",
+    "categoria_slug": "sitio"
+  },
+  {
+    "slug": "parques-del-rio-medellin",
+    "archivo": "ficha/ficha-parques-del-rio-medellin.json",
+    "nombre": "Parques del Rio Medellin",
+    "categoria_slug": "sitio"
+  }
+]

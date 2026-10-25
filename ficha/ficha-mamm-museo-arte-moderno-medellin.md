@@ -1,0 +1,166 @@
+# Ficha: Museo de Arte Moderno de Medellin (MAMM)
+
+- Slug: `mamm-museo-arte-moderno-medellin`
+- Categoria: `sitio`
+- Ciudad: Medellin, Antioquia
+- Coordenadas: 6.2238, -75.5752
+- Estado editorial: `published`
+
+Ficha de datos del pipeline de ExploraCO. El bloque JSON es la fuente
+de verdad y es el que valida `scripts/validate_ficha.js`; el archivo
+`ficha-mamm-museo-arte-moderno-medellin.json` es el mismo contenido en bruto para los cargadores.
+```json
+{
+  "BASE": {
+    "slug": "mamm-museo-arte-moderno-medellin",
+    "nombre": "Museo de Arte Moderno de Medellin (MAMM)",
+    "categoria_slug": "sitio",
+    "lead": "Espacio cultural e industrial recuperado en Ciudad del Rio dedicado al arte contemporaneo y manifestaciones audiovisuales.",
+    "descripcion": "El MAMM esta ubicado en el antiguo edificio de Talleres Robledo, una estructura siderurgica de 1938 rehabilitada e intervenida con una moderna expansion arquitectonica en bloques escalonados. Es el corazon cultural del barrio Ciudad del Rio.\n\nAlberga exposiciones temporales de arte contemporaneo, una sala de cine independiente, plazoletas abiertas y terrazas con vistas sobre los parques del sector.",
+    "highlight": "4.7/10 \u00b7 Arte Contemporaneo \u00b7 Cine \u00b7 Arquitectura",
+    "ciudad": "Medellin",
+    "region": "Antioquia",
+    "barrio": "Ciudad del Rio / El Poblado",
+    "lat": 6.2238,
+    "lng": -75.5752,
+    "whatsapp": "",
+    "telefono": "5744442622",
+    "email": "info@elmamm.org",
+    "web": "https://www.elmamm.org",
+    "instagram": "@elmamm",
+    "precio_desde": "$18.000 COP General / $12.000 COP Estudiantes",
+    "horario": "Mar-Vie 11:00 AM - 07:00 PM / Sab-Dom 11:00 AM - 06:00 PM",
+    "emoji": "\ud83c\udfa0",
+    "hero_bg": "linear-gradient(135deg, #424242 0%, #111111 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Museo \u00b7 Centro Cultural",
+    "capacidad": "Salas de exhibicion y cine",
+    "como_llegar": "Estacion Industriales del Metro Linea A (10 minutos a pie).",
+    "status": "published",
+    "destacado": false
+  },
+  "TAGS": {
+    "tipo_actividad": "Arte Contemporaneo \u00b7 Cine de Autor \u00b7 Conciertos en Plazoleta",
+    "dificultad": "Facil",
+    "dificultad_desc": "Accesibilidad total.",
+    "duracion": "1-2 horas",
+    "altitud": "1495 msnm",
+    "temporada": [
+      "Todo el a\u00f1o"
+    ],
+    "precio_entrada": "$18.000 COP",
+    "distancia": "Ciudad del Rio",
+    "como_llegar": "Metro Industriales.",
+    "permisos": "Boleta en taquilla",
+    "temporada_nota": "Entrada libre el ultimo viernes de cada mes entre 06:00 PM y 10:00 PM.",
+    "fauna_flora": [],
+    "secretos": [],
+    "regulaciones": "",
+    "checklist_tip": "Disfrutar de un picnic en la plazoleta de Ciudad del Rio frente al museo.",
+    "entradas": [],
+    "tours": [],
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad_tags": [],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "ideal",
+      "Jun": "ideal",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    },
+    "subcategoria": "museo"
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfEl MAMM tiene proyecciones de cine?",
+      "respuesta": "Si, la Sala de Cine MAMM ofrece cartelera independiente semanal."
+    },
+    {
+      "pregunta": "\u00bfCuanto cuesta la entrada al MAMM?",
+      "respuesta": "$18.000 COP la entrada general y $12.000 COP para estudiantes. La boleta se compra en taquilla."
+    },
+    {
+      "pregunta": "\u00bfCuando hay entrada libre?",
+      "respuesta": "El ultimo viernes de cada mes, entre las 06:00 PM y las 10:00 PM."
+    },
+    {
+      "pregunta": "\u00bfCual es el horario del museo?",
+      "respuesta": "Martes a viernes de 11:00 AM a 07:00 PM y sabados y domingos de 11:00 AM a 06:00 PM."
+    },
+    {
+      "pregunta": "\u00bfComo se llega al MAMM?",
+      "respuesta": "Estacion Industriales del Metro Linea A, a unos 10 minutos a pie, en el barrio Ciudad del Rio."
+    },
+    {
+      "pregunta": "\u00bfQue es el edificio que ocupa el museo?",
+      "respuesta": "Ocupa el antiguo edificio de Talleres Robledo, una estructura siderurgica de 1938 rehabilitada y ampliada con bloques escalonados. Alberga exposiciones temporales de arte contemporaneo, la sala de cine, plazoletas abiertas y terrazas."
+    },
+    {
+      "pregunta": "\u00bfSe puede hacer picnic en el entorno?",
+      "respuesta": "Si, la plazoleta de Ciudad del Rio frente al museo es un espacio abierto usado para picnic."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Fachada del MAMM",
+      "caption": "Fachada del Museo de Arte Moderno de Medellin en los antiguos Talleres Robledo",
+      "nombres_archivo_wikimedia": [
+        "File:2018 Fachada del Museo de Arte Moderno de Medell\u00edn - Antiguos Talleres Robledo.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Edificio del museo",
+      "caption": "Volumetria del museo en Ciudad del Rio",
+      "nombres_archivo_wikimedia": [
+        "File:Museo de Arte Moderno de Medell\u00edn.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Vista del conjunto",
+      "caption": "El MAMM visto desde el entorno de Ciudad del Rio",
+      "nombres_archivo_wikimedia": [
+        "File:Museo de Arte Moderno de Medell\u00edn desde Comfama 1.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Libreria del museo",
+      "caption": "Libreria del MAMM en el edificio de los antiguos Talleres Robledo",
+      "nombres_archivo_wikimedia": [
+        "File:2018 Librer\u00eda del Museo de Arte Moderno de Medell\u00edn - Antiguos Talleres Robledo.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Sala de estudio",
+      "caption": "Sala de estudio y consulta del museo",
+      "nombres_archivo_wikimedia": [
+        "File:Sala de Estudio MAMM.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.elmamm.org",
+      "que_respalda": "programacion, tarifas y horarios"
+    },
+    {
+      "tipo": "fotografica",
+      "url": "https://commons.wikimedia.org/wiki/Category:Museo_de_Arte_Moderno_de_Medell%C3%ADn",
+      "que_respalda": "archivos fotograficos de Wikimedia Commons usados en FOTOS_SUGERIDAS"
+    }
+  ]
+}
+```
