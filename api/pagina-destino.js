@@ -187,6 +187,8 @@ function mediaEsFotoValida(u, tipo) {
 
 // img (4o argumento, opcional): URL YA resuelta por la cascada del hero
 // (foto_hero -> foto -> primera curada valida -> Unsplash por categoria).
+// Con tags.sin_foto_hero esa cascada NO llega al Unsplash de categoria y el
+// hero puede venir vacio: entonces no se emite la clave image (ver buildHTML).
 // Se revalida aqui para las llamadas sin ese argumento.
 function schemaLD(d, cat, autor, img) {
   var tipos = { hostal:'LodgingBusiness', comida:'FoodEstablishment', sitio:'TouristAttraction', evento:'Event', blog:'BlogPosting' };
@@ -707,10 +709,22 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     if (a.orden !== b.orden) return a.orden - b.orden;
     return a.idx - b.idx;
   });
+  // -- Flag de fila: tags.sin_foto_hero (corte ADITIVO y CONDICIONAL) ---
+  // Una ficha sin foto propia (foto_hero NULL y 0 filas en destinos_fotos)
+  // recibia igualmente la imagen generica de Unsplash de su categoria en el
+  // hero, en og:image y en el image del JSON-LD: una foto que NO es del
+  // lugar. Con tags.sin_foto_hero la fila degrada a hero_bg (o CAT_GRAD) +
+  // emoji y no inventa imagen. Se toleran las 3 formas que guarda el panel
+  // (booleano true, string 'true', string '1'). Sin el flag, cascada intacta.
+  var sinFotoHeroTags = (d.tags && typeof d.tags === 'object') ? d.tags : (safeJSON(d.tags) || {});
+  var sinFotoHeroRaw  = sinFotoHeroTags.sin_foto_hero;
+  var sinFotoHero = (sinFotoHeroRaw === true || sinFotoHeroRaw === 1
+                  || sinFotoHeroRaw === '1' || sinFotoHeroRaw === 'true');
   // -- Foto principal: cascada determinista ----------------------------
   // Orden estricto: destinos.foto_hero -> destinos.foto -> primera curada
   // (es_hero DESC, orden ASC, solo imagenes) -> Unsplash por categoria.
   // El Unsplash es el ULTIMO recurso, no el primero tras fallar foto_hero.
+  // Con tags.sin_foto_hero ese ultimo paso se corta (ver mas abajo).
   var hero = '';
   var heroCand = String(d.foto_hero || '').trim();
   if (heroCand && mediaEsFotoValida(heroCand, '')) hero = heroCand;
@@ -725,7 +739,12 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     sitio:  'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
     evento: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1200&q=80',
   };
-  if (!hero) hero = heroFallbacks[cat] || heroFallbacks.sitio;
+  // PUNTO UNICO DE DECISION del flag tags.sin_foto_hero: el candidato
+  // Unsplash de categoria NO se usa y hero queda vacio. De ese unico valor
+  // heredan todos los consumidores sin repetir la condicion: heroMainStyle
+  // (cae a hero_bg/CAT_GRAD + emoji), og:image/twitter:image y el image del
+  // JSON-LD (ambos se omiten). Las curadas y foto_hero/foto no se tocan.
+  if (!hero && !sinFotoHero) hero = heroFallbacks[cat] || heroFallbacks.sitio;
   var rat   = d.rating ? parseFloat(d.rating) : 0;
   var nRes  = parseInt(d.total_resenas||0);
   var dimDefs = DIM_BY_CAT[cat] || DIM_BY_CAT.sitio;
@@ -1818,8 +1837,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   //
   // Nota de gate: galAll SIEMPRE trae al menos el hero (fallback Unsplash
   // en buildHTML), por lo que "galAll.length > 0" es trivialmente
-  // verdadero. El bloque usa > 1 (gate historico), que cumple "solo si
-  // galAll.length > 0" y evita una grilla con una sola foto.
+  // verdadero. Excepcion: una fila con tags.sin_foto_hero y sin foto propia
+  // no tiene hero, asi que galAll puede venir vacio; los gates de abajo ya
+  // usan length > 1 / length, por lo que degradan sin emitir nada. El bloque
+  // usa > 1 (gate historico), que cumple "solo si galAll.length > 0" y evita
+  // una grilla con una sola foto.
   var GAL_THUMBS_MAX = 12;
   // ADR-036: el ranking unico por votos (curadas + comunidad, con la
   // precedencia de dedupe curada > comunidad) ya se calculo en mediaRank
@@ -2563,7 +2585,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // audio NUNCA se publica como imagen social.
   var heroPropio = hero || '';
   var ogHeroAbs = heroPropio ? (String(heroPropio).indexOf('http') === 0 ? String(heroPropio) : BASE + (String(heroPropio).charAt(0) === '/' ? '' : '/') + String(heroPropio)) : '';
-  var ogImage = ogHeroAbs || 'https://latawel.com/assets/brand/og/latawel-og-1200x630.png';
+  // Con tags.sin_foto_hero y sin foto propia (el hero quedo vacio porque se
+  // corto el Unsplash de categoria) NO se emite og:image ni twitter:image:
+  // no se publica una URL social que no es del lugar. Las filas sin el flag
+  // conservan el fallback de marca de siempre (comportamiento intacto).
+  var ogImage = ogHeroAbs || (sinFotoHero ? '' : 'https://latawel.com/assets/brand/og/latawel-og-1200x630.png');
   return '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
     + '<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
     + '<title>'+esc(d.nombre)+'  LATAWEL</title>\n'
@@ -2576,12 +2602,12 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<meta property="og:title" content="'+esc(d.nombre)+'  LATAWEL">\n'
     + '<meta property="og:description" content="'+esc(d.lead||'')+'">\n'
     + '<meta property="og:url" content="'+BASE+'/'+esc(d.slug)+'.html">\n'
-    + '<meta property="og:image" content="'+esc(ogImage)+'">\n'
+    + (ogImage ? '<meta property="og:image" content="'+esc(ogImage)+'">\n' : '')
     + '<meta property="og:type" content="place">\n'
     + '<meta name="twitter:card" content="summary_large_image">\n'
     + '<meta name="twitter:title" content="'+esc(d.nombre)+'  LATAWEL">\n'
     + '<meta name="twitter:description" content="'+esc(d.lead||'')+'">\n'
-    + '<meta name="twitter:image" content="'+esc(ogImage)+'">\n'
+    + (ogImage ? '<meta name="twitter:image" content="'+esc(ogImage)+'">\n' : '')
     + '<meta name="theme-color" content="#FF4A00">\n'
     + '<link rel="canonical" href="'+BASE+'/'+esc(d.slug)+'.html">\n'
     + schemaLD(d, cat, autor, hero) + '\n'
@@ -2617,7 +2643,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + (hctarRow2.length ? '<div class="hctar-row">'+hctarRow2.join('')+'</div>' : '')
       + '</div>'
       + '</div>\n'
-      + '<div class="hr"><div class="psm" style="'+heroMainStyle+'" onclick="irAFotoGaleria(HERO_FOTOS[0])">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;'+grad+'"></div>')+'</div>'
+      + '<div class="hr"><div class="psm" style="'+heroMainStyle+'" onclick="irAFotoGaleria(HERO_FOTOS[0])">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px">'+esc(d.emoji||'')+'</div>')+'</div>'
       + (heroThumbs ? '<div class="prow">'+heroThumbs+'</div>' : '')
       + '</div>\n</div></section>\n\n')
 

@@ -8,12 +8,23 @@
 //
 // Uso:
 //   node scripts/validate_ficha.js <ruta-ficha.md>
+//   node scripts/validate_ficha.js <ruta-ficha.md> --sin-fotos
+//
+// --sin-fotos es una excepcion EXPLICITA y opt-in: permite FOTOS_SUGERIDAS
+// vacia para una pagina de ciudad sin fotos por decision del operador, donde
+// el hero degrada a hero_bg solido + emoji. Sin la bandera, una lista vacia o
+// con menos de 5 items FALLA igual que siempre (contrato canonico, BUG-034).
+// Si FOTOS_SUGERIDAS trae items, se exigen minimo 5 y exactamente 1 es_hero
+// con o sin bandera.
 //
 // Exit code 0 = PASS, 1 = FAIL. Solo lectura; no modifica archivos.
 // ASCII-safe (no se emiten tildes ni caracteres especiales).
 
 var fs = require('fs');
 var path = require('path');
+
+// Excepcion opt-in (se activa con --sin-fotos en argv; ver bloque "Uso").
+var SIN_FOTOS = false;
 
 var VALID = ['hostal', 'comida', 'sitio', 'evento'];
 
@@ -148,8 +159,21 @@ function validate(fichaPath) {
     });
   }
 
-  if (!Array.isArray(data.FOTOS_SUGERIDAS) || data.FOTOS_SUGERIDAS.length < 5) {
-    allPass = fail('FOTOS_SUGERIDAS debe tener al menos 5 items (tiene ' + (data.FOTOS_SUGERIDAS ? data.FOTOS_SUGERIDAS.length : 0) + ')');
+  // FOTOS_SUGERIDAS: contrato canonico = minimo 5 items y exactamente 1
+  // es_hero. Unica excepcion: lista VACIA con la bandera --sin-fotos, para una
+  // pagina de ciudad sin fotos por decision del operador (el hero degrada a
+  // hero_bg solido + emoji). Sin la bandera, vacio o < 5 = FAIL.
+  var fotos = data.FOTOS_SUGERIDAS;
+  if (SIN_FOTOS && Array.isArray(fotos) && fotos.length === 0) {
+    console.log('[AVISO] EXCEPCION --sin-fotos: FOTOS_SUGERIDAS vacia aceptada. ' +
+      'Pagina sin fotos por decision del operador; el hero debe degradar a ' +
+      'hero_bg solido + emoji (foto_hero = null).');
+  } else if (!Array.isArray(fotos) || fotos.length < 5) {
+    allPass = fail('FOTOS_SUGERIDAS debe tener al menos 5 items (tiene ' +
+      (fotos ? fotos.length : 0) + ')' +
+      ((Array.isArray(fotos) && fotos.length === 0)
+        ? '; si la pagina va sin fotos por decision del operador, invoca la excepcion con --sin-fotos'
+        : ''));
   } else {
     var heroCount = 0;
     data.FOTOS_SUGERIDAS.forEach(function (f, i) {
@@ -181,9 +205,11 @@ function validate(fichaPath) {
   return allPass;
 }
 
-var arg = process.argv[2];
+var argv = process.argv.slice(2);
+SIN_FOTOS = argv.indexOf('--sin-fotos') !== -1;
+var arg = argv.filter(function (a) { return a.indexOf('--') !== 0; })[0];
 if (!arg) {
-  console.error('Uso: node ' + path.basename(process.argv[1]) + ' <ruta-ficha.md>');
+  console.error('Uso: node ' + path.basename(process.argv[1]) + ' <ruta-ficha.md> [--sin-fotos]');
   process.exit(1);
 }
 
