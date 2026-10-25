@@ -1,0 +1,373 @@
+# Ficha unica Barranquilla - fuente de datos para la pagina dinamica barranquilla.html
+
+Origen: ficha entregada por el operador (2026-10-25). Categoria `sitio`, subcategoria `ciudad`, zona `caribe`.
+
+Pendiente antes de publicar (BUG-022 / ADR-002):
+
+- `foto_hero` viene como placeholder `"FOTO 1"`: debe sustituirse por una URL real con HEAD 200.
+- Los 5 nombres de archivo de Wikimedia de `FOTOS_SUGERIDAS` NO estan verificados: comprobar con `curl -I` antes de usarlos.
+- JSON ASCII-safe: todos los no-ASCII van como escapes `\uXXXX`.
+
+## Bloque JSON final
+
+```json
+{
+  "BASE": {
+    "slug": "barranquilla",
+    "nombre": "Barranquilla",
+    "categoria_slug": "sitio",
+    "subcategoria": "ciudad",
+    "zona": "caribe",
+    "sintro": "La Puerta de Oro de Colombia: vibrante capital industrial, cultural y ribere\u00f1a del Caribe con el Gran Malec\u00f3n y el Carnaval.",
+    "lead": "Conocida como la Puerta de Oro de Colombia, Barranquilla combina la majestuosidad del r\u00edo Magdalena con una potencia cultural inigualable. Cuna del Carnaval m\u00e1s importante del pa\u00eds y hogar de una hospitalidad caribe\u00f1a \u00fanica.",
+    "descripcion": "Barranquilla es la principal ciudad del norte de Colombia y capital del departamento del Atl\u00e1ntico. Estrat\u00e9gicamente ubicada junto a la desembocadura del r\u00edo Magdalena, hist\u00f3ricamente ha funcionado como el puerto de entrada de la modernidad, la aviaci\u00f3n y la industria al pa\u00eds. Su clima tropical y su car\u00e1cter alegre definen la identidad de los barranquilleros, mundialmente c\u00e9lebres por su calidez y energ\u00eda festiva.\n\nEl epicentro cultural de la ciudad gira en torno al majestuoso Gran Malec\u00f3n del R\u00edo, un desarrollo urbano moderno que reconecta a los habitantes con el r\u00edo Magdalena a trav\u00e9s de espacios recreativos, gastron\u00f3micos y culturales como el Caim\u00e1n del R\u00edo. Asimismo, barrios tradicionales como El Prado conservan la arquitectura republicana y neocl\u00e1sica que narra la \u00e9poca dorada de la aristocracia local a principios del siglo XX.\n\nLa econom\u00eda y la infraestructura urbana han tenido una transformaci\u00f3n notable en los \u00faltimos a\u00f1os, consolidando a la ciudad como un destino clave para el turismo de negocios, eventos y entretenimiento. Monumentos ic\u00f3nicos como la Ventana al Mundo, la Ventana de Campeones y la monumental estatua de Shakira reflejan el orgullo contempor\u00e1neo y el talento global que emana de esta tierra caribe\u00f1a.",
+    "highlight": "9.4/10 | Capital del Caribe",
+    "ciudad": "Barranquilla",
+    "region": "Atl\u00e1ntico",
+    "barrio": "",
+    "lat": 10.9685,
+    "lng": -74.7813,
+    "whatsapp": "",
+    "telefono": "+57 (5) 3399999",
+    "email": "info@barranquilla.gov.co",
+    "web": "https://www.barranquilla.gov.co",
+    "instagram": "@barranquillaptm",
+    "precio_desde": "Presupuesto mochilero desde $90.000 COP por d\u00eda",
+    "horario": "Ciudad abierta 24/7; atractivos principales 08:00 - 22:00",
+    "emoji": "\u2693",
+    "hero_bg": "linear-gradient(135deg, #1B365D 0%, #B59A57 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Destino Urbano | Cultura y R\u00edo",
+    "capacidad": "Aforo ilimitado (Destino urbano)",
+    "como_llegar": "Acceso a\u00e9reo por el Aeropuerto Internacional Ernesto Cortissoz (BAQ) y terrestre a trav\u00e9s de la Terminal Metropolitana de Transportes de Barranquilla.",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Ciudad",
+    "duracion": "2-4 d\u00edas",
+    "precio_entrada": "Sin entrada",
+    "distancia": "Ubicada en la costa norte colombiana sobre el margen occidental del r\u00edo Magdalena.",
+    "como_llegar": "Conexi\u00f3n a\u00e9rea nacional e internacional v\u00eda Aeropuerto Ernesto Cortissoz; rutas terrestres desde Cartagena (2 horas) y Santa Marta (2.5 horas).",
+    "permisos": "No requiere",
+    "temporada": [
+      "Diciembre",
+      "Enero",
+      "Febrero",
+      "Marzo"
+    ],
+    "temporada_nota": "Temporada seca ideal y fechas de celebraci\u00f3n del Carnaval de Barranquilla.",
+    "entradas": [],
+    "atracciones": [
+      {
+        "icono": "\ud83c\udf0a",
+        "nombre": "Gran Malec\u00f3n del R\u00edo",
+        "descripcion": "Paseo costero moderno de 5 kil\u00f3metros junto al r\u00edo Magdalena con zonas verdes, gastronom\u00eda y entretenimiento."
+      },
+      {
+        "icono": "\ud83c\udfad",
+        "nombre": "Museo del Carnaval",
+        "descripcion": "Espacio interactivo que exhibe la historia, comparsas, disfraces y la magia del Carnaval de Barranquilla."
+      },
+      {
+        "icono": "\ud83c\udfdf\ufe0f",
+        "nombre": "Barrio El Prado",
+        "descripcion": "Emblem\u00e1tico sector residencial patrimonial con mansiones de arquitectura republicana y calles arborizadas."
+      },
+      {
+        "icono": "\ud83c\udf0f",
+        "nombre": "Ventana al Mundo",
+        "descripcion": "Monumento ic\u00f3nico de cristal de colores que rinde homenaje a la industria y el desarrollo de la ciudad."
+      },
+      {
+        "icono": "\u26bd",
+        "nombre": "Ventana de Campeones",
+        "descripcion": "Monumento deportivo en honor al Junior de Barranquilla situado en el Gran Malec\u00f3n."
+      },
+      {
+        "icono": "\u26ea",
+        "nombre": "Iglesia de San Nicol\u00e1s",
+        "descripcion": "Joya arquitect\u00f3nica neog\u00f3tica situada en el coraz\u00f3n del centro hist\u00f3rico."
+      }
+    ],
+    "actividades_gratis": [
+      {
+        "icono": "\ud83d\udeb6",
+        "nombre": "Caminata por el Gran Malec\u00f3n",
+        "descripcion": "Disfrutar de la brisa del r\u00edo Magdalena, las zonas de skate y las esculturas p\u00fablicas sin costo."
+      },
+      {
+        "icono": "\ud83d\udcf8",
+        "nombre": "Ruta fotogr\u00e1fica Ventana al Mundo",
+        "descripcion": "Capturar la emblem\u00e1tica estructura multicolor ubicada en la Circunvalar."
+      },
+      {
+        "icono": "\ud83d\uddfa\ufe0f",
+        "nombre": "Paseo por la Plaza de la Paz",
+        "descripcion": "Visitar el principal punto de concentraci\u00f3n c\u00edvica y cultural frente a la Catedral Metropolitana."
+      }
+    ],
+    "programacion": [
+      {
+        "dia": "Febrero",
+        "eventos": "Carnaval de Barranquilla"
+      },
+      {
+        "dia": "Septiembre",
+        "eventos": "Sabor Barranquilla (Gastronom\u00eda)"
+      }
+    ],
+    "accesibilidad": [
+      {
+        "icono": "\ud83d\ude8c",
+        "nombre": "Transmetro accesible",
+        "descripcion": "Estaciones y buses con rampas y adaptaciones para personas con movilidad reducida."
+      },
+      {
+        "icono": "\u267f",
+        "nombre": "Infraestructura peatonal",
+        "descripcion": "Ampliaci\u00f3n de andenes y rampas en corredores tur\u00edsticos principales."
+      }
+    ],
+    "contexto": "Barranquilla es el motor industrial y cultural del caribe colombiano, reconocida por su tradici\u00f3n portuaria, su arquitectura republicana y por albergar una de las festividades folcl\u00f3ricas m\u00e1s importantes de Am\u00e9rica Latina.",
+    "barrios": [
+      {
+        "icono": "\ud83c\udfe8",
+        "nombre": "Riomar",
+        "tipo": "Alojamiento",
+        "descripcion": "Zona moderna, segura y comercial con amplia oferta hotelera y centros comerciales."
+      },
+      {
+        "icono": "\ud83c\udfdf\ufe0f",
+        "nombre": "El Prado",
+        "tipo": "Historico",
+        "descripcion": "Barrio patrimonial con encanto hist\u00f3rico, arquitectura cl\u00e1sica y hoteles boutique."
+      },
+      {
+        "icono": "\ud83c\udf7d\ufe0f",
+        "nombre": "Alto Prado",
+        "tipo": "Gastronomico",
+        "descripcion": "Sector residencial c\u00e9ntrico destacado por su cercan\u00eda a los mejores restaurantes y bares."
+      }
+    ],
+    "transporte": [
+      {
+        "icono": "\u2708\ufe0f",
+        "nombre": "Aeropuerto Internacional Ernesto Cortissoz",
+        "descripcion": "Ubicado en Soledad a 25 min; taxis regulados y transporte terrestre oficial."
+      },
+      {
+        "icono": "\ud83d\ude8c",
+        "nombre": "Sistema Transmetro",
+        "descripcion": "Red de buses articulados que conecta las troncales principales de la ciudad."
+      },
+      {
+        "icono": "\ud83d\ude95",
+        "nombre": "Taxis y Apps",
+        "descripcion": "Servicio frecuente de taxis amarillos y plataformas digitales en toda la zona urbana."
+      }
+    ],
+    "seguridad": [
+      {
+        "icono": "\ud83d\udee1\ufe0f",
+        "nombre": "Zonas Tur\u00edsticas Seguras",
+        "descripcion": "Riomar, El Prado y Gran Malec\u00f3n cuentan con vigilancia constante; precauci\u00f3n nocturna en sectores del Centro (Alcald\u00eda de Barranquilla, 2026)."
+      },
+      {
+        "icono": "\ud83d\udc6e",
+        "nombre": "Polic\u00eda de Turismo",
+        "descripcion": "Presencia activa en terminales, aeropuertos y corredores viales (SuperTransporte, 2026)."
+      }
+    ],
+    "presupuesto": [
+      {
+        "tipo": "Mochilero",
+        "rango": "90.000 - 150.000 COP",
+        "descripcion": "Hostales, transporte en Transmetro y comidas en mercados locales."
+      },
+      {
+        "tipo": "Medio",
+        "rango": "250.000 - 500.000 COP",
+        "descripcion": "Hotel 3 estrellas, taxis/apps y restaurantes formales en Riomar."
+      },
+      {
+        "tipo": "Alto",
+        "rango": "> 600.000 COP",
+        "descripcion": "Hoteles boutique, cenas gourmet y transporte privado."
+      }
+    ],
+    "gastronomia": [
+      {
+        "icono": "\ud83e\udd5f",
+        "nombre": "Arepa de Huevo",
+        "descripcion": "Tradicional arepa de ma\u00edz frito rellena de huevo y carne; disponible en puestos tradicionales."
+      },
+      {
+        "icono": "\ud83c\udf5a",
+        "nombre": "Arroz de Lisa",
+        "descripcion": "Plato emblem\u00e1tico con pescado lisa salado, bollo de yuca y suero atollabuey."
+      },
+      {
+        "icono": "\ud83c\udf72",
+        "nombre": "Mondongo Caribe\u00f1o",
+        "descripcion": "Sopa espesa a base de mondongo con verduras, \u00f1ame y yuca."
+      }
+    ],
+    "cuando_ir": [
+      {
+        "periodo": "Ene-Mar",
+        "estado": "ideal",
+        "nota": "Clima seco, brisa caribe\u00f1a y temporada de Carnaval."
+      },
+      {
+        "periodo": "Abr-Ago",
+        "estado": "posible",
+        "nota": "\u00c9poca de transici\u00f3n con lluvias tropicales intermitentes."
+      },
+      {
+        "periodo": "Sep-Dic",
+        "estado": "ideal",
+        "nota": "Segunda temporada seca del a\u00f1o y eventos gastron\u00f3micos."
+      }
+    ],
+    "dificultad": null,
+    "dificultad_desc": null,
+    "regulaciones": null,
+    "tours": [],
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad_tags": [],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "posible",
+      "May": "posible",
+      "Jun": "posible",
+      "Jul": "posible",
+      "Ago": "posible",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    },
+    "creditos_fotos": [
+      {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/4/4e/AspectoGranMalecon.jpg",
+        "autor": "Jdvillalobos",
+        "licencia": "CC BY-SA 4.0"
+      },
+      {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/b/ba/La_ventana_al_mundo_Barranquilla.jpg",
+        "autor": "Araad1992",
+        "licencia": "CC BY-SA 4.0"
+      },
+      {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Barranquilla_casona_barrio_El_Prado.jpg/1280px-Barranquilla_casona_barrio_El_Prado.jpg",
+        "autor": "Jdvillalobos",
+        "licencia": "CC BY 3.0"
+      },
+      {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Marimonda_-_Carnaval_de_Barranquilla_2012.jpg/1280px-Marimonda_-_Carnaval_de_Barranquilla_2012.jpg",
+        "autor": "Michele Mariani",
+        "licencia": "CC BY-SA 2.0"
+      },
+      {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/2/23/CaimandelRioGranMaleconBarranquilla.jpg",
+        "autor": "Jdvillalobos",
+        "licencia": "CC BY-SA 4.0"
+      }
+    ]
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfCu\u00e1l es la mejor \u00e9poca del a\u00f1o para visitar Barranquilla?",
+      "respuesta": "Entre diciembre y marzo, cuando sopla la brisa caribe\u00f1a y se vive el Carnaval."
+    },
+    {
+      "pregunta": "\u00bfC\u00f3mo llegar desde el Aeropuerto Ernesto Cortissoz hasta el norte?",
+      "respuesta": "En taxi autorizado o mediante aplicaciones de movilidad; el trayecto toma 25 a 30 minutos."
+    },
+    {
+      "pregunta": "\u00bfQu\u00e9 tan seguro es recorrer las zonas tur\u00edsticas?",
+      "respuesta": "Las zonas principales como el Gran Malec\u00f3n, Riomar y El Prado son seguras y cuentan con vigilancia policial."
+    },
+    {
+      "pregunta": "\u00bfCu\u00e1l es el presupuesto diario estimado para un viajero promedio?",
+      "respuesta": "Entre $250.000 y $500.000 COP por d\u00eda, cubriendo hospedaje c\u00f3modo, comidas y transporte."
+    },
+    {
+      "pregunta": "\u00bfCu\u00e1les son las zonas recomendadas para hospedarse?",
+      "respuesta": "Riomar y Alto Prado por su oferta comercial y seguridad, o El Prado por su riqueza hist\u00f3rica."
+    },
+    {
+      "pregunta": "\u00bfC\u00f3mo se vive el Carnaval de Barranquilla si es mi primera vez?",
+      "respuesta": "Se compran palcos o casetas oficiales con antelaci\u00f3n y se llega temprano a los desfiles; el Museo del Carnaval abre todo el a\u00f1o y explica las comparsas y los disfraces."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Gran Malec\u00f3n del R\u00edo Magdalena atardecer",
+      "caption": "Vista panor\u00e1mica del malec\u00f3n y el r\u00edo al atardecer",
+      "nombres_archivo_wikimedia": [
+        "File:Gran_Malecon_Barranquilla_atardecer.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Ventana al Mundo Barranquilla",
+      "caption": "Monumento de cristal multicolor en la Circunvalar",
+      "nombres_archivo_wikimedia": [
+        "File:Ventana_al_Mundo_Barranquilla.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Barrio El Prado Barranquilla arquitectura",
+      "caption": "Mansion republicana en el barrio El Prado",
+      "nombres_archivo_wikimedia": [
+        "File:Barrio_El_Prado_Barranquilla.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Carnaval de Barranquilla desfile",
+      "caption": "Comparsas y disfraces tradicionales en desfile",
+      "nombres_archivo_wikimedia": [
+        "File:Carnaval_de_Barranquilla_desfile.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Caiman del Rio Barranquilla",
+      "caption": "Mercado gastron\u00f3mico y cultural en el malec\u00f3n",
+      "nombres_archivo_wikimedia": [
+        "File:Caiman_del_Rio_Barranquilla.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.barranquilla.gov.co",
+      "que_respalda": "Atractivos tur\u00edsticos, datos institucionales y de gesti\u00f3n urbana."
+    },
+    {
+      "tipo": "maps",
+      "url": "https://www.expedia.com/es/Barranquilla.dx494",
+      "que_respalda": "Zonas hoteleras, barrios clave (Riomar, El Prado) y puntos de inter\u00e9s."
+    },
+    {
+      "tipo": "prensa",
+      "url": "https://www.supertransporte.gov.co/index.php/comunicaciones-2026/barranquilla-se-prepara-para-recibir-a-37-000-pasajeros-desde-las-terminales-de-transporte-del-pais-para-la-celebracion-de-su-carnaval/",
+      "que_respalda": "Operatividad de transporte, seguridad vial y movilizaci\u00f3n tur\u00edstica 2026."
+    },
+    {
+      "tipo": "otra",
+      "url": "https://aerobarranquilla.aerocivil.gov.co/publicaciones/noticias/4382",
+      "que_respalda": "Datos de conectividad a\u00e9rea y movimiento de pasajeros en el Aeropuerto Ernesto Cortissoz."
+    }
+  ]
+}
+```

@@ -1,0 +1,67 @@
+{
+  "slug": "barranquilla",
+  "nota": "BUG-022: los 5 nombres de archivo de FOTOS_SUGERIDAS (ficha) devolvieron 404 en Special:FilePath. Se resolvieron los archivos REALES de Wikimedia Commons con la API (action=query&list=search&prop=imageinfo) y se verifico cada URL final con curl -I => HEAD 200. URLs sin parametros utm.",
+  "fotos": [
+    {
+      "tema": "Gran Malecon del Rio Magdalena atardecer",
+      "caption": "Vista panor\u00e1mica del malec\u00f3n y el r\u00edo al atardecer",
+      "archivo_wikimedia": "File:AspectoGranMalecon.jpg",
+      "sustituye_a": "File:Gran_Malecon_Barranquilla_atardecer.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/4/4e/AspectoGranMalecon.jpg",
+      "status": 200,
+      "es_hero": true,
+      "autor": "Jdvillalobos",
+      "licencia": "CC BY-SA 4.0"
+    },
+    {
+      "tema": "Ventana al Mundo Barranquilla",
+      "caption": "Monumento de cristal multicolor en la Circunvalar",
+      "archivo_wikimedia": "File:La ventana al mundo Barranquilla.jpg",
+      "sustituye_a": "File:Ventana_al_Mundo_Barranquilla.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/b/ba/La_ventana_al_mundo_Barranquilla.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Araad1992",
+      "licencia": "CC BY-SA 4.0"
+    },
+    {
+      "tema": "Barrio El Prado Barranquilla arquitectura",
+      "caption": "Mansion republicana en el barrio El Prado",
+      "archivo_wikimedia": "File:Barranquilla casona barrio El Prado.jpg",
+      "sustituye_a": "File:Barrio_El_Prado_Barranquilla.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Barranquilla_casona_barrio_El_Prado.jpg/1280px-Barranquilla_casona_barrio_El_Prado.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Jdvillalobos",
+      "licencia": "CC BY 3.0"
+    },
+    {
+      "tema": "Carnaval de Barranquilla desfile",
+      "caption": "Comparsas y disfraces tradicionales en desfile",
+      "archivo_wikimedia": "File:Marimonda - Carnaval de Barranquilla 2012.jpg",
+      "sustituye_a": "File:Carnaval_de_Barranquilla_desfile.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Marimonda_-_Carnaval_de_Barranquilla_2012.jpg/1280px-Marimonda_-_Carnaval_de_Barranquilla_2012.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Michele Mariani",
+      "licencia": "CC BY-SA 2.0"
+    },
+    {
+      "tema": "Caiman del Rio Barranquilla",
+      "caption": "Mercado gastron\u00f3mico y cultural en el malec\u00f3n",
+      "archivo_wikimedia": "File:CaimandelRioGranMaleconBarranquilla.jpg",
+      "sustituye_a": "File:Caiman_del_Rio_Barranquilla.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/2/23/CaimandelRioGranMaleconBarranquilla.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Jdvillalobos",
+      "licencia": "CC BY-SA 4.0"
+    }
+  ],
+  "descartadas": [],
+  "fuentes_status": [
+    { "url": "https://barranquilla.gov.co", "status": 403, "nota": "WAF del distrito responde 403 a curl con UA de navegador (apex y www); se conserva como fuente editorial, no se renderiza" },
+    { "url": "https://www.expedia.com/es/Barranquilla.dx494", "status": 429, "nota": "rate limit transitorio de curl; se conserva como fuente editorial" },
+    { "url": "https://aerobarranquilla.aerocivil.gov.co/publicaciones/noticias/4382", "status": 200 }
+  ]
+}
