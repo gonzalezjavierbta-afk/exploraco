@@ -2452,3 +2452,25 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **Registro:** detectado como **H1** en **TSK-233** el 2026-10-25 y cerrado en codigo en el **segundo pase de cierre** de esa misma tanda. No guarda relacion con la decision de dominio canonico que se estaba ejecutando en paralelo (**ADR-102**), que tiene su propio riesgo y sus propios pendientes.
 
+## BUG-139: **81** seeds con fotos de Wikimedia Commons **no escriben `tags.creditos_fotos`** (atribucion CC BY / CC BY-SA ausente en produccion) y `galeria.html` no tiene capa de credito -- **ABIERTO (2026-10-25, auditoria tras TSK-235)**
+
+**Severidad: ALTA (riesgo legal de atribucion, el mismo que BUG-138 pero por DATO y no por MOTOR). Estado: ABIERTO -- auditoria medida en la sesion del 2026-10-25, sin correccion iniciada. Este registro documental no cambia codigo.**
+
+**Sintoma:** paginas publicadas con fotos de Commons que se sirven **sin** `Foto: autor / licencia` visible. No hay error tecnico: el render esta sano, el dato falta.
+
+**Alcance (medido):** de los seeds `scripts/seed-*.js`, **81** contienen URLs de `upload.wikimedia.org` y solo **2** escriben `tags.creditos_fotos` (`seed-barranquilla.js`, `seed-santa-marta.js`) -> **81 seeds con fotos Commons SIN credito**. Medido con `Get-ChildItem scripts/seed-*.js` + `-match 'upload\.wikimedia\.org'` y `-match 'creditos_fotos'`.
+
+**Causa (dato, no motor):** `api/pagina-destino.js:959-1010` **ya** renderiza `creditos_fotos` en hero / galeria / thumbs (cierre de BUG-138). El hueco es que **el seed no siembra el array**. Guard de referencia del patron correcto: `scripts/seed-santa-marta.js:119-120`.
+
+**Segundo frente (misma causa, capa distinta):** `galeria.html` (**66.978** bytes) tiene `creditos_fotos` = **0** y `.fcred` = **0**; renderiza en cliente contra `/api/` (**6** llamadas, **48** menciones de `destino`). `https://exploraco.vercel.app/galeria.html?destino=barranquilla` responde **HTTP 200** con **0** creditos en el HTML servido: aunque el seed siembre el dato, el visor independiente tampoco lo pinta. Se registra **aqui**, como segundo frente, porque el criterio de cierre es el mismo (credito visible al usuario) y separarlo fragmentaria la misma causa. Si se aborda por separado, exige **gate de `@frontend-tpl`/`@renderer-dev`** (toca cliente, no solo datos).
+
+**Patron de solucion (cero codigo nuevo de motor):** replicar **santa-marta / barranquilla** en cada seed: `TAGS.creditos_fotos` con forma `{url, autor, licencia}` + caption espejo `Foto: autor / licencia` + guard que exige autor no vacio y licencia `CC BY` (`seed-barranquilla.js:129`). Autores/licencias se resuelven por la **API de Commons**, nunca por memoria.
+
+**Relacion con otros BUG (sin duplicar):** **BUG-022** es sobre **nombres de archivo inventados** (existencia de la foto); este es sobre **atribucion ausente** (la foto existe y no se acredita). **BUG-138** fue el defecto de **motor** y esta cerrado; este es el defecto de **datos** que BUG-138 dejo visible al resolverse.
+
+**Criterio de cierre:** (1) cada seed del alcance escribe `tags.creditos_fotos` no vacio y pasa su guard; (2) verificacion **en el HTML servido** de que `.fcred` **> 0** y `CC BY` **> 0** (leccion de BUG-138: la base y el payload no cuentan); (3) `galeria.html` en cliente muestra el credito para el mismo `destino`.
+
+**Patron de falla (el que hay que recordar):** el motor puede estar bien y la obligacion legal seguir sin cumplirse; un contrato de render sin dato en origen es **un default silencioso hacia el incumplimiento**.
+
+**Registro:** detectado al cerrar **TSK-235** (barranquilla fue la excepcion, no la regla: 81 seeds fuera). Sin dueno asignado, sin gate abierto, sin correccion iniciada.
+
