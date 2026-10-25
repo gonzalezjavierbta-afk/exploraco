@@ -407,6 +407,16 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".gal-i img{width:100%;height:100%;object-fit:cover}"
 +".gal-main{aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;cursor:pointer;transition:transform .15s}"
 +".gal-main:hover{transform:scale(1.005)}"
+// ADR-008: las fotos dinamicas son <img> con onerror silencioso, no
+// background-image (que no admite onerror). El contenedor conserva su fondo
+// oscuro de siempre y el handler solo oculta el nodo roto: sin reintento,
+// sin icono de imagen rota y sin 404 en cascada.
++".gal-main,.gal-i,.pth,.rcimg,.bcover{position:relative}"
++".gal-main img,.pth img,.rcimg img,.bcover img,.mimg{width:100%;height:100%;object-fit:cover;display:block}"
+// Credito de autor/licencia (CC BY-SA) discreto sobre la foto. Solo se emite
+// si hay dato real (degradacion condicional: galerias antiguas sin credito
+// no dejan overlay vacio).
++".fcred{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:3px 7px;font-size:9px;line-height:1.35;font-weight:400;color:#fff;text-align:right;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;background:linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,0))}"
 // 12 miniaturas con mas presencia: 6x2 en desktop, 3 columnas en tablet
 // y 2 columnas en movil (antes 4/2/1).
 +".gal-thumbs{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:10px}"
@@ -510,7 +520,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".rcard{flex:0 0 240px;background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;text-decoration:none;display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s}"
 +".rcard:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.08)}"
 +".rcimg{height:120px;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center}"
-+".rcemoji{font-size:40px}"
++".rcemoji{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:40px;pointer-events:none}"
 +".rcbody{padding:14px;display:flex;flex-direction:column;gap:5px}"
 +".rcbadge{align-self:flex-start;background:var(--gold-light);color:var(--gold-ink);padding:3px 8px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px}"
 +".rctitle{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:var(--text);line-height:1.2}"
@@ -743,7 +753,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   };
   // PUNTO UNICO DE DECISION del flag tags.sin_foto_hero: el candidato
   // Unsplash de categoria NO se usa y hero queda vacio. De ese unico valor
-  // heredan todos los consumidores sin repetir la condicion: heroMainStyle
+  // heredan todos los consumidores sin repetir la condicion: la portada
   // (cae a hero_bg/CAT_GRAD + emoji), og:image/twitter:image y el image del
   // JSON-LD (ambos se omiten). Las curadas y foto_hero/foto no se tocan.
   if (!hero && !sinFotoHero) hero = heroFallbacks[cat] || heroFallbacks.sitio;
@@ -929,6 +939,84 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var hwUrl      = det.hostelworld_url || d.hostelworld || '';
   var airbnbUrl  = det.airbnb_url      || d.airbnb      || '';
 
+  // -- ADR-008 (Silent Fallback) + CREDITO CC BY-SA en fotos dinamicas ---
+  // Las fotos dinamicas se pintan como <img>, no como background-image:
+  // solo un <img> admite onerror. El handler es silencioso (oculta el nodo
+  // roto y deja ver el fondo/emoji de siempre del contenedor), no reintenta
+  // y no encadena peticiones: una URL muerta produce un unico 404.
+  var FALLBACK_ONERROR = ' onerror="this.style.display=&#39;none&#39;"';
+  function fotoImg(url, cls, eager, altTxt, styleTxt) {
+    var u = String(url || '').trim();
+    if (!u) return '';
+    return '<img' + (cls ? ' class="' + cls + '"' : '')
+      + ' src="' + esc(u) + '" alt="' + esc(altTxt || 'Foto del destino') + '"'
+      + (eager ? ' fetchpriority="high"' : ' loading="lazy"')
+      + ' decoding="async"'
+      + (styleTxt ? ' style="' + styleTxt + '"' : '')
+      + FALLBACK_ONERROR + '>';
+  }
+
+  // CREDITO DE AUTOR/LICENCIA (CC BY-SA). destinos_fotos no tiene columnas
+  // propias de autor/licencia: el dato viaja en tres sitios y se resuelve
+  // por URL con esta precedencia:
+  //   1) tags.creditos_fotos [{url, autor, licencia}] (lo escribe el seed)
+  //   2) campos autor/licencia del propio item de media (comunidad)
+  //   3) el caption, que el seed compone "<texto> - Foto: <autor> / <lic>"
+  // Sin dato -> cadena vacia y NO se emite overlay: las galerias antiguas
+  // sin credito no muestran texto vacio ni basura.
+  var creditosTags = safeJSON(tags.creditos_fotos);
+  if (!Array.isArray(creditosTags)) creditosTags = [];
+  var creditoPorUrl = {};
+  var captionPorUrl = {};
+  function creditoDeCredenciales(au, li) {
+    var a = String(au || '').trim();
+    var l = String(li || '').trim();
+    if (!a && !l) return '';
+    return (a && l) ? (a + ' / ' + l) : (a || l);
+  }
+  creditosTags.forEach(function(c){
+    var u = String((c && c.url) || '').trim();
+    if (!u) return;
+    var credT = creditoDeCredenciales(c && c.autor, c && c.licencia);
+    if (credT && !creditoPorUrl[u]) creditoPorUrl[u] = credT;
+  });
+  (fotos || []).forEach(function(f){
+    if (!f || typeof f !== 'object') return;
+    var u = String(f.url || '').trim();
+    if (!u) return;
+    if (f.caption && !captionPorUrl[u]) captionPorUrl[u] = String(f.caption);
+    if (!creditoPorUrl[u]) {
+      var credI = creditoDeCredenciales(f.autor, f.licencia);
+      if (credI) creditoPorUrl[u] = credI;
+    }
+  });
+  // Texto final "Foto: autor / licencia", o "" si no hay credito fiable.
+  function creditoFoto(url) {
+    var u = String(url || '').trim();
+    var cred = creditoPorUrl[u] || '';
+    if (!cred && u && captionPorUrl[u]) {
+      var mCred = captionPorUrl[u].match(/Foto:\s*(.+)$/i);
+      if (mCred) cred = mCred[1];
+    }
+    cred = String(cred || '').replace(/\s+/g, ' ').trim();
+    if (!cred) return '';
+    if (cred.length > 90) cred = cred.slice(0, 88).replace(/\s\S*$/, '') + '...';
+    return 'Foto: ' + cred;
+  }
+  // Overlay de credito: cadena vacia cuando no hay dato (cero huecos).
+  function creditoHTML(url) {
+    var c = creditoFoto(url);
+    return c ? '<span class="fcred">' + esc(c) + '</span>' : '';
+  }
+  // Alt de la foto: el texto del caption sin el tramo de credito; si no hay
+  // caption util se usa el nombre del destino. Nunca queda vacio.
+  function fotoAlt(url, porDefecto) {
+    var u = String(url || '').trim();
+    var cap = String(captionPorUrl[u] || '').replace(/\s*-\s*Foto:[\s\S]*$/i, '').replace(/\s+/g, ' ').trim();
+    if (cap.length > 90) cap = cap.slice(0, 88).replace(/\s\S*$/, '') + '...';
+    return cap || porDefecto || 'Foto del destino';
+  }
+
   var galAll = [];
   (fotos||[]).forEach(function(f){
     var u = (f && f.url) ? f.url : f;
@@ -1013,7 +1101,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // menos de 3 miniaturas: es correcto, no se emite placeholder ni div
   // vacio. La dedupe por URL normalizada la hace addHeroThumb().
   var HERO_THUMBS_MAX = 3;
-  var heroMainStyle = hero ? "background-image:url('"+esc(hero)+"')" : "background:"+grad;
+  // ADR-008: la portada se pinta como <img> con onerror silencioso (ver
+  // fotoImg). El contenedor lleva el gradiente de categoria como red de
+  // fallback, no la URL como background-image.
+  var heroStyleBg = "background:"+grad;
   var heroThumbsList = [];
   function addHeroThumb(u) {
     if (!u) return;
@@ -1044,9 +1135,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     // Mismos atributos de rating que la galeria (mismo item del ranking
     // unico): el hero no pintaba contador de votos, asi que aqui solo se
     // anade el dato, sin cambiar el aspecto ni quitar nada.
-    return '<div class="pth" style="background-image:url(\''+esc(u)+'\')"'
+    return '<div class="pth"'
       + mediaRatingAttrs(mediaRankByUrl(u))
-      + ' onclick="irAFotoGaleria(HERO_FOTOS['+(i+1)+'])"></div>';
+      + ' onclick="irAFotoGaleria(HERO_FOTOS['+(i+1)+'])">'
+      + fotoImg(u, '', false, d.nombre)
+      + '</div>';
   }).join('');
 
   // -- HQI: chips de informacion rapida bajo el titulo (TSK-013 Hero) --
@@ -1186,7 +1279,9 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
         var fotoUrl = fotoMatch[1].trim();
         var fotoCap = fotoMatch[2].trim();
         if (/^https?:\/\//i.test(fotoUrl)) {
-          out += '<figure class="bfig"><img src="'+esc(fotoUrl)+'" alt="'+esc(fotoCap||'Foto del articulo')+'" loading="lazy">'
+          // ADR-008: el fallback silencioso tambien cubre las fotos inline del
+          // cuerpo del post (antes era el unico <img> dinamico sin onerror).
+          out += '<figure class="bfig"><img src="'+esc(fotoUrl)+'" alt="'+esc(fotoCap||'Foto del articulo')+'" loading="lazy" decoding="async"'+FALLBACK_ONERROR+'>'
             + (fotoCap ? '<figcaption>'+esc(fotoCap)+'</figcaption>' : '')
             + '</figure>';
         }
@@ -1230,7 +1325,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Quien escribe</h2><div class="stnum">'+nextNum()+'</div></div>'
       + '<div class="blog-autor-card">'
       + (autor.foto_url
-          ? '<img class="blog-autor-foto" src="'+esc(autor.foto_url)+'" alt="'+esc(autor.nombre)+'">'
+          ? '<img class="blog-autor-foto" src="'+esc(autor.foto_url)+'" alt="'+esc(autor.nombre)+'"'+FALLBACK_ONERROR+'>'
           : '<div class="blog-autor-foto blog-autor-ph">'+esc((autor.nombre||'?').charAt(0).toUpperCase())+'</div>')
       + '<div><div class="blog-autor-nombre">'+esc(autor.nombre)+'</div>'
       + (autor.bio ? '<div class="blog-autor-bio">'+esc(autor.bio)+'</div>' : '')
@@ -1999,12 +2094,18 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   }
   var galMainItem = galMerge[0] || null;
   var galCuradaHTML = hayGaleriaCurada
-    ? '<div class="gal-main" style="background-image:url(\''+esc(galBig)+'\')"'
+    ? '<div class="gal-main"'
       + mediaRatingAttrs(galMainItem)
-      + ' onclick="irAFotoGaleria(GAL_FOTOS[0])"></div>'
-      + '<div class="gal-thumbs">'+galThumbsList.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')"'
+      + ' onclick="irAFotoGaleria(GAL_FOTOS[0])">'
+      + fotoImg(galBig, '', false, fotoAlt(galBig, d.nombre))
+      + creditoHTML(galBig)
+      + '</div>'
+      + '<div class="gal-thumbs">'+galThumbsList.map(function(u,i){ return '<div class="gal-i"'
         + mediaRatingAttrs(mediaRankByUrl(u))
-        + ' onclick="irAFotoGaleria(GAL_FOTOS['+(i+1)+'])"></div>'; }).join('')+'</div>'
+        + ' onclick="irAFotoGaleria(GAL_FOTOS['+(i+1)+'])">'
+        + fotoImg(u, '', false, fotoAlt(u, d.nombre))
+        + creditoHTML(u)
+        + '</div>'; }).join('')+'</div>'
       + btnGaleriaAmpliada
     : '';
   var secGaleria = '<section class="ssec bwarm" id="galeria">'
@@ -2122,7 +2223,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Menu destacado</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="igrid">'+menuDestacado.map(function(m){
         var badgeTxt = m.badge ? (MENU_BADGE[m.badge] || m.badge) : '';
-        var photoDiv = m.foto ? '<div style="width:100%;height:110px;border-radius:8px;margin-bottom:10px;background-size:cover;background-position:center;background-image:url(\''+esc(m.foto)+'\')"></div>' : '';
+        var photoDiv = m.foto ? fotoImg(m.foto, 'mimg', false, m.nombre || 'Foto del plato', 'height:110px;border-radius:8px;margin-bottom:10px') : '';
         return '<div class="icard" style="text-align:left">'
           + photoDiv
           + '<div class="ilbl">'+esc(m.nombre||'')+'</div>'
@@ -2499,9 +2600,14 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
         var rCand2 = String(r.foto || '').trim();
         if (rCand2 && mediaEsFotoValida(rCand2, '')) rHero = rCand2;
       }
-      var rImg = rHero
-        ? '<div class="rcimg" style="background-image:url(\''+esc(rHero)+'\')"></div>'
-        : '<div class="rcimg" style="'+grad+'"><span class="rcemoji">'+esc(r.emoji||'')+'</span></div>';
+      // ADR-008: la miniatura es un <img> con onerror. El emoji queda SIEMPRE
+      // detras (absoluto, pointer-events:none): si la foto carga la tapa; si
+      // falla, el handler oculta el nodo y reaparece el emoji + gradiente de
+      // categoria. Silencioso y sin peticiones extra.
+      var rImg = '<div class="rcimg" style="'+grad+'">'
+        + '<span class="rcemoji">'+esc(r.emoji||'')+'</span>'
+        + (rHero ? fotoImg(rHero, '', false, r.nombre) : '')
+        + '</div>';
       var rRat = parseFloat(r.rating) || 0;
       var rN = parseInt(r.total_resenas||0, 10) || 0;
       var rStars = rN > 0 ? [1,2,3,4,5].map(function(i){ return '<span class="rcst'+(i<=Math.round(rRat)?' on':'')+'">*</span>'; }).join('') : '';
@@ -2754,7 +2860,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + (d.lead ? '<p class="bhslead">'+esc(d.lead)+'</p>' : '')
       + (hqi.length ? '<div class="bchips">'+hqi.join('')+'</div>' : '')
       + '</div>'
-      + '<div class="bcover" style="'+heroMainStyle+'">'+(hero?'':'<div class="bph" style="background:'+grad+'"></div>')+'</div>'
+      + '<div class="bcover" style="'+heroStyleBg+'">'+(hero ? fotoImg(hero, '', true, d.nombre) : '<div class="bph" style="background:'+grad+'"></div>')+'</div>'
       + '</section>\n\n'
       : '<section class="hero"><div class="hi">\n'
       + '<div class="hl"><div class="hew">'+esc(label)+'</div>'
@@ -2767,7 +2873,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + (hctarRow2.length ? '<div class="hctar-row">'+hctarRow2.join('')+'</div>' : '')
       + '</div>'
       + '</div>\n'
-      + '<div class="hr"><div class="psm" style="'+heroMainStyle+'" onclick="irAFotoGaleria(HERO_FOTOS[0])">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px">'+esc(d.emoji||'')+'</div>')+'</div>'
+      + '<div class="hr"><div class="psm" style="'+heroStyleBg+'" onclick="irAFotoGaleria(HERO_FOTOS[0])">'+(hero ? fotoImg(hero, '', true, d.nombre) + creditoHTML(hero) : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px">'+esc(d.emoji||'')+'</div>')+'</div>'
       + (heroThumbs ? '<div class="prow">'+heroThumbs+'</div>' : '')
       + '</div>\n</div></section>\n\n')
 

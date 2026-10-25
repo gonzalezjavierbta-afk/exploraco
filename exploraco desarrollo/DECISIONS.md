@@ -9299,3 +9299,124 @@ Fija el **estado medido hoy** (ADR-006) y **sustituye** las frases de estado de 
 **Precedente que se fija:** el mismo pase encontro dos defectos reales del admin. (i) El boton emitia `horarios-zona` mientras el colector leia `horarios_zona`. (ii) `loadForm` precargaba con `p[k]` en vez de la clave local, asi que las listas nuevas nunca se rellenaban (afectaba tambien a `cuando_ir` y `actividades_gratis`). Regla: **un motor declarativo nuevo necesita prueba de precarga, no solo de colecta**; registrar claves sin probar la ida y vuelta deja listas vacias en silencio. El criterio de verificacion 3 se cumple ahora sobre **10** copias y lo mide `verificar-subcategorias.js`, no una comparacion manual.
 
 **Deudas que SIGUEN abiertas:** (i) **verificacion contra Neon real**: `DATABASE_URL` no esta definida en este entorno, de modo que la persistencia de D7 sigue probada solo por lectura de codigo; (ii) **smoke funcional de `buildHTML()` con datos mock de `ciudad`**: hoy la cobertura son arneses `vm` por seccion, no una ficha completa que cuente **12** secciones renderizadas (deuda 4 de la Revision 2 sigue viva).
+
+---
+
+## ADR-102: El dominio canonico del sitio es **UNO** (`https://latawel.com`) y `exploraco.vercel.app` queda como host de despliegue y pruebas **NO indexable** (`X-Robots-Tag` acotado por `has.host`), **sin 301**: el canonico ya se emite bien en las cuatro superficies SEO y lo que falta es alinear **cuatro URLs hardcodeadas de cara al usuario** [NO deroga ninguna premisa de ADR previos; **cierra** el pendiente operativo 1 de ADR-073 y **acota** su lista de "PRESERVADOS" en lo tocante a `exploraco.vercel.app`]
+
+**ID:** ADR-102
+**Fecha:** 2026-10-25
+**Autor:** `@architect` (diseno y verificacion contra el archivo real y contra produccion). Gate de riesgo CONFIRMADO explicitamente por el operador para arquitectura/ADR.
+**Estado:** **ACEPTADO / PENDIENTE DE IMPLEMENTAR.** ADR de **diseno**: no escribe codigo. **No** propone endpoint nuevo (Vercel Hobby **8/8**), **no** toca base de datos, **no** toca el modelo de `tags` y **no** cambia CSS. El veredicto tiene una parte no obvia: **`sitemap.xml` NO se cambia** y **no se pone 301**; la parte que si cambia son **4 cadenas** y **1 bloque de headers** en `vercel.json`.
+
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor encabezado del fichero era **`ADR-101`** (linea **9181**). Encabezados `^## ADR-` antes de esta seccion: **100**. Apariciones previas de la cadena `ADR-102`: **0** (conteo por `Select-String`). Tamano real medido hoy: **1.444.155 bytes / 9.301 lineas**. La nota de ADR-099 que decia "no se crea ADR-100" no se contradice: el 100 y el 101 existen por otros ADR posteriores.
+
+### Problema
+
+El sitio se sirve hoy desde **dos nombres de host que responden 200 con el mismo contenido**: el dominio de marca `https://latawel.com` y el host por defecto del proyecto en Vercel `https://exploraco.vercel.app`. Ninguno de los dos redirige al otro y ninguno emite `X-Robots-Tag`. El sintoma que disparo este ADR: la pagina nueva `santa-marta` se publico como `https://latawel.com/santa-marta.html`, se prueba en `https://exploraco.vercel.app/santa-marta.html`, y el `sitemap.xml` que **se sirve en el host de Vercel** emite 268 `<loc>` **todas** con el host de marca.
+
+El riesgo que se temia —`canonical`, `og:url`, sitemap y host servido en desacuerdo— **no se confirma tal cual**: las cuatro superficies ya emiten `latawel.com`. El riesgo que **si** existe es el inverso y mas concreto: (a) **duplicado de host** indexable, porque el mismo HTML responde 200 en dos nombres distintos sin senal de canonicidad a nivel de host; y (b) **URLs de cara al usuario** (enlaces de referido y enlaces en correos transaccionales) construidas sobre el host que **no** es el canonico.
+
+### Datos medidos (2026-10-25, contra produccion y contra el archivo real; el codigo gana a la documentacion, ADR-006)
+
+| # | Hecho medido | Evidencia |
+|---|---|---|
+| 1 | `https://latawel.com/santa-marta.html` responde **200** | HEAD con `curl.exe -I` |
+| 2 | `https://exploraco.vercel.app/santa-marta.html` responde **200**, **sin** `Location` y **sin** `X-Robots-Tag` | HEAD; cabeceras presentes: solo `X-Vercel-Cache: MISS`, `X-Vercel-Id`, `Server: Vercel` |
+| 3 | El sitemap servido en el host de Vercel es **100% de marca**: **268** `<loc>`, **268/268** `latawel.com`, primera `https://latawel.com/`, **42.295 bytes** | descarga de `https://exploraco.vercel.app/sitemap.xml` y conteo por regex |
+| 4 | `BASE` tiene **una sola definicion por archivo** y ambas caen en la marca: `process.env.SITE_BASE_URL || 'https://latawel.com'` | `api/utilidades.js:17`, `api/pagina-destino.js:19` |
+| 5 | El sitemap consume `BASE` en las dos ramas (estaticas y destinos) | `api/utilidades.js:166` (`p.loc`) y `:178` (`'/'+r.slug+'.html'`) |
+| 6 | `robots.txt` apunta el sitemap a la marca | `robots.txt:8` (`Sitemap: https://latawel.com/sitemap.xml`) |
+| 7 | El motor de fichas emite `og:url` y `canonical` desde `BASE`, y el `og:image` por defecto es absoluto a la marca | `api/pagina-destino.js:2728`, `:2736`, `:2716` |
+| 8 | **Desalineacion real en la portada:** `canonical` dice `/index.html` pero `og:url` dice `/` y el sitemap lista `/` | `index.html:10` vs `index.html:19` vs hecho 3 |
+| 9 | **Cero** canonicals a dominios muertos: todos los `rel="canonical"` de los HTML de la raiz son `latawel.com`; `exploraco.co` ya no resuelve | agrupacion por regex sobre `*.html`; `ADR-073:3982` |
+| 10 | `vercel.json` (**38 lineas**) **no** tiene ningun `redirect` ni `header` acotado por host: 1 redirect de slug, 4 rewrites, 4 grupos de headers | lectura del archivo completo (1388 bytes) |
+| 11 | El backend hace un **POST servidor-a-servidor** a un host `vercel.app`: `baseUrlAdm = VERCEL_URL ? 'https://'+VERCEL_URL : 'https://exploraco.vercel.app'` y `fetch(baseUrlAdm + '/api/interacciones', {method:'POST', ... tipo:'publicar_lugar_otorgar'})` | `api/admin.js:397-405` |
+| 12 | Los correos transaccionales del admin enlazan al host de Vercel: dos botones a `.../admin.html` y el aviso de publicado a `https://exploraco.vercel.app/<slug>.html` | `api/admin.js:317`, `:327`, `:423` |
+| 13 | El enlace de **referido** que el usuario copia se construye sobre el host de Vercel | `mi-perfil.html:5410` (`REF_URL_BASE = 'https://exploraco.vercel.app'`) usado en `:5597` (`/registro.html?ref=`) |
+| 14 | Fallback de `origin` para compartir mapas: host de Vercel | `index.html:2387` |
+| 15 | Los cargadores de seed tienen `BASE_URL` por defecto en el host de Vercel | `scripts/load-*.js:16` (patron repetido) |
+| 16 | El pendiente operativo de ADR-073 sobre `SITE_BASE_URL` **sigue abierto**: una variable de entorno obsoleta **gana** al fallback | `ADR-073:4012` |
+
+### Decision
+
+**D1. Dominio canonico unico: `https://latawel.com`.** Se acepta como **ya implementado** en las cuatro superficies SEO y **no se toca ninguna de ellas**: `canonical` (`api/pagina-destino.js:2736`), `og:url` (`:2728`), sitemap (`api/utilidades.js:166,178`) y `robots.txt:8`. **`sitemap.xml` NO requiere cambio**: aunque se sirve en el host de Vercel, emite la marca porque el host no entra en la construccion del `<loc>`, solo `BASE`. Cambiarlo seria trabajo sin efecto.
+
+**D2. `exploraco.vercel.app` NO lleva 301 (ni 308) a la marca.** Es el punto que mas se aleja de la receta SEO generica y se decide por dos hechos medidos, no por preferencia: (i) **hay POST servidor-a-servidor contra ese host** (`api/admin.js:397-405`, otorgamiento de XP al aprobar): la semantica de `fetch` en **301/302 reescribe el metodo a GET**, de modo que un redirect silencioso convertiria el otorgamiento en una lectura vacia **sin error visible** —el mismo tipo de fallo silencioso que ADR-099 T3 acaba de cerrar—; los cargadores de seed (`scripts/load-*.js:16`) caen en el mismo patron; y (ii) la verificacion operativa del proyecto es **HEAD 200 por `curl -I`** sobre ese host: un redirect cambia el contrato de todos los smokes y del `Escudo GOLD` de un plumazo. Un **308** conservaria el metodo, pero sigue rompiendo (ii) y añade un salto a cada seed, sin ganancia sobre D3.
+
+**D3. En su lugar, el host de Vercel se marca NO indexable, acotado por host.** Un unico grupo nuevo en `vercel.json`:
+
+```json
+{
+  "source": "/(.*)",
+  "has": [{ "type": "host", "value": "exploraco.vercel.app" }],
+  "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+}
+```
+
+Esto elimina el duplicado de indexacion **sin** tocar el metodo HTTP, **sin** romper los HEAD 200 y **sin** afectar a la marca, porque `has.host` lo acota. **Este es el unico cambio del ADR con riesgo catastrofico si se copia mal:** si se omite el bloque `has`, el `noindex` cae sobre **todo** el sitio, marca incluida. Es la razon de que D3 vaya **al final** del orden de despliegue y con la verificacion V3 como gate.
+
+**D4. Las URLs de cara al usuario dejan de construirse sobre el host de Vercel** — y esto va **antes** que D3, no despues: no tiene sentido desindexar un host y seguir mandandole usuarios. Las cuatro cadenas:
+
+1. `mi-perfil.html:5410`: `REF_URL_BASE` pasa a derivarse de `window.location.origin` con **fallback literal** `https://latawel.com` (asi el enlace de referido es correcto en cualquier host, incluido un preview).
+2. `api/admin.js:423`: el enlace del aviso de publicado pasa a `https://latawel.com/<slug>.html`.
+3. `api/admin.js:317`, `:327`: los botones de los correos apuntan a `https://latawel.com/admin.html` (siguen en `Disallow` por `robots.txt:3`; no se indexan, pero se enlazan con la marca).
+4. `index.html:2387`: el fallback de `origin` pasa a `https://latawel.com`.
+
+`api/admin.js:397` (`VERCEL_URL`) **no se toca**: es direccionamiento de **infraestructura** servidor-a-servidor, no una URL de cara al usuario, y `VERCEL_URL` es el host del despliegue concreto —el destino correcto para una llamada interna—. Queda registrado como deuda 2 para que nadie lo "arregle" a la marca y rompa el aislamiento entre despliegues.
+
+**D5. Alineacion de la portada.** `index.html:10` pasa de `https://latawel.com/index.html` a `https://latawel.com/`, para coincidir con su propio `og:url` (`:19`) y con la primera `<loc>` del sitemap. Cambio de una cadena, cero efecto en render.
+
+**D6. `SITE_BASE_URL` es un contrato de despliegue, no una preferencia.** Debe estar **sin definir** o valer **exactamente** `https://latawel.com`. Cualquier otro valor (incluido `https://exploraco.vercel.app`, o el viejo de `exploraco.co`) reescribe de golpe **268** `<loc>` y **todos** los `canonical`/`og:url` del motor. Es el pendiente 1 de ADR-073 y aqui se cierra como **criterio de verificacion V4**, no como cambio de codigo: el default en el codigo ya es correcto y no se toca.
+
+**Orden de despliegue obligatorio:** D5 y D4 (inofensivos, sin dependencias) → verificar V1/V2/V5 → **D3** (`vercel.json`) → verificar V2 **y** V3. Si V3 falla, **revertir D3 inmediatamente**: es preferible un host duplicado a un sitio entero fuera del indice.
+
+### Consecuencias
+
+- **Cero funciones serverless nuevas** (8/8 intactas): todo se resuelve en `vercel.json` y en cadenas existentes.
+- **Cero migraciones, cero columnas, cero claves nuevas en `tags`**: el modelo de datos no participa. Este ADR **no** toca `CATEGORY_TAG_FIELDS`, `CATEGORY_TAG_LISTS`, `collectPlace()`, `_placeToAPI()` ni `loadForm()`.
+- **La autoridad SEO queda en un solo host** sin depender de que Google "entienda" el `canonical`, que es lo que hoy hace todo el trabajo.
+- **Las tarjetas sociales dejan de discrepar**: `og:url` ya era la marca, y a partir de D4 los enlaces que se comparten (referido, correos) tambien.
+- **Se conserva la comodidad operativa**: `exploraco.vercel.app` sigue respondiendo 200 para smokes, `curl -I`, `Escudo GOLD` y pruebas manuales; solo deja de competir en el indice.
+- **El coste de mantenimiento sube un escalon minimo y acotado**: una regla de headers con `has` en `vercel.json`, y cuatro cadenas que ya no vuelven a apuntar al host de infraestructura.
+
+### Alternativas descartadas
+
+- **(A) 301 de host completo (`exploraco.vercel.app/*` -> `latawel.com/*`).** La receta canonica, descartada por el hecho 11: `fetch` reescribe POST a GET en 301/302 y el otorgamiento de XP de `api/admin.js:398` fallaria **en silencio**, ademas de romper todos los HEAD 200 de verificacion.
+- **(B) 308 de host completo.** Protocolo-correcto (conserva el metodo), pero sigue rompiendo la verificacion por 200 y añade un salto a cada seed; no aporta nada que D3 no consiga.
+- **(C) Dejar todo como esta (canonical ya correcto).** Viable y es el estado actual; se descarta porque el duplicado de host sigue indexable y porque hay **dos** superficies de cara al usuario (referido y correos) apuntando al host equivocado. Si el operador prefiere no tocar `vercel.json`, la parte D4+D5 sigue siendo valida y barata **por si sola**: es un ADR divisible.
+- **(D) Declarar `exploraco.vercel.app` como canonico.** Contradice ADR-073 (marca LATAWEL, `exploraco.co` muerto y sin resolver) y dejaria el dominio de marca como duplicado del host de infraestructura: la peor de las dos opciones para autoridad.
+- **(E) Cambiar el `sitemap.xml` para que emita el host servido.** Es exactamente lo contrario de lo que pide el SEO: indexaria el host de Vercel. Descartada.
+
+### Deudas
+
+1. **`SITE_BASE_URL` en el panel de Vercel** no se puede verificar desde el repositorio (hecho 16). Queda como V4, manual y de una vez.
+2. **`api/admin.js:397` usa `VERCEL_URL`**: correcto para infraestructura, pero es el unico punto del backend donde el host del despliegue es funcionalmente relevante. Documentado para que no se "normalice" a la marca por error.
+3. **No hay guard automatico** que impida reintroducir un `exploraco.vercel.app` de cara al usuario: el hecho 15 muestra que el patron ya se propago a `scripts/load-*.js`. Candidato a `scripts/verificar-dominio.js` (0 dependencias, salida tipo `verificar-subcategorias.js`) en un pase posterior; hoy no se crea.
+4. **Previews `*-git-*.vercel.app`**: `has.host` es coincidencia exacta, asi que los previews no quedan cubiertos por D3. En la practica no compiten en el indice (no se enlazan), y ampliarlo exige otra regla; no se hace hoy.
+5. **Search Console y re-scrape de OG** (pendientes 2 y 3 de ADR-073) siguen siendo tarea del operador, no del implementador.
+
+### Criterio de verificacion
+
+1. **V1** `curl.exe -I https://latawel.com/santa-marta.html` -> **200** y **sin** `X-Robots-Tag`.
+2. **V2** `curl.exe -I https://exploraco.vercel.app/santa-marta.html` -> **200** (sigue sirviendo) **con** `X-Robots-Tag: noindex, nofollow`.
+3. **V3 (gate de D3)** La marca **no** hereda el `noindex`: V1 lo prueba en una ficha; repetir en `https://latawel.com/` y en `https://latawel.com/directorio.html`. **Si alguna trae `X-Robots-Tag`, revertir D3.**
+4. **V4** `sitemap.xml` descargado **desde los dos hosts**: **268** `<loc>` y **268/268** con host `latawel.com`. Si el numero o el host cambian, hay `SITE_BASE_URL` obsoleto (deuda 1).
+5. **V5** Cero `exploraco.vercel.app` en URLs de cara al usuario: `mi-perfil.html:5410`, `api/admin.js:317/327/423`, `index.html:2387`. El unico residuo aceptado es `api/admin.js:397` (infra) y `scripts/load-*.js:16` (herramienta interna).
+6. **V6** `vercel.json` sigue siendo **JSON valido** (`node -e "JSON.parse(...)"`) y **no** se pierde ningun `rewrite` (sitemap, blog, `/:slug.html`, buscar). Si se edito `index.html`, el **balance de divs** no cambia y el **Escudo GOLD** corre antes del deploy.
+
+### Ficheros que toca un implementador (tabla de riesgo; ninguno se toca en este ADR)
+
+| # | Fichero / rango | Cambio | Riesgo |
+|---|---|---|---|
+| 1 | `vercel.json:11-37` (nuevo grupo en `headers`) | D3: `X-Robots-Tag` con `has.host` | **ALTO** — omitir `has` desindexa el sitio entero. Va ultimo, con V3 como gate. Es JSON: el `Escudo GOLD` no lo cubre, se valida a mano. |
+| 2 | `mi-perfil.html:5410` | D4.1: `REF_URL_BASE` derivado de `origin` + fallback marca | **BAJO** — archivo de **379,2 KB**: editar por linea, nunca leer completo (ADR-084 D5). |
+| 3 | `api/admin.js:423` | D4.2: enlace del aviso de publicacion a la marca | **MEDIO** — `api/*.js` exige **ASCII-safe** (ADR-002) y `Escudo GOLD`. Solo la cadena; no cambiar el `fetch` de `:397-405`. |
+| 4 | `api/admin.js:317`, `:327` | D4.3: botones de correo a la marca | **MEDIO** — mismo fichero, ASCII-safe, dos cadenas dentro de un HTML generado: cuidado con el balance de etiquetas. |
+| 5 | `index.html:10` | D5: `canonical` a `https://latawel.com/` | **MEDIO** — `index.html` es superficie SEO y de portada: `Escudo GOLD` + balance de divs. |
+| 6 | `index.html:2387` | D4.4: fallback de `origin` | **BAJO** — una cadena en JS de cliente. |
+| 7 | *(no tocar)* `api/pagina-destino.js:19,2716,2728,2736` | D1: ya correcto | **NULO** — tocarlo es el error. |
+| 8 | *(no tocar)* `api/utilidades.js:17,166,178`, `robots.txt:8` | D1: sitemap ya correcto | **NULO** — el sitemap **no** se cambia. |
+| 9 | *(no tocar)* `scripts/load-*.js:16` | Deuda 3 | **NULO** — herramienta interna; si se cambia, que sea con el operador. |
+
+**Reparto sugerido:** `@seo-dev` (1, 5, 6 — es su dominio y ya tiene el gate), `@admin-dev` (3, 4) y `@backend-dev` (2 si se prefiere por `api/`), o un unico `@backend-dev` con el brief completo si el operador quiere un solo pase. **Cierre documental** (`NEXT.md`/`TASKS.md`) en un unico pase de `@docs-keeper` (R2): este ADR es el **unico** sitio donde vive el argumento (ADR-084 D1); los demas ficheros solo lo apuntan por ID.

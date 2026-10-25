@@ -2426,4 +2426,23 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **Verificacion pendiente (al cerrar el bug):** (1) `GET /api/destinos?categoria=sitio` -> el objeto de `santiago-de-cali` y el de `cartagena-de-indias` con **`ciudad` no vacio**; (2) paridad `city == ciudad` en las **4** rutas (listado, mapa, cercania, busqueda) **4/4**.
 
 
+## BUG-138: el motor de render **no pinta la atribucion de las fotos de Commons** (`Foto: autor / CC BY-SA`): el credito **viaja en los datos y no llega al HTML** en **todas** las paginas con fotos de Commons, no solo en `santa-marta` -- **RESUELTO EN CODIGO - PENDIENTE DE DEPLOY (2026-10-25, TSK-233 / TSK-234)**
+
+**Severidad: ALTA (riesgo legal de atribucion: las 5 fotos de `santa-marta` son CC BY-SA 3.0/4.0, la licencia exige credito visible y el incumplimiento se sirve en produccion sin ningun error tecnico que lo delate). Estado: RESUELTO EN CODIGO el 2026-10-25 por `@renderer-dev` en `api/pagina-destino.js` (**+123/-17**), en una sola tanda con H2; PENDIENTE DE REDEPLOY en Vercel y de verificacion en vivo (criterio de cierre en TSK-234). Este registro documental no cambia codigo.**
+
+**Sintoma:** el HTML servido de `https://exploraco.vercel.app/santa-marta.html` mostraba **0** ocurrencias de `CC BY-SA` y **0** de `Foto:` con **24** referencias a `wikimedia` (las fotos **si** se servian). El credito existia en los datos -- `destinos_fotos.caption` y `TAGS.creditos_fotos` (`scripts/seed-santa-marta.js:93`) -- pero **ninguna capa de render lo consumia**.
+
+**Alcance real (el dato que cambia la severidad y el motivo de este BUG):** **no era un defecto de `santa-marta`**. Afectaba a **todas** las paginas cuyas fotos vienen de Wikimedia Commons y se pintan con el motor compartido: `ciudad`, `hostal`, `evento`, `comida`, `blog` y `galeria`. La pagina nueva solo lo hizo **visible** porque fue la primera que se cerro midiendo el credito en el HTML vivo. Despues del fix se verifico en los **6** escenarios.
+
+**Causa (medida en el archivo real, ADR-006):** el motor pintaba la galeria como **`background-image` en CSS** y no tenia **ninguna** rama que leyera autor/licencia. Dos consecuencias del mismo diseno: (1) el credito, que viaja en JSONB, se quedaba **sin contrato de render**; (2) `background-image` **no admite `onerror`**, luego la pagina tampoco tenia red de **ADR-008** (Silent Fallback) -- ese era **H2**, sintoma hermano y del mismo origen.
+
+**Correccion aplicada (una sola tanda, `api/pagina-destino.js`, +123/-17):** (1) resolucion del credito **por URL** con precedencia explicita **`tags.creditos_fotos` -> `autor`/`licencia` del item -> tramo `Foto:` del `caption`** (el seed escribe la primera; el caption es el espejo legado) y overlay `.fcred` (CSS en `:419`, helper en `:1009`). (2) **H2 / ADR-008:** las fotos dinamicas pasan a **`<img>` con `onerror` silencioso** (`FALLBACK_ONERROR`: oculta el `<img>` y deja el fondo/emoji del contenedor) -> sin 404 en cascada ni huecos; la portada usa el mismo camino.
+
+**Evidencia medida (render local de `santa-marta`, antes -> despues):** `onerror` **0 -> 9**; `.fcred` **0 -> 6**; `CC BY-SA` **0 -> 6**; `background-image:url` de fotos **9 -> 0**. **No-regresion en 6 escenarios** (divs balanceados cada uno por separado): ciudad **345/345**, hostal **106/106**, evento **105/105**, comida **99/99**, blog **67/67**, galeria sin credito **91/91** (este ultimo prueba que la **ausencia** de credito no rompe el render). `node --check` **OK**, ASCII-safety **0** bytes > 127, **0** backticks, smoke `santa-marta` **28/28**.
+
+**Verificacion pendiente (criterio de cierre, NO cumplido aun):** sobre el HTML **servido** en `https://exploraco.vercel.app/santa-marta.html` con el motor nuevo: `CC BY-SA` **> 0**, `Foto:` **> 0**, `onerror` **> 0** y `background-image:url(` de fotos **= 0**. Hoy la pagina sigue **prerenderizada con el motor viejo**: el fix esta en el arbol de trabajo y **no** en el aire. Gate: redeploy en Vercel (**TSK-234**).
+
+**Patron de falla (el que hay que recordar):** **un dato que nadie renderiza es indistinguible de un dato que falta.** El seed guardaba el credito, el smoke contaba divs e ids y la API devolvia el caption: las **tres** verificaciones daban verde sobre una pagina legalmente incompleta. Un dato con obligacion externa (licencia, autor, fuente) necesita comprobacion **en el HTML servido**, no en la base ni en el payload que lo transporta.
+
+**Registro:** detectado como **H1** en **TSK-233** el 2026-10-25 y cerrado en codigo en el **segundo pase de cierre** de esa misma tanda. No guarda relacion con la decision de dominio canonico que se estaba ejecutando en paralelo (**ADR-102**), que tiene su propio riesgo y sus propios pendientes.
 

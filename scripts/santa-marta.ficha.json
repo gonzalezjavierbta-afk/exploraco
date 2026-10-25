@@ -1,0 +1,136 @@
+{
+  "BASE": {
+    "slug": "santa-marta",
+    "nombre": "Santa Marta",
+    "categoria_slug": "sitio",
+    "subcategoria": "ciudad",
+    "zona": "caribe",
+    "sintro": "La bahia mas linda de America, cuna de historia colonial, playas caribe\u00f1as y puerta de entrada a la Sierra Nevada.",
+    "lead": "Fundada en 1525, Santa Marta combina el encanto de su arquitectura colonial con una biodiversidad unica donde la selva de la Sierra Nevada se encuentra con el mar Caribe.",
+    "descripcion": "Santa Marta, oficialmente Distrito Turistico, Cultural e Historico de Santa Marta, es la ciudad mas antigua de Colombia y la segunda de la costa Caribe. Su centro historico deslumbra con plazas arboladas, casonas republicanas y la imponente Catedral Basilica, siendo el punto de partida ideal para recorrer la Bahia de Santa Marta y disfrutar de atardeceres legendarios sobre el mar.\n\nLa ciudad es mundialmente famosa por albergar el Parque Nacional Natural Tayrona, un santuario ecologico con playas virgenes de arena blanca, formaciones coralinas y densa selva tropical. Asimismo, es el hogar de la Sierra Nevada de Santa Marta, la montana costera mas alta del mundo, habitada por comunidades indigenas ancestrales como los Koguis y Arhuacos, y escenario de la misteriosa Ciudad Perdida (Teyuna).\n\nSu infraestructura turistica se extiende por sectores vibrantes como el Rodadero, Taganga y Bello Horizonte, ofreciendo una amplia gama gastronomica centrada en la pesca del dia, arroces tipicos y frutos del mar. Con un clima calido todo el ano, Santa Marta se consolida como un polo de desarrollo turistico sostenible y cultural en el Caribe colombiano.",
+    "highlight": "11.2408\u00b0 N, -74.1990\u00b0 W \u00b7 1.5 M de visitantes/ano",
+    "ciudad": "Santa Marta",
+    "region": "Magdalena",
+    "barrio": "",
+    "lat": 11.2408,
+    "lng": -74.1990,
+    "whatsapp": "",
+    "telefono": "+57 (605) 4209600",
+    "email": "atencionalciudadano@santamarta.gov.co",
+    "web": "https://www.santamarta.gov.co",
+    "instagram": "@santamartadtch",
+    "precio_desde": "Presupuesto mochilero desde $80.000 COP/dia",
+    "horario": "Acceso libre a espacios publicos 24/7",
+    "emoji": "\ud83c\udfdd",
+    "hero_bg": "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Destino de Playa \u00b7 Naturaleza \u00b7 Historia",
+    "capacidad": "Aforo ilimitado en espacios publicos",
+    "como_llegar": "Llegada via Aeropuerto Internacional Simon Bolivar (SMM) a 15 km del centro, o por bus intermunicipal desde Barranquilla y Cartagena.",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Ciudad",
+    "dificultad": "Facil",
+    "dificultad_desc": "Acceso urbano sencillo y traslados cortos",
+    "duracion": "3 a 5 dias",
+    "altitud": "2 m s. n. m.",
+    "temporada": ["Enero", "Febrero", "Marzo", "Diciembre"],
+    "precio_entrada": "Sin entrada (espacio publico general)",
+    "distancia": "Costa Caribe colombiana, a 95 km de Barranquilla",
+    "como_llegar": "Vuelos directos nacionales desde Bogota, Medellin y Cali. Buses desde las principales ciudades de la Costa.",
+    "permisos": "No requiere permiso para la ciudad, pero si reserva previa para Parque Tayrona y Ciudad Perdida.",
+    "temporada_nota": "Diciembre a marzo (epoca seca, alta afluencia); septiembre a noviembre (temporada de lluvias).",
+    "fauna_flora": [],
+    "secretos": [],
+    "regulaciones": "Normas de conservacion ambiental en areas protegidas y playas del distrito.",
+    "checklist_tip": "Llevar ropa ligera de lino/algodon, protector solar biodegradable, gorra y calzado comodo.",
+    "entradas": [],
+    "tours": [],
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad_tags": [{"texto": "Apto para todo tipo de viajero", "apto": true}],
+    "temporada_matriz": {
+      "Ene": "ideal", "Feb": "ideal", "Mar": "ideal", "Abr": "posible",
+      "May": "posible", "Jun": "posible", "Jul": "posible", "Ago": "posible",
+      "Sep": "no", "Oct": "no", "Nov": "no", "Dic": "ideal"
+    },
+    "atracciones": [
+      {"icono": "\ud83c\udfdb\ufe0f", "nombre": "Parque Nacional Natural Tayrona", "descripcion": "Santuario natural con playas virgenes de arena blanca y densa selva tropical."},
+      {"icono": "\ud83c\udfdb\ufe0f", "nombre": "Catedral Basilica de Santa Marta", "descripcion": "Primera iglesia construida en jurisdiccion eclesiastica en Suramerica (1531)."},
+      {"icono": "\ud83c\udfdb\ufe0f", "nombre": "Quinta de San Pedro Alejandrino", "descripcion": "Hacienda historica donde fallecio el Libertador Simon Bolivar en 1830."},
+      {"icono": "\ud83c\udf04\ufe0f", "nombre": "Camellon de la Bahia", "descripcion": "Malecon renovado ideal para caminatas al atardecer frente al mar Caribe."},
+      {"icono": "\ud83c\udfdb\ufe0f", "nombre": "Museo del Oro Tairona", "descripcion": "Muestra arqueologica de la cultura indigena prehispana en la Casa de la Aduana."},
+      {"icono": "\ud83c\udfd6\ufe0f", "nombre": "Playa Blanca y Taganga", "descripcion": "Hermosas bahias de pescadores tradicionales y sitios de buceo."}
+    ],
+    "actividades_gratis": [
+      {"icono": "\ud83d\udefd", "nombre": "Caminata por el Centro Historico", "descripcion": "Recorrido patrimonial por la Plaza de la Catedral y el Parque de los Novios."},
+      {"icono": "\ud83c\udf04", "nombre": "Atardecer en el Camellon", "descripcion": "Disfrutar de la brisa marina y las esculturas publicas al caer la tarde."},
+      {"icono": "\ud83c\udfde\ufe0f", "nombre": "Mirador de Taganga", "descripcion": "Vista panoramica gratuita de la bahia de pescadores desde los cerros circundantes."},
+      {"icono": "\ud83c\udfa8", "nombre": "Tour de Arte Urbano", "descripcion": "Avistamiento de murales culturales en los callejones del centro y el barrio Pescaito."}
+    ],
+    "programacion": [
+      {"dia": "Julio", "eventos": "Fiestas del Mar (festival nautico, deportivo y cultural)"},
+      {"dia": "Enero", "eventos": "Festival de Verano y Musica al Mar"},
+      {"dia": "Marzo / Abril", "eventos": "Procesiones y actos liturgicos de Semana Santa"}
+    ],
+    "accesibilidad": [
+      {"icono": "\u267f", "nombre": "Camellon de la Bahia", "descripcion": "Infraestructura completamente pavimentada y adaptada para sillas de ruedas."},
+      {"icono": "\ud83d\udeb4", "nombre": "Transporte publico", "descripcion": "Buses urbanos con accesibilidad limitada; se recomienda uso de taxis autorizados."},
+      {"icono": "\ud83c\udfd6\ufe0f", "nombre": "Playas naturales", "descripcion": "Acceso limitado en areas naturales protegidas como Tayrona debido a senderos agrestes."}
+    ],
+    "contexto": "Santa Marta es la ciudad mas antigua de Colombia, fundada en 1525 por Rodrigo de Bastidas. Su legado historico, su posicion geografica privilegiada entre el mar Caribe y la Sierra Nevada de Santa Marta, y su dinamica cultural la convierten en uno de los destinos turisticos mas importantes de Suramerica.",
+    "barrios": [
+      {"icono": "\ud83c\udfe0", "nombre": "Centro Historico", "tipo": "Historico", "descripcion": "Ideal para amantes de la arquitectura colonial, restaurantes y vida nocturna bohemia."},
+      {"icono": "\ud83c\udfe0", "nombre": "El Rodadero", "tipo": "Alojamiento", "descripcion": "Zona hotelera tradicional con alta oferta de servicios y playa urbana comercial."},
+      {"icono": "\ud83c\udfe0", "nombre": "Taganga", "tipo": "Vida nocturna", "descripcion": "Antiguo pueblo de pescadores predilecto por mochileros y buceadores."},
+      {"icono": "\ud83c\udfe0", "nombre": "Bello Horizonte", "tipo": "Compras", "descripcion": "Sector moderno al sur con resorts internacionales y playas exclusivas."}
+    ],
+    "transporte": [
+      {"icono": "\u2708\ufe0f", "nombre": "Aeropuerto Simon Bolivar", "descripcion": "Ubicado a 15 km al sur; servicio de taxis regulados al centro por $30.000 COP (25-30 min)."},
+      {"icono": "\ud83d\ude8c", "nombre": "Buses urbanos (SITM)", "descripcion": "Red de buses que conecta los barrios y playas cercanas con tarifas accesibles ($3.000 COP)."},
+      {"icono": "\ud83d\ude95", "nombre": "Taxis y Apps", "descripcion": "Servicio de taxi tradicional medido por taximetro y plataformas digitales habilitadas."}
+    ],
+    "seguridad": [
+      {"icono": "\u26a0\ufe0f", "nombre": "Nivel de riesgo por zona", "descripcion": "Nivel moderado en zonas perifericas y playas solitarias de noche; centro historico seguro con Policia de Turismo (Fuente: Observatorio Delictivo MinDefensa, cortes 2026)."},
+      {"icono": "\ud83d\udee1\ufe0f", "nombre": "Recomendaciones", "descripcion": "Evitar transitar por playas oscuras despues de las 10:00 p.m. y cuidar pertenencias en aglomeraciones."},
+      {"icono": "\ud83d\udcde", "nombre": "Emergencias", "descripcion": "Linea unica de emergencia nacional 123 y Policia de Turismo de Santa Marta."}
+    ],
+    "presupuesto": [
+      {"tipo": "Mochilero", "rango": "80.000 - 150.000 COP", "detalle": "Incluye hostal compartido, alimentacion en mercados locales y transporte publico."},
+      {"tipo": "Medio", "rango": "200.000 - 450.000 COP", "detalle": "Incluye hotel 3 estrellas, restaurantes turisticos y tours guiados al Tayrona."},
+      {"tipo": "Alto", "rango": "Superior a 600.000 COP", "detalle": "Incluye resorts en Bello Horizonte, gastronomia gourmet y transporte privado."}
+    ],
+    "gastronomia": [
+      {"icono": "\ud83c\udf75", "nombre": "Arroz de Lisa", "descripcion": "Plato emblematico a base de pescado lisa salada, arroz, achiote y verduras, servido con suero y patacon."},
+      {"icono": "\ud83c\udf75", "nombre": "Pescado Frito con Patacon", "descripcion": "Tradicional mojarra o chivo frito acompanado de patacon pisao, ensalada y arroz de coco."},
+      {"icono": "\ud83c\udf75", "nombre": "Sancocho de Pescado", "descripcion": "Sopa espesa con pescado fresco del dia, platano, yuca y yuca, aromatizada con cilantro cimarron."},
+      {"icono": "\ud83c\udf75", "nombre": "Caribayolas", "descripcion": "Yuca cocida y molida rellena de carne desmechada o queso, frita hasta dorar."}
+    ],
+    "cuando_ir": [
+      {"periodo": "Enero - Abril", "estado": "ideal", "nota": "Epoca seca con excelente clima soleado, vientos alisios y mar propicio para el buceo."},
+      {"periodo": "Mayo - Agosto", "estado": "posible", "nota": "Lluvias ocasionales por la tarde y clima calido con menor afluencia turistica."},
+      {"periodo": "Septiembre - Noviembre", "estado": "no", "nota": "Temporada principal de lluvias y tormentas tropicales en el Caribe colombiano."}
+    ]
+  },
+  "FAQS": [
+    {"pregunta": "\u00bfCual es la mejor epoca del ano para visitar Santa Marta?", "respuesta": "Entre diciembre y marzo, cuando el clima es seco y los vientos alisios refrescan la costa."},
+    {"pregunta": "\u00bfComo llegar desde el aeropuerto al centro de la ciudad?", "respuesta": "En taxi autorizado (aproximadamente 25-30 minutos) o mediante bus urbano que pasa por la via principal."},
+    {"pregunta": "\u00bfEs necesario reservar la entrada al Parque Nacional Natural Tayrona?", "respuesta": "Si, se recomienda adquirir los tiquetes de ingreso con anticipacion a traves de la plataforma oficial de Parques Nacionales."},
+    {"pregunta": "\u00bfQue presupuesto diario minimo se requiere para un viaje mochilero?", "respuesta": "Alrededor de $80.000 a $150.000 COP por dia, cubriendo hostal, alimentacion basica y transporte publico."},
+    {"pregunta": "\u00bfCuales son las zonas mas seguras y recomendadas para hospedarse?", "respuesta": "El Centro Historico por su oferta cultural y cercania a restaurantes, o El Rodadero y Bello Horizonte para turismo de playa."}
+  ],
+  "FOTOS_SUGERIDAS": [
+    {"tema": "Vista panoramica de la bahia de Santa Marta al atardecer", "caption": "Atardecer en la Bahia de Santa Marta", "nombres_archivo_wikimedia": ["File:Santa_Marta_Bay_Sunset.jpg"], "es_hero": true},
+    {"tema": "Catedral Basilica de Santa Marta", "caption": "Catedral Basilica de Santa Marta", "nombres_archivo_wikimedia": ["File:Catedral_Basilica_de_Santa_Marta.jpg"], "es_hero": false},
+    {"tema": "Playa Cabo San Juan en el Parque Nacional Natural Tayrona", "caption": "Cabo San Juan - Parque Tayrona", "nombres_archivo_wikimedia": ["File:Cabo_San_Juan_del_Guia_Tayrona.jpg"], "es_hero": false},
+    {"tema": "Quinta de San Pedro Alejandrino", "caption": "Quinta de San Pedro Alejandrino", "nombres_archivo_wikimedia": ["File:Quinta_de_San_Pedro_Alejandrino_Santa_Marta.jpg"], "es_hero": false},
+    {"tema": "Camellon de la Bahia de Santa Marta", "caption": "Malecon y Camellon de la Bahia", "nombres_archivo_wikimedia": ["File:Camellon_de_Santa_Marta.jpg"], "es_hero": false}
+  ],
+  "FUENTES": [
+    {"tipo": "oficial", "url": "https://www.santamarta.gov.co", "que_respalda": "Datos generales, atractivos turisticos, transporte y datos institucionales"},
+    {"tipo": "oficial", "url": "https://parquesnacionales.gov.co", "que_respalda": "Condiciones de ingreso y regulaciones del Parque Nacional Natural Tayrona"},
+    {"tipo": "oficial", "url": "https://colombia.travel/es/santa-marta", "que_respalda": "Guia turistica oficial, gastronomia y oferta hotelera"}
+  ]
+}

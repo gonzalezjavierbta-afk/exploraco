@@ -1,0 +1,54 @@
+{
+  "fotos": [
+    {
+      "tema": "Vista panor\u00e1mica de la bah\u00eda de Santa Marta al atardecer",
+      "caption": "Atardecer sobre la bah\u00eda de Santa Marta desde la playa",
+      "archivo_wikimedia": "File:Atardecer en Santa Marta, Colombia - 1.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Atardecer_en_Santa_Marta%2C_Colombia_-_1.jpg/1280px-Atardecer_en_Santa_Marta%2C_Colombia_-_1.jpg",
+      "status": 200,
+      "es_hero": true,
+      "autor": "TitiNicola",
+      "licencia": "CC BY-SA 4.0"
+    },
+    {
+      "tema": "Catedral Bas\u00edlica de Santa Marta",
+      "caption": "Catedral Bas\u00edlica de Santa Marta, centro hist\u00f3rico",
+      "archivo_wikimedia": "File:Cathedral of Santa Marta 2022 02.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Cathedral_of_Santa_Marta_2022_02.jpg/1280px-Cathedral_of_Santa_Marta_2022_02.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Vaido Otsar",
+      "licencia": "CC BY-SA 4.0"
+    },
+    {
+      "tema": "Playa Cabo San Juan del Gu\u00eda, Parque Nacional Natural Tayrona",
+      "caption": "Playa y kiosco mirador del Cabo San Juan del Gu\u00eda, PNN Tayrona",
+      "archivo_wikimedia": "File:Cabo de San Juan de Gu\u00eda.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Cabo_de_San_Juan_de_Gu%C3%ADa.jpg/1280px-Cabo_de_San_Juan_de_Gu%C3%ADa.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Niop90",
+      "licencia": "CC BY-SA 4.0"
+    },
+    {
+      "tema": "Quinta de San Pedro Alejandrino",
+      "caption": "Casona de la Quinta de San Pedro Alejandrino, donde muri\u00f3 Sim\u00f3n Bol\u00edvar",
+      "archivo_wikimedia": "File:Llegada a la Quinta de San Pedro Alejandrino.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Llegada_a_la_Quinta_de_San_Pedro_Alejandrino.jpg/1280px-Llegada_a_la_Quinta_de_San_Pedro_Alejandrino.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "SALOMON BERMUDEZ",
+      "licencia": "CC BY-SA 3.0"
+    },
+    {
+      "tema": "Camell\u00f3n / malec\u00f3n de la bah\u00eda de Santa Marta",
+      "caption": "Malec\u00f3n de Santa Marta hacia la calle 19",
+      "archivo_wikimedia": "File:2018 Santa Marta (Colombia) - Malec\u00f3n de Santa Marta hacia la calle 19.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/2018_Santa_Marta_%28Colombia%29_-_Malec%C3%B3n_de_Santa_Marta_hacia_la_calle_19.jpg/1280px-2018_Santa_Marta_%28Colombia%29_-_Malec%C3%B3n_de_Santa_Marta_hacia_la_calle_19.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Felipe Restrepo Acosta",
+      "licencia": "CC BY-SA 4.0"
+    }
+  ]
+}
