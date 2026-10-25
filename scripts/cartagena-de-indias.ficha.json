@@ -1,0 +1,338 @@
+{
+  "BASE": {
+    "slug": "cartagena-de-indias",
+    "nombre": "Cartagena de Indias",
+    "categoria_slug": "sitio",
+    "subcategoria": "ciudad",
+    "zona": "caribe",
+    "sintro": "Joya amurallada del Caribe colombiano con historia colonial, arquitectura colorida y playas tropicales.",
+    "lead": "Cartagena de Indias deslumbra por su imponente arquitectura colonial, sus murallas cargadas de historia y su vibrante energia caribena. Es el destino turistico mas iconico de Colombia.",
+    "descripcion": "Fundada en 1533 por Pedro de Heredia, Cartagena de Indias fue uno de los puertos mas importantes de America durante la epoca colonial espanola, convirtiendose en blanco constante de piratas y corsarios que obligaron a la construccion de una de las redes defensivas mas avanzadas del continente, destacando el Castillo de San Felipe de Barajas y las murallas que hoy protegen el Centro Historico (declarado Patrimonio de la Humanidad por la UNESCO).\n\nLa ciudad combina magistralmente su legado historico con el desarrollo turistico moderno. Detras de las murallas, las coloridas casonas con balcones floridos albergan boutiques, hoteles de lujo, restaurantes de alta cocina y plazas bulliciosas como la Plaza de los Coches y la Plaza de Santo Domingo, llenas de artistas callejeros y palenqueras.\n\nFuera del recinto amurallado, barrios como Getsemani ofrecen un ambiente bohemio, autentico y lleno de arte urbano, mientras que la zona moderna de Bocagrande despliega rascacielos frente a la playa, centros comerciales y una intensa vida nocturna. Ademas, su ubicacion privilegiada sirve como puerta de entrada al Parque Nacional Natural Corales del Rosario y de San Bernardo.",
+    "highlight": "9.6/10 - Patrimonio UNESCO y Playas del Caribe",
+    "ciudad": "Cartagena",
+    "region": "Bolivar",
+    "barrio": "Centro Historico",
+    "lat": 10.3910,
+    "lng": -75.4794,
+    "whatsapp": "573001234567",
+    "telefono": "+57 (605) 6501000",
+    "email": "info@cartagenaturismo.gov.co",
+    "web": "https://www.colombia.travel/es/cartagena",
+    "instagram": "@colombia_travel",
+    "precio_desde": "Hospedaje desde $70.000 COP / dia",
+    "horario": "Acceso libre a espacios publicos; museos y castillos de 8:00 a.m. a 6:00 p.m.",
+    "emoji": "\uD83C\uDFD6\uFE0F",
+    "hero_bg": "linear-gradient(135deg, #111111 0%, #2c1e08 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Destino Historico - Caribe - Playas",
+    "capacidad": "Aforo abierto / Destino urbano general",
+    "como_llegar": "Vuelo internacional o nacional al Aeropuerto Internacional Rafael Nunez (CTG). Acceso terrestre por la Troncal del Caribe desde Barranquilla y Santa Marta.",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Ciudad",
+    "duracion": "3-5 dias",
+    "precio_entrada": "Sin entrada (acceso libre a la ciudad; atracciones especificas pagan tarifa)",
+    "distancia": "Ubicada en la costa norte colombiana sobre el mar Caribe; aeropuerto a 10 minutos del Centro Historico.",
+    "como_llegar": "Vuelo directo al Aeropuerto Rafael Nunez o bus intermunicipal desde terminales de la Costa Atlantica.",
+    "permisos": "No requiere permisos previos para circulacion publica.",
+    "temporada": [
+      "Diciembre a Abril",
+      "Julio y Agosto",
+      "Septiembre a Noviembre"
+    ],
+    "temporada_nota": "Diciembre y enero presentan alta ocupacion hotelera y precios elevados; se recomienda reserva anticipada.",
+    "entradas": [
+      {
+        "tipo": "Castillo de San Felipe",
+        "precio": "$35.000 COP",
+        "incluye": "Acceso general y audio guia basica",
+        "link": "https://www.patrimoniocartagena.com"
+      }
+    ],
+    "atracciones": [
+      {
+        "icono": "\uD83C\uDFEF",
+        "nombre": "Castillo de San Felipe de Barajas",
+        "descripcion": "La fortificacion militar espanola mas grande de America, con laberintos de tuneles defensivos. Entrada: $35.000 COP."
+      },
+      {
+        "icono": "\uD83C\uDFF0",
+        "nombre": "Murallas de Cartagena y Baluartes",
+        "descripcion": "Estructuras defensivas historicas ideales para caminar al atardecer y ver la puesta de sol."
+      },
+      {
+        "icono": "\uD83C\uDFFA",
+        "nombre": "Museo del Oro Zenu",
+        "descripcion": "Exhibicion arqueologica que muestra la maestria orfebre de la cultura prehispanica Zenu."
+      },
+      {
+        "icono": "\u26EA",
+        "nombre": "Iglesia y Convento de San Pedro Claver",
+        "descripcion": "Templo historico que resguarda los restos del defensor de los derechos de los esclavizados."
+      },
+      {
+        "icono": "\uD83D\uDDFD",
+        "nombre": "Torre del Reloj",
+        "descripcion": "Icono arquitectonico y puerta principal de entrada al Centro Historico amurallado."
+      },
+      {
+        "icono": "\uD83C\uDFD8\uFE0F",
+        "nombre": "Barrio Getsemani",
+        "descripcion": "Antiguo arrabal obrero transformado en el epicentro del arte urbano, la musica y la vida bohemia."
+      }
+    ],
+    "actividades_gratis": [
+      {
+        "icono": "\uD83D\uDEB6",
+        "nombre": "Caminata por el Centro Historico",
+        "descripcion": "Recorrido libre por plazas, calles empedradas y casonas coloniales con balcones de madera."
+      },
+      {
+        "icono": "\uD83C\uDFA8",
+        "nombre": "Ruta de Arte Urbano en Getsemani",
+        "descripcion": "Observacion de murales, grafitis y expresiones artisticas locales al aire libre."
+      },
+      {
+        "icono": "\uD83C\uDF05",
+        "nombre": "Puesta de sol en los Baluartes",
+        "descripcion": "Disfrutar del atardecer caribeno desde las murallas historicas de la ciudad."
+      },
+      {
+        "icono": "\uD83C\uDF84",
+        "nombre": "Paseo por la Plaza de los Coches",
+        "descripcion": "Espacios publicos tradicionales llenos de cultura y tradicion dulce en el Portal de los Dulces."
+      }
+    ],
+    "programacion": [
+      {
+        "dia": "Marzo",
+        "eventos": "Festival Internacional de Cine de Cartagena de Indias (FICCI)"
+      },
+      {
+        "dia": "Enero",
+        "eventos": "Hay Festival Cartagena de Indias"
+      },
+      {
+        "dia": "Noviembre (11-14)",
+        "eventos": "Fiestas de Independencia de Cartagena y desfiles folkloricos"
+      }
+    ],
+    "accesibilidad": [
+      {
+        "icono": "\u267F",
+        "nombre": "Centro Historico",
+        "descripcion": "Rampas en esquinas principales, aunque algunas calles adoquinadas pueden dificultar el desplazamiento en silla de ruedas."
+      },
+      {
+        "icono": "\uD83D\uDE95",
+        "nombre": "Transporte adaptado",
+        "descripcion": "Disponibilidad limitada de vehiculos adaptados para movilidad reducida."
+      }
+    ],
+    "contexto": "Fundada en 1533, Cartagena es el bastion colonial mas importante del Caribe, caracterizada por su arquitectura militar, sus plazas llenas de vida y su rica fusion cultural afrocaribena.",
+    "barrios": [
+      {
+        "icono": "\uD83C\uDFDA\uFE0F",
+        "nombre": "Centro Historico",
+        "tipo": "Historico",
+        "descripcion": "Alojamiento de lujo y estilo boutique en casonas coloniales; ideal para romance y turismo cultural."
+      },
+      {
+        "icono": "\uD83C\uDF8F",
+        "nombre": "Getsemani",
+        "tipo": "Cultural",
+        "descripcion": "Estilo bohemio, hostales juveniles y posadas autenticas; perfecto para mochileros y amantes de la vida nocturna."
+      },
+      {
+        "icono": "\uD83C\uDFD6\uFE0F",
+        "nombre": "Bocagrande",
+        "tipo": "Alojamiento",
+        "descripcion": "Hoteles modernos de cadena frente a la playa, edificios residenciales y comercio; excelente para familias."
+      },
+      {
+        "icono": "\uD83C\uDF34",
+        "nombre": "Manga",
+        "tipo": "Alojamiento",
+        "descripcion": "Zona residencial tranquila con opciones de apartamentos turisticos y cercania a la bahia."
+      }
+    ],
+    "transporte": [
+      {
+        "icono": "\u2708\uFE0F",
+        "nombre": "Aeropuerto Rafael Nunez",
+        "descripcion": "Ubicado a 10 min del centro; conexion con taxis autorizados de tarifa fija."
+      },
+      {
+        "icono": "\uD83D\uDE8C",
+        "nombre": "Transcaribe",
+        "descripcion": "Sistema de transporte masivo de bus rapido que conecta los puntos clave de la ciudad."
+      },
+      {
+        "icono": "\uD83D\uDE95",
+        "nombre": "Taxis y Apps",
+        "descripcion": "Amplia disponibilidad de taxis amarillos y plataformas de movilidad digital."
+      }
+    ],
+    "seguridad": [
+      {
+        "icono": "\u26A0\uFE0F",
+        "nombre": "Riesgo por zona",
+        "descripcion": "El Centro Historico y Bocagrande son seguros y vigilados; precaucion en periferias y playas solitarias de noche (Policia de Turismo, enero 2026)."
+      },
+      {
+        "icono": "\uD83D\uDC6E",
+        "nombre": "Recomendaciones generales",
+        "descripcion": "Cuidar pertenencias en aglomeraciones y evitar vendedores insistentes en playas."
+      }
+    ],
+    "presupuesto": [
+      {
+        "tipo": "Mochilero",
+        "rango": "$70.000 - $120.000 COP",
+        "detalle": "Hostal compartido, transporte publico, menu del dia en mercados locales."
+      },
+      {
+        "tipo": "Medio",
+        "rango": "$250.000 - $450.000 COP",
+        "detalle": "Hotel 3 estrellas, restaurantes tipicos, tours compartidos a islas, taxis."
+      },
+      {
+        "tipo": "Alto",
+        "rango": "Superior a $800.000 COP",
+        "detalle": "Hoteles boutique de lujo, alta cocina, tours privados en yate, traslados exclusivos."
+      }
+    ],
+    "gastronomia": [
+      {
+        "icono": "\uD83C\uDF71",
+        "nombre": "Cazuela de Mariscos",
+        "descripcion": "Mariscos frescos cocinados en crema de coco y especias caribenias."
+      },
+      {
+        "icono": "\uD83D\uDC1F",
+        "nombre": "Pescado Frito con Patacones",
+        "descripcion": "Mojarra o pargo frito acompanado de arroz con coco y patacones crujientes."
+      },
+      {
+        "icono": "\uD83E\uDD64",
+        "nombre": "Arepa de Huevo",
+        "descripcion": "Arepa de maiz frita rellena con huevo entero y carne desmechada."
+      }
+    ],
+    "cuando_ir": [
+      {
+        "periodo": "Ene-Abr",
+        "estado": "ideal",
+        "nota": "Epoca seca con excelente clima, sol radiante y vientos alisios refrescantes."
+      },
+      {
+        "periodo": "May-Ago",
+        "estado": "posible",
+        "nota": "Meses de transicion con dias calurosos, alta humedad y lluvias esporadicas."
+      },
+      {
+        "periodo": "Sep-Dic",
+        "estado": "ideal",
+        "nota": "Epoca de festivales culturales importantes, celebracion de la independencia y clima calido."
+      }
+    ],
+    "regulaciones": "Acceso libre a espacios publicos del Centro Historico. Cuidado del patrimonio cultural y prohibicion de arrojar basuras en monumentos.",
+    "equipamiento": [],
+    "itinerario": [],
+    "dificultad": "Facil",
+    "dificultad_desc": "Destino urbano apto para todo tipo de viajeros con caminatas a nivel del suelo.",
+    "dificultad_tags": [],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "posible",
+      "Jun": "posible",
+      "Jul": "posible",
+      "Ago": "posible",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    }
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfEs seguro caminar de noche por el Centro Historico de Cartagena?",
+      "respuesta": "Si, las zonas amuralladas y Getsemani son muy concurridas y cuentan con policias de turismo patrullando constantemente."
+    },
+    {
+      "pregunta": "\u00bfComo llegar desde el aeropuerto al Centro Historico?",
+      "respuesta": "En taxi autorizado (tarifa fija regulada) o bus del sistema Transcaribe; el trayecto toma entre 10 y 15 minutos."
+    },
+    {
+      "pregunta": "\u00bfCual es la mejor epoca del ano para visitar Cartagena?",
+      "respuesta": "Entre diciembre y abril gracias a la temporada seca y los vientos alisios."
+    },
+    {
+      "pregunta": "\u00bfCuanto presupuesto diario minimo se necesita en Cartagena?",
+      "respuesta": "Un mochilero puede gastar entre $70.000 y $120.000 COP diarios."
+    },
+    {
+      "pregunta": "\u00bfQue zonas de alojamiento son mas recomendadas?",
+      "respuesta": "El Centro Historico para cultura, Getsemani para vida bohemia y Bocagrande para hoteles de playa."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Centro Historico amurallado con arquitectura colonial y balcones floridos",
+      "caption": "Cartagena de Indias - Arquitectura colonial en el Centro Historico",
+      "nombres_archivo_wikimedia": ["File:Cartagena_Colombia_Walled_City.jpg"],
+      "es_hero": true
+    },
+    {
+      "tema": "Castillo de San Felipe de Barajas al atardecer",
+      "caption": "Castillo de San Felipe de Barajas, Cartagena",
+      "nombres_archivo_wikimedia": ["File:Castillo_de_San_Felipe_de_Barajas,_Cartagena.jpg"],
+      "es_hero": false
+    },
+    {
+      "tema": "Murallas historicas de Cartagena frente al mar Caribe",
+      "caption": "Murallas de Cartagena de Indias",
+      "nombres_archivo_wikimedia": ["File:Murallas_de_Cartagena_de_Indias.jpg"],
+      "es_hero": false
+    },
+    {
+      "tema": "Coloridas calles y arte urbano en el barrio Getsemani",
+      "caption": "Getsemani, Cartagena de Indias",
+      "nombres_archivo_wikimedia": ["File:Getsemani,_Cartagena_de_Indias_street.jpg"],
+      "es_hero": false
+    },
+    {
+      "tema": "Torre del Reloj iluminada en la entrada del Centro Historico",
+      "caption": "Torre del Reloj, Cartagena",
+      "nombres_archivo_wikimedia": ["File:Torre_del_Reloj,_Cartagena.jpg"],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.colombia.travel/es/cartagena",
+      "que_respalda": "Informacion general, atractivos turisticos y perfil de la ciudad"
+    },
+    {
+      "tipo": "oficial",
+      "url": "https://www.cartagena.gov.co",
+      "que_respalda": "Datos historicos, festividades locales y dependencias de turismo distrital"
+    },
+    {
+      "tipo": "maps",
+      "url": "https://maps.google.com/?q=Cartagena+de+Indias",
+      "que_respalda": "Coordenadas geograficas y ubicacion del aeropuerto"
+    },
+    {
+      "tipo": "prensa",
+      "url": "https://www.eluniversal.com.co",
+      "que_respalda": "Datos de seguridad turistica y eventos recurrentes 2026"
+    }
+  ]
+}

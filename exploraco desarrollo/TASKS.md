@@ -6083,5 +6083,31 @@ El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 evento
 
 **Patron de falla que deja la tanda:** un defecto puede sobrevivir porque **las dos fuentes se pisan en silencio** y cada lado parece correcto por separado. La defensa no es una prohibicion, es **una precedencia escrita y un caso de prueba por direccion** (D4). El pase de D1 anadio la segunda mitad de la leccion: **una clave que se emite y una clave que se lee son dos piezas** -- hay que probar **ida y vuelta**, no solo la colecta.
 
+## TSK-231 - Pagina nueva `cartagena-de-indias` (categoria `sitio`, subcategoria `ciudad`): primera del repo con el contrato de 12 secciones de ciudad; seed idempotente + loader + smoke 21/21 + HTTP 200 en produccion - 2026-10-25 - COMPLETADA
+
+**Estado: COMPLETADA** -- 2026-10-25 (pase documental unico R2). **Sin cambios en `api/*.js`, cero migracion, cero endpoint nuevo.** Cierra el piloto Cartagena que la deuda **TSK-230 / D5** dejaba "pendiente de que Gemini devuelva la ficha"; el argumento de la subcategoria vive en **ADR-101 (Revision 2)** y aqui solo va el alcance ejecutado y la evidencia.
+
+**Archivos (medidos contra el repositorio real, ADR-006):**
+
+1. `scripts/seed-cartagena-de-indias.js` -- seed **idempotente** (upsert x2, mismo id en las dos pasadas).
+2. `scripts/load-cartagena-de-indias-api.js` -- loader por la API de admin.
+3. `scripts/smoke_test_cartagena_de_indias.js` -- smoke de la pagina (**21 checks**).
+4. Insumos: `scripts/cartagena-de-indias.ficha.json` y `scripts/cartagena-de-indias.fotos.json`.
+
+**Verificacion medida (21 checks + produccion):**
+
+- **Smoke PASS 21/21**: **12/12** secciones del contrato `ciudad`; balance de divs **321/321**; `node --check` **3/3**; ASCII-safety **0/0/0** bytes > 127.
+- **Produccion:** `GET https://exploraco.vercel.app/cartagena-de-indias.html` -> **HTTP 200** (len **99796**), **12/12** secciones, divs **351/351**.
+- **API:** `GET /api/destinos?categoria=sitio` -> **total 102**, **hit 1** con `status=published`, `destacado=true`, `subcategoria=ciudad`, `rating=0`.
+- **Base:** id `4edf7ec8-90a4-4192-a721-2e78a8d412f4`; idempotencia probada con upsert x2 y **mismo id**.
+- **R5:** `node scripts/ejecucion/verificar-capa-gratis.js` -> **RESULTADO OK** (18 agentes, 0 pines, 16 heredados, check (f) OK).
+
+**Desviaciones editoriales deliberadas:**
+
+- `BASE.highlight` venia como `9.6/10 - ...` y el seed **retira el `9.6/10`** por **ADR-009** (el rating nunca va hardcodeado), conservando el texto editorial.
+- `FUENTES` cita el apex `https://cartagena.gov.co` porque `www.cartagena.gov.co` responde **403 por WAF** (verificado).
+
+**Deudas que abre (decision del operador, registradas en `NEXT.md`):** `tags.fuentes` se guarda en el JSONB (**4 filas**) pero el motor **no lo renderiza** (atribucion invisible); **`sitemap.xml` no existe** en el repo (verificacion **N/A**); la galeria son **4 fotos + hero aparte** y no se decidio si las **5** entran a `/galeria.html`.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

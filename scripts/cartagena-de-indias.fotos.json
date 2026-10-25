@@ -1,0 +1,60 @@
+{
+  "fotos": [
+    {
+      "tema": "Centro Historico amurallado visto desde el mar",
+      "caption": "Centro Historico amurallado de Cartagena de Indias",
+      "archivo_wikimedia": "File:Walled city and Centro de Convenciones (Cartagena's Convention Center) (4625666443).jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Walled_city_and_Centro_de_Convenciones_%28Cartagena%27s_Convention_Center%29_%284625666443%29.jpg/1280px-Walled_city_and_Centro_de_Convenciones_%28Cartagena%27s_Convention_Center%29_%284625666443%29.jpg",
+      "status": 200,
+      "es_hero": true,
+      "autor": "Jorge L\u00e1scar",
+      "licencia": "CC BY 2.0"
+    },
+    {
+      "tema": "Castillo de San Felipe de Barajas",
+      "caption": "Castillo de San Felipe de Barajas, Cartagena de Indias",
+      "archivo_wikimedia": "File:Castillo San Felipe de Barajas, Cartagena 01.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Castillo_San_Felipe_de_Barajas%2C_Cartagena_01.jpg/1280px-Castillo_San_Felipe_de_Barajas%2C_Cartagena_01.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Bernard Gagnon",
+      "licencia": "CC BY-SA 4.0"
+    },
+    {
+      "tema": "Murallas historicas frente al mar Caribe",
+      "caption": "Murallas de Cartagena de Indias",
+      "archivo_wikimedia": "File:City walls of Cartagena 02.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/City_walls_of_Cartagena_02.jpg/1280px-City_walls_of_Cartagena_02.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Bernard Gagnon",
+      "licencia": "CC BY-SA 4.0"
+    },
+    {
+      "tema": "Arte urbano en el barrio Getsemani",
+      "caption": "Getseman\u00ed, Cartagena de Indias: murales y arte urbano",
+      "archivo_wikimedia": "File:Graffiti in Getseman\u00ed, Cartagena 01.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Graffiti_in_Getseman%C3%AD%2C_Cartagena_01.jpg/1280px-Graffiti_in_Getseman%C3%AD%2C_Cartagena_01.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Bernard Gagnon",
+      "licencia": "CC BY-SA 4.0"
+    },
+    {
+      "tema": "Torre del Reloj en la entrada del Centro Historico",
+      "caption": "Torre del Reloj, Cartagena de Indias",
+      "archivo_wikimedia": "File:Torre del Reloj, Cartagena 02.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Torre_del_Reloj%2C_Cartagena_02.jpg/1280px-Torre_del_Reloj%2C_Cartagena_02.jpg",
+      "status": 200,
+      "es_hero": false,
+      "autor": "Bernard Gagnon",
+      "licencia": "CC BY-SA 4.0"
+    }
+  ],
+  "fuentes_status": [
+    { "url": "https://www.colombia.travel/es/cartagena", "status": 200 },
+    { "url": "https://www.cartagena.gov.co", "status": 403, "nota": "el host www devuelve 403 (WAF) con UA de navegador; el apex https://cartagena.gov.co responde 200" },
+    { "url": "https://maps.google.com/?q=Cartagena+de+Indias", "status": 200, "nota": "redirige a https://www.google.com/maps?q=Cartagena+de+Indias" },
+    { "url": "https://www.eluniversal.com.co", "status": 200 }
+  ]
+}
