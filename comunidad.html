@@ -859,10 +859,10 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     </div>
     <!-- Tabs -->
         <div class="comm-tabs">
-      <div class="ctab on" onclick="showCommTab('chat')">💬 Chat</div>
+      <div class="ctab on" onclick="showCommTab('feed')">&#9889; Novedades</div>
+      <div class="ctab" onclick="showCommTab('chat')">💬 Chat</div>
       <div class="ctab" data-nivel-requerido="6" onclick="showCommTab('planes')">🗺️ Planes</div>
       <div class="ctab" onclick="showCommTab('mapa')">&#x1F5FA; Mapa</div>
-      <div class="ctab" onclick="showCommTab('feed')">&#9889; Feed Vivo</div>
       <div class="ctab" onclick="showCommTab('ranking')">🏆 Ranking</div>
       <div class="ctab" data-nivel-requerido="14" onclick="showCommTab('pandillas')">👥 Parches</div>
       <div class="ctab" data-nivel-requerido="15" onclick="showCommTab('wayfarer')">🕵️ Activo Oculto</div>
@@ -878,7 +878,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     <div class="comm-panels">
 
     <!-- CHAT -->
-    <div class="cpanel on" id="cpanel-chat">
+    <div class="cpanel" id="cpanel-chat">
       <div id="chat-lock" style="display:none;padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(255,74,0,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Chat bloqueado</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6">Desbloquea el chat en el nivel <b id="chat-lock-nivel" style="color:var(--gold)">3</b> (<span id="chat-lock-xp">250</span> XP). A medida que avanzas desbloqueas crear salas y moderar el chat.</div>
@@ -1084,7 +1084,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     </div>
 
     <!-- FEED VIVO (timeline unificada: medios, escritos, lugares y planes) -->
-    <div class="cpanel" id="cpanel-feed">
+    <div class="cpanel on" id="cpanel-feed">
       <div class="feed-filtros-bar" id="feed-filtros-bar" role="tablist" aria-label="Filtrar el feed por tipo de contenido">
         <button type="button" class="btn-filtro-feed active" data-categoria="todos" role="tab" aria-pressed="true" aria-selected="true">&#9889; Todos</button>
         <button type="button" class="btn-filtro-feed" data-categoria="medio" role="tab" aria-pressed="false" aria-selected="false">&#128247; Medios</button>
@@ -3458,6 +3458,41 @@ function feedPintaAviso(lista, texto) {
   lista.appendChild(aviso);
 }
 
+/* Acciones de voto/guardado de una tarjeta del feed. SOLO se pintan si el
+   item viene de album_foto: es el unico origen con fuente valida para
+   media-actions.js. En resena/destino/plan (fuente_media null) la tarjeta
+   se queda con Abrir y Compartir, sin botones muertos.
+   Degradacion ADR-008: si el motor no esta cargado no se pinta markup de
+   accion (nunca un throw). Atributos y clases copiados de avActLikeHTML y
+   avActSaveHTML (:3248 y :3253); item.item_id se usa tal cual. */
+function feedMediaActionsHTML(item) {
+  if (!item || item.fuente_media !== 'album_foto') return '';
+  if (!item.item_id) return '';
+  if (!window.MediaActions || !window.MediaActions.bind) return '';
+  var id = feedEsc(String(item.item_id));
+  var votos = parseInt(item.votos, 10);
+  if (!isFinite(votos) || votos < 0) votos = 0;
+  var nota = avMiNota(item.mi_puntuacion);
+  var attrs = '';
+  if (nota) attrs += ' data-ma-puntuacion="' + nota + '"';
+  var rating = avRatingStr(item.rating_promedio);
+  if (!rating) {
+    var rn = parseFloat(item.rating_promedio);
+    if (isFinite(rn)) rating = String(Math.round(rn * 10) / 10);
+  }
+  if (rating) attrs += ' data-ma-rating="' + feedEsc(rating) + '"';
+  if (votos > 0) attrs += ' data-ma-votos="' + votos + '"';
+  var yaGuardado = avFlag01(item.ya_guardado);
+  var html = '<button type="button" class="av-act av-act-like' + (nota ? ' on' : '') + '"'
+    + ' data-ma-voto data-ma-fuente="album_foto" data-ma-item="' + id + '"' + attrs + '>'
+    + '\u2B50 <span data-ma-count>' + votos + '</span></button>';
+  html += '<button type="button" class="av-act av-act-save' + (yaGuardado ? ' on' : '') + '"'
+    + ' data-ma-save data-ma-fuente="album_foto" data-ma-item="' + id + '"'
+    + ' data-ma-ya-guardado="' + yaGuardado + '" aria-pressed="' + (yaGuardado ? 'true' : 'false') + '">'
+    + (yaGuardado ? 'Guardado' : 'Guardar') + '</button>';
+  return html;
+}
+
 function feedCardHTML(item) {
   var cat = feedEtiquetas[item.categoria] ? item.categoria : 'medio';
   /* avatar_autor es opcional: puede llegar '' si el usuario no tiene foto,
@@ -3495,6 +3530,7 @@ function feedCardHTML(item) {
   html += '<button type="button" class="btn-filtro-feed" data-feed-share="1"'
     + ' data-feed-url="' + feedEsc(url || '') + '"'
     + ' data-feed-title="' + titulo + '">Compartir</button>';
+  html += feedMediaActionsHTML(item || {});
   html += '</div>';
   return html;
 }
@@ -3640,6 +3676,14 @@ function feedTimelineCargar(reset) {
         }
         lista.appendChild(feedCard(item));
       });
+      /* Motor de acciones de media: bind es idempotente por contenedor
+         (__maBound) y sync repinta el estado de lo ya montado, asi que
+         paginar no duplica listeners. Si el motor no esta cargado no hay
+         markup de accion y el enganche es no-op (ADR-008). */
+      if (window.MediaActions && window.MediaActions.bind) {
+        avBindMediaActions(lista);
+        avSyncMediaActions(lista);
+      }
       if (reset && res && res.degradado && res.degradado.length) {
         feedPintaAviso(lista, 'Parte del feed no esta disponible ahora.');
       }
@@ -3697,6 +3741,10 @@ function feedInitFeed() {
       });
     }
   }
+  /* Arranque por defecto: #cpanel-feed nace con class="on" (es la primera
+     pestana), asi que este bloque inicializa el timeline UNA sola vez al
+     cargar el DOM. Si el usuario entra por hash a otra pestana, el panel no
+     trae "on" y no se carga aqui: el listener del .ctab lo hara al pulsar. */
   var panel = document.getElementById('cpanel-feed');
   if (panel && panel.classList.contains('on') && !feedInicializado) {
     feedInicializado = true;

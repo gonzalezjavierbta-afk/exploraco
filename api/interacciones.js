@@ -8669,9 +8669,97 @@ module.exports = async function handler(req, res) {
             autor_nombre: r.autor_nombre || null,
             autor_avatar: r.autor_avatar || '',
             creado_en: r.creado_en || null,
-            url: r.url || null
+            url: r.url || null,
+            // v24 (TSK-240): estado PROPIO de voto/guardado. Neutro por
+            // defecto y se rellena mas abajo SOLO en origen 'medio':
+            // 'album_foto' es la unica fuente valida para votar y guardar
+            // (media_votos y media_guardados, 023 movio item_id a text).
+            // No existe fuente 'destino' ni 'plan': esos origenes quedan
+            // neutros a proposito, no se inventan.
+            item_id: null,
+            fuente_media: null,
+            mi_puntuacion: null,
+            rating_promedio: null,
+            votos: 0,
+            ya_guardado: false
           };
         });
+        // Estado propio de voto y guardado para los items 'album_foto'. Se
+        // calcula DESPUES del recorte de la pagina (limit+1 -> limit): el
+        // UNION ALL ya es caro y meterle JOINs multiplicaria el coste por
+        // las filas del union, no por las <= 20 devueltas (TSK-240). Aqui
+        // el coste escala con la pagina, no con el origen.
+        // El 'id' del contrato llega prefijado ('album_foto:<uuid>'): se
+        // emite item_id ya CRUDO para que el front no parsee el prefijo.
+        var tlPrefMedia = 'album_foto:';
+        var tlIdsMedia = [];
+        var tlVistosMedia = {};
+        for (var tlMi = 0; tlMi < tlItems.length; tlMi++) {
+          var tlItMedia = tlItems[tlMi];
+          if (tlItMedia.tipo !== 'album_foto') continue;
+          if (typeof tlItMedia.id !== 'string') continue;
+          if (tlItMedia.id.indexOf(tlPrefMedia) !== 0) continue;
+          var tlCrudoMedia = tlItMedia.id.slice(tlPrefMedia.length);
+          if (!tlCrudoMedia) continue;
+          tlItMedia.item_id = tlCrudoMedia;
+          tlItMedia.fuente_media = 'album_foto';
+          if (tlVistosMedia[tlCrudoMedia]) continue;
+          tlVistosMedia[tlCrudoMedia] = true;
+          tlIdsMedia.push(tlCrudoMedia);
+        }
+        // La rama es PUBLICA: sin sesion firmada los campos ya quedaron en su
+        // valor neutro (null/0/false) y NO se toca ninguna tabla de estado.
+        // La sesion sale de la cabecera Authorization: Bearer via
+        // verificarSesion (:4814), nunca de un query param.
+        var tlSesMedia = tlIdsMedia.length ? verificarSesion(req) : { ok: false };
+        if (tlSesMedia.ok && tlIdsMedia.length) {
+          // UNA sola sentencia por pagina (patron en lote de
+          // cargarMetricasMedia :5846): unnest($2::text[]) + LEFT JOIN LATERAL
+          // a la funcion agregada. mi_puntuacion y ya_guardado van como
+          // subconsulta escalar para no abrir el fan-out de filas del voto.
+          var tlEstadoMedia = {};
+          try {
+            var tlFilasMedia = await sql(
+              'SELECT x.item_id, e.votos, e.promedio,'
+                + ' (SELECT mv.puntuacion FROM media_votos mv'
+                + '   WHERE mv.usuario_id=$3 AND mv.fuente=$1 AND mv.activo=true'
+                + '     AND mv.item_id=x.item_id LIMIT 1) AS mi_puntuacion,'
+                + ' EXISTS (SELECT 1 FROM media_guardados mg'
+                + '   WHERE mg.usuario_id=$3 AND mg.fuente=$1 AND mg.activo=true'
+                + '     AND mg.item_id=x.item_id) AS ya_guardado'
+                + ' FROM unnest($2::text[]) AS x(item_id)'
+                + ' LEFT JOIN LATERAL public.media_estadisticas($1, x.item_id) e ON true',
+              ['album_foto', tlIdsMedia, String(tlSesMedia.sub)]
+            );
+            (tlFilasMedia || []).forEach(function(r) {
+              var tlPm = parseInt(r.mi_puntuacion, 10);
+              tlEstadoMedia[String(r.item_id)] = {
+                votos: parseInt(r.votos, 10) || 0,
+                rating_promedio: parsearPromedioMedia(r.promedio),
+                mi_puntuacion: isFinite(tlPm) ? tlPm : null,
+                ya_guardado: r.ya_guardado === true
+              };
+            });
+          } catch (tlErrMedia) {
+            // Esquema ausente (42P01/42703) o funcion de 051 sin aplicar
+            // (42883): el timeline NO cae, los campos se quedan neutros.
+            if (!(tlErrMedia && (tlErrMedia.code === '42P01'
+              || tlErrMedia.code === '42703' || tlErrMedia.code === '42883')))
+              throw tlErrMedia;
+            console.warn('TRACE: estado de media ausente (migracion pendiente); neutro');
+            tlEstadoMedia = {};
+          }
+          for (var tlMj = 0; tlMj < tlItems.length; tlMj++) {
+            var tlItEst = tlItems[tlMj];
+            if (!tlItEst.item_id) continue;
+            var tlEst = tlEstadoMedia[String(tlItEst.item_id)];
+            if (!tlEst) continue;
+            tlItEst.votos = tlEst.votos;
+            tlItEst.rating_promedio = tlEst.rating_promedio;
+            tlItEst.mi_puntuacion = tlEst.mi_puntuacion;
+            tlItEst.ya_guardado = tlEst.ya_guardado;
+          }
+        }
         // siguiente_cursor = cursor del ULTIMO item devuelto; null si no hay
         // mas. Se usa la MISMA clave del ORDER BY (epoch si creado_en es null).
         var tlSigCursor = null;

@@ -9704,3 +9704,68 @@ Las tres decisiones difíciles (D1, D3, D4) se justifican por el mismo criterio:
 - `comunidad.html:748-749` y `:794` — CSS del silo del feed (`feed-filtros-bar`).
 - `comunidad.html:76-78`, `:631`, `:862` — `.ctab` como `<div onclick>` (deuda 3: sin `tabindex` en todo el archivo).
 - ADR-010 y ADR-001 (8/8 y cero endpoints nuevos), ADR-002 (ASCII-safe en serverless), ADR-003 (cero borrado lógico), ADR-008 (`onerror` con fallback). **Ninguna se deroga**; ADR-010 y ADR-001 quedan **acotados** por D1 en el sentido de que este feed se resuelve **extendiendo** una función existente y no abriendo una.
+
+### Ampliación 2026-10-26 — contrato v3 y acciones por tarjeta: el feed deja de ser solo lectura
+
+**Fecha de la ampliación:** 2026-10-26
+**Autor:** Chief Architect (segunda tanda del **mismo** ADR-105; el gate de riesgo de `@architect` fue CONFIRMADO explícitamente por el operador). Documenta un hecho **ya implementado y verificado** en `comunidad.html` y `api/interacciones.js`: **no** crea ADR nuevo, **no** reescribe D1-D8, **no** añade endpoint, tabla, migración ni índice.
+**Estado:** **ACEPTADO / YA APLICADO**. Extiende el contrato de D2 y la superficie de cliente de D7; **no deroga** ninguna decisión previa de este ADR.
+
+**Precisión de numeración (ADR-006, verificado contra el archivo real):** esta sección es una **subsección** del ADR-105, no un ADR. El conteo de encabezados `## ADR-` del fichero **no cambia** (sigue en **104**) y la cadena `^## ADR-105` sigue apareciendo **1** sola vez. Las citas de línea de esta ampliación se **re-midieron** contra el archivo real: sustituyen, para los rangos nuevos, a las de la primera tanda (que quedan como estaban).
+
+#### Contexto
+
+El contrato v2 del feed resolvía **composición** (cuatro orígenes, keyset, degradación) pero dejaba al usuario ante tarjetas **de solo lectura**: `Abrir` y `Compartir`. Un feed de comunidad donde no se puede votar ni guardar lo que se ve es un escaparate, no una comunidad; y el sitio **ya tenía** motor de voto/guardado con XP e idempotencia (`media-actions.js` + `POST ?tipo=votar` / `?tipo=guardar`). La tentación evidente era pintar los cuatro botones en las cuatro categorías. El obstáculo no era de UI sino de **contrato de backend**: voto y guardado validan contra **listas cerradas de fuentes** y una reseña, un lugar o un plan **no están** en ellas; pintar el botón habría producido un `400` garantizado por cada clic. A la vez, cualquier estado propio por item (`mi_puntuacion`, `ya_guardado`) exige consultar tablas de usuario, y hacerlo dentro del `UNION ALL` de cuatro orígenes habría multiplicado el coste **por filas del union** justo cuando el `EXPLAIN` sigue pendiente (deuda 1 / TSK-240). Y una tercera decisión, de producto: qué ve el usuario **al entrar** a Comunidad.
+
+#### Decisión
+
+**D9. Contrato v3 = extensión compatible, y `item_id` existe para que el cliente NO parsee el `id` prefijado de D4.** Se añaden **6 campos por item** en la rama `feed_timeline`: `item_id` (id **crudo** sin prefijo, solo en origen `album_foto`; `null` en el resto), `fuente_media` (`'album_foto'` o `null`), `mi_puntuacion` (1..5 o `null`), `rating_promedio` (número o `null`), `votos` (int) y `ya_guardado` (bool). Nacen **neutros** en el `.map()` de cada item (`api/interacciones.js:8679-8684`), de modo que **sin sesión el contrato ya está completo**. **No se renombra ni se retira ningún campo de D2/D4**: un consumidor viejo sigue funcionando y el prefijo de D4 **permanece** para keyset y dedupe. `item_id` no duplica al `id`: es el **único** campo que el cliente puede pasar al motor de acciones sin `split`/`slice`, y por eso existe (parsear `'album_foto:<uuid>'` en el front sería repetir en cliente un contrato que ya está resuelto en servidor).
+
+**D10. Hidratación del estado propio FUERA del `UNION ALL`: lote sobre la página, no sobre el conjunto.** El estado se resuelve **después del recorte** `limit+1 -> limit` (`:8687-8691`), con **una sola sentencia en lote** (`unnest($2::text[])` + `LEFT JOIN LATERAL public.media_estadisticas($1, x.item_id)` en `:8723-8731`, mismo patrón que `cargarMetricasMedia:5846`), y **solo si** `verificarSesion(req)` (`:4814`) devuelve `ok` **y** hay ids `album_foto` (`:8714-8715`). Sin token no se consulta ninguna tabla de estado y la rama sigue siendo **pública**. Si el esquema o la función faltan (**`42P01`/`42703`/`42883`**) los campos se quedan **neutros** y el feed **no cae** (`:8743-8751`). El motivo es de coste, no de estilo: dentro del union el estado se pagaría **por filas del union** en vez de por las **<= 20** devueltas; fuera, escala con la página. Esto **protege** la medición de TSK-240 sin cerrarla.
+
+**D11. La superficie de acciones se limita a las fuentes que el backend acepta.** Las allowlists reales son `MEDIA_FUENTES = curada|viajero_foto|album_foto` (`:5442`) y `GUARDADO_FUENTES = album|album_foto|viajero_foto|curada` (`:5452`): **no existe** fuente `destino` ni `plan`, y una reseña no es guardable. Regla: se pinta voto/guardado **solo** si la fuente del item está en la allowlist; si no, la tarjeta se queda con **Abrir + Compartir**. Es una degradación **de UI**, no de contrato: el condicional se aplica **al construir el markup** en plantilla, no ocultando un id ya existente, así que no toca ADR-003. Pintar botones que devuelven `400` no es "más completo", es un botón roto por diseño.
+
+**D12. Se reutiliza el motor `media-actions.js`; cero CSS nuevo y cero clases nuevas.** El script ya está cargado en `comunidad.html:1151` y expone `bind`/`sync` en `:567-573`. El markup del feed copia los atributos y clases existentes (`av-act av-act-like` / `av-act av-act-save`, `data-ma-*`, tomados de `avActLikeHTML:3248` y `avActSaveHTML:3255`) y se inyecta en el contenedor `.feed-post-actions` (`:3528-3534`, llamada en `:3533`). El generador `feedMediaActionsHTML` vive en **`:3468-3494`** y devuelve cadena vacía si falta el motor (`:3471`): sin `media-actions.js` la tarjeta degrada a Abrir+Compartir, **nunca** un botón muerto ni un `throw`. Duplicar voto/guardado habría duplicado XP, estado optimista y reconciliación: tres formas nuevas de divergir del servidor por una razón estética.
+
+**D13. `Novedades` (feed) es la pestaña 1 y la activa por defecto.** La etiqueta `Novedades` pasa a `:862`, **antes** del chat (`:863`), y la clase `on` se mueve de `#cpanel-chat` a `#cpanel-feed` (`:1087`). El **id interno no cambia**: `showCommTab('feed')` y `#cpanel-feed` quedan intactos (cero renombrados en cliente). Como el click ya no ocurre al cargar, el arranque se resuelve explícitamente en `:3744-3752` (init único si el panel trae `on`) y `:3754-3760` (`DOMContentLoaded`). Dos consecuencias se asumen con el cambio: (a) **un `GET ?tipo=feed_timeline` en cada visita** a `comunidad.html`, se mire o no la pestaña — el coste del feed deja de ser condicional; (b) la deuda 3 (`.ctab` no focusable, **0** apariciones de `tabindex` en el archivo) pasa a afectar a la **primera** pestaña, no a una secundaria.
+
+#### Consecuencias
+
+**Positivas**
+
+- **Estado propio real por tarjeta** (`votos`, `rating_promedio`, `mi_puntuacion`, `ya_guardado`) sin romper el contrato v2: campos añadidos, ninguno retirado, neutros por defecto.
+- **Acciones donde el backend las acepta**: votar y guardar funcionan de verdad en `album_foto` porque se reutiliza el motor existente, con su XP e idempotencia.
+- **Coste acotado por página**: la hidratación escala con `<= 20` items, no con las filas del `UNION ALL`; un fallo de esquema deja campos neutros en vez de tumbar el feed.
+- **Una sola implementación de voto/guardado** en todo el sitio (`media-actions.js`), cero CSS nuevo y cero clases nuevas: nada que sincronizar a mano.
+- **La primera vista de Comunidad es "lo que está pasando"**, no "la pestaña que abriste": el feed deja de estar escondido tras un click.
+
+**Negativas**
+
+- **Un GET extra en cada visita** a `comunidad.html`: el feed es ahora coste fijo de la página (antes, coste condicional). No hay caché ni `IntersectionObserver` en el primer disparo, y no se añade en esta tanda.
+- **Asimetría visible entre tarjetas**: unas tienen 4 acciones y otras 2. Es correcta por contrato, pero sin explicación el usuario puede leerla como fallo; el aviso es deuda de copy, no de código.
+- **El cliente depende ahora del runtime de `media-actions.js`** para 2 de los 4 controles: si ese script no carga, el feed sigue íntegro pero pierde voto/guardado (degradación silenciosa por diseño).
+- **Superficie de escape mayor**: seis campos nuevos entran en HTML generado; todos pasan por `feedEsc` (`:3472`, `:3483`, `:3484`) y `item_id` se usa tal cual solo después de escapar. Un campo nuevo sin escape sería un agujero, no una mejora.
+- **La rama pública y la autenticada tienen ahora dos formas de respuesta** (neutros vs. hidratados): el cliente debe tratar ambos casos como normales, y un bug de token se manifiesta como "no veo mis votos", no como error.
+
+#### Deuda derivada (se suma a la deuda 1-5 de arriba)
+
+6. **Ampliar fuentes de voto/guardado a `destino`/`plan`** exige tocar las allowlists del backend (`:5442`, `:5452`), decidir el mapeo de `item_id` por fuente y probablemente una migración: **ADR/migración aparte**, no un parche en la rama del feed. Mientras no exista, la asimetría de acciones es deuda **de producto** asumida.
+7. **`.ctab` no focusable, ahora en la pestaña por defecto.** Sin `tabindex` (**0** apariciones en `comunidad.html`) y sin rol de tab, la primera pestaña —y por tanto la vista inicial— **no se alcanza con teclado**. La deuda 3 sube de severidad: ya no es "una pestaña secundaria inaccesible" sino la entrada.
+8. **`EXPLAIN`/índices sigue pendiente (deuda 1 / TSK-240).** La hidratación se sacó del union precisamente para **no** empeorar la medición, pero el coste del `UNION ALL` **no cambió**: sigue sin `EXPLAIN (ANALYZE)` y sin índice verificado.
+9. **Smoke contra Neon pendiente (extiende la deuda 4).** Falta cubrir con datos reales: `GET` **sin** token -> 6 campos neutros y **cero** consultas a tablas de estado; `GET` **con** token -> `mi_puntuacion`/`ya_guardado` reales **solo** en `album_foto`; `item_id` crudo == `album_fotos.id::text`; y que votar desde la tarjeta re-pinte la misma tarjeta (vía `sync`) sin recargar la lista.
+
+#### Referencias de esta ampliación
+
+- `api/interacciones.js:8679-8684` — declaración de los 6 campos v3 en estado neutro dentro del `.map()` de items.
+- `api/interacciones.js:8687-8762` — hidratación del estado propio: fuera del union, post-recorte (`:8687-8691`), guard de sesión e ids (`:8714-8715`), sentencia en lote (`:8723-8731`), degradación `42P01`/`42703`/`42883` (`:8743-8751`), aplicación por item (`:8752-8761`).
+- `api/interacciones.js:5442` y `:5452` — `MEDIA_FUENTES` y `GUARDADO_FUENTES` (allowlists reales; no hay `destino` ni `plan`).
+- `api/interacciones.js:5846` — `cargarMetricasMedia`, patrón de lote (`unnest($2::text[])` + `LEFT JOIN LATERAL public.media_estadisticas(...)`, `:5854-5855`) replicado en la hidratación.
+- `api/interacciones.js:4814` — `verificarSesion(req)`, única fuente de sesión (cabecera, nunca query param).
+- `db/migrations/023_interacciones_media_unificadas.sql:64` (`media_votos.item_id text`), `:88` (`media_guardados.item_id text`) y `:151` (`ALTER COLUMN item_id TYPE text USING item_id::text`) — tipos que hacen válido comparar `id::text` contra `item_id`.
+- `comunidad.html:3468-3494` — `feedMediaActionsHTML`: solo `album_foto`, requiere `item_id` y motor cargado (`:3469-3471`); markup con clases existentes (`av-act av-act-like` `:3486`, `av-act av-act-save` `:3489`).
+- `comunidad.html:3528-3534` — contenedor `.feed-post-actions`: Abrir (`:3529`), Compartir (`:3530-3532`, handler `feedCompartir` `:3538`), inyección de voto/guardado (`:3533`).
+- `comunidad.html:1151` — carga de `media-actions.js`; `media-actions.js:567-573` — API `bind`/`sync` del motor compartido.
+- `comunidad.html:862-863` — `Novedades` como primera `.ctab` (con `on`) y el chat desplazado; `:1087` — `#cpanel-feed` nace con `class="cpanel on"`.
+- `comunidad.html:3744-3752` y `:3754-3760` — arranque explícito del feed (init único si el panel trae `on`, más `DOMContentLoaded`), necesario porque ya no hay click inicial.
+- `comunidad.html:76-78` y `:631` — CSS de `.ctab`; **0** apariciones de `tabindex` en todo el archivo (deuda 7).
+- Hereda: ADR-001 y ADR-010 (8/8, cero endpoints nuevos), ADR-002 (ASCII-safe en serverless), ADR-003 (cero borrado lógico de ids), ADR-006 (baseline = archivo real), ADR-008 (`onerror`/degradación sin `throw`). **Ninguna se deroga.**
