@@ -5100,30 +5100,6 @@ function queryConMediaFallback(sqlFn, plantilla, params) {
   return intentar();
 }
 
-// ESPEJO EN SERVIDOR de API.spotifyTrackId (media-embed.js).
-// POR QUE SE DUPLICA EL REGEX Y NO SE REUSA EL DEL CLIENTE: el servidor es
-// quien decide la obligatoriedad de miniatura_url, y no puede require() el
-// asset de cliente (media-embed.js vive en el navegador, no en el bundle de
-// Vercel). Los dos deben mantenerse EXACTAMENTE en la misma forma: si uno
-// acepta mas que el otro, el frontend bloquea altas que el backend acepta o
-// el backend acepta altas que la UIadvertia como invalidas.
-// Criterio (identico al del cliente): solo el tipo "track" (episode, album,
-// playlist y show NO cuentan), id de exactamente 22 caracteres base62
-// [A-Za-z0-9], se aceptan el prefijo de locale /intl-xx/ y el host
-// open.spotify.com y open.spotify.us. Si el id no cumple, NO es un track
-// valido y la obligatoriedad se aplica normal.
-var RE_SPOTIFY_TRACK_WEB = /^https?:\/\/open\.spotify\.(?:com|us)\/(?:intl-[A-Za-z]{2,5}\/)?track\/([A-Za-z0-9]{22})(?:[?#].*)?$/i;
-var RE_SPOTIFY_TRACK_URI = /^spotify:track:([A-Za-z0-9]{22})(?:[?#].*)?$/i;
-var RE_SPOTIFY_TRACK_ID = /^[A-Za-z0-9]{22}$/;
-function esUrlTrackSpotify(url) {
-  if (url === null || url === undefined) return false;
-  var s = String(url).trim();
-  if (!s) return false;
-  var m = RE_SPOTIFY_TRACK_WEB.exec(s);
-  if (!m) m = RE_SPOTIFY_TRACK_URI.exec(s);
-  return !!(m && RE_SPOTIFY_TRACK_ID.test(m[1]));
-}
-
 // Arma el INSERT de un recurso del Museo sobre album_fotos con las columnas
 // OPCIONALES bajo demanda: destino_id (migracion 042) y miniatura_url
 // (migracion 043). Se omiten (y no se mandan como NULL) cuando el dato no
@@ -11394,37 +11370,23 @@ module.exports = async function handler(req, res) {
               mrMiniatura = mrMiniRaw;
             }
           }
-          // OBLIGATORIEDAD SOLO EN ALTAS NUEVAS (video y audio).
-          // POR QUE ESTA EN LA CAPA DE APLICACION Y NO COMO NOT NULL:
-          // YA existen filas persistidas con foto_type IN ('video','audio')
-          // en album_fotos, asi que un NOT NULL sin DEFAULT haria fallar el
-          // ALTER de la migracion 043 y un NOT NULL con DEFAULT seria un
-          // backfill destructivo (inventaria una miniatura falsa para cada
-          // recurso ya guardado). La columna queda NULL y la regla de
-          // producto vive aqui, donde puede evolucionar sin un ALTER sobre
-          // produccion. Ver el bloque "POR QUE NULL Y NO NOT NULL" de
-          // db/migrations/043_album_fotos_miniatura.sql.
-          // NO se replica en accion=editar: un recurso antiguo sin
-          // miniatura debe poder editarse (caption, coords, visibilidad)
-          // sin quedar bloqueado por un campo que no es editable todavia.
-          // tipo_media=foto NO la exige: la foto ES su propia miniatura.
-          //
-          // EXCEPCION SPOTIFY (unico hueco de la regla): un track de
-          // Spotify SI tiene caratula publica y el frontend la resuelve
-          // sola por HTTP contra el endpoint publico oEmbed
-          // (https://open.spotify.com/oembed?url=...), que NO necesita
-          // clave ni registro y responde JSON con thumbnail_url. Exigirla
-          // en el POST seria un error de diseno: dejaria al usuario sin
-          // poder publicar un track. Con la excepcion, si no llega
-          // miniatura se acepta y la columna queda NULL (el renderizador
-          // pinta su placeholder o su caratula por oEmbed). El resto de
-          // medios NO exponen caratula automatica (un .mp4 o un .mp3
-          // subido a un host no la tienen), asi que siguen exigiendola.
-          // Si la URL no cumple la forma del track, la obligatoriedad se
-          // aplica normal (ver esUrlTrackSpotify).
-          var mrEsTrackSpotify = esUrlTrackSpotify(mrUrl);
-          if ((mrTipo === 'video' || mrTipo === 'audio') && mrMiniatura === null && !mrEsTrackSpotify)
-            return res.status(400).json({ ok: false, error: 'Los recursos de video y audio requieren imagen de muestra (miniatura_url)' });
+          // MINIATURA OPCIONAL en todas las altas (video y audio incluidos).
+          // Si el alta no trae miniatura_url, el recurso se crea igual y la
+          // columna se guarda en NULL: no hay 400 por este campo. El
+          // renderizador ya degrada a su placeholder, y el cliente intenta
+          // derivar la caratula del propio link cuando el medio es YouTube;
+          // para el resto de medios queda el placeholder. La invariante
+          // "un <img> NUNCA apunta a un medio" NO depende de esta columna:
+          // la garantiza el render sobre miniatura_url, nunca foto_url.
+          // La validacion de FORMATO de arriba se conserva intacta y solo
+          // corre cuando el campo llega con valor.
+          // POR QUE LA COLUMNA ES NULL Y NO NOT NULL: el argumento vive una
+          // sola vez, en el bloque "POR QUE NULL Y NO NOT NULL" de
+          // db/migrations/043_album_fotos_miniatura.sql (ya habia filas
+          // video/audio y un NOT NULL con DEFAULT inventaria caratulas
+          // falsas).
+          // tipo_media=foto tampoco la necesita: la foto ES su propia
+          // miniatura.
           var mrCaption = '';
           if (body.caption !== undefined && body.caption !== null) {
             mrCaption = String(body.caption).trim();

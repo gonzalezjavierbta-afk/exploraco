@@ -1385,7 +1385,7 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
         </div>
       </div>
       <div class="pf-museo-field" id="museo-miniatura-wrap" style="display:none">
-        <label class="pf-museo-lbl" for="museo-f-miniatura">Imagen de muestra del video/audio (obligatoria, salvo Spotify)</label>
+        <label class="pf-museo-lbl" for="museo-f-miniatura">Imagen de muestra del video/audio (opcional)</label>
         <input type="url" id="museo-f-miniatura" class="pf-museo-input" maxlength="2000" placeholder="https://... o sube una imagen" oninput="museoActualizarPreview()">
         <button type="button" onclick="museoElegirMiniatura()" style="margin-top:6px;padding:6px 12px;background:rgba(255,74,0,.15);border:1px solid rgba(255,74,0,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x2B06; Subir imagen</button>
         <div class="pf-museo-hint" id="museo-f-miniatura-msg"></div>
@@ -1596,7 +1596,7 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
 <!-- ADR-052: media-actions.js (voto/guardado compartido) antes del inline -->
 <script src="media-actions.js"></script>
 <script src="dictado-voz.js?v=1"></script>
-<script src="media-embed.js?v=1"></script>
+<script src="media-embed.js?v=3"></script>
 <script src="media-upload.js"></script>
 <script src="mercado.js?v=2"></script>
 <script>
@@ -3543,17 +3543,39 @@ function cargarMisAlbumes() {
    <img src> NUNCA apunta a un archivo de audio/video ni a una URL de Spotify.
    Prioridad de render en mpPortadaHTML():
      1. miniatura de la columna (mpMiniaturaDe)
-     2. si no hay, placeholder con icono (mismo lenguaje que la vista de dueno)
+     2. si no hay y el link es de YouTube, la caratula DERIVADA del video
+        (mpMiniaturaDerivada); en cualquier otro caso, el placeholder con icono
      3. si la URL es de Spotify, el navegador la resuelve por oEmbed y la
         portada MEJORA en sitio cuando llega la respuesta
    En los tres casos hay siempre una imagen o un placeholder: nunca un hueco. */
 
 /* El backend expone la columna album_fotos.miniatura_url (migracion 043) con
    el alias que elija su lector: miniatura_url, media_miniatura o poster_url.
-   Se aceptan todos para que el render no se rompa si el nombre no coincide. */
+   Se aceptan todos para que el render no se rompa si el nombre no coincide.
+   La imagen de muestra es OPCIONAL: si la fila no la trae, se intenta la
+   caratula DERIVADA del link (solo YouTube). Asi los recursos ya guardados sin
+   caratula se pintan con la del video sin tocar la BD. */
 function mpMiniaturaDe(m) {
   if (!m) return '';
-  return m.miniatura_url || m.media_miniatura || m.poster_url || m.poster || '';
+  var propia = m.miniatura_url || m.media_miniatura || m.poster_url || m.poster || '';
+  if (propia) return propia;
+  return mpMiniaturaDerivada(m.media_url || m.url || m.foto_url);
+}
+
+/* Caratula DERIVADA de un link de YouTube (determinista, sin fetch ni clave).
+   Delega en media-embed.js, que es la fuente unica; si el asset no llego, el
+   fallback local saca el id con un regex. Defensiva: nunca lanza y devuelve ''
+   cuando la URL no es de YouTube, para que el consumidor caiga a su
+   placeholder. Solo YouTube: Vimeo y los medios directos (.mp3/.mp4) sin
+   caratula se quedan con el placeholder de siempre. */
+function mpMiniaturaDerivada(url) {
+  var M = window.ExploraMediaEmbed;
+  if (M && typeof M.youtubeThumb === 'function') {
+    try { return M.youtubeThumb(url) || ''; } catch (e) { /* cae al local */ }
+  }
+  var s = String(url == null ? '' : url).trim();
+  var m = /youtube\.com\/watch\?v=([\w-]{6,})/i.exec(s) || /youtu\.be\/([\w-]{6,})/i.exec(s);
+  return (m && m[1]) ? 'https://img.youtube.com/vi/' + m[1] + '/hqdefault.jpg' : '';
 }
 
 /* true solo para audio/video: los unicos tipos con caratula propia. */
@@ -3633,6 +3655,9 @@ function mpPortadaHTML(url, tipo, alto, cover, titulo) {
   }
   /* Audio/video: la URL del recurso queda fuera del <img> para siempre. */
   var c = (cover && !mpEsUrlRecurso(cover)) ? cover : '';
+  /* Sin caratula en la fila (recurso antiguo o alta sin imagen): si el link es
+     de YouTube se deriva la del propio video, que SI es una imagen real. */
+  if (!c) c = mpMiniaturaDerivada(url);
   var cid = '';
   if (!c && mpEsUrlSpotify(url)) cid = 'mpc' + (++mpSeq);
   var html = mpPhHtml(tipo, alto, (cid ? 'data-mp-c="' + cid + '"' : ''));
@@ -3670,14 +3695,17 @@ function mpEsUrlSpotify(url) {
 }
 
 /* true si la URL es un track de Spotify VALIDO para la regla de la imagen de
-   muestra. Mismo criterio EXACTO que el espejo servidor esUrlTrackSpotify
-   (api/interacciones.js) y que API.spotifyTrackId (media-embed.js): solo el
-   tipo "track" (episode, album, playlist y show NO cuentan), id de
-   exactamente 22 caracteres base62, y se aceptan el prefijo de locale
-   /intl-xx/ y el host open.spotify.com y open.spotify.us.
+   muestra. Este criterio del cliente es la UNICA fuente del reconocimiento de
+   tracks de Spotify: el antiguo espejo servidor de api/interacciones.js fue
+   RETIRADO en ADR-104 al pasar la caratula a ser opcional para todos los
+   video/audio, asi que ya no hay espejo que mantener sincronizado. Se
+   conserva el mismo criterio que API.spotifyTrackId
+   (media-embed.js): solo el tipo "track" (episode, album, playlist y show NO
+   cuentan), id de exactamente 22 caracteres base62, y se aceptan el prefijo
+   de locale /intl-xx/ y el host open.spotify.com y open.spotify.us.
    Se separa de mpEsUrlSpotify porque aquella solo mira la RUTA /track/ y no
-   la longitud del id: un id corto NO es un track valido y el backend si lo
-   rechaza, asi que el formulario tiene que rechazarlo igual. */
+   la longitud del id: un id corto NO es un track valido, asi que el
+   formulario tiene que rechazarlo igual. */
 function museoEsTrackSpotify(url) {
   var M = window.ExploraMediaEmbed;
   if (M && typeof M.spotifyTrackId === 'function') {
@@ -4466,6 +4494,7 @@ function museoActualizarPreview() {
      cambio de URL, de tipo y de caratula. */
   museoToggleCampoMiniatura();
   if (url) museoAutoCoverSpotify(url);
+  if (url) museoAutoCoverYoutube(url);
   if (!url) { prev.innerHTML = '<div class="pf-museo-ph">Pega un link para ver la vista previa.</div>'; return; }
   prev.innerHTML = mediaPreviewHTML(url, tipo, miniatura);
 }
@@ -4660,23 +4689,28 @@ function museoToggleCampoMiniatura() {
     msg.className = 'pf-museo-hint ' + (okUrl ? 'good' : 'bad');
     return;
   }
-  /* Sin caratula: en un ALTA es obligatoria para video/audio (la exige el
-     backend al crear), SALVO que la URL sea un track de Spotify valido: su
-     caratula es publica y el navegador la trae solo por oEmbed, asi que si
-     esa consulta falla se queda el placeholder y no se bloquea el alta. Al
-     EDITAR es solo un aviso discreto (el backend tampoco lo exige). El texto
-     se lee del propio campo de URL para no mentir sobre lo que hay escrito. */
+  /* Sin caratula NO se bloquea nada: la imagen de muestra dejo de ser un
+     requisito, ni en el alta ni al editar. El aviso solo informa de lo que se
+     vera:
+       - YouTube: la caratula se DERIVA del propio video (determinista).
+       - Track de Spotify: su caratula es publica y el navegador la trae por
+         oEmbed; si esa consulta falla, queda el placeholder.
+       - Cualquier otro caso (.mp4/.mp3 sin imagen): placeholder.
+     El texto se lee del propio campo de URL para no mentir sobre lo escrito. */
   var urlEl = document.getElementById('museo-f-url');
-  var esTrack = urlEl ? museoEsTrackSpotify(urlEl.value) : false;
-  if (esTrack) {
+  var urlActual = urlEl ? String(urlEl.value || '') : '';
+  if (museoEsTrackSpotify(urlActual)) {
     msg.textContent = 'Un track de Spotify trae su propia caratula: se rellena sola y no es obligatorio anadirla.';
     msg.className = 'pf-museo-hint';
     return;
   }
-  msg.textContent = museoEditandoId
-    ? 'Este recurso no tiene imagen de muestra. Puedes anadirla o guardar igual.'
-    : 'Obligatoria al agregar un video o un audio: sube una imagen o pega un link.';
-  msg.className = 'pf-museo-hint' + (museoEditandoId ? '' : ' bad');
+  if (mpMiniaturaDerivada(urlActual)) {
+    msg.textContent = 'Se usa la caratula del video de YouTube.';
+    msg.className = 'pf-museo-hint';
+    return;
+  }
+  msg.textContent = 'Opcional. Si no la pones se muestra un placeholder.';
+  msg.className = 'pf-museo-hint';
 }
 
 /* Ultima URL de Spotify consultada por oEmbed. El preview se refresca en
@@ -4704,6 +4738,21 @@ function museoAutoCoverSpotify(url) {
       })
       .catch(function () { /* sin caratula automatica: el usuario puede ponerla */ });
   } catch (e) { /* idem */ }
+}
+
+/* Al pegar un link de YouTube la caratula se rellena sola: la URL del
+   thumbnail es determinista (img.youtube.com/vi/<ID>/hqdefault.jpg), asi que
+   no hace falta fetch ni clave de API. Mismo contrato que el de Spotify: solo
+   rellena si el campo esta vacio, nunca pisa lo que el usuario escribio a
+   mano. Si no hay id de YouTube, no hace nada. */
+function museoAutoCoverYoutube(url) {
+  var thumb = mpMiniaturaDerivada(url);
+  if (!thumb) return;
+  var inp = document.getElementById('museo-f-miniatura');
+  if (!inp) return;
+  if ((inp.value || '').trim()) return;
+  inp.value = thumb;
+  museoActualizarPreview();
 }
 
 function museoModoPublicacion(modo) {
@@ -4809,31 +4858,24 @@ function museoGuardar() {
   var body = esEdicion
     ? { accion: 'editar', id: museoEditandoId, caption: caption, visible: visible }
     : { accion: 'crear', url: url, tipo_media: tipo, caption: caption, visible: visible };
-  /* La imagen de muestra es OBLIGATORIA al CREAR un video o un audio: lo
-     exige api/interacciones.js (rama crear) y devuelve 400 sin ella. Se
-     valida aqui para avisar en el formulario y no con un error tras el POST.
-     EXCEPCION Spotify (misma regla que el backend): si la URL es un track
-     de Spotify valido NO se bloquea el alta, porque su caratula es publica y
-     este mismo form la trae por oEmbed (museoAutoCoverSpotify); si oEmbed no
-     responde, la columna queda en NULL y el placeholder del preview cubre el
-     hueco. Cualquier otro medio (un .mp4 o un .mp3) sigue bloqueado.
-     En EDICION no se exige, ni aqui ni en el backend: un recurso antiguo sin
-     caratula se puede seguir editando, y este es el sitio natural para
-     anadirla. */
-  if (!esEdicion && mpEsAudioVideo(tipo) && !miniatura && !museoEsTrackSpotify(url)) {
-    museoFormMsg('Agrega una imagen de muestra para el video o el audio.', false);
-    toastError('Los recursos de video y audio requieren imagen de muestra');
-    return;
-  }
+  /* La imagen de muestra es OPCIONAL: ya no la exige ni este formulario ni el
+     backend, ni en el alta ni al editar. Sin caratula propia:
+       - YouTube: se envia la DERIVADA del video (ver mpMiniaturaDerivada) para
+         que quede PERSISTIDA en album_fotos.miniatura_url desde el alta.
+       - Track de Spotify: no se envia nada; su caratula es publica y el
+         navegador la trae por oEmbed al pintar.
+       - Un .mp4/.mp3: se guarda igual y el consumidor pinta su placeholder. */
+  var miniaturaFinal = miniatura || mpMiniaturaDerivada(url);
   if (miniatura && (!/^https?:\/\//i.test(miniatura) || miniatura.length > 2000)) {
     museoFormMsg('La imagen de muestra debe ser un link http o https.', false);
     toastError('Imagen de muestra invalida');
     return;
   }
-  /* miniatura_url: solo se envia con valor. Asi, al editar un recurso antiguo
-     SIN caratula, la clave no viaja y el backend no pisa lo que ya tenia; si
-     el usuario anade una, se envia y se guarda. */
-  if (miniatura) body.miniatura_url = miniatura;
+  /* miniatura_url: se envia con valor propio o con la derivada de YouTube. Al
+     editar un recurso antiguo SIN caratula que no es de YouTube la clave no
+     viaja, y el backend no pisa lo que ya tenia; si el usuario anade una, se
+     envia y se guarda. */
+  if (miniaturaFinal) body.miniatura_url = miniaturaFinal;
   if (albumId) body.album_id = albumId;
   if (museoQuitarCoords) body.quitar_coords = true;
   else if (traeLat && (!esEdicion || usuarioFijoCoords)) { body.lat = lat; body.lng = lng; }

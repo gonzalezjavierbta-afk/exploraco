@@ -9470,3 +9470,104 @@ El desacuerdo no estaba en el esquema: estaba en haber entregado el dato con un 
 2. **V2** `estado_nota` **0** coincidencias en `api/pagina-destino.js` (conteo por `Select-String`); si algun dia aparece, este ADR queda superado y hay que abrir el ADR de motor de D3.
 3. **V3** En el HTML servido de la pagina, la frase de `nota` **aparece** en el bloque de `cuando_ir` (`esc(ci.nota || ci.descripcion || '')`, `api/pagina-destino.js:2006`); el fallback a `descripcion` no debe estar tapando el campo.
 4. **V4** `scripts/seed-salento.js` sin bytes > 127 (ADR-002) y con `ON CONFLICT (slug) DO UPDATE` (`L415`) para no duplicar al reintentar.
+
+## ADR-104: La imagen de muestra (`album_fotos.miniatura_url`) deja de ser **OBLIGATORIA** en el alta de `video`/`audio`: la caratula de YouTube se **DERIVA del propio link** en el modulo compartido `media-embed.js` (una sola fuente, sin fetch, sin clave y sin endpoint) y el resto de medios se acepta con **placeholder** [NO deroga ninguna premisa de ADR previos; **acota** la obligatoriedad que la migracion 043 delego en la **capa de aplicacion** y **no toca el esquema**, que ya nacia `text NULL`]
+
+**ID:** ADR-104
+**Fecha:** 2026-10-25
+**Autor:** Chief Architect (documenta una decision de **producto** del operador, ya implementada, auditada y medida; el dominio backend tiene gate y fue concedido).
+**Estado:** **ACEPTADO / YA APLICADO** en `api/interacciones.js`, `media-embed.js` y `mi-perfil.html`, con el `?v=3` propagado a `galeria.html`, `comunidad.html` y `mi-perfil.html`. Es un ADR **retrospectivo**: no propone codigo nuevo, **no** cambia el esquema (`album_fotos` sigue igual), **no** ejecuta backfill, **no** crea migracion y **no** crea endpoint (Vercel Hobby **8/8** agotado).
+
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor encabezado del fichero era **`ADR-103`** (linea **9424**); `ADR-100`, `ADR-101` y `ADR-102` **ya existen** (lineas 9098, 9181, 9305) y **no se tocaron**. Apariciones previas de la cadena `ADR-104`: **0**. Tamano real medido hoy: **1.467.233 bytes / 9.473 lineas / 102 encabezados** `## ADR-`.
+
+### Problema
+
+La migracion **043** (`db/migrations/043_album_fotos_miniatura.sql`) anadio `album_fotos.miniatura_url text NULL` y **delego la obligatoriedad en la capa de aplicacion**: su propio bloque *"POR QUE NULL Y NO NOT NULL"* dice literalmente que un `NOT NULL` habria fallado sobre las filas `video`/`audio` ya persistidas y que un `NOT NULL DEFAULT` seria *"un backfill destructivo"*, de modo que *"la obligatoriedad se valida en la CAPA DE APLICACION (`api/interacciones.js`, rama POST `?tipo=museo_recurso`), no con una constraint"*. El esquema nunca exigio el campo; lo exigia **una sola linea de la rama `crear`** que devolvia `400` cuando el alta de un `video` o un `audio` llegaba sin `miniatura_url`.
+
+Ese `400` era **friccion pura en el caso mas comun**: la inmensa mayoria de los recursos de video del sitio son **links de YouTube**, y para un link de YouTube la portada **no es un dato**: es una funcion determinista del propio link (`img.youtube.com/vi/<ID>/hqdefault.jpg`). Pedirsela al usuario era pedirle que copiase a mano un dato que el sistema ya conoce, y el usuario que no la copiaba **no podia guardar su recurso**. En paralelo, el `400` arrastraba una **excepcion Spotify** (`esUrlTrackSpotify` / `RE_SPOTIFY_TRACK_*`) que intentaba distinguir "medio sin caratula posible" de "medio con caratula obligatoria": una regla de tres casos (video, audio, track) para un problema que tiene **dos** (hay caratula derivable / no la hay).
+
+Ademas habia un **riesgo latente de invariante**: si el campo se rellenaba a mano con la URL del propio medio (o con una URL de embed), la portada acababa dentro de un `<img>` y se rompia la invariante *"un `<img>` NUNCA apunta a un medio"*.
+
+### Opciones evaluadas
+
+1. **A. Mantener el `400` y exigir la muestra (statu quo).** Descartada: bloquea el alta por un dato derivable en el 100% de los YouTube y no resuelve nada en los `.mp4`/`.mp3`, donde el usuario **no tiene** una imagen que dar.
+2. **B. Quitar el `400` y dejar el campo siempre manual y opcional.** Descartada: elimina la friccion pero **pierde la portada** en el caso mayoritario, y la grilla del Museo queda con placeholders donde antes habia caratulas reales. Mejora el alta a costa del render.
+3. **C. Derivar en el SERVIDOR al crear** (llamada a la API de YouTube, `fetch` del link o *scrape* de `og:image`). Descartada por tres motivos simultaneos: introduce **dependencia de red** y **latencia** en una rama de escritura; exige **clave de API** (o es fragil ante cambios de HTML ajeno) y **falla en cerrado** con los hosts sin `og:image`; y el presupuesto de Vercel Hobby esta **8/8**, asi que cualquier derivacion server-side vive dentro de una funcion ya existente y le suma tiempo de ejecucion por un dato que el cliente calcula en cero milisegundos.
+4. **D. Hacer el campo OPCIONAL y derivar la caratula en el CLIENTE con URL determinista, persistiendola al crear y derivandola al pintar para las filas ya guardadas (ELEGIDA).** Sin fetch, sin clave, sin endpoint, sin migracion y sin backfill. Un solo origen de verdad para la derivacion (`media-embed.js`), consumido por admin, galeria y perfil sin duplicar la regla.
+5. **E. Opcional + capturar un fotograma con `canvas` para `.mp4`/`.mp3`.** **Descartada por decision explicita del operador**: el `<video>` cross-origin contamina el canvas y `toDataURL()` lanza `SecurityError` salvo que el host sirva CORS, de modo que la solucion funcionaria **solo en algunos hosts**; ademas cuesta decodificar el medio en el cliente para un beneficio cosmetico. El placeholder ya existe y es honesto.
+
+### Decision
+
+**D1. La miniatura es OPCIONAL en el alta, sin excepciones por tipo.** Se elimina el `400` de la rama `crear` de `api/interacciones.js` para `?tipo=museo_recurso`. Un alta de `video` o `audio` **sin** `miniatura_url` se guarda con la columna en **NULL**. La **validacion de FORMATO se conserva intacta** y solo corre cuando el campo llega con valor: esquema `http`/`https` y longitud `<= 2000` (la **misma** politica que la URL del recurso, para que ningun campo sea mas permisivo que el otro). La rama **`editar` no cambia**: ya no exigia el campo. Evidencia: `api/interacciones.js:11388-11396` (formato intacto), `11397-11413` (comentario de opcionalidad), `11603-11618` (rama `editar` sin hunks).
+
+**D2. La caratula se DERIVA del link cuando el medio es YouTube, con una URL determinista y sin red.**
+`https://img.youtube.com/vi/<ID>/hqdefault.jpg`. Sin `fetch`, sin clave de API y sin API de terceros: es una URL de imagen publica y estable. Se soportan las cuatro formas en que un video de YouTube llega al sitio: `watch?v=`, `youtu.be/`, `/embed/` y `/shorts/`. El caso `/embed/` **se anadio** porque sin el una miniatura de tipo embed pasaba el filtro (no es medio directo, pero tampoco la reconocia `kind()`) y acababa dentro de un `<img>`, violando la invariante de **D5**. `hqdefault` y no `maxresdefault` porque `hqdefault` **existe para todo video publico subido**, mientras que la maxima resolucion falta en muchos y devuelve un 404 que se pintaria como imagen rota.
+
+**D3. La derivacion vive UNA sola vez, en el modulo compartido.** `media-embed.js` expone `API.youtubeThumb(url)` (definido en `~133`, tras `YOUTUBE_THUMB` en `:55`) y `API.mediaDe().caratula` lo consume (`~252-261`). **Ningun consumidor reimplementa el patron de la URL** (Regla de No-Duplicidad, espejo de ADR-044): `galeria.html`, `comunidad.html`, `mi-perfil.html` y el admin **preguntan** al modulo. Si manana cambia el host de la caratula, cambia en **una** linea.
+
+**D4. Placeholder para todo lo que no es YouTube, sin captura de fotograma.** Un `.mp4` o `.mp3` alojado en **cualquier** host **no tiene caratula derivable**: se acepta sin caratula y se pinta el **placeholder que ya existia** (`mpPortadaHTML` en `mi-perfil.html`, `_adminMediaPhHtml` en el admin). Se descarta explicitamente la captura de fotograma por `canvas` (opcion E): depende del **CORS del host** y no es determinista. El usuario que **quiera** una portada para un `.mp4` la sigue pudiendo dar: la opcionalidad no elimina la capacidad, elimina el peaje.
+
+**D5. La caratula derivada se PERSISTE al crear y se DERIVA al pintar para lo ya guardado.**
+- **Escritura:** al crear, si el cliente puede derivar la caratula, la envia en `body.miniatura_url` y el servidor la guarda con la validacion de **D1**. Resultado: **un solo origen de verdad** en la columna, y `admin`/`galeria` la sirven **sin ningun cambio** de codigo (leen `miniatura_url` como siempre).
+- **Lectura:** para las filas **YA guardadas** sin caratula, se deriva **al pintar, en cliente**. **Cero escrituras en Neon, cero migracion, cero backfill SQL** (decision explicita del operador): el fallback es una **funcion del render**, no un estado de la base. Evidencia: `mi-perfil.html` (`mpMiniaturaDe` / `mpPortadaHTML` con la derivada, envio de la derivada en `body.miniatura_url`), label a **"(opcional)"** en `:1388` y bloqueo de `museoGuardar` eliminado.
+
+**D6. La invariante que NO se relaja: "un `<img>` NUNCA apunta a un medio ni a una URL de servicio de embed".**
+`caratula` solo se rellena con **imagenes reales**. El filtro `!isDirectMedia && !kind` de `mediaDe()` se mantiene (`media-embed.js:261`, `:274`) y ahora cubre **tambien** el caso nuevo: si la miniatura persistida **no es pintable** y el link **es** de YouTube, se usa la **derivada**; si no es pintable y no es YouTube, `caratula` queda **vacia** y manda el placeholder. La opcionalidad del campo **no** relaja esta invariante: la garantiza el **render sobre `miniatura_url`**, nunca el uso de `foto_url` como portada.
+
+**D7. Sin endpoint nuevo y sin servicio nuevo.** Presupuesto de Vercel Hobby **8/8** agotado (ADR-010): la derivacion es **100% cliente**. Prohibido abrir una funcion serverless para esto y prohibido *scrapear* `og:image` desde el backend.
+
+### Justificacion
+
+La obligatoriedad vivia **en el unico punto donde el dato no aporta**: el alta. El sistema ya tiene la informacion necesaria para producir la portada en el caso mayoritario (el link), asi que pedirla era **pedir al usuario que hiciera de copista de un dato derivable**. La opcion D gana porque resuelve el problema **en el sitio donde esta el conocimiento** (el cliente que ya parsea el link para el embed) y porque **reutiliza** el modulo que ya centraliza esa logica en vez de crear un quinto lugar donde se decide que es un medio (ADR-044).
+
+El reparto **persistir al crear / derivar al pintar** (D5) no es indecision: es la unica combinacion que da **un solo origen de verdad para lo nuevo** (la columna, que ya leen tres superficies sin tocar codigo) sin pagar **un backfill** por filas historicas que nadie ha pedido. Un `UPDATE` masivo habria exigido migracion, ventana de ejecucion y un criterio de "que caratula le toca" escrito en SQL; una linea de cliente lo resuelve **idempotente y sin estado**.
+
+Y la parte que mas importa a largo plazo es **D6**: relajar un campo obligatorio es exactamente el movimiento en el que se cuela una regresion de invariante. Aqui el campo se relaja y la invariante **se endurece**, porque el caso nuevo (miniatura no pintable + YouTube) se cierra con la derivada en vez de con un `<img>` apuntando a un embed.
+
+### Impacto
+
+- **Backend (`api/interacciones.js`, dominio `@backend-dev`, gate concedido):** **una** rama modificada (`crear` de `?tipo=museo_recurso`). Se elimina el `400` por miniatura ausente; se conserva el `400` por miniatura con **formato invalido**. La rama `editar` **no** se toca. `node --check` **OK**, bytes `> 127` = **0**, `git grep "requieren imagen de muestra"` = **0** resultados.
+- **Modulo compartido (`media-embed.js`):** `API.youtubeThumb` (una definicion), uso en `mediaDe`, filtro final **intacto**. Smoke del modulo: **45 PASS / 0 FAIL**.
+- **Cliente (`mi-perfil.html`):** label `"(opcional)"`, sin bloqueo en `museoGuardar`, derivada en el cuerpo del alta, `mpMiniaturaDe`/`mpPortadaHTML` con la derivada. **Divs 578/578** (antes 578/578), ASCII en los rangos editados = **0**.
+- **Cache-busting:** `media-embed.js?v=3` en `galeria.html:421`, `comunidad.html:1082`, `mi-perfil.html:1599` (dos saltos, porque el modulo se toco dos veces).
+- **Datos:** **cero** cambios de esquema y **cero** escrituras retroactivas. `album_fotos.miniatura_url` sigue `text NULL`; las filas historicas siguen en NULL y se pintan con derivada o placeholder.
+- **Smokes oficiales tocados:** `smoke_036_media_unificada.js` **80 PASS / 13 SKIP / 0 FAIL**; `smoke_media_upload_prefijo.js` **46/46**.
+- **Documental:** `TASKS.md` y `NEXT.md` apuntan aqui **por ID**; el argumento vive **solo en este ADR** (ADR-084 D1).
+- **Riesgo residual:** si YouTube deja de servir `hqdefault` o cambia el formato de sus URLs, la derivada **falla en abierto** (imagen rota) y no en cerrado. Mitigacion existente: `onerror` con fallback (ADR-008). No hay guard automatico que detecte el cambio de host: la senal es visual.
+
+### Deuda declarada (NO se arregla en este ADR)
+
+1. **`esUrlTrackSpotify` y `RE_SPOTIFY_TRACK_*` quedaron SIN llamador en el servidor.** La excepcion Spotify se volvio irrelevante cuando la regla paso a ser **uniformemente opcional** (D1): ya no hay ninguna rama que necesite distinguir un track. Se **conservaron** a proposito como **espejo del criterio cliente** (misma forma de URL que `media-embed.js`). **Decidir su retiro es tarea aparte**, no un efecto colateral de este ADR.
+2. **`index.html:1042` carga `media-embed.js?v=1` y NO usa el modulo** (`0` referencias a `ExploraMediaEmbed`). Es una **discrepancia inerte** (ninguna rama de esa pagina depende del modulo), y **no se toco** porque `index.html` tiene **gate propio** (`@seo-dev`). Queda registrada para que nadie la "arregle" en caliente dentro de un cambio de SEO.
+3. **`scripts/smoke_media_embed.js:14` tiene un backtick en un comentario.** No es cliente y no afecta el despliegue; se deja por la regla 18 (no se reescribe un script de verificacion que pasa) y se anota aqui para que no parezca un descuido de ADR-002.
+
+### Nota de actualizacion (2026-10-25): deudas 1 y 2 CERRADAS en la misma tanda
+
+**[Actualizacion 2026-10-25]:** de las tres deudas de arriba, **la 1 y la 2 quedaron cerradas en la misma tanda** en que este ADR se documento. Se anota aqui, sin reescribir el ADR, para que el registro no siga afirmando algo que ya es falso (ADR-006: el baseline es el archivo real).
+
+1. **Deuda 1 CERRADA: `esUrlTrackSpotify` y `RE_SPOTIFY_TRACK_*` RETIRADOS del servidor.** El "espejo documentado" no se sostuvo: tras **D1** la excepcion Spotify era **inutilizable** (la regla paso a ser **uniformemente opcional**, no queda ninguna rama que necesite distinguir un track) y **un helper sin llamador es un criterio de negocio que nadie ejecuta**. Se borraron el bloque de comentario, las tres constantes y la funcion en `api/interacciones.js`: `grep "esUrlTrackSpotify|RE_SPOTIFY_TRACK_"` sobre `api/` = **0** resultados, `node --check api/interacciones.js` **OK**, bytes `> 127` = **0**, `smoke_036_media_unificada.js` **80 PASS / 13 SKIP / 0 FAIL** y `smoke_media_upload_prefijo.js` **46/46**. **El espejo del CLIENTE es independiente y SIGUE VIGENTE:** `museoEsTrackSpotify` en `mi-perfil.html` es codigo **con llamador** (lo usa el flujo de alta) y no se toco; lo retirado es la copia muerta del servidor, **no** el criterio.
+2. **Deuda 2 CERRADA: `index.html:1042` alineado a `media-embed.js?v=3`.** La discrepancia (`?v=1`) se corrigio en la misma tanda con el gate propio de `index.html` (`@seo-dev`). La pagina sigue **sin usar** el modulo (`0` referencias a `ExploraMediaEmbed`), pero ya **no sirve una version anterior**: la **V9** se extiende a `index.html`.
+3. **Deuda 3 SIGUE VIVA (unica pendiente):** el backtick en `scripts/smoke_media_embed.js:14`. No se toco.
+
+**El criterio de derivacion (D2/D3) queda CONGELADO por un smoke nuevo:** `scripts/smoke_media_caratula.js` da **104 PASS / 0 FAIL**. Su **prueba negativa** (variante que rompe el patron de la URL) da **87 PASS / 17 FAIL**, lo que demuestra que el smoke **detecta** la regresion y no es un verde de complacencia. Cubre el criterio de derivacion que el **Riesgo residual** daba por sin guard automatico; el riesgo del **host** de YouTube sigue siendo visual, como alli se dice.
+
+### Criterio de verificacion
+
+1. **V1** `git grep "requieren imagen de muestra" -- api/` -> **0** resultados (el `400` por miniatura ausente no existe).
+2. **V2** `POST ?tipo=museo_recurso` con `tipo_media=video`, `foto_url` valida y **sin** `miniatura_url` -> **200/201** y fila con `miniatura_url IS NULL` (no `400`).
+3. **V3** El mismo POST con `miniatura_url` de formato invalido (`ftp://...` o `> 2000` caracteres) -> **400** `URL de miniatura invalida` (la validacion de formato **sobrevive** a D1).
+4. **V4** `API.youtubeThumb` devuelve la **misma** caratula para las cuatro formas del mismo video: `watch?v=ID`, `youtu.be/ID`, `/embed/ID`, `/shorts/ID` -> `https://img.youtube.com/vi/ID/hqdefault.jpg`. **0** definiciones duplicadas de `img.youtube.com` fuera de `media-embed.js` (Regla de No-Duplicidad).
+5. **V5** `API.mediaDe()` sobre un `.mp4` de host arbitrario -> `caratula === ''` y `esMedio === true`; sobre una miniatura **no pintable** + link de YouTube -> `caratula` **derivada**; sobre una URL de embed pasada como miniatura -> **nunca** se devuelve como `caratula` (D6).
+6. **V6** Ningun `<img>` del render (admin, galeria, perfil) tiene `src` igual a `foto_url` de un `video`/`audio` ni a una URL de embed; el caso sin caratula pinta el placeholder (`mpPortadaHTML` / `_adminMediaPhHtml`).
+7. **V7** `node scripts/smoke_media_embed.js` -> **45 PASS / 0 FAIL**; `smoke_036_media_unificada.js` -> **0 FAIL**; `smoke_media_upload_prefijo.js` -> **46/46**.
+8. **V8** `node --check api/interacciones.js` **OK**, `node --check media-embed.js` **OK**, y **0** bytes `> 127` en `api/interacciones.js` y en `media-embed.js` (ADR-002).
+9. **V9** `grep -c "media-embed.js?v=3"` = **1** en cada una de `galeria.html`, `comunidad.html` y `mi-perfil.html`; ninguna de las tres sirve una version anterior (cache-busting coherente con el contenido del modulo).
+10. **V10** `album_fotos.miniatura_url` sigue siendo `text NULL` (`information_schema.columns` -> `is_nullable = YES`) y **0 filas** fueron actualizadas por este cambio (no hay `UPDATE` en el delta).
+
+### Nota de acotamiento (migracion 043; y una precision sobre "ADR-043")
+
+**Este ADR ACOTA, no deroga, la regla de obligatoriedad de la migracion 043.** El esquema **no cambia**: la columna sigue `text NULL` y la migracion 043 **no se re-ejecuta ni se edita**. Lo que cambia es **la regla de aplicacion** que la propia 043 delego en `api/interacciones.js` (*"la obligatoriedad se valida en la CAPA DE APLICACION ..., no con una constraint"*): esa regla pasa de **obligatoria** a **opcional con derivacion y placeholder**. La 043 queda **vigente y sin enmienda** en todo lo demas: la columna, su `COMMENT`, su caracter **aditivo/idempotente**, su decision de **no crear indice**, su prohibicion de `backfill` y su orden de aplicacion. El argumento de *"por que NULL y no NOT NULL"* **no se repite aqui**: sigue viviendo una sola vez en el encabezado de `db/migrations/043_album_fotos_miniatura.sql`, y `api/interacciones.js:11414-11418` **apunta** a el (ADR-084 D1).
+
+**Precision necesaria (ADR-006):** `ADR-043` **no** regula esta materia. `ADR-043` es *"Contenedor persistente separado del host de inyeccion dinamica"* (`DECISIONS.md:2079`) y no menciona miniaturas ni recursos de media; `DECISIONS.md` no contiene **ninguna** aparicion de `miniatura_url` fuera de este bloque. La obligatoriedad no nacio en un ADR: nacio **en codigo** sobre una migracion que dejaba el campo nullable. Por eso este ADR cita la **migracion 043** por su numero de archivo y **no** un ADR-043 inexistente en la materia.
+
+**Dependencias intactas:** ADR-039 (Museo URL-only y visibilidad por recurso), ADR-044 (abstraccion compartida de media / anti-duplicidad), ADR-010 y ADR-001 (presupuesto 8/8 y cero endpoints nuevos), ADR-002 (ASCII-safe en serverless), ADR-008 (`onerror` con fallback) y ADR-003 (cero borrado fisico). **Ninguna se deroga.**

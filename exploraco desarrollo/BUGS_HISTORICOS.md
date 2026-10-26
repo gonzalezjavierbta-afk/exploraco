@@ -2484,3 +2484,24 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **Registro:** detectado al cerrar **TSK-235** (barranquilla fue la excepcion, no la regla: 81 seeds fuera). Sin dueno asignado, sin gate abierto, sin correccion iniciada.
 
+## BUG-140: una miniatura con URL `/embed/` de YouTube pasaba el filtro de caratula y llegaba a `<img>` (imagen rota) -- **CERRADO (2026-10-25, en el mismo pase de TSK-238)**
+
+**Severidad: BAJA (cosmetico, un solo recurso mal pintado; no hay error 500, no hay fuga y no toca datos). Estado: CERRADO -- corregido dentro del mismo pase que introdujo la derivacion de caratula (TSK-238), no se arrastra como deuda.**
+
+**Sintoma:** un audio/video cuyo campo de imagen de muestra contenia una URL de YouTube en forma `https://www.youtube.com/embed/<ID>` se pintaba con **la URL del embed dentro de un `<img src>`**: el navegador pide un documento HTML donde espera un JPEG y la portada aparece **rota** (recuadro sin imagen), en vez del placeholder o de la caratula del video.
+
+**Causa (una sola linea de logica, en cadena):** `media-embed.js::mediaDe` acepta la miniatura como caratula solo si **no** es un medio directo y **no** es una URL de servicio: `candidata = (miniatura && !isDirectMedia(miniatura) && !kind(miniatura)) ? miniatura : ''` (`:261`). Y `API.kind` (`:193-201`) **delega en `youtubeId`**. Como `youtubeId` reconocia `watch?v=`, `youtu.be/` y `/shorts/` pero **no** `/embed/`, una URL `/embed/` devolvia `null` -> `kind` devolvia `null` -> **la URL cruda sobrevivia al filtro** y se devolvia como `caratula` (`:274`). El consumidor la metia en un `<img>` con toda confianza porque el contrato dice "la caratula ya esta validada aqui".
+
+**Fix (aditivo, 1 regex + 1 rama):** `RE_YOUTUBE_EMBED = /youtube\.com\/embed\/([\w-]{6,})/i` (`media-embed.js:89`) y la rama correspondiente en `youtubeId` (`:123-124`). Efecto doble, y el segundo es el que importa: (1) la URL `/embed/` ahora **se descarta** como caratula (es un servicio de embed, no una imagen) y (2) al ser `kind === 'youtube'`, entra la **derivada determinista** `youtubeThumb` -> `img.youtube.com/vi/<ID>/hqdefault.jpg`, que **si** es una imagen real. El umbral de id es `{6,}`, el **mismo** que `watch` y `youtu.be`, para no inventar ids cortos.
+
+**Verificacion:** `node --check media-embed.js` **OK**; **0** bytes > 127; el caso `/embed/` cubierto por el smoke ad-hoc de `mediaDe`/`youtubeThumb` (**45 PASS / 0 FAIL** en la sesion, **sin script nuevo**, `git grep -l "youtubeThumb" -- scripts` = **0**); `smoke_036_media_unificada.js` **80 PASS / 13 SKIP / 0 FAIL**. **Sin migracion, sin backfill y sin tocar Neon**: las filas con `/embed/` guardado se corrigen **al pintar**.
+
+**Patron de falla (el que hay que recordar):** un filtro de "esto no es una imagen" escrito como **lista negra de formas conocidas** falla en silencio con la forma que nadie enumero, y el fallo **no se ve en el HTML ni en el payload**: se ve como una portada rota. La validacion de forma de una URL debe delegar en **un unico extractor de id por servicio** (`youtubeId`), no en un regex paralelo: por eso el fix fue extender ese extractor y no anadir otro guard en cada consumidor.
+
+**Relacion con otros BUG (sin duplicar):** no es **BUG-138** (atribucion) ni **BUG-139** (credito ausente) ni **BUG-022** (nombres de archivo inventados): aqui la foto **no existe porque la URL nunca fue una foto**. Es la cara opuesta de la invariante que `mediaDe` garantiza: "un `<img>` NUNCA apunta a algo que no sea una imagen".
+
+**Registro:** detectado y corregido al implementar **TSK-238** (`/embed/` se soporta de forma explicita porque el caso aparecio al probar la derivacion). Se registra como **hallazgo menor RESUELTO** por decision del pase documental, no como deuda abierta.
+
+**Cobertura permanente (2026-10-25, segundo y ULTIMO pase documental R2):** la regresion de este BUG ya no depende de un smoke ad-hoc. `scripts/smoke_media_caratula.js` (**191** lineas, CommonJS, `vm` + stub de `window`, **sin red**) prueba el caso "miniatura `/embed/` -> derivada" junto con las 4 formas del link y "medio no-YouTube -> placeholder", y esta enganchado al final de la cadena de `npm test` (`package.json:5`). Medido: **104 PASS / 0 FAIL**; prueba negativa: rompiendo `youtubeThumb` el mismo script da **87 PASS / 17 FAIL**. El BUG **sigue CERRADO**: esto no lo reabre, solo congela la red que lo detecta.
+
+

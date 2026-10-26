@@ -11,7 +11,7 @@
 //   5) spotifyOembedUrl(): URL de oEmbed lista para fetch del navegador.
 //   6) Idempotencia: cargar el archivo dos veces no rompe.
 //   7) spotifyEmbedIframe(): allow="encrypted-media" y loading="lazy" presentes.
-//   8) Carga diferida sin `window.ExploraMediaEmbed` -> null, sin excepcion.
+//   8) Carga diferida sin 'window.ExploraMediaEmbed' -> null, sin excepcion.
 // Exit 0 = todo OK. Sin dependencias npm.
 
 "use strict";

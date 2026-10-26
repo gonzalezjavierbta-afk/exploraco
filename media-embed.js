@@ -1,10 +1,12 @@
 /* media-embed.js -- Modulo compartido de resolucion de URLs de media (ExploraCO).
  *
- * Regla de No-Duplicidad: galeria.html, comunidad.html y mapa-cultural.js ya no
- * reimplementan la logica de embed. Las tres delegan en window.ExploraMediaEmbed.
+ * Regla de No-Duplicidad: mi-perfil.html, galeria.html y comunidad.html cargan
+ * este modulo y delegan en window.ExploraMediaEmbed; mapa-cultural.js tambien
+ * delega en el, pero solo si esta presente (degrada a null si no lo esta).
  *
  * Alcance del soporte:
- *   - YouTube  (youtube.com/watch?v=..., youtu.be/...)
+ *   - YouTube  (youtube.com/watch?v=..., youtu.be/..., youtube.com/shorts/...,
+ *               youtube.com/embed/...)
  *   - Vimeo    (vimeo.com/<id numerico>)
  *   - Spotify  SOLO tipo "track" (episode, album, playlist y show NO se soportan)
  *   - directo  (.mp3 .m4a .aac .wav .ogg .opus .mp4 .webm .mov .m4v)
@@ -16,7 +18,15 @@
  * No hace fetch ni peticiones de red: la caratula de Spotify se resuelve en el
  * navegador llamando a spotifyOembedUrl(url) y haciendo el GET ahi.
  *
- * Uso:  <script src="media-embed.js?v=1"></script>
+ * Caratula DERIVADA (v2): si un item de YouTube no trae imagen de muestra, o
+ * trae como miniatura algo que NO es pintable en un <img> (un medio directo o
+ * una URL de servicio de embed), la caratula NO es obligatoria: se deriva del
+ * link con youtubeThumb(url), que es una URL de imagen determinista (sin fetch,
+ * sin clave de API). mediaDe() la usa cuando kind === 'youtube'. Vimeo y los
+ * medios directos (.mp3/.mp4) sin miniatura pintable se quedan con el
+ * placeholder del consumidor: para ellos no hay derivada.
+ *
+ * Uso:  <script src="media-embed.js?v=3"></script>
  */
 (function (global) {
   'use strict';
@@ -39,6 +49,10 @@
   API.ALTURA_SPOTIFY_ANCHA = 232;
 
   var YOUTUBE_EMBED = 'https://www.youtube.com/embed/';
+  /* Endpoint publico de thumbnails de YouTube: /vi/<ID>/<nombre>.jpg.
+     hqdefault (480x360) existe para todo video publico subido, a diferencia de
+     maxresdefault, que solo esta si el autor subio el video en HD. */
+  var YOUTUBE_THUMB = 'https://img.youtube.com/vi/';
   var VIMEO_EMBED = 'https://player.vimeo.com/video/';
   var SPOTIFY_EMBED = 'https://open.spotify.com/embed/track/';
   var SPOTIFY_OEMBED = 'https://open.spotify.com/oembed?url=';
@@ -66,6 +80,13 @@
      resolver mas URLs, nunca menos: no rompe ninguna de las dos variantes. */
   var RE_YOUTUBE_WATCH = /youtube\.com\/watch\?v=([\w-]{6,})/i;
   var RE_YOUTUBE_SHORT = /youtu\.be\/([\w-]{6,})/i;
+  /* YouTube Shorts: https://www.youtube.com/shorts/<ID> (y variantes m./www.).
+     Mismo umbral {6,} que watch y youtu.be para no inventar ids cortos. */
+  var RE_YOUTUBE_SHORTS = /youtube\.com\/shorts\/([\w-]{6,})/i;
+  /* YouTube embed: https://www.youtube.com/embed/<ID> (src de un iframe ya
+     montado). No es una imagen: reconocerlo aqui es lo que permite que el
+     filtro de caratula lo DESCARTE y que youtubeThumb derive del id. */
+  var RE_YOUTUBE_EMBED = /youtube\.com\/embed\/([\w-]{6,})/i;
   var RE_VIMEO = /vimeo\.com\/(\d+)/i;
 
   /* ---------------------------------------------------------------------
@@ -89,7 +110,7 @@
      API publica: extractores de id
      --------------------------------------------------------------------- */
 
-  /* Id de YouTube (watch?v= o youtu.be/). Id valido o null. */
+  /* Id de YouTube (watch?v=, youtu.be/, shorts/ o embed/). Id valido o null. */
   API.youtubeId = function (url) {
     var s = norm(url);
     if (!s) { return null; }
@@ -97,7 +118,22 @@
     if (m) { return m[1]; }
     m = RE_YOUTUBE_SHORT.exec(s);
     if (m) { return m[1]; }
+    m = RE_YOUTUBE_SHORTS.exec(s);
+    if (m) { return m[1]; }
+    m = RE_YOUTUBE_EMBED.exec(s);
+    if (m) { return m[1]; }
     return null;
+  };
+
+  /* Caratula determinista de un video de YouTube (hqdefault). No hace fetch:
+     la URL se deriva del id y el navegador la cachea como cualquier imagen.
+     Defensiva: null/undefined/no-string o URL que no es de YouTube -> ''.
+     Nunca devuelve null, para que el llamador pueda asignarla a un <img> sin
+     guardas adicionales. */
+  API.youtubeThumb = function (url) {
+    var id = API.youtubeId(url);
+    if (!id) { return ''; }
+    return YOUTUBE_THUMB + id + '/hqdefault.jpg';
   };
 
   /* Id numerico de Vimeo. Id valido o null. */
@@ -188,10 +224,13 @@
        tipo      <- media_type | foto_type; si falta, se deriva de la URL
        miniatura <- miniatura_url | media_miniatura   (CRUDO, tal cual llega)
        caratula  <- la miniatura SOLO si es utilizable en un <img>/poster;
-                    si la URL resulta ser un medio (.mp3/.mp4) o una URL de
-                    Spotify/YouTube/Vimeo, queda '' y el consumidor cae a su
-                    placeholder. Invariante critica: NUNCA un <img> (ni un
-                    poster) apuntando a algo que no sea una imagen.
+                    si falta, o si lo que llega NO es pintable (un medio
+                    .mp3/.mp4 o una URL de servicio de embed Spotify/YouTube/
+                    Vimeo), y el item es de YouTube, la caratula DERIVADA del
+                    link (youtubeThumb); para cualquier otro caso no pintable
+                    queda '' y el consumidor cae a su placeholder.
+                    Invariante critica: NUNCA un <img> (ni un poster)
+                    apuntando a algo que no sea una imagen.
        kind      <- youtube | vimeo | spotify | directo | null
      Es defensivo: acepta null/undefined/no-objeto y devuelve strings vacios,
      nunca lanza. Si el consumidor la envuelve en un try/catch no hace nada. */
@@ -212,6 +251,15 @@
       tipo = 'foto';
     }
     var miniatura = norm(o.miniatura_url) || norm(o.media_miniatura);
+    /* La miniatura es OPCIONAL, y ademas puede llegar como algo que no es una
+       imagen: alguien pega la URL del video en el campo de miniatura. En ese
+       caso NO se descarta el item: si el recurso es de YouTube se recupera la
+       caratula DERIVADA del link, youtubeThumb es una URL de imagen real
+       (img.youtube.com/vi/<ID>/hqdefault.jpg). Para Vimeo y para los medios
+       directos sin miniatura pintable no hay derivada: el consumidor pinta su
+       placeholder. */
+    var candidata = (miniatura && !API.isDirectMedia(miniatura) && !API.kind(miniatura)) ? miniatura : '';
+    if (!candidata && kind === 'youtube') { candidata = API.youtubeThumb(url); }
     /* caratula SOLO si la URL es claramente una imagen. kind() descarta a la
        vez los medios directos (.mp3/.mp4/...) y las URLs de servicio de embed
        (Spotify/YouTube/Vimeo), que tampoco son pintables en un <img>. Asi la
@@ -223,7 +271,7 @@
       kind: kind,
       esMedio: !!kind,
       miniatura: miniatura,
-      caratula: (miniatura && !API.isDirectMedia(miniatura) && !API.kind(miniatura)) ? miniatura : ''
+      caratula: (candidata && !API.isDirectMedia(candidata) && !API.kind(candidata)) ? candidata : ''
     };
   };
 
