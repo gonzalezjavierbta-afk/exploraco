@@ -741,6 +741,58 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
   /* son botones reales, no microcopia, y van a 16px con 44px de alto.      */
   :is(#gate,#community) [style*="background:var(--gold)"][style*="font-size:10px"]{font-size:16px!important;line-height:1.2;min-height:44px}
 }
+
+/* ===== FEED VIVO (timeline unificada: medios, escritos, lugares, planes) =====
+   Silo propio: toda clase nueva lleva prefijo feed- (ADR-004). Acento = var(--gold).
+   Independiente del feed audiovisual .av-feed-* (no se reutiliza ni se altera).   */
+.feed-filtros-bar{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;padding:2px 2px 12px;margin-bottom:5px;border-bottom:1px solid rgba(255,255,255,.08)}
+.feed-filtros-bar::-webkit-scrollbar{display:none}
+.btn-filtro-feed{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:rgba(255,255,255,.62);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;line-height:1;white-space:nowrap;cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease}
+.btn-filtro-feed:hover{border-color:rgba(255,74,0,.45);color:#fff}
+.btn-filtro-feed:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.btn-filtro-feed.active{background:rgba(255,74,0,.16);border-color:rgba(255,74,0,.55);color:var(--gold)}
+.feed-timeline-container{display:flex;flex-direction:column;gap:10px;min-height:48px}
+.feed-post-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.feed-post-head{display:flex;align-items:center;gap:9px;min-width:0}
+.feed-post-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;flex:0 0 auto;display:block;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+.feed-post-headmain{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 auto}
+.feed-post-author{font-size:12px;font-weight:700;color:#fff;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed-post-badge{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;max-width:100%;padding:2px 7px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;line-height:1.5;white-space:nowrap}
+.feed-post-badge[data-categoria="medio"]{background:rgba(96,165,250,.14);border-color:rgba(96,165,250,.4);color:#60A5FA}
+.feed-post-badge[data-categoria="escrito"]{background:rgba(192,132,252,.14);border-color:rgba(192,132,252,.4);color:#C084FC}
+.feed-post-badge[data-categoria="lugar"]{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.4);color:#22C55E}
+.feed-post-badge[data-categoria="plan"]{background:rgba(255,184,77,.14);border-color:rgba(255,184,77,.4);color:var(--gold-d)}
+.feed-post-time{flex:0 0 auto;font-size:10px;color:rgba(255,255,255,.42);white-space:nowrap;font-weight:400}
+.feed-post-title{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:#fff;line-height:1.25}
+.feed-post-text{margin:0;font-size:12px;color:rgba(255,255,255,.72);line-height:1.5;word-break:break-word}
+.feed-post-text a{color:var(--gold);text-decoration:none}
+.feed-post-text a:hover{text-decoration:underline}
+.feed-post-media{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;background:#181818;border:1px solid rgba(255,255,255,.06)}
+.feed-post-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.07);padding-top:8px}
+/* Acciones de la tarjeta: son botones, no pestanas de filtro. Sobrescriben la
+   pastilla .btn-filtro-feed SOLO dentro de .feed-post-actions (no toca L750). */
+.feed-post-actions .btn-filtro-feed{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:rgba(255,255,255,.78);font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;text-transform:none;letter-spacing:normal;line-height:1.2;white-space:nowrap;cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease}
+.feed-post-actions .btn-filtro-feed:hover{background:rgba(255,74,0,.14);border-color:var(--gold-d);color:var(--gold)}
+.feed-post-actions .btn-filtro-feed:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.feed-post-actions .btn-filtro-feed[disabled],.feed-post-actions .btn-filtro-feed.is-busy{opacity:.6;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.feed-post-actions .btn-filtro-feed{transition:none}}
+.feed-empty{margin:0;padding:26px 16px;border:1px dashed rgba(255,255,255,.14);border-radius:12px;text-align:center;font-size:12px;color:rgba(255,255,255,.5);line-height:1.6}
+.feed-skeleton{height:112px;border-radius:12px;border:1px solid rgba(255,255,255,.06);background:linear-gradient(90deg,rgba(255,255,255,.04) 0%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.04) 100%);background-size:200% 100%;animation:feedShimmer 1.2s linear infinite}
+@keyframes feedShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.feed-skeleton{animation:none;background:rgba(255,255,255,.06)}}
+.feed-cargar-mas{display:block;margin:12px auto 4px;padding:9px 18px;border-radius:999px;border:1px solid rgba(255,74,0,.45);background:rgba(255,74,0,.1);color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:background .15s ease,border-color .15s ease}
+.feed-cargar-mas:hover{background:rgba(255,74,0,.2);border-color:rgba(255,74,0,.7)}
+.feed-cargar-mas:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.feed-cargar-mas[hidden]{display:none}
+#feed-timeline-sentinel{width:100%;height:1px}
+@media (max-width:600px){
+  .feed-post-card{padding:11px}
+  .feed-post-media{width:100%;aspect-ratio:4/3}
+  .feed-post-avatar{width:30px;height:30px}
+  .feed-post-actions{gap:6px}
+  .feed-post-actions .btn-filtro-feed{padding:6px 10px;font-size:11px}
+  .feed-filtros-bar{padding-bottom:10px}
+}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -810,6 +862,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
       <div class="ctab on" onclick="showCommTab('chat')">💬 Chat</div>
       <div class="ctab" data-nivel-requerido="6" onclick="showCommTab('planes')">🗺️ Planes</div>
       <div class="ctab" onclick="showCommTab('mapa')">&#x1F5FA; Mapa</div>
+      <div class="ctab" onclick="showCommTab('feed')">&#9889; Feed Vivo</div>
       <div class="ctab" onclick="showCommTab('ranking')">🏆 Ranking</div>
       <div class="ctab" data-nivel-requerido="14" onclick="showCommTab('pandillas')">👥 Parches</div>
       <div class="ctab" data-nivel-requerido="15" onclick="showCommTab('wayfarer')">🕵️ Activo Oculto</div>
@@ -1028,6 +1081,20 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     <!-- MARCAS Y SPOTS (ADR-064) -->
     <div class="cpanel" id="cpanel-marcas">
       <div class="cm-v61" id="cm-marcas"></div>
+    </div>
+
+    <!-- FEED VIVO (timeline unificada: medios, escritos, lugares y planes) -->
+    <div class="cpanel" id="cpanel-feed">
+      <div class="feed-filtros-bar" id="feed-filtros-bar" role="tablist" aria-label="Filtrar el feed por tipo de contenido">
+        <button type="button" class="btn-filtro-feed active" data-categoria="todos" role="tab" aria-pressed="true" aria-selected="true">&#9889; Todos</button>
+        <button type="button" class="btn-filtro-feed" data-categoria="medio" role="tab" aria-pressed="false" aria-selected="false">&#128247; Medios</button>
+        <button type="button" class="btn-filtro-feed" data-categoria="escrito" role="tab" aria-pressed="false" aria-selected="false">&#9997;&#65039; Escritos</button>
+        <button type="button" class="btn-filtro-feed" data-categoria="lugar" role="tab" aria-pressed="false" aria-selected="false">&#128205; Lugares</button>
+        <button type="button" class="btn-filtro-feed" data-categoria="plan" role="tab" aria-pressed="false" aria-selected="false">&#127890; Planes</button>
+      </div>
+      <div id="feed-timeline-lista" class="feed-timeline-container" aria-live="polite"></div>
+      <div id="feed-timeline-sentinel" aria-hidden="true"></div>
+      <button id="feed-cargar-mas" class="feed-cargar-mas" type="button" hidden>Cargar mas</button>
     </div>
 
   </div>
@@ -3281,6 +3348,369 @@ function feedCardAV(f) {
   };
   return card;
 }
+
+/* FEED_TIMELINE_START */
+/* ---- FEED VIVO: timeline unificada (medio | escrito | lugar | plan) ----
+   Endpoint existente: GET /api/interacciones?tipo=feed_timeline
+   Contrato v2: paginacion por KEYSET (limit + cursor opaco); "offset" queda
+   solo como contador interno de diagnostico y NO viaja en la URL.
+   El id de cada item llega PREFIJADO por origen (album_foto:, resena:,
+   destino:, plan:): se usa tal cual como clave de dedupe, sin parsear.
+   Payload raiz "degradado": [] => categorias que fallaron en el servidor;
+   el feed sigue siendo valido y solo se anuncia con un aviso discreto.
+   Silo independiente del feed audiovisual .av-feed-* (no se toca).
+   Todo valor del servidor pasa por feedEsc antes de tocar markup y los
+   fallos de imagen son SILENCIOSOS (ADR-008). Sin CSS ni clases nuevas. */
+var feedCategoriaActiva = 'todos';
+var feedCursor = null;
+var feedVistos = {};
+var feedCargando = false;
+var feedHayMas = true;
+var feedInicializado = false;
+var feedObserver = null;
+var feedEtiquetas = { medio: 'Medio', escrito: 'Escrito', lugar: 'Lugar', plan: 'Plan' };
+var feedVacios = {
+  todos: 'A\u00fan no hay nada en el feed',
+  medio: 'A\u00fan no hay medios en el feed',
+  escrito: 'A\u00fan no hay escritos en el feed',
+  lugar: 'A\u00fan no hay lugares en el feed',
+  plan: 'A\u00fan no hay planes en el feed'
+};
+var feedAvatarFallback = 'data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2034%2034%22%3E%3Crect%20width=%2234%22%20height=%2234%22%20fill=%22%23222%22/%3E%3Ccircle%20cx=%2217%22%20cy=%2213%22%20r=%226%22%20fill=%22%23666%22/%3E%3Cpath%20d=%22M5%2034c0-7%205-12%2012-12s12%205%2012%2012z%22%20fill=%22%23666%22/%3E%3C/svg%3E';
+
+function feedEsc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function feedHace(fechaISO) {
+  if (!fechaISO) return '';
+  var t = Date.parse(fechaISO);
+  if (isNaN(t)) return '';
+  var dif = Date.now() - t;
+  if (dif < 0) dif = 0;
+  var min = Math.floor(dif / 60000);
+  if (min < 1) return 'ahora';
+  if (min < 60) return 'hace ' + min + ' min';
+  var h = Math.floor(min / 60);
+  if (h < 24) return 'hace ' + h + ' h';
+  var d = Math.floor(h / 24);
+  if (d <= 30) return 'hace ' + d + ' d';
+  var f = new Date(t);
+  var dd = f.getDate();
+  var mm = f.getMonth() + 1;
+  return (dd < 10 ? '0' + dd : String(dd)) + '/' + (mm < 10 ? '0' + mm : String(mm)) + '/' + f.getFullYear();
+}
+
+function feedRecorte(txt, max) {
+  var s = String(txt === null || txt === undefined ? '' : txt).replace(/\s+/g, ' ').trim();
+  if (s.length <= max) return s;
+  s = s.slice(0, max - 3);
+  var corte = s.lastIndexOf(' ');
+  if (corte > max * 0.6) s = s.slice(0, corte);
+  return s + '...';
+}
+
+function feedUrlSegura(u) {
+  var s = String(u === null || u === undefined ? '' : u).trim();
+  if (!s) return '';
+  if (s.charAt(0) === '/' && s.charAt(1) !== '/') return s;
+  if (/^https:\/\//i.test(s) || /^http:\/\//i.test(s)) return s;
+  return '';
+}
+
+function feedPonerSkeletons(lista, n) {
+  for (var i = 0; i < n; i++) {
+    var sk = document.createElement('div');
+    sk.className = 'feed-skeleton';
+    sk.setAttribute('data-feed-skeleton', '1');
+    lista.appendChild(sk);
+  }
+}
+
+function feedQuitarSkeletons(lista) {
+  var sk = lista.querySelectorAll('[data-feed-skeleton]');
+  for (var i = sk.length - 1; i >= 0; i--) {
+    if (sk[i].parentNode) sk[i].parentNode.removeChild(sk[i]);
+  }
+}
+
+function feedPintaVacio(lista, texto) {
+  var vacio = document.createElement('p');
+  vacio.className = 'feed-empty';
+  vacio.textContent = texto || feedVacios.todos;
+  lista.appendChild(vacio);
+}
+
+/* Aviso discreto cuando el servidor reporta categorias degradadas (payload
+   raiz "degradado": []). Reutiliza la clase existente .feed-empty; el nodo
+   lleva data-feed-aviso y se retira al inicio de la siguiente carga. */
+function feedPintaAviso(lista, texto) {
+  var aviso = document.createElement('p');
+  aviso.className = 'feed-empty';
+  aviso.setAttribute('data-feed-aviso', '1');
+  aviso.textContent = texto;
+  lista.appendChild(aviso);
+}
+
+function feedCardHTML(item) {
+  var cat = feedEtiquetas[item.categoria] ? item.categoria : 'medio';
+  /* avatar_autor es opcional: puede llegar '' si el usuario no tiene foto,
+     o incluso "undefined"/"null" desde un origen antiguo. En ese caso se usa
+     el placeholder interno; nunca se pinta "undefined" en el src. */
+  var avatarRaw = feedUrlSegura(item.autor_avatar);
+  if (!avatarRaw || avatarRaw === 'undefined' || avatarRaw === 'null') {
+    avatarRaw = feedAvatarFallback;
+  }
+  var avatar = feedEsc(avatarRaw);
+  var nombre = feedEsc(feedRecorte(item.autor_nombre || 'Viajero', 60));
+  var cuando = feedEsc(feedHace(item.creado_en));
+  var titulo = feedEsc(feedRecorte(item.titulo || '', 90));
+  var texto = feedEsc(feedRecorte(item.texto || '', 180));
+  /* media_type no decide el render: solo media_url. "lugar" trae
+     media_type:'image'; "escrito"/"plan" pueden venir sin media (vacio). */
+  var media = feedUrlSegura(item.media_url);
+  var url = feedUrlSegura(item.url);
+  var alt = feedEsc(feedRecorte(item.titulo || 'Publicacion de la comunidad', 80));
+  var html = '<div class="feed-post-head">'
+    + '<img class="feed-post-avatar" src="' + avatar + '" alt="" loading="lazy"'
+    + ' onerror="this.onerror=null;this.src=\'' + feedAvatarFallback + '\'">'
+    + '<div class="feed-post-headmain">'
+    + '<div class="feed-post-author">' + nombre + '</div>'
+    + '<span class="feed-post-badge" data-categoria="' + feedEsc(cat) + '">' + feedEsc(feedEtiquetas[cat]) + '</span>'
+    + '</div>'
+    + '<span class="feed-post-time">' + cuando + '</span>'
+    + '</div>';
+  if (titulo) html += '<h3 class="feed-post-title">' + titulo + '</h3>';
+  if (texto) html += '<p class="feed-post-text">' + texto + '</p>';
+  if (media) html += '<img class="feed-post-media" src="' + feedEsc(media) + '" alt="' + alt + '" loading="lazy"'
+    + ' onerror="this.parentNode&&this.parentNode.removeChild(this)">';
+  html += '<div class="feed-post-actions">';
+  if (url) html += '<a class="btn-filtro-feed" href="' + feedEsc(url) + '" rel="noopener">Abrir</a>';
+  html += '<button type="button" class="btn-filtro-feed" data-feed-share="1"'
+    + ' data-feed-url="' + feedEsc(url || '') + '"'
+    + ' data-feed-title="' + titulo + '">Compartir</button>';
+  html += '</div>';
+  return html;
+}
+
+function feedCompartir(btn) {
+  if (!btn) return;
+  var url = btn.getAttribute('data-feed-url') || '';
+  var titulo = btn.getAttribute('data-feed-title') || 'ExploraCO';
+  var abs = url ? (url.charAt(0) === '/' ? location.origin + url : url) : location.href;
+  var original = btn.textContent;
+  var ocupado = function (on) {
+    try {
+      if (on) btn.classList.add('is-busy');
+      else btn.classList.remove('is-busy');
+    } catch (e) {}
+  };
+  var marcar = function (msg) {
+    try { btn.textContent = msg; } catch (e) {}
+    setTimeout(function () {
+      try { btn.textContent = original; } catch (e) {}
+    }, 1500);
+  };
+  var liberar = function () { ocupado(false); };
+  ocupado(true);
+  if (navigator.share) {
+    var promesa = null;
+    try { promesa = navigator.share({ title: titulo, url: abs }); } catch (e) { promesa = null; }
+    if (promesa && typeof promesa.then === 'function') {
+      promesa.then(function () { liberar(); }, function () { liberar(); });
+    } else {
+      liberar();
+    }
+    return;
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      navigator.clipboard.writeText(abs).then(function () {
+        marcar('Copiado');
+        liberar();
+      }, function () {
+        marcar('Copia el enlace');
+        liberar();
+      });
+    } catch (e) {
+      marcar('Copia el enlace');
+      liberar();
+    }
+    return;
+  }
+  marcar('Copia el enlace');
+  liberar();
+}
+
+function feedCard(item) {
+  var card = document.createElement('div');
+  card.className = 'feed-post-card';
+  card.innerHTML = feedCardHTML(item || {});
+  var share = card.querySelector('[data-feed-share]');
+  if (share) {
+    share.addEventListener('click', function () { feedCompartir(share); });
+  }
+  return card;
+}
+
+function feedAsegurarObserver() {
+  /* Ciclo de vida en dos piezas: esta CREA el observer si falta y el sentinel
+     existe; feedActualizarPaginacion() lo DESCONECTA al agotar la categoria.
+     Asi cambiar de filtro revive el scroll infinito en vez de dejarlo muerto. */
+  if (feedObserver) return;
+  var cent = document.getElementById('feed-timeline-sentinel');
+  if (!cent || !('IntersectionObserver' in window)) return;
+  feedObserver = new IntersectionObserver(function (entradas) {
+    for (var i = 0; i < entradas.length; i++) {
+      if (entradas[i].isIntersecting && feedHayMas && feedCursor && !feedCargando && feedInicializado) {
+        feedTimelineCargar(false);
+        return;
+      }
+    }
+  }, { rootMargin: '160px' });
+  feedObserver.observe(cent);
+}
+
+function feedActualizarPaginacion() {
+  var btn = document.getElementById('feed-cargar-mas');
+  if (btn) btn.hidden = !feedHayMas;
+  if (!feedHayMas) {
+    if (feedObserver) {
+      try { feedObserver.disconnect(); } catch (e) {}
+      feedObserver = null;
+    }
+    return;
+  }
+  feedAsegurarObserver();
+}
+
+function feedTimelineCargar(reset) {
+  var lista = document.getElementById('feed-timeline-lista');
+  if (!lista) return;
+  if (feedCargando) return;
+  /* Anti-bucle: sin cursor no se puede pedir otra pagina (keyset v2).
+     Si el backend dijo hay_mas pero no entrego siguiente_cursor,
+     se corta aqui en vez de repetir skeletons. */
+  if (!reset && !feedCursor) { feedHayMas = false; feedActualizarPaginacion(); return; }
+  feedCargando = true;
+  var avisosViejos = lista.querySelectorAll('[data-feed-aviso]');
+  for (var a = avisosViejos.length - 1; a >= 0; a--) {
+    if (avisosViejos[a].parentNode) avisosViejos[a].parentNode.removeChild(avisosViejos[a]);
+  }
+  if (reset) {
+    lista.innerHTML = '';
+    feedVistos = {};
+    feedCursor = null;
+    feedHayMas = true;
+    feedAsegurarObserver();
+  }
+  feedPonerSkeletons(lista, 2);
+  var endpoint = '/api/interacciones?tipo=feed_timeline&categoria=' + encodeURIComponent(feedCategoriaActiva)
+    + '&limit=20';
+  if (!reset && feedCursor) endpoint += '&cursor=' + encodeURIComponent(feedCursor);
+  fetch(endpoint)
+    .then(function (r) {
+      if (!r.ok) throw new Error('http');
+      return r.json();
+    })
+    .then(function (res) {
+      var items = (res && res.items) || [];
+      var pag = (res && res.paginacion) || null;
+      feedCursor = (pag && pag.siguiente_cursor) ? String(pag.siguiente_cursor) : null;
+      /* hay_mas solo cuenta si hay cursor: sin cursor no hay via de paginacion. */
+      feedHayMas = !!(pag && pag.hay_mas && feedCursor);
+      if (!items.length) {
+        if (!lista.querySelector('.feed-post-card')) {
+          feedPintaVacio(lista, feedVacios[feedCategoriaActiva] || feedVacios.todos);
+        }
+        feedHayMas = false;
+        return;
+      }
+      items.forEach(function (item) {
+        var clave = (item && item.id !== undefined && item.id !== null) ? String(item.id) : '';
+        if (clave) {
+          if (feedVistos[clave]) return;
+          feedVistos[clave] = 1;
+        }
+        lista.appendChild(feedCard(item));
+      });
+      if (reset && res && res.degradado && res.degradado.length) {
+        feedPintaAviso(lista, 'Parte del feed no esta disponible ahora.');
+      }
+    })
+    .catch(function () {
+      if (!lista.querySelector('.feed-post-card')) feedPintaVacio(lista, 'No se pudo cargar el feed');
+      feedHayMas = false;
+      feedCursor = null;
+    })
+    .then(function () {
+      feedQuitarSkeletons(lista);
+      feedCargando = false;
+      feedActualizarPaginacion();
+    });
+}
+
+function feedInitFeed() {
+  var lista = document.getElementById('feed-timeline-lista');
+  if (!lista) return;
+  var barra = document.getElementById('feed-filtros-bar');
+  if (barra && !barra.getAttribute('data-feed-bind')) {
+    barra.setAttribute('data-feed-bind', '1');
+    barra.addEventListener('click', function (ev) {
+      var btn = ev.target && ev.target.closest ? ev.target.closest('.btn-filtro-feed') : null;
+      if (!btn || !barra.contains(btn)) return;
+      var filtros = barra.querySelectorAll('.btn-filtro-feed');
+      for (var i = 0; i < filtros.length; i++) {
+        filtros[i].classList.remove('active');
+        filtros[i].setAttribute('aria-pressed', 'false');
+      }
+      btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
+      feedCategoriaActiva = btn.getAttribute('data-categoria') || 'todos';
+      feedInicializado = true;
+      feedTimelineCargar(true);
+    });
+  }
+  var mas = document.getElementById('feed-cargar-mas');
+  if (mas && !mas.getAttribute('data-feed-bind')) {
+    mas.setAttribute('data-feed-bind', '1');
+    mas.addEventListener('click', function () {
+      if (feedHayMas && feedCursor && !feedCargando) feedTimelineCargar(false);
+    });
+  }
+  feedAsegurarObserver();
+  var tabs = document.querySelectorAll('.ctab');
+  for (var j = 0; j < tabs.length; j++) {
+    var oc = String(tabs[j].getAttribute('onclick') || '');
+    if (oc.indexOf("showCommTab('feed')") > -1 && !tabs[j].getAttribute('data-feed-bind')) {
+      tabs[j].setAttribute('data-feed-bind', '1');
+      tabs[j].addEventListener('click', function () {
+        if (feedInicializado) return;
+        feedInicializado = true;
+        feedTimelineCargar(true);
+      });
+    }
+  }
+  var panel = document.getElementById('cpanel-feed');
+  if (panel && panel.classList.contains('on') && !feedInicializado) {
+    feedInicializado = true;
+    feedTimelineCargar(true);
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function () {
+    try { feedInitFeed(); } catch (e) {}
+  });
+} else {
+  try { feedInitFeed(); } catch (e) {}
+}
+/* FEED_TIMELINE_END */
 
 /* ---- ACTIVO OCULTO (Wayfarer, Entrega 016) ----
    Segmento gamificado: los viajeros proponen puntos secretos con

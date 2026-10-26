@@ -8471,6 +8471,230 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: feedRows });
       }
 
+      // Timeline de feed (contrato estable para el front). v2: 4 origenes
+      // REALES, cada uno con su tabla y su linea de referencia en el repo:
+      //   medio   -> album_fotos x albumes x usuarios (ver :8440, mismo
+      //              discriminador 'album_foto' que resolverMediaItem)
+      //   escrito -> interacciones i.tipo='resena' (ver :6469-6473) con
+      //              contexto del destino via LEFT JOIN destinos
+      //   lugar   -> destinos publicados (status='published', ver
+      //              api/utilidades.js:592) con foto_hero
+      //   plan    -> planes_viaje con activo = true (ver :7259)
+      // UN SOLO wrapper: SELECT * FROM (UNION ALL ...) t con ORDER BY y filtro
+      // KEYSET uniformes, de modo que 1 origen o 4 comparten la MISMA logica.
+      // id se proyecta como TEXT unico global ("origen:uuid"): el keyset es
+      // estable y no hay colisiones entre tablas. El orden global es
+      // COALESCE(creado_en, epoch) DESC, id DESC: la MISMA expresion ordena y
+      // filtra, asi que el keyset nunca reentrega una fila.
+      // Paginacion: cursor opaco base64url("ISO|id") como via principal; sin
+      // cursor se mantiene offset (compatibilidad con el contrato anterior).
+      // hay_mas se calcula con limit+1 filas y recorte, NO con length===limit.
+      // LIMIT tope 20 (no 50 como mi_feed_fotos): el timeline es una tira
+      // corta con scroll, no el feed completo.
+      if (tipo === 'feed_timeline') {
+        var tlCat = String(req.query.categoria || 'todos').toLowerCase();
+        if (['todos', 'medio', 'escrito', 'lugar', 'plan'].indexOf(tlCat) === -1)
+          tlCat = 'todos';
+        var tlLimit = parseInt(req.query.limit || '20', 10);
+        if (!isFinite(tlLimit) || tlLimit < 1) tlLimit = 20;
+        if (tlLimit > 20) tlLimit = 20;
+        var tlOffset = parseInt(req.query.offset || '0', 10);
+        if (!isFinite(tlOffset) || tlOffset < 0) tlOffset = 0;
+
+        // Cursor opaco: base64url("creado_en ISO|id"). Sin Buffer no hay
+        // cursor valido y se cae a offset (compatibilidad), nunca a 500.
+        function tlEncCursor(iso, idTxt) {
+          return Buffer.from(String(iso) + '|' + String(idTxt), 'utf8')
+            .toString('base64')
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+        function tlDecCursor(raw) {
+          var s = String(raw || '').replace(/-/g, '+').replace(/_/g, '/');
+          while (s.length % 4 !== 0) s += '=';
+          try { return Buffer.from(s, 'base64').toString('utf8'); }
+          catch (e) { return ''; }
+        }
+        var tlCursor = null;
+        if (req.query.cursor) {
+          var tlDec = tlDecCursor(req.query.cursor);
+          var tlIx = tlDec.indexOf('|');
+          if (tlIx > 0) {
+            var tlTs = tlDec.slice(0, tlIx);
+            var tlIdTxt = tlDec.slice(tlIx + 1);
+            var tlDate = new Date(tlTs);
+            if (tlIdTxt && !isNaN(tlDate.getTime()))
+              tlCursor = { ts: tlDate.toISOString(), id: tlIdTxt };
+          }
+        }
+
+        // Cada origen devuelve YA las columnas normalizadas del contrato, con
+        // id TEXT prefijado por el origen. Nada de input de usuario aqui.
+        function tlSelOrigen(og) {
+          if (og === 'medio') {
+            return 'SELECT \'album_foto:\' || af.id::text AS id,'
+              + ' \'album_foto\' AS tipo, \'medio\' AS categoria,'
+              + ' COALESCE(af.media_title, a.titulo)::text AS titulo,'
+              + ' af.media_title::text AS texto,'
+              + ' af.foto_url AS media_url, af.foto_type AS media_type,'
+              + ' af.autor_original_id AS autor_id, u.nombre AS autor_nombre,'
+              + ' COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar,'
+              + ' af.creado_en AS creado_en,'
+              + ' \'/galeria.html?album_id=\' || a.id::text AS url'
+              + ' FROM album_fotos af'
+              + ' JOIN albumes a ON a.id = af.album_id'
+              + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
+              + ' WHERE af.activo = true AND af.visible = true AND a.activo = true';
+          }
+          if (og === 'escrito') {
+            // titulo = nombre del destino resenado; url = ficha real por slug
+            // (misma convencion que el sitemap: BASE + '/' + slug + '.html',
+            // api/utilidades.js:178).
+            return 'SELECT \'resena:\' || i.id::text AS id,'
+              + ' \'resena\' AS tipo, \'escrito\' AS categoria,'
+              + ' d.nombre::text AS titulo, i.texto::text AS texto,'
+              + ' NULL::text AS media_url, NULL::text AS media_type,'
+              + ' i.usuario_id AS autor_id, u.nombre AS autor_nombre,'
+              + ' COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar,'
+              + ' i.creado_en AS creado_en,'
+              + ' CASE WHEN d.slug IS NULL THEN NULL::text'
+              + '  ELSE \'/\' || d.slug || \'.html\' END AS url'
+              + ' FROM interacciones i'
+              + ' LEFT JOIN usuarios u ON u.id = i.usuario_id'
+              + ' LEFT JOIN destinos d ON d.id = i.destino_id'
+              + ' WHERE i.tipo = \'resena\' AND i.activo = true';
+          }
+          if (og === 'lugar') {
+            // status='published' es el literal de las lecturas publicas
+            // (api/utilidades.js:592 y :617); el blog se excluye igual que
+            // en esos listados. texto = ciudad/region sin comas huerfanas.
+            return 'SELECT \'destino:\' || d.id::text AS id,'
+              + ' \'destino\' AS tipo, \'lugar\' AS categoria,'
+              + ' d.nombre::text AS titulo,'
+              + ' NULLIF(CONCAT_WS(\', \', NULLIF(d.ciudad, \'\'),'
+              + ' NULLIF(d.region, \'\')), \'\')::text AS texto,'
+              + ' d.foto_hero AS media_url, \'image\'::text AS media_type,'
+              + ' NULL::uuid AS autor_id, NULL::text AS autor_nombre,'
+              + ' \'\'::text AS autor_avatar,'
+              + ' d.creado_en AS creado_en,'
+              + ' CASE WHEN d.slug IS NULL THEN NULL::text'
+              + '  ELSE \'/\' || d.slug || \'.html\' END AS url'
+              + ' FROM destinos d'
+              + ' WHERE d.status = \'published\' AND d.categoria_slug <> \'blog\'';
+          }
+          return 'SELECT \'plan:\' || p.id::text AS id,'
+            + ' \'plan\' AS tipo, \'plan\' AS categoria,'
+            + ' p.destino::text AS titulo, p.descripcion::text AS texto,'
+            + ' NULL::text AS media_url, NULL::text AS media_type,'
+            + ' p.creador_id AS autor_id, u.nombre AS autor_nombre,'
+            + ' COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar,'
+            + ' p.creado_en AS creado_en, \'/comunidad.html\'::text AS url'
+            + ' FROM planes_viaje p'
+            + ' LEFT JOIN usuarios u ON u.id = p.creador_id'
+            + ' WHERE p.activo = true';
+        }
+
+        // Wrapper unico. Limit/offset/cursor SIEMPRE parametrizados.
+        function tlSqlWrapper(ogs, conCursor) {
+          var s = 'SELECT * FROM (' + ogs.map(tlSelOrigen).join(' UNION ALL ') + ') t';
+          if (conCursor)
+            s += ' WHERE (COALESCE(t.creado_en, to_timestamp(0)), t.id)'
+              + ' < ($1::timestamptz, $2::text)';
+          s += ' ORDER BY COALESCE(t.creado_en, to_timestamp(0)) DESC, t.id DESC';
+          if (conCursor) s += ' LIMIT $3';
+          else s += ' LIMIT $1 OFFSET $2';
+          return s;
+        }
+        function tlParams(conCursor, nPedidas, nOffset) {
+          if (conCursor) return [tlCursor.ts, tlCursor.id, nPedidas];
+          return [nPedidas, nOffset];
+        }
+
+        var tlSolicitados = (tlCat === 'todos')
+          ? ['medio', 'escrito', 'lugar', 'plan']
+          : [tlCat];
+        var tlActivos = tlSolicitados.slice();
+        var tlDegradado = [];
+        var tlRows = [];
+        try {
+          tlRows = await sql(tlSqlWrapper(tlActivos, !!tlCursor),
+            tlParams(!!tlCursor, tlLimit + 1, tlOffset));
+        } catch (tlErr) {
+          if (!(tlErr && (tlErr.code === '42P01' || tlErr.code === '42703')))
+            throw tlErr;
+          // Degradacion POR ORIGEN: se sondea cada fuente sola y solo se
+          // retiran las que tienen el esquema ausente. El resto se conserva,
+          // asi "todos" sigue devolviendo las otras 3 en vez de [].
+          var tlCaidas = {};
+          for (var tlK = 0; tlK < tlActivos.length; tlK++) {
+            var tlOg = tlActivos[tlK];
+            try {
+              await sql('SELECT * FROM (' + tlSelOrigen(tlOg) + ') t LIMIT 1');
+            } catch (tlErr2) {
+              if (tlErr2 && (tlErr2.code === '42P01' || tlErr2.code === '42703')) {
+                tlCaidas[tlOg] = true;
+                console.warn('TRACE: feed_timeline origen ' + tlOg
+                  + ' ausente (migracion pendiente); degradado');
+              } else {
+                throw tlErr2;
+              }
+            }
+          }
+          tlActivos = tlActivos.filter(function(o) { return !tlCaidas[o]; });
+          tlDegradado = tlSolicitados.filter(function(o) { return !!tlCaidas[o]; });
+          tlRows = [];
+          if (tlActivos.length) {
+            try {
+              tlRows = await sql(tlSqlWrapper(tlActivos, !!tlCursor),
+                tlParams(!!tlCursor, tlLimit + 1, tlOffset));
+            } catch (tlErr3) {
+              if (!(tlErr3 && (tlErr3.code === '42P01' || tlErr3.code === '42703')))
+                throw tlErr3;
+              tlDegradado = tlSolicitados.slice();
+              tlRows = [];
+            }
+          }
+        }
+        if (!Array.isArray(tlRows)) tlRows = [];
+        var tlHayMas = tlRows.length > tlLimit;
+        var tlItems = tlRows.slice(0, tlLimit).map(function(r) {
+          return {
+            id: r.id,
+            tipo: r.tipo,
+            categoria: r.categoria,
+            titulo: (r.titulo === null || r.titulo === undefined) ? null : String(r.titulo),
+            texto: (r.texto === null || r.texto === undefined) ? null : String(r.texto),
+            media_url: r.media_url || null,
+            media_type: r.media_type || null,
+            autor_id: r.autor_id || null,
+            autor_nombre: r.autor_nombre || null,
+            autor_avatar: r.autor_avatar || '',
+            creado_en: r.creado_en || null,
+            url: r.url || null
+          };
+        });
+        // siguiente_cursor = cursor del ULTIMO item devuelto; null si no hay
+        // mas. Se usa la MISMA clave del ORDER BY (epoch si creado_en es null).
+        var tlSigCursor = null;
+        if (tlHayMas && tlItems.length) {
+          var tlLast = tlItems[tlItems.length - 1];
+          var tlLastDate = new Date(tlLast.creado_en ? tlLast.creado_en : 0);
+          if (isNaN(tlLastDate.getTime())) tlLastDate = new Date(0);
+          tlSigCursor = tlEncCursor(tlLastDate.toISOString(), String(tlLast.id));
+        }
+        return res.status(200).json({
+          ok: true,
+          categoria: tlCat,
+          items: tlItems,
+          paginacion: {
+            limit: tlLimit,
+            offset: tlOffset,
+            hay_mas: tlHayMas,
+            siguiente_cursor: tlSigCursor
+          },
+          degradado: tlDegradado
+        });
+      }
+
       // ADR-032 (v17): "Mis fotos" del museo. Une las fotos agregadas a
       // albumes propios (album_fotos.agregador_id) con las fotos de viajero
       // subidas en fichas (interacciones.tipo='foto', excluyendo las filas

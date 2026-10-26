@@ -9571,3 +9571,136 @@ Y la parte que mas importa a largo plazo es **D6**: relajar un campo obligatorio
 **Precision necesaria (ADR-006):** `ADR-043` **no** regula esta materia. `ADR-043` es *"Contenedor persistente separado del host de inyeccion dinamica"* (`DECISIONS.md:2079`) y no menciona miniaturas ni recursos de media; `DECISIONS.md` no contiene **ninguna** aparicion de `miniatura_url` fuera de este bloque. La obligatoriedad no nacio en un ADR: nacio **en codigo** sobre una migracion que dejaba el campo nullable. Por eso este ADR cita la **migracion 043** por su numero de archivo y **no** un ADR-043 inexistente en la materia.
 
 **Dependencias intactas:** ADR-039 (Museo URL-only y visibilidad por recurso), ADR-044 (abstraccion compartida de media / anti-duplicidad), ADR-010 y ADR-001 (presupuesto 8/8 y cero endpoints nuevos), ADR-002 (ASCII-safe en serverless), ADR-008 (`onerror` con fallback) y ADR-003 (cero borrado fisico). **Ninguna se deroga.**
+
+## ADR-105: El feed consolidado de la comunidad vive en **UNA rama GET `feed_timeline`** de la función serverless existente (`api/interacciones.js`), con **contrato único** para cuatro orígenes reales, **degradación por origen** (`degradado[]`) y **keyset `(creado_en, id)`** como paginación principal; `offset` queda como compatibilidad y el **`id` prefijado por origen** es requisito del keyset y del dedupe en cliente [NO deroga ninguna premisa de ADR previos; **acota** ADR-010 y ADR-001 (8/8, cero funciones nuevas) y **reafirma** ADR-002, ADR-003 y ADR-008]
+
+**ID:** ADR-105
+**Fecha:** 2026-10-26
+**Autor:** Chief Architect (documenta una decisión de **arquitectura** ya implementada y verificada en local; el gate de riesgo de `@architect` fue CONFIRMADO explícitamente por el operador y el dominio backend tiene gate propio de `@backend-dev`).
+**Estado:** **ACEPTADO / YA APLICADO** en `api/interacciones.js` (rama `GET ?tipo=feed_timeline`) y `comunidad.html` (panel `#cpanel-feed` + bloque JS `/* FEED_TIMELINE_START */ ... /* FEED_TIMELINE_END */`). Es un ADR **retrospectivo**: no propone código nuevo, **no** crea endpoint, **no** crea tabla, **no** ejecuta migración y **no** crea índice ni backfill.
+
+**Numeración (ADR-006, verificado contra el archivo real):** el mayor encabezado del fichero era **`ADR-104`** (línea **9474**); la cadena `ADR-105` aparecía **0** veces. Se escribe como **105**, el siguiente consecutivo libre. Tamaño real medido antes de esta sección: **1.486.857 bytes / 9.573 líneas / 103 encabezados `## ADR-`**. **Precisión de conteo:** un `Select-String "^## ADR-0"` cuenta **98** y **no** sube con este ADR, porque `ADR-105` empieza por `ADR-1`; el conteo que manda es `^## ADR-` (**103 → 104**).
+
+**Citas de línea re-medidas (ADR-006):** las referencias a `comunidad.html` se re-verificaron contra el archivo real tras la auditoría: `FEED_TIMELINE_END` **`:3705`**, `feedVistos` **`:3367`**, reset **`:3587`**, dedupe **`:3615-3619`** (antes `:3677` / `:3361` / `:3571` / `:3593-3594`). El panel (`:1087` / `:1088` / `:1095`) no requería corrección.
+
+### Problema
+
+`comunidad.html` tenía las cuatro actividades de la comunidad **en cuatro pantallas distintas** y ninguna vista que las mezclara: los medios viven en `album_fotos` (con su álbum), las reseñas en `interacciones` (`tipo='resena'`), los lugares en `destinos` publicados y los planes en `planes_viaje` activos. El usuario que entraba a "Comunidad" no veía *qué está pasando*, veía *qué pestaña abrió*. Y la actividad **más reciente de cada fuente** no tenía un lugar común donde ordenarse: cualquier intento de "últimas novedades" obligaba a componer cuatro listas en cliente, cada una con su propia paginación, su propio formato y su propio criterio de "lo último".
+
+El problema no era pintar tarjetas, era **decidir tres cosas a la vez** sin margen de error de presupuesto:
+
+1. **Dónde vive el feed.** El presupuesto de Vercel Hobby está **8/8** (ADR-010): un `api/feed.js` no es una opción, es un endpoint imposible. Y "N endpoints, uno por origen" reproduce el problema en el servidor.
+2. **Qué se hace cuando una fuente falla.** Un feed que suma cuatro tablas **hereda la fragilidad de las cuatro**: una tabla ausente/renombrada en un entorno (o un `42703` por una columna que cambió) convertía la vista completa en un `500`. Un feed que se cae entero por la fuente menos importante es peor producto que una lista corta.
+3. **Cómo se pagina sin duplicar.** Un `UNION ALL` ordenado por fecha paginado con `OFFSET` es exactamente el caso donde el offset **miente**: entre la página 1 y la página 2 entra una publicación nueva, el orden global se desplaza una fila y el usuario **ve la misma tarjeta dos veces** (o se salta una). Con cuatro orígenes que escriben a ritmos distintos, esto no es un caso teórico: es el comportamiento normal en hora pico.
+
+### Datos medidos (2026-10-26, contra el archivo real; el código gana a la documentación, ADR-006)
+
+1. **La rama existe y es una sola:** `api/interacciones.js:8474-8696` (**224 líneas nuevas, 0 líneas borradas**). El comentario de contrato abre en `:8474` (*"Timeline de feed (contrato estable para el front). v2: 4 origenes REALES..."*), el despacho `if (tipo === 'feed_timeline')` está en **`:8494`** y hay un `console.warn('TRACE: feed_timeline origen ...')` en **`:8635`** que hace trazable por origen el sondeo de degradación.
+2. **Cero archivos nuevos en `api/`:** sigue habiendo **8/8** funciones serverless. No se abrió endpoint (ADR-010) y no se duplicó el motor de sesión: la rama vive dentro de la función que ya tiene CORS, `verificarSesion` y el resto de ramas GET.
+3. **Los cuatro orígenes son tablas reales, no composites del cliente:** `medio` -> `album_fotos` **JOIN** `albumes`; `escrito` -> `interacciones WHERE tipo='resena'` (+ `destinos` para el contexto del lugar reseñado); `lugar` -> `destinos WHERE d.status = 'published' AND d.categoria_slug <> 'blog'` (el literal `'published'` es el mismo de las lecturas públicas, `api/utilidades.js:592` y `:617`; el blog se excluye porque ya tiene su propia superficie); `plan` -> `planes_viaje WHERE activo = true`. `todos` es un **`UNION ALL`** de los cuatro con orden global `COALESCE(creado_en, to_timestamp(0)) DESC, id DESC` (el `COALESCE` existe porque las cuatro tablas no comparten la misma garantía de `creado_en` y `NULL` rompería el orden del keyset).
+4. **Parámetros y validación de entrada:** `categoria` contra lista cerrada `todos|medio|escrito|lugar|plan` con **fallback a `todos`** cuando llega inválida (nunca `400` por basura en la query: el feed es lectura pública y un `400` ahí solo rompe la vista); `limit` con **default 20 y tope 20**; `offset` **legado**; `cursor` **opaco**, `base64url(ISO|id)`.
+5. **Contrato de respuesta:** `{ok, categoria, items[{id, tipo, categoria, titulo, texto, media_url, media_type, autor_id, autor_nombre, autor_avatar, creado_en, url}], paginacion{limit, offset, hay_mas, siguiente_cursor}, degradado[]}`. `hay_mas` se calcula por **`limit+1` recortado** (se pide una fila de más y se descarta): una sola consulta, sin `COUNT(*)` sobre cuatro tablas.
+6. **Degradación por origen implementada, no prometida:** si el SQL de una fuente lanza **`42P01`** (tabla ausente) o **`42703`** (columna ausente), se **sondea por fuente**, se retira la caída y se **reintenta una vez**; la fuente excluida entra en `degradado[]`. Resultado: **nunca un `500` por tabla ausente**. Ambas señales aparecen 3 veces en el bloque.
+7. **El cliente consume el contrato, no lo adivina:** `comunidad.html` panel `#cpanel-feed` en **`:1087`**, barra de filtros `#feed-filtros-bar` en **`:1088`** con **5 botones** (`todos`, `medio`, `escrito`, `lugar`, `plan`) que mantienen `aria-pressed` y `aria-selected` en espejo; lista `#feed-timeline-lista` en **`:1095`** (`aria-live="polite"`), centinela `#feed-timeline-sentinel` y botón `#feed-cargar-mas` como **fallback** cuando no hay `IntersectionObserver`. JS inline entre **`:3352`** (`/* FEED_TIMELINE_START */`) y **`:3705`** (`/* FEED_TIMELINE_END */`); `feedVistos` declarado en **`:3367`** y reseteado en **`:3587`** al cambiar de filtro; dedupe en **`:3615-3619`**.
+8. **Higiene del cliente medida:** `IntersectionObserver` **2** apariciones, `feedUrlSegura` **4**, `feedEsc` **13** (todo dato del servidor pasa por escape), `onerror` **3** (ADR-008: la imagen rota no deja hueco) y `feedUrlSegura` bloquea `javascript:` y `data:` antes de cualquier `href`/`src`.
+9. **Verificación de esta tanda:** `node --check api/interacciones.js` **pass**; bytes `> 127` en el bloque backend = **0** y backticks = **0** (ADR-002); bytes `> 127` en el bloque JS del cliente = **0**; el bloque JS parsea y los `div` del panel están balanceados.
+10. **Riesgo de coste medido con lo que hay:** `UNION ALL` de **4** orígenes con **`LEFT JOIN usuarios`** (3 apariciones del join en el bloque) y **`LIMIT (limit + 1)`** = **21** filas con el default. **No se creó ni se verificó ningún índice en esta tanda** y no se ejecutó `EXPLAIN`: es la deuda 1 de este ADR, registrada como riesgo abierto y **sin inventar nombres de índice**.
+
+### Opciones evaluadas
+
+1. **A. Endpoint nuevo `api/feed.js`.** Descartada por presupuesto: **8/8** funciones agotadas (ADR-010). Ni siquiera es una discusión de diseño, es un límite de plataforma; y aun con hueco, un endpoint que solo lee cuatro tablas para componer una vista habría duplicado CORS, verificación de sesión y manejo de errores de una función que ya los tiene.
+2. **B. Feed solo de medios (`album_fotos`).** Descartada: convierte el feed de la comunidad en **un álbum**. La actividad real del sitio incluye reseñas, lugares publicados y planes; un feed que ignora tres de cuatro fuentes no es "lo que pasa", es "lo que se subió". Menos consultas, sí; menos producto, también.
+3. **C. `OFFSET` puro como única paginación.** Descartada por corrección, no por gusto: con inserción concurrente entre páginas el orden global se desplaza y el `OFFSET` **duplica o salta** filas. En un feed ordenado por fecha eso se percibe inmediatamente (la misma tarjeta dos veces). Además el coste crece con la página, y en un `UNION ALL` de cuatro orígenes el `OFFSET` se paga en las cuatro ramas.
+4. **D. Cuatro ramas GET separadas (`feed_medio`, `feed_escrito`, ...) en la misma función.** Descartada: cumple el presupuesto (es la misma función) pero **multiplica el contrato por cuatro** y devuelve al cliente el trabajo que este ADR quiere quitarle: ordenar, deduplicar entre fuentes y paginar en cuatro cursores a la vez. Además `todos` seguiría sin existir.
+5. **E. Una rama `feed_timeline` en la función existente, contrato único por categoría, `UNION ALL` de los cuatro orígenes, keyset `(creado_en, id)` y degradación por origen (ELEGIDA).** Cero endpoints, una sola forma de pedir el feed y una sola forma de paginar.
+
+### Decisión
+
+**D1. El feed es UNA rama de una función existente, no un endpoint.** `GET /api/interacciones?tipo=feed_timeline` (`api/interacciones.js:8474-8696`). Presupuesto Vercel Hobby **8/8 intacto**, cero archivos nuevos en `api/`, y el feed hereda CORS, sesión y el manejo de errores que la función ya tenía. **Prohibido** proponer `api/feed.js` o cualquier función nueva para esto: si mañana el feed necesita otro dato, se extiende **esta** rama con otro query param.
+
+**D2. Un contrato único, con `categoria` como selector y `todos` como composición.**
+- `categoria` se valida contra la lista cerrada `todos|medio|escrito|lugar|plan`; un valor inválido **cae a `todos`**, no devuelve `400` (lectura pública: la query nunca debe tumbar la vista).
+- Los cuatro orígenes son los reales: `medio` -> `album_fotos JOIN albumes`; `escrito` -> `interacciones WHERE tipo='resena'` con `destinos` para contexto; `lugar` -> `destinos WHERE status='published' AND categoria_slug <> 'blog'`; `plan` -> `planes_viaje WHERE activo = true`. El cliente **no conoce tablas**: solo ve `items[]` con el mismo esquema venga de donde venga.
+- `todos` es `UNION ALL` de los cuatro con orden global `COALESCE(creado_en, to_timestamp(0)) DESC, id DESC`. El `COALESCE` es normativo: sin él, una fila con `creado_en` nulo rompe el orden y, con él, el keyset.
+
+**D3. Keyset `(creado_en, id)` como vía principal; `offset` solo como compatibilidad.** El cursor es **opaco** al cliente: `base64url(ISO|id)`. El servidor compara por tupla `(creado_en, id)` con `<` sobre el par, de modo que dos filas con el **mismo timestamp** no se pisan ni se repiten (el `id` desempata). Motivo único y suficiente: con `OFFSET`, una publicación concurrente entre la página 1 y la 2 **desplaza el orden global** y produce duplicado o salto; el keyset es **inmune** a inserciones porque ancla en el último elemento visto, no en una posición. `offset` se conserva porque ya está en el contrato y algún consumidor lo usa: **no se retira en este ADR** (deuda 5).
+
+**D4. El `id` de cada item va PREFIJADO por su origen.** Un `id` global no existe: `album_fotos.id`, `interacciones.id`, `destinos.id` y `planes_viaje.id` son **cuatro secuencias distintas** que pueden colisionar. Por eso el item expone un `id` con prefijo de origen. Esto no es cosmético: es **requisito del keyset** (el `id` es el desempate del cursor y debe ser único en el conjunto ordenado) y **requisito del dedupe en cliente** (`feedVistos[id]` en `comunidad.html:3615-3619` no puede confundir una foto con una reseña). Un `id` sin prefijo habría hecho que el dedupe **ocultara** contenido legítimo.
+
+**D5. Degradación por origen: una fuente caída degrada el feed, no lo rompe.** Si el SQL de un origen lanza `42P01`/`42703`, se **sondea por fuente** (con traza `TRACE: feed_timeline origen ...`, `:8635`), se **retira** la fuente caída y se **reintenta una vez**; la fuente queda listada en **`degradado[]`** del contrato. **Nunca `500` por tabla o columna ausente.** La regla es explícita porque el fallo esperable no es "Neon no responde" (eso sí es un error de la vista) sino "una de las cuatro tablas cambió": perder la sección de planes durante un despliegue es aceptable, perder la comunidad entera no. `degradado[]` **viaja en la respuesta** para que el cliente pueda avisar; no se silencia.
+
+**D6. `limit` con default 20 y tope 20, y `hay_mas` por `limit+1`.** El tope es **duro** en servidor (no se confía en el cliente) y `hay_mas` se resuelve pidiendo **una fila de más** y recortando: una consulta por página, sin `COUNT(*)` sobre cuatro tablas. `siguiente_cursor` solo se emite cuando `hay_mas` es cierto.
+
+**D7. El cliente pagina con `IntersectionObserver` y tiene fallback explícito.** `#feed-timeline-sentinel` dispara la carga; `#feed-cargar-mas` existe como **botón visible cuando no hay `IntersectionObserver`** (o cuando el observer no se dispara). Reglas de cliente que este ADR fija por obligatorias: dedupe por `id` (`feedVistos`, reseteado al cambiar de filtro), `feedEsc` sobre **todo** dato del servidor, `feedUrlSegura` bloqueando `javascript:` y `data:` antes de cualquier `href`/`src`, y `onerror` con fallback en las imágenes (ADR-008). Nada de esto es opcional: son las cuatro formas en que un feed compuesto por datos de usuario se rompe.
+
+**D8. Sin tabla nueva, sin migración, sin backfill y sin índice en esta tanda.** El feed **lee** lo que ya existe; no introduce almacenamiento propio ni materializa nada. Cualquier caché o tabla de feed es un ADR aparte y hoy no se necesita.
+
+### Justificación
+
+Las tres decisiones difíciles (D1, D3, D4) se justifican por el mismo criterio: **el feed es una lectura compuesta, y las lecturas compuestas fallan por composición, no por pintado**.
+
+**D1** no es una preferencia estética: es el único diseño compatible con **8/8**. Y tiene un beneficio secundario real: al vivir en la función que ya resuelve sesión y CORS, el feed **no necesita** un segundo camino de autenticación ni un segundo mapa de errores.
+
+**D3** se elige por **corrección demostrable**. El `OFFSET` no es "menos eficiente": es **incorrecto** en un feed ordenado por fecha con escrituras concurrentes. La prueba es trivial y no depende del volumen: si entre la página *n* y la *n+1* se inserta una fila que ordena antes del corte, el `OFFSET` retrocede una posición y **repite** el último elemento; si se borra, **salta** uno. El keyset, al anclar en `(creado_en, id)` del último elemento entregado, no tiene "posición": tiene un **punto de corte**, y un punto de corte no se mueve cuando entran filas. Se conserva `offset` por compatibilidad, pero **no es la vía** y así queda escrito para que nadie lo use como principal en el próximo consumidor.
+
+**D4** es la pieza que hace posible D3 y que suele olvidarse. Un keyset necesita un desempate **estable y único**; cuatro tablas con secuencias independientes **no lo dan** sin prefijo. Y el mismo prefijo resuelve el dedupe del cliente: dos orígenes distintos pueden producir el mismo número, y un `feedVistos` que los confunda **borraría contenido sin error visible** — el peor tipo de bug, porque no hay traza.
+
+**D2 y D5** son la misma idea aplicada a dos ejes: **el cliente no debe saber de dónde viene cada cosa** (contrato único) y **no debe quedarse sin nada cuando una fuente cambia** (degradación por origen). Juntas convierten cuatro consultas frágiles en **una superficie estable**.
+
+### Consecuencias
+
+**Positivas**
+
+- **Una sola forma de pedir el feed** (`?tipo=feed_timeline&categoria=...`) y **un solo contrato** para cinco vistas lógicas; el cliente no tiene cinco paginaciones.
+- **Presupuesto intacto**: 8/8 y **0** archivos nuevos en `api/` (ADR-010, ADR-001).
+- **Paginación correcta bajo concurrencia** por keyset, y **dedupe determinista** por `id` prefijado.
+- **Fallo acotado**: una tabla renombrada o ausente degrada **una** categoría (`degradado[]`) en vez de tumbar la vista; cero `500` por `42P01`/`42703`.
+- **Orden global único**: `todos` es comparable entre orígenes gracias a `COALESCE(creado_en, to_timestamp(0))` y al desempate por `id`.
+- **El cliente queda blindado en los cuatro puntos que importan**: escape (`feedEsc`), URL segura (`feedUrlSegura`), imagen rota (`onerror`, ADR-008) y duplicado (`feedVistos`).
+
+**Negativas**
+
+- **Coste de una lectura compuesta:** `UNION ALL` de cuatro orígenes con `LEFT JOIN usuarios` y `LIMIT 21`. El coste **no está medido** (`EXPLAIN` pendiente) y **no hay índice nuevo verificado**: si `destinos` o `album_fotos` crecen, la rama `todos` es la primera que se degrada (deuda 1).
+- **Dos caminos de paginación conviven** (`cursor` y `offset`) mientras exista un consumidor del segundo: superficie que hay que recordar al tocar la rama (deuda 5).
+- **Contrato con campos de relleno para orígenes que no los tienen** (`media_url`/`media_type` vacíos en un plan, `texto` vacío en un lugar): el cliente debe tolerar campos presentes y vacíos en vez de ausentes. Es el precio de un esquema único y se asume.
+- **La degradación puede tapar una regresión**: si una fuente falla de forma persistente, el feed **sigue funcionando** y `degradado[]` puede pasar desapercibido si nadie lo pinta con señal visible. El servidor cumple (nunca `500`); la vigilancia depende de que el cliente muestre el aviso.
+- **`feedVistos` es memoria de sesión sin techo**: crece con cada tarjeta vista y no se poda (deuda 2).
+
+### Impacto
+
+- **Backend (`api/interacciones.js`, dominio `@backend-dev`, gate concedido):** **224 líneas nuevas, 0 borradas** en `:8474-8696`; una rama GET más en el despacho existente. `node --check` **pass**, bytes `> 127` = **0**, backticks = **0** (ADR-002). **Sin** endpoint nuevo, **sin** tabla nueva, **sin** migración, **sin** índice.
+- **Contrato expuesto:** `{ok, categoria, items[{id, tipo, categoria, titulo, texto, media_url, media_type, autor_id, autor_nombre, autor_avatar, creado_en, url}], paginacion{limit, offset, hay_mas, siguiente_cursor}, degradado[]}`. `id` **prefijado por origen** (D4) y `siguiente_cursor` **opaco** (D3).
+- **Cliente (`comunidad.html`):** panel `#cpanel-feed` (`:1087`), barra `#feed-filtros-bar` con 5 filtros en espejo `aria-pressed`/`aria-selected` (`:1088-1094`), lista `#feed-timeline-lista` (`:1095`, `aria-live="polite"`), centinela `#feed-timeline-sentinel`, botón `#feed-cargar-mas`, CSS en `:748-749` y `:794`, JS entre `:3352-3705`. Bloque JS: `IntersectionObserver` ×2, `feedEsc` ×13, `feedUrlSegura` ×4, `onerror` ×3, `0` bytes `> 127`, divs del panel balanceados.
+- **Presupuesto de plataforma:** **8/8** funciones serverless, **0** archivos nuevos en `api/` — verificado, no supuesto.
+- **Coste/rendimiento:** `UNION ALL` de 4 orígenes + `LEFT JOIN usuarios` ×3 + `LIMIT (limit+1)` = 21. **Riesgo abierto**: sin `EXPLAIN` y sin índice nuevo verificado en esta tanda (deuda 1). No se nombra ningún índice porque no se ha medido ninguno.
+- **Documental:** `TASKS.md` y `NEXT.md` apuntan aquí **por ID**; el argumento vive **solo en este ADR** (ADR-084 D1).
+
+### Deuda declarada (NO se arregla en este ADR)
+
+1. **Índices no verificados (riesgo abierto, sin nombres inventados).** La rama `todos` recorre cuatro orígenes con `UNION ALL`, `LEFT JOIN usuarios` y `LIMIT 21`. **No** se ejecutó `EXPLAIN (ANALYZE)` ni se creó índice alguno en esta tanda, y este ADR **no fija nombres de índice**: la cobertura real de `creado_en`/`id` por tabla y el plan de ejecución son **mediciones pendientes**. Criterio de cierre: medir antes de decidir; si el plan muestra ordenaciones en memoria sobre las cuatro ramas, la decisión de índice es un ADR/migración aparte.
+2. **`feedVistos` sin techo.** El mapa de dedupe del cliente crece con cada tarjeta vista y se **resetea al cambiar de filtro** (`:3587`), pero no tiene poda ni límite dentro de una misma sesión larga de scroll. Coste acotado (memoria del cliente, no del servidor) y aceptado por ahora.
+3. **`.ctab` no es focusable.** Las pestañas de `comunidad.html` son `<div class="ctab" onclick="...">` (p. ej. `:862`) sin `tabindex` (**0** apariciones de `tabindex` en el archivo): no se alcanzan con teclado y no tienen rol de tab. Es deuda de **accesibilidad** preexistente al feed, no introducida por él, y **no** se arregla aquí porque cambiar el patrón de pestañas es un cambio de UI con su propio alcance.
+4. **Smoke contra Neon pendiente.** La verificación de esta tanda es **sintáctica y estática** (`node --check`, ASCII, backticks, parseo del bloque, balance de `div`). **No** hay smoke con datos reales: cursor real emitido y consumido, `hay_mas` en el límite exacto, `siguiente_cursor` estable ante duplicados de `creado_en`, y `degradado[]` con una fuente realmente caída (simulada) siguen **sin cubrir** por un script.
+5. **`offset` legado sigue vivo en el contrato.** Se mantiene por compatibilidad y **no** se retira en este ADR. Retirarlo exige confirmar que ningún consumidor lo usa y tocar el cliente a la vez; hasta entonces conviven dos caminos de paginación y el keyset es el único **normativo**.
+
+### Criterio de verificación
+
+1. **V1** `git grep -c "feed_timeline" -- api/` -> la rama vive en `api/interacciones.js` y **0** archivos nuevos en `api/` (`8/8` funciones).
+2. **V2** `GET /api/interacciones?tipo=feed_timeline&categoria=<basura>` -> **200** con `categoria: 'todos'` (no `400`, no lista vacía).
+3. **V3** `limit=500` -> `items.length <= 20`; `limit=20` con más filas disponibles -> `hay_mas: true` y `siguiente_cursor` presente; con exactamente 20 filas totales -> `hay_mas: false` y `siguiente_cursor` ausente/nulo.
+4. **V4** Pasar el `siguiente_cursor` de la página 1 como `cursor` -> la página 2 **no repite** ningún `id` de la página 1 y no salta filas conocidas; dos filas con el **mismo** `creado_en` aparecen **ambas** exactamente una vez (desempate por `id`).
+5. **V5** Forzar `42P01`/`42703` en una fuente (tabla o columna retirada en el sondeo) -> **200**, la fuente aparece en `degradado[]` y las demás categorías siguen sirviendo; **0** respuestas `500`.
+6. **V6** Todos los `id` de una respuesta son **únicos** y llevan prefijo de origen; el cliente no repite tarjeta al cambiar de filtro ni al paginar (`feedVistos`).
+7. **V7** `node --check api/interacciones.js` **OK**; bytes `> 127` = **0** y backticks = **0** en el bloque backend (ADR-002); bloque JS del cliente **parsea** y `0` bytes `> 127`; `div` del panel balanceados.
+8. **V8** Ningún `<img>`/`href` del feed recibe un valor del servidor sin `feedEsc`, y `feedUrlSegura` **bloquea** `javascript:` y `data:`; toda imagen lleva `onerror` (ADR-008).
+9. **V9** `EXPLAIN` de la rama `todos` **documentado** en el cierre de la deuda 1 (hoy **pendiente**: la ausencia de esta medición es el estado declarado, no un aprobado).
+
+### Referencias
+
+- `api/interacciones.js:8474-8696` — rama `GET ?tipo=feed_timeline`: contrato (`:8474`), despacho (`:8494`), traza por origen (`:8635`), degradación `42P01`/`42703`, `UNION ALL`, keyset `base64url(ISO|id)`.
+- `api/utilidades.js:592` y `:617` — literal `status='published'` de las lecturas públicas (criterio que `lugar` hereda).
+- `comunidad.html:1087-1096` — panel `#cpanel-feed`, `#feed-filtros-bar` (5 filtros con `aria-pressed`/`aria-selected`), `#feed-timeline-lista`, `#feed-timeline-sentinel`, `#feed-cargar-mas`.
+- `comunidad.html:3352-3705` — bloque `/* FEED_TIMELINE_START */ ... /* FEED_TIMELINE_END */`; `feedVistos` (`:3367`, reset `:3587`, dedupe `:3615-3619`).
+- `comunidad.html:748-749` y `:794` — CSS del silo del feed (`feed-filtros-bar`).
+- `comunidad.html:76-78`, `:631`, `:862` — `.ctab` como `<div onclick>` (deuda 3: sin `tabindex` en todo el archivo).
+- ADR-010 y ADR-001 (8/8 y cero endpoints nuevos), ADR-002 (ASCII-safe en serverless), ADR-003 (cero borrado lógico), ADR-008 (`onerror` con fallback). **Ninguna se deroga**; ADR-010 y ADR-001 quedan **acotados** por D1 en el sentido de que este feed se resuelve **extendiendo** una función existente y no abriendo una.
