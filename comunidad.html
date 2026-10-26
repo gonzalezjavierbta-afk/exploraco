@@ -793,6 +793,28 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
   .feed-post-actions .btn-filtro-feed{padding:6px 10px;font-size:11px}
   .feed-filtros-bar{padding-bottom:10px}
 }
+/* =====================================================================
+   ARMONIZACION DE LA FILA DE ACCIONES DEL FEED (SCRUM: 4 controles)
+   Abrir/Compartir vienen de .feed-post-actions .btn-filtro-feed (L774).
+   Votar (av-act-like) y Guardar (av-act-save) heredaban .av-act (L233:
+   Barlow 11px, radio 6px, fondo transparente) y, en <=768px, el override
+   global .av-act de L672 (min-height 44px). Aqui SOLO se scopea bajo
+   .feed-post-actions (ADR-004): .av-act global queda intacto para el panel
+   Audiovisual y el resto de vistas (L3016, L3082, L3248, L3253).
+   Estado .on (L236/L238) se re-declara con mas especificidad para que el
+   fondo base no lo aplane.
+   ===================================================================== */
+.feed-post-actions .av-act{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:rgba(255,255,255,.78);font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;text-transform:none;letter-spacing:normal;line-height:1.2;white-space:nowrap;min-height:30px;cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease}
+.feed-post-actions .btn-filtro-feed{min-height:30px}
+.feed-post-actions .av-act:hover:not(.on){background:rgba(255,74,0,.14);border-color:var(--gold-d);color:var(--gold)}
+.feed-post-actions .av-act.on{background:rgba(255,74,0,.16);border-color:rgba(255,74,0,.55);color:var(--gold)}
+.feed-post-actions .av-act-save.on{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.5);color:#22C55E}
+.feed-post-actions .av-act:disabled{opacity:.6;cursor:default}
+.feed-post-actions .av-act:focus-visible,.feed-post-actions .av-act:focus-visible:not(.on){outline:2px solid var(--gold);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.feed-post-actions .av-act{transition:none}}
+@media (max-width:768px){
+  .feed-post-actions .btn-filtro-feed,.feed-post-actions .av-act{min-height:40px;font-size:12px;padding:6px 10px}
+}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -858,19 +880,19 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
       <button type="button" onclick="if(window.ExploraCO&amp;&amp;window.ExploraCO.abrirGuiaXP)window.ExploraCO.abrirGuiaXP()" style="font-size:10px;font-weight:700;color:var(--black);background:var(--gold);border:none;border-radius:5px;padding:8px 14px;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;flex-shrink:0">Como ganar XP</button>
     </div>
     <!-- Tabs -->
-        <div class="comm-tabs">
-      <div class="ctab on" onclick="showCommTab('feed')">&#9889; Novedades</div>
-      <div class="ctab" onclick="showCommTab('chat')">💬 Chat</div>
-      <div class="ctab" data-nivel-requerido="6" onclick="showCommTab('planes')">🗺️ Planes</div>
-      <div class="ctab" onclick="showCommTab('mapa')">&#x1F5FA; Mapa</div>
-      <div class="ctab" onclick="showCommTab('ranking')">🏆 Ranking</div>
-      <div class="ctab" data-nivel-requerido="14" onclick="showCommTab('pandillas')">👥 Parches</div>
-      <div class="ctab" data-nivel-requerido="15" onclick="showCommTab('wayfarer')">🕵️ Activo Oculto</div>
-      <div class="ctab" onclick="showCommTab('av')">🎬 Audiovisual</div>
-      <div class="ctab" onclick="showCommTab('mercado')">&#x1F6D2; Mercado</div>
-      <div class="ctab" onclick="showCommTab('gobernanza')">&#x1F3DB; Gobernanza</div>
-      <div class="ctab" onclick="showCommTab('contratos')">&#x1F4DC; Contratos</div>
-      <div class="ctab" onclick="showCommTab('marcas')">&#x1F3F7; Marcas</div>
+        <div class="comm-tabs" role="tablist" aria-label="Secciones de Mi Comunidad">
+      <div role="tab" aria-controls="cpanel-feed" aria-selected="true" tabindex="0" class="ctab on" onclick="showCommTab('feed')">&#9889; Novedades</div>
+      <div role="tab" aria-controls="cpanel-chat" aria-selected="false" tabindex="-1" class="ctab" onclick="showCommTab('chat')">💬 Chat</div>
+      <div role="tab" aria-controls="cpanel-planes" aria-selected="false" tabindex="-1" class="ctab" data-nivel-requerido="6" onclick="showCommTab('planes')">🗺️ Planes</div>
+      <div role="tab" aria-controls="cpanel-mapa" aria-selected="false" tabindex="-1" class="ctab" onclick="showCommTab('mapa')">&#x1F5FA; Mapa</div>
+      <div role="tab" aria-controls="cpanel-ranking" aria-selected="false" tabindex="-1" class="ctab" onclick="showCommTab('ranking')">🏆 Ranking</div>
+      <div role="tab" aria-controls="cpanel-pandillas" aria-selected="false" tabindex="-1" class="ctab" data-nivel-requerido="14" onclick="showCommTab('pandillas')">👥 Parches</div>
+      <div role="tab" aria-controls="cpanel-wayfarer" aria-selected="false" tabindex="-1" class="ctab" data-nivel-requerido="15" onclick="showCommTab('wayfarer')">🕵️ Activo Oculto</div>
+      <div role="tab" aria-controls="cpanel-av" aria-selected="false" tabindex="-1" class="ctab" onclick="showCommTab('av')">🎬 Audiovisual</div>
+      <div role="tab" aria-controls="cpanel-mercado" aria-selected="false" tabindex="-1" class="ctab" onclick="showCommTab('mercado')">&#x1F6D2; Mercado</div>
+      <div role="tab" aria-controls="cpanel-gobernanza" aria-selected="false" tabindex="-1" class="ctab" onclick="showCommTab('gobernanza')">&#x1F3DB; Gobernanza</div>
+      <div role="tab" aria-controls="cpanel-contratos" aria-selected="false" tabindex="-1" class="ctab" onclick="showCommTab('contratos')">&#x1F4DC; Contratos</div>
+      <div role="tab" aria-controls="cpanel-marcas" aria-selected="false" tabindex="-1" class="ctab" onclick="showCommTab('marcas')">&#x1F3F7; Marcas</div>
     </div>
     </div>
 
@@ -878,7 +900,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     <div class="comm-panels">
 
     <!-- CHAT -->
-    <div class="cpanel" id="cpanel-chat">
+    <div role="tabpanel" class="cpanel" id="cpanel-chat">
       <div id="chat-lock" style="display:none;padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(255,74,0,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Chat bloqueado</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6">Desbloquea el chat en el nivel <b id="chat-lock-nivel" style="color:var(--gold)">3</b> (<span id="chat-lock-xp">250</span> XP). A medida que avanzas desbloqueas crear salas y moderar el chat.</div>
@@ -912,7 +934,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     </div>
 
     <!-- PLANES -->
-    <div class="cpanel" id="cpanel-planes">
+    <div role="tabpanel" class="cpanel" id="cpanel-planes">
       <div id="planes-guest" style="display:none;padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(255,74,0,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Planes bloqueados</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para crear y unirte a planes de viaje colectivos.</div>
@@ -937,7 +959,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     </div>
 
         <!-- RANKING (4 sub-vistas: viajeros, casas, facciones, parches) -->
-    <div class="cpanel" id="cpanel-ranking">
+    <div role="tabpanel" class="cpanel" id="cpanel-ranking">
       <div class="lb-head">
         <div class="lb-title">&#x1F3C6; RANKING DE <span id="rk-foco">VIAJEROS</span></div>
       </div>
@@ -961,7 +983,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
          y la media audiovisual se pintan en esa misma capa, con iconos
          distintos por fuente. Los chips de categoria filtran solo los
          destinos; los botones de media filtran solo la multimedia. -->
-    <div class="cpanel" id="cpanel-mapa">
+    <div role="tabpanel" class="cpanel" id="cpanel-mapa">
       <div class="mmx-card">
         <div class="mmx-head"><div class="mmx-title">Mis mapas personales</div><button type="button" class="mmx-new" onclick="MyMap.openNuevo()">&#xFF0B; Nuevo</button></div>
         <div class="mmx-pills" id="mm-personal-pills"></div>
@@ -1003,7 +1025,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     </div>
 
     <!-- PANDILLAS (Gamificacion v4) -->
-    <div class="cpanel" id="cpanel-pandillas">
+    <div role="tabpanel" class="cpanel" id="cpanel-pandillas">
       <div id="pandillas-guest" style="display:none;padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(255,74,0,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Parches bloqueados</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para unirte o fundar un parche.</div>
@@ -1018,7 +1040,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     </div>
 
     <!-- AUDIOVISUAL (albumes + feed de media, ADR-017) -->
-    <div class="cpanel" id="cpanel-av">
+    <div role="tabpanel" class="cpanel" id="cpanel-av">
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
         <span style="font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px;margin-right:4px">Orden</span>
         <button class="av-chip on" data-av-orden="recientes" onclick="setAVOrden('recientes')">Recientes</button>
@@ -1036,7 +1058,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     </div>
 
     <!-- ACTIVO OCULTO (Wayfarer, Entrega 016) -->
-    <div class="cpanel" id="cpanel-wayfarer">
+    <div role="tabpanel" class="cpanel" id="cpanel-wayfarer">
       <div id="ao-guest" style="display:none;padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(255,74,0,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🕵️ Activo Oculto bloqueado</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para proponer, votar y descubrir puntos secretos.</div>
@@ -1054,7 +1076,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     </div>
 
     <!-- MERCADO DE EMPRENDEDORES (asset compartido mercado.js) + cartas/moneda v6.1 -->
-    <div class="cpanel" id="cpanel-mercado">
+    <div role="tabpanel" class="cpanel" id="cpanel-mercado">
       <div id="mercado-cuerpo"></div>
 
       <!-- GAMING v6.1 (Fase 4 / T7): mercado de cartas -->
@@ -1069,22 +1091,22 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     </div>
 
     <!-- GOBERNANZA (Fase 2B / ADR-063) -->
-    <div class="cpanel" id="cpanel-gobernanza">
+    <div role="tabpanel" class="cpanel" id="cpanel-gobernanza">
       <div class="cm-v61" id="cm-gobernanza"></div>
     </div>
 
     <!-- CONTRATOS P2P (Gig Economy / ADR-066) -->
-    <div class="cpanel" id="cpanel-contratos">
+    <div role="tabpanel" class="cpanel" id="cpanel-contratos">
       <div class="cm-v61" id="cm-contratos"></div>
     </div>
 
     <!-- MARCAS Y SPOTS (ADR-064) -->
-    <div class="cpanel" id="cpanel-marcas">
+    <div role="tabpanel" class="cpanel" id="cpanel-marcas">
       <div class="cm-v61" id="cm-marcas"></div>
     </div>
 
     <!-- FEED VIVO (timeline unificada: medios, escritos, lugares y planes) -->
-    <div class="cpanel on" id="cpanel-feed">
+    <div role="tabpanel" class="cpanel on" id="cpanel-feed">
       <div class="feed-filtros-bar" id="feed-filtros-bar" role="tablist" aria-label="Filtrar el feed por tipo de contenido">
         <button type="button" class="btn-filtro-feed active" data-categoria="todos" role="tab" aria-pressed="true" aria-selected="true">&#9889; Todos</button>
         <button type="button" class="btn-filtro-feed" data-categoria="medio" role="tab" aria-pressed="false" aria-selected="false">&#128247; Medios</button>
@@ -4189,10 +4211,18 @@ function showCommTab(tab) {
   // cubre el nivel cambiado sin onExploraCOUpdate (smoke S6-B/S6-C).
   cmAplicarGateNivel();
   if(cmTabBloqueado(tab)) tab = cmPrimerTabVisible();
-  document.querySelectorAll('.ctab').forEach(function(t){ t.classList.remove('on'); });
+  document.querySelectorAll('.ctab').forEach(function(t){
+    t.classList.remove('on');
+    t.setAttribute('aria-selected', 'false');
+    t.setAttribute('tabindex', '-1');
+  });
   document.querySelectorAll('.cpanel').forEach(function(p){ p.classList.remove('on'); });
   document.querySelectorAll('.ctab').forEach(function(t){
-    if(t.getAttribute('onclick') && t.getAttribute('onclick').indexOf(tab) !== -1) t.classList.add('on');
+    if(t.getAttribute('onclick') && t.getAttribute('onclick').indexOf(tab) !== -1){
+      t.classList.add('on');
+      t.setAttribute('aria-selected', 'true');
+      t.setAttribute('tabindex', '0');
+    }
   });
   var panel = document.getElementById('cpanel-' + tab);
   if(panel) {
@@ -4211,6 +4241,50 @@ function showCommTab(tab) {
   }
   if(tab !== 'chat') stopChatPoll();
 }
+
+/* ARIA tabs (a11y): teclado delegado sobre .comm-tabs. Un solo registro
+   por documento (guarda __commTabsKeys). ASCII-safe (ADR-002). */
+function cmTabsTeclado(ev) {
+  var tecla = ev.key;
+  if(!tecla) return;
+  if(tecla !== 'Enter' && tecla !== ' ' && tecla !== 'Spacebar' && tecla !== 'ArrowRight' && tecla !== 'ArrowLeft' && tecla !== 'Home' && tecla !== 'End') return;
+  var cont = document.querySelector('.comm-tabs');
+  if(!cont) return;
+  var tabs = Array.prototype.slice.call(cont.querySelectorAll('.ctab'));
+  if(!tabs.length) return;
+  var actual = (ev.target && ev.target.closest) ? ev.target.closest('.ctab') : null;
+  if(!actual) return;
+  if(actual.getAttribute('data-gate-bloqueado') === '1') return;
+  var idx = tabs.indexOf(actual);
+  if(idx === -1) return;
+  var m = (actual.getAttribute('onclick') || '').match(/showCommTab\('([^']+)'\)/);
+  if(tecla === 'Enter' || tecla === ' ' || tecla === 'Spacebar') {
+    ev.preventDefault();
+    if(m) showCommTab(m[1]);
+    return;
+  }
+  ev.preventDefault();
+  var objetivo = null;
+  if(tecla === 'ArrowRight') objetivo = tabs[(idx + 1) % tabs.length];
+  else if(tecla === 'ArrowLeft') objetivo = tabs[(idx - 1 + tabs.length) % tabs.length];
+  else if(tecla === 'Home') objetivo = tabs[0];
+  else if(tecla === 'End') objetivo = tabs[tabs.length - 1];
+  if(!objetivo) return;
+  if(objetivo.getAttribute('data-gate-bloqueado') === '1') return;
+  var mo = (objetivo.getAttribute('onclick') || '').match(/showCommTab\('([^']+)'\)/);
+  if(!mo) return;
+  showCommTab(mo[1]);
+  objetivo.focus();
+}
+function cmTabsInitTeclado() {
+  if(window.__commTabsKeys) return;
+  var cont = document.querySelector('.comm-tabs');
+  if(!cont) return;
+  window.__commTabsKeys = true;
+  cont.addEventListener('keydown', cmTabsTeclado);
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cmTabsInitTeclado);
+else cmTabsInitTeclado();
 
 /* ---- TOAST ---- */
 function showXPToastComm(msg){
