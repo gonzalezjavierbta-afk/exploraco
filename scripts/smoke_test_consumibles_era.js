@@ -269,8 +269,17 @@ async function run() {
   // ================= 4. ESTATICOS: wiring ===========================
   var apiSrc = fs.readFileSync(path.join(ROOT, 'api/interacciones.js'), 'utf8');
   var apiOcur = apiSrc.split('ERA_INSUFICIENTE').length - 1;
-  check('4a: api/interacciones.js con exactamente 1 ERA_INSUFICIENTE',
-    apiOcur === 1, apiOcur);
+  // Son 2 y no 1 desde la entrega de consumibles de faccion nivel 4:
+  //   (a) el gate REAL de compra (POST comprar_consumible): responde
+  //       403 { ok:false, error:'ERA_INSUFICIENTE', era_requerida, era_actual };
+  //   (b) la ETIQUETA de bloqueo del catalogo (GET tipo=consumibles): el campo
+  //       aditivo motivo_bloqueo reutiliza el mismo literal para que el cliente
+  //       muestre el candado de era sin un mapeo nuevo.
+  // El conteo es EXACTO a proposito: un tercer literal seria una copia
+  // accidental del gate, y un >= lo dejaria pasar. Si la entrega borra (a) el
+  // check cae a 1, si duplica el gate sube a 3: los dos casos fallan.
+  check('4a: api/interacciones.js con exactamente 2 ERA_INSUFICIENTE',
+    apiOcur === 2, apiOcur);
 
   var adminSrc = fs.readFileSync(path.join(ROOT, 'admin.html'), 'utf8');
   check('4b: admin.html contiene id="consumible-era"',
@@ -286,15 +295,40 @@ async function run() {
   // de consumibles se retiro de la pestana Inventario (T5: cargarTienda,
   // renderTiendaChips, setTiendaFiltro, categoriaConsumible, PF_TIENDA_CATS,
   // PF_TIENDA_CAT, PF_CAT_CONSUMIBLE y el CSS .store-*), por eso mi-perfil.html
-  // ya no tiene era_usuario ni consulta GET tipo=consumibles. El gate de era
-  // sigue vivo en el servidor (2a-2 lo cubre sobre el handler real) y en el
-  // cliente lo unica superficie restante es el badge .inv-era que
-  // cargarInventario pinta sobre cada consumible poseido. Por eso 4g verifica
-  // esa superficie en vez de la variable retirada.
+  // ya no tiene era_usuario. El gate de era sigue vivo en el servidor (2a-2 lo
+  // cubre sobre el handler real) y en el cliente lo unica superficie restante
+  // es el badge .inv-era que cargarInventario pinta sobre cada consumible
+  // poseido. Por eso 4g verifica esa superficie en vez de la variable retirada.
   check('4g-1: mi-perfil.html pinta la era en el inventario (.inv-era)',
     perfilSrc.indexOf('inv-era') !== -1);
-  check('4g-2: mi-perfil.html ya no consulta el catalogo (tipo=consumibles)',
-    perfilSrc.indexOf('tipo=consumibles') === -1);
+  // 4g-2: lo que T5 proscribio NO fue "consultar consumibles desde mi-perfil"
+  // sino DUPLICAR la tienda general: ya existia un componente y una segunda
+  // copia divergia del canonico (dos criterios de filtrado y dos precios). Ese
+  // componente sigue retirado y no debe volver.
+  // EXCEPCION DOCUMENTADA (entrega de consumibles de faccion nivel 4): el
+  // modulo .pf-fac (funcion pfFacCargar) reintroduce una tienda ACOTADA que
+  // consume el mismo endpoint pero se queda SOLO con la categoria 'faccion'
+  // (pfFacLista filtra return ... categoria === 'faccion'), y su estado de
+  // bloqueo lo manda el motor. Por eso la asercion ya no prohibe el literal:
+  // exige EXACTAMENTE UNA llamada, que viva DENTRO de pfFacCargar, que el
+  // filtro de categoria siga en pie, y conserva la prohibicion de la tienda
+  // general duplicada. Si alguien reintroduce una tienda general aqui, 4g-2
+  // (2 llamadas) o 4g-2c (cargarTienda/PF_TIENDA_CATS) fallan.
+  var consOcur = perfilSrc.split('tipo=consumibles').length - 1;
+  check('4g-2: mi-perfil.html con exactamente 1 tipo=consumibles (tienda de faccion)',
+    consOcur === 1, consOcur);
+  var facIni = perfilSrc.indexOf('function pfFacCargar');
+  var facFin = perfilSrc.indexOf('function pfFacRefrescar');
+  var consIdx = perfilSrc.indexOf('tipo=consumibles');
+  check('4g-2a: la llamada tipo=consumibles vive dentro de pfFacCargar',
+    facIni !== -1 && facFin !== -1 && facIni < facFin
+    && consIdx > facIni && consIdx < facFin);
+  check('4g-2b: la tienda de faccion solo pinta la categoria faccion',
+    perfilSrc.indexOf("String(it.categoria || '').toLowerCase() === 'faccion'") !== -1);
+  check('4g-2c: la tienda general de consumibles sigue sin duplicarse en mi-perfil.html',
+    perfilSrc.indexOf('cargarTienda') === -1
+    && perfilSrc.indexOf('PF_TIENDA_CATS') === -1
+    && perfilSrc.indexOf('categoriaConsumible') === -1);
 
   console.log('');
   if (fails === 0) {

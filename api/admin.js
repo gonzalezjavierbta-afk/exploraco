@@ -193,6 +193,133 @@ function normalizarEraConsumible(v) {
   return eras[s] || null;
 }
 
+// == CONSUMIBLE DE FACCION Y EFECTO POR BONO (migracion 057) ===============
+// Columnas de efecto de un consumible de faccion: gate de faccion y de nivel,
+// numero de cargas del bono, ventana de validez en horas, claves de accion
+// bonificadas, XP plano por accion, tope diario de compra e icono.
+// El CHECK chk_consumibles_faccion_requerida de la tabla cierra el vocabulario
+// de facciones; aqui se espeja para responder 400 con la lista valida en vez
+// de dejar que reviente el constraint. El catalogo sigue siendo administrable
+// (ADR-028): el CHECK de faccion es la excepcion deliberada de la 057.
+var FACCIONES_CONSUMIBLE = ['exploradores', 'curadores', 'creadores', 'artistas'];
+// Claves de accion que consume el handler de bonos. bono_accion es un CSV SIN
+// espacios; una clave desconocida dejaria el bono inerte en silencio, asi que
+// se valida contra esta lista y se responde 400 con ella.
+var BONO_ACCIONES_CONSUMIBLE = ['guardado', 'visita', 'media_voto', 'resena', 'foto'];
+// Contrato de las 4 columnas smallint de efecto. 'def' es el DEFAULT de la
+// columna en la 057 y se aplica cuando el campo no viene en el body: asi crear
+// y editar resuelven el valor en un solo sitio y los rangos no se repiten.
+// EXCEPCION: limite_diario no usa su 'def' al crear; ver
+// defectoLimiteDiarioConsumible() (1 en faccion, 0 en el resto).
+// nivel_requerido NULL = sin gate de nivel (la curva real tiene 40 niveles;
+// la era Mito es 36-40). limite_diario 0 = sin tope diario por clave.
+var CAMPOS_ENTEROS_CONSUMIBLE = [
+  { campo: 'nivel_requerido', min: 1, max: 40,  def: null },
+  { campo: 'cargas',          min: 1, max: 20,  def: 1 },
+  { campo: 'duracion_horas',  min: 1, max: 168, def: 24 },
+  { campo: 'limite_diario',   min: 0, max: 5,   def: 1 }
+];
+
+// faccion_requerida: vacio/NULL => null (sin gate de faccion). Cualquier otro
+// valor debe estar en FACCIONES_CONSUMIBLE y se devuelve en minusculas.
+// Devuelve undefined (no null) ante un valor basura, para que el caller
+// distinga "sin gate" de "faccion invalida" y responda 400.
+function normalizarFaccionConsumible(v) {
+  var s = String(v == null ? '' : v).trim().toLowerCase();
+  if (!s) return null;
+  return FACCIONES_CONSUMIBLE.indexOf(s) >= 0 ? s : undefined;
+}
+
+// Entero acotado de las columnas smallint de efecto. Recibe el valor crudo y
+// devuelve el entero, o undefined si no es un entero decimal en [min, max].
+function normalizarEnteroConsumible(v, min, max) {
+  var s = String(v == null ? '' : v).trim();
+  if (!/^[0-9]+$/.test(s)) return undefined;
+  var n = parseInt(s, 10);
+  if (!isFinite(n) || n < min || n > max) return undefined;
+  return n;
+}
+
+// limite_diario NO sigue el DEFAULT de la columna (1): al crear manda la
+// semantica del dato. 1 solo tiene sentido en los consumibles de faccion, que
+// son bonos diarios con tope POR CLAVE; en cualquier otra categoria 0 = sin
+// tope por clave (las filas clasicas quedan con el tope GLOBAL de 5 compras
+// por dia que ya aplica el handler). Devuelve el entero, nunca undefined.
+function defectoLimiteDiarioConsumible(categoria) {
+  var s = String(categoria == null ? '' : categoria).trim().toLowerCase();
+  return s === 'faccion' ? 1 : 0;
+}
+
+// Valida de golpe las 4 columnas smallint de CAMPOS_ENTEROS_CONSUMIBLE.
+//   soloEnviados = false (crear): devuelve SIEMPRE las 4 claves, aplicando el
+//     DEFAULT de la columna cuando el campo no viene.
+//   soloEnviados = true (editar): devuelve solo las claves presentes en el
+//     body, para no pisar con el DEFAULT una columna que el admin no toco.
+// Respuesta: { ok:true, valores:{...} } o { ok:false, error:'<mensaje 400>' }.
+// defectos (opcional) sustituye el 'def' de la columna en las claves que trae,
+// para los campos cuyo default al crear no es el DEFAULT del esquema.
+function validarEnterosConsumible(body, soloEnviados, defectos) {
+  var src = body || {};
+  var out = {};
+  for (var i = 0; i < CAMPOS_ENTEROS_CONSUMIBLE.length; i++) {
+    var spec = CAMPOS_ENTEROS_CONSUMIBLE[i];
+    if (soloEnviados && !(spec.campo in src)) continue;
+    var crudo = String(src[spec.campo] == null ? '' : src[spec.campo]).trim();
+    if (!crudo) {
+      out[spec.campo] = (defectos && spec.campo in defectos) ? defectos[spec.campo] : spec.def;
+      continue;
+    }
+    var n = normalizarEnteroConsumible(crudo, spec.min, spec.max);
+    if (n === undefined) {
+      return { ok:false, error: spec.campo + ' debe ser un entero entre ' + spec.min + ' y ' + spec.max };
+    }
+    out[spec.campo] = n;
+  }
+  return { ok:true, valores: out };
+}
+
+// bono_accion: CSV SIN espacios con claves de BONO_ACCIONES_CONSUMIBLE.
+// Vacio => null (bono sin accion). undefined => hay una clave desconocida.
+// Se deduplica y se reescribe normalizado para que la columna quede canonica.
+function normalizarBonoAccionConsumible(v) {
+  var s = String(v == null ? '' : v).trim().toLowerCase();
+  if (!s) return null;
+  var partes = s.split(',');
+  var vistas = [];
+  for (var i = 0; i < partes.length; i++) {
+    var p = partes[i].trim();
+    if (!p) continue;
+    if (BONO_ACCIONES_CONSUMIBLE.indexOf(p) < 0) return undefined;
+    if (vistas.indexOf(p) < 0) vistas.push(p);
+  }
+  return vistas.length ? vistas.join(',') : null;
+}
+
+// bono_xp_fijo: numeric(12,2) >= 0, mismo orden de precision que
+// xp_ledger.bonos_planos (migracion 031). Vacio => null y el caller escribe 0,
+// que es el DEFAULT de la columna. undefined => valor invalido.
+function normalizarXpFijoConsumible(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (!s) return null;
+  var n = parseFloat(s.replace(',', '.'));
+  if (!isFinite(n) || n < 0) return undefined;
+  return red2(n);
+}
+
+// icono: ENTIDAD HTML en texto ASCII (ej. '&#128301;'), maximo 24 caracteres
+// para admitir entidad doble. Se rechaza cualquier byte > 127 para no
+// reintroducir emojis literales en la base de datos (BUG-026). Vacio => null.
+// undefined => demasiado largo o con algun byte > 127.
+function normalizarIconoConsumible(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (!s) return null;
+  if (s.length > 24) return undefined;
+  for (var i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) > 127) return undefined;
+  }
+  return s;
+}
+
 // == CARTAS DE TERRITORIO (ADR-062, migraciones 040/041) ==================
 // Catalogo administrable cartas_catalogo. El vocabulario de rareza es el
 // mismo de cromos_catalogo y el CHECK de la tabla lo fija: comun|raro|
@@ -578,11 +705,15 @@ module.exports = async function handler(req, res) {
 
     // --- Lista: todos (activos e inactivos) ------------------------------
     if (tipo === 'consumibles_lista') {
-      // Degradacion (migracion 035 pendiente): sin era_exclusiva, pero la
-      // lista sigue completa. El catch de la primera consulta devuelve null
-      // solo ante error; un [] legitimo es truthy y no reintenta.
+      // Degradacion en cascada, del esquema mas nuevo al mas viejo. El catch
+      // devuelve null solo ante error; un [] legitimo es truthy y no
+      // reintenta:
+      //   1. 057 aplicada: las 8 columnas de efecto de faccion.
+      //   2. 057/035 sin aplicar: catalogo clasico (sin era_exclusiva).
       var filasC = await sql(
-        'SELECT id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, creado_en '
+        'SELECT id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, creado_en, '
+        + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, '
+        + 'bono_accion, bono_xp_fijo, limite_diario, icono '
         + 'FROM consumibles ORDER BY activo DESC, precio_xp ASC, clave ASC'
       ).catch(function(){ return null; });
       if (!filasC) {
@@ -594,6 +725,17 @@ module.exports = async function handler(req, res) {
       filasC = filasC.map(function(c){
         c.precio_xp = red2(numXp(c.precio_xp));
         c.era_exclusiva = c.era_exclusiva || null;
+        // Columnas de la 057: numeric llega como string desde Neon y los NULL
+        // de gate salen como null explicito; los NOT NULL caen al DEFAULT de
+        // la columna si la consulta degrado a un esquema anterior.
+        c.faccion_requerida = c.faccion_requerida || null;
+        c.nivel_requerido = c.nivel_requerido == null ? null : Number(c.nivel_requerido);
+        c.cargas = c.cargas == null ? 1 : Number(c.cargas);
+        c.duracion_horas = c.duracion_horas == null ? 24 : Number(c.duracion_horas);
+        c.bono_accion = c.bono_accion || null;
+        c.bono_xp_fijo = red2(numXp(c.bono_xp_fijo));
+        c.limite_diario = c.limite_diario == null ? 0 : Number(c.limite_diario);
+        c.icono = c.icono || null;
         return c;
       });
       return res.status(200).json({ ok:true, data: filasC, total: filasC.length });
@@ -622,17 +764,50 @@ module.exports = async function handler(req, res) {
       }
       // ADR-056: era_exclusiva opcional; vacio/desconocido -> null (sin gate).
       var eraN = normalizarEraConsumible(body.era_exclusiva);
+      // Migracion 057: gate de faccion y nivel, cargas, ventana, bono por
+      // accion, XP plano y tope diario. Las 4 columnas NOT NULL con DEFAULT se
+      // escriben con ese mismo DEFAULT (CAMPOS_ENTEROS_CONSUMIBLE.def y
+      // bono_xp_fijo 0) para que el INSERT sea explicito campo a campo;
+      // limite_diario es la excepcion: su default al crear es semantico
+      // (defectoLimiteDiarioConsumible). precio_xp_base se persiste igual a
+      // precio_xp porque la vista consumibles_precio calcula el descuento
+      // comparando ambas: con 0 reportaria un 100% de descuento.
+      var facN = normalizarFaccionConsumible(body.faccion_requerida);
+      if (facN === undefined) {
+        return res.status(400).json({ ok:false, error:'FACCION_INVALIDA: ' + FACCIONES_CONSUMIBLE.join('|') });
+      }
+      var entC = validarEnterosConsumible(body, false, { limite_diario: defectoLimiteDiarioConsumible(catN) });
+      if (!entC.ok) return res.status(400).json({ ok:false, error: entC.error });
+      var bonoC = normalizarBonoAccionConsumible(body.bono_accion);
+      if (bonoC === undefined) {
+        return res.status(400).json({ ok:false, error:'bono_accion debe ser un CSV sin espacios con claves de: ' + BONO_ACCIONES_CONSUMIBLE.join('|') });
+      }
+      var bxC = normalizarXpFijoConsumible(body.bono_xp_fijo);
+      if (bxC === undefined) {
+        return res.status(400).json({ ok:false, error:'bono_xp_fijo debe ser un numero mayor o igual a 0' });
+      }
+      if (bxC === null) bxC = 0;
+      var icoC = normalizarIconoConsumible(body.icono);
+      if (icoC === undefined) {
+        return res.status(400).json({ ok:false, error:'icono debe ser una entidad HTML ASCII de hasta 24 caracteres' });
+      }
       var existC = await sql('SELECT 1 FROM consumibles WHERE clave=$1 LIMIT 1',[claveN]);
       if (existC.length) {
         return res.status(409).json({ ok:false, error:'Ya existe un consumible con esa clave' });
       }
       var insC = await sql(
-        'INSERT INTO consumibles (clave, nombre, descripcion, precio_xp, categoria, era_exclusiva) '
-        + 'VALUES ($1,$2,$3,$4,$5,$6) '
-        + 'RETURNING id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, creado_en',
-        [claveN, nombreN, descN, precioN, catN, eraN]
+        'INSERT INTO consumibles (clave, nombre, descripcion, precio_xp, precio_xp_base, categoria, era_exclusiva, '
+        + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, '
+        + 'bono_accion, bono_xp_fijo, limite_diario, icono) '
+        + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) '
+        + 'RETURNING id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, creado_en, '
+        + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, bono_accion, bono_xp_fijo, limite_diario, icono',
+        [claveN, nombreN, descN, precioN, precioN, catN, eraN,
+         facN, entC.valores.nivel_requerido, entC.valores.cargas, entC.valores.duracion_horas,
+         bonoC, bxC, entC.valores.limite_diario, icoC]
       );
       insC[0].precio_xp = red2(numXp(insC[0].precio_xp));
+      insC[0].bono_xp_fijo = red2(numXp(insC[0].bono_xp_fijo));
       return res.status(201).json({ ok:true, data: insC[0], mensaje:'Consumible creado' });
     }
 
@@ -670,17 +845,60 @@ module.exports = async function handler(req, res) {
         var eraE = normalizarEraConsumible(body.era_exclusiva);
         setsC.push('era_exclusiva=$'+piC++); paramsC.push(eraE);
       }
+      // Migracion 057: solo se tocan las columnas PRESENTES en el body (mismo
+      // patron que el bloque de arriba): un campo ausente no se pisa con NULL
+      // y la clave sigue siendo identidad no editable. nivel_requerido vacio o
+      // null QUITA el gate (vuelve a NULL); las 3 columnas NOT NULL caen a su
+      // DEFAULT de columna cuando llegan vacias.
+      if ('faccion_requerida' in body) {
+        var facE = normalizarFaccionConsumible(body.faccion_requerida);
+        if (facE === undefined) {
+          return res.status(400).json({ ok:false, error:'FACCION_INVALIDA: ' + FACCIONES_CONSUMIBLE.join('|') });
+        }
+        setsC.push('faccion_requerida=$'+piC++); paramsC.push(facE);
+      }
+      var entE = validarEnterosConsumible(body, true);
+      if (!entE.ok) return res.status(400).json({ ok:false, error: entE.error });
+      for (var ie = 0; ie < CAMPOS_ENTEROS_CONSUMIBLE.length; ie++) {
+        var campoE = CAMPOS_ENTEROS_CONSUMIBLE[ie].campo;
+        if (campoE in entE.valores) {
+          setsC.push(campoE+'=$'+piC++); paramsC.push(entE.valores[campoE]);
+        }
+      }
+      if ('bono_accion' in body) {
+        var bonoE = normalizarBonoAccionConsumible(body.bono_accion);
+        if (bonoE === undefined) {
+          return res.status(400).json({ ok:false, error:'bono_accion debe ser un CSV sin espacios con claves de: ' + BONO_ACCIONES_CONSUMIBLE.join('|') });
+        }
+        setsC.push('bono_accion=$'+piC++); paramsC.push(bonoE);
+      }
+      if ('bono_xp_fijo' in body) {
+        var bxE = normalizarXpFijoConsumible(body.bono_xp_fijo);
+        if (bxE === undefined) {
+          return res.status(400).json({ ok:false, error:'bono_xp_fijo debe ser un numero mayor o igual a 0' });
+        }
+        setsC.push('bono_xp_fijo=$'+piC++); paramsC.push(bxE === null ? 0 : bxE);
+      }
+      if ('icono' in body) {
+        var icoE = normalizarIconoConsumible(body.icono);
+        if (icoE === undefined) {
+          return res.status(400).json({ ok:false, error:'icono debe ser una entidad HTML ASCII de hasta 24 caracteres' });
+        }
+        setsC.push('icono=$'+piC++); paramsC.push(icoE);
+      }
       if (!setsC.length) {
-        return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, descripcion, precio_xp, categoria o era_exclusiva' });
+        return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, descripcion, precio_xp, categoria, era_exclusiva, faccion_requerida, nivel_requerido, cargas, duracion_horas, bono_accion, bono_xp_fijo, limite_diario o icono' });
       }
       paramsC.push(body.id);
       var updC = await sql(
         'UPDATE consumibles SET '+setsC.join(', ')+' WHERE id=$'+piC
-        + ' RETURNING id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo',
+        + ' RETURNING id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, '
+        + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, bono_accion, bono_xp_fijo, limite_diario, icono',
         paramsC
       );
       if (!updC.length) return res.status(404).json({ ok:false, error:'Consumible no encontrado' });
       updC[0].precio_xp = red2(numXp(updC[0].precio_xp));
+      updC[0].bono_xp_fijo = red2(numXp(updC[0].bono_xp_fijo));
       return res.status(200).json({ ok:true, data: updC[0], mensaje:'Consumible actualizado' });
     }
 

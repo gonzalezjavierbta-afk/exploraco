@@ -294,7 +294,29 @@ check('79. api/usuarios.js NIVELES bornes exactos del spec v6',
 // Verificar que consumibles GET retorna shape { ok, data: [...] }
 // ADR-056: el payload suma era_usuario al lado de data (data sigue siendo
 // el array del catalogo); la asercion acepta el campo aditivo.
-check('80. consumibles GET retorna { ok, data }', srcInt.indexOf("ok: true, data: catalogoConsumibles") !== -1);
+// Entrega de consumibles de faccion nivel 4: la respuesta pasa a MULTILINEA y
+// suma dos campos mas de contexto del usuario, asi que el literal de una sola
+// linea ya no existe. Desde aqui el contrato se valida por ESTRUCTURA (claves
+// presentes en el mismo objeto de respuesta, cualquier orden/indentacion) y no
+// por formato: sigue fallando una regresion real (catalogo borrado de la
+// respuesta o campos de contexto eliminados) y deja de fallar un reformateo.
+function respConsumiblesBloque(src) {
+  var iData = src.search(/data\s*:\s*catalogoConsumibles/);
+  if (iData < 0) return '';
+  var ini = src.lastIndexOf('json({', iData);
+  if (ini < 0) ini = Math.max(0, iData - 300);
+  var fin = src.indexOf('});', iData);
+  if (fin < 0) fin = Math.min(src.length, iData + 300);
+  return src.slice(ini, fin + 3);
+}
+var respCons = respConsumiblesBloque(srcInt);
+check('80. consumibles GET retorna { ok, data: catalogoConsumibles, era/nivel/faccion_usuario }',
+  !!respCons
+  && /ok\s*:\s*true/.test(respCons)
+  && /data\s*:\s*catalogoConsumibles/.test(respCons)
+  && /era_usuario\s*:/.test(respCons)
+  && /nivel_usuario\s*:/.test(respCons)
+  && /faccion_usuario\s*:/.test(respCons));
 check('81. inventario GET retorna { ok, data: { consumibles, nivel, xp_total, era } }',
   srcInt.indexOf('consumibles: inventarioCons') !== -1
   && srcInt.indexOf('xp_total: invXp') !== -1

@@ -2188,6 +2188,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <option value="impulso">Impulso</option>
             <option value="social">Social</option>
             <option value="coleccion">Colección</option>
+            <option value="faccion">Facción</option>
           </select>
         </div>
         <div style="flex:0 0 170px">
@@ -2200,6 +2201,44 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <option value="Leyenda">Leyenda (31-35)</option>
             <option value="Mito">Mito (36-40)</option>
           </select>
+        </div>
+        <div style="flex:0 0 160px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Facción</div>
+          <select class="form-input" id="consumible-faccion" style="width:100%">
+            <option value="" selected>Sin gate</option>
+            <option value="exploradores">Exploradores</option>
+            <option value="curadores">Curadores</option>
+            <option value="creadores">Creadores</option>
+            <option value="artistas">Artistas</option>
+          </select>
+        </div>
+        <div style="flex:0 0 105px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Nivel req.</div>
+          <input class="form-input" id="consumible-nivel" type="number" min="1" max="40" step="1" placeholder="4" title="Nivel mínimo para comprar (1-40). Vacío = sin gate de nivel." style="width:100%">
+        </div>
+        <div style="flex:0 0 95px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Cargas</div>
+          <input class="form-input" id="consumible-cargas" type="number" min="1" max="20" step="1" value="1" title="Activaciones del bono (1-20)." style="width:100%">
+        </div>
+        <div style="flex:0 0 110px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Duración h</div>
+          <input class="form-input" id="consumible-duracion" type="number" min="1" max="168" step="1" value="24" title="Ventana de validez del bono en horas (1-168)." style="width:100%">
+        </div>
+        <div style="flex:0 0 110px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Límite día</div>
+          <input class="form-input" id="consumible-limite" type="number" min="0" max="5" step="1" value="1" title="Compras por usuario y día (0-5). 0 = sin tope diario por clave." style="width:100%">
+        </div>
+        <div style="flex:0 0 110px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Bono XP</div>
+          <input class="form-input" id="consumible-bonoxp" type="number" min="0" step="0.01" value="0" title="XP plano por acción bonificada (0 = sin bono)." style="width:100%">
+        </div>
+        <div style="flex:1 1 190px;min-width:170px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Bono acción</div>
+          <input class="form-input" id="consumible-bonoaccion" placeholder="guardado,visita" title="CSV sin espacios. Claves: guardado, visita, media_voto, resena, foto." style="width:100%">
+        </div>
+        <div style="flex:0 0 120px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Icono</div>
+          <input class="form-input" id="consumible-icono" maxlength="24" placeholder="&amp;#128301;" title="Entidad HTML ASCII, máximo 24 caracteres." style="width:100%">
         </div>
         <button class="btn btn-gold" onclick="crearConsumible()" style="white-space:nowrap">＋ Crear</button>
       </div>
@@ -2737,6 +2776,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <option value="impulso">Impulso</option>
           <option value="social">Social</option>
           <option value="coleccion">Colección</option>
+          <option value="faccion">Facción</option>
         </select>
       </div>
       <div>
@@ -2749,6 +2789,44 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <option value="Leyenda">Leyenda (31-35)</option>
           <option value="Mito">Mito (36-40)</option>
         </select>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Facción</div>
+        <select class="form-input" id="consumible-edit-faccion" style="width:100%">
+          <option value="">Sin gate</option>
+          <option value="exploradores">Exploradores</option>
+          <option value="curadores">Curadores</option>
+          <option value="creadores">Creadores</option>
+          <option value="artistas">Artistas</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Nivel requerido</div>
+        <input class="form-input" id="consumible-edit-nivel" type="number" min="1" max="40" step="1" placeholder="4" title="Nivel mínimo para comprar (1-40). Vacío = sin gate de nivel." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Cargas</div>
+        <input class="form-input" id="consumible-edit-cargas" type="number" min="1" max="20" step="1" title="Activaciones del bono (1-20)." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Duración (horas)</div>
+        <input class="form-input" id="consumible-edit-duracion" type="number" min="1" max="168" step="1" title="Ventana de validez del bono en horas (1-168)." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Límite diario</div>
+        <input class="form-input" id="consumible-edit-limite" type="number" min="0" max="5" step="1" title="Compras por usuario y día (0-5). 0 = sin tope diario por clave." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Bono XP fijo</div>
+        <input class="form-input" id="consumible-edit-bonoxp" type="number" min="0" step="0.01" title="XP plano por acción bonificada (0 = sin bono)." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Bono acción (CSV)</div>
+        <input class="form-input" id="consumible-edit-bonoaccion" placeholder="guardado,visita" title="CSV sin espacios. Claves: guardado, visita, media_voto, resena, foto." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Icono (entidad HTML)</div>
+        <input class="form-input" id="consumible-edit-icono" maxlength="24" placeholder="&amp;#128301;" title="Entidad HTML ASCII, máximo 24 caracteres." style="width:100%">
       </div>
       <div style="font-size:11px;color:var(--muted);line-height:1.5">💡 Editar el precio no corrompe historial: el ledger compra_consumibles guarda xp_pagado como snapshot de cada compra.</div>
     </div>
@@ -9320,6 +9398,17 @@ function renderConsumibles() {
   lista.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + filas + '</div>';
 }
 
+// Migracion 057: lee un input numerico opcional del formulario de consumibles.
+// '' -> null (el backend aplica el DEFAULT de la columna o quita el gate).
+function _numConsumible(id) {
+  var el = document.getElementById(id);
+  if (!el) return null;
+  var s = String(el.value == null ? '' : el.value).trim();
+  if (!s) return null;
+  var n = parseFloat(s.replace(',', '.'));
+  return isFinite(n) ? n : null;
+}
+
 async function crearConsumible() {
   var clave = document.getElementById('consumible-clave').value.trim().toLowerCase();
   var nombre = document.getElementById('consumible-nombre').value.trim();
@@ -9329,6 +9418,17 @@ async function crearConsumible() {
   var precio = parseFloat(String(document.getElementById('consumible-precio').value || '').replace(',', '.'));
   var categoria = (document.getElementById('consumible-categoria') || {}).value || 'general';
   var era = (document.getElementById('consumible-era') || {}).value || '';
+  // Migracion 057: gate de faccion / nivel y efecto por bono de accion. Los
+  // numericos vacios se envian como null y el backend aplica el DEFAULT de la
+  // columna (cargas 1, duracion_horas 24, limite_diario 1, bono_xp_fijo 0).
+  var faccion = (document.getElementById('consumible-faccion') || {}).value || '';
+  var nivel = _numConsumible('consumible-nivel');
+  var cargas = _numConsumible('consumible-cargas');
+  var duracion = _numConsumible('consumible-duracion');
+  var limite = _numConsumible('consumible-limite');
+  var bonoXp = _numConsumible('consumible-bonoxp');
+  var bonoAccion = String((document.getElementById('consumible-bonoaccion') || {}).value || '').trim();
+  var icono = String((document.getElementById('consumible-icono') || {}).value || '').trim();
 
   if (!clave || !nombre) { showAdminToast('Clave y nombre son obligatorios', 'error'); return; }
   if (!/^[a-z0-9_]+$/.test(clave)) { showAdminToast('Clave: solo minúsculas, números y guion bajo', 'error'); return; }
@@ -9338,7 +9438,18 @@ async function crearConsumible() {
     var resp = await fetch('/api/admin?recurso=consumibles&tipo=consumibles_crear', {
       method: 'POST',
       headers: _adminHeaders(),
-      body: JSON.stringify({ clave: clave, nombre: nombre, descripcion: descripcion, precio_xp: precio, categoria: categoria, era_exclusiva: era ? era : null })
+      body: JSON.stringify({
+        clave: clave, nombre: nombre, descripcion: descripcion, precio_xp: precio,
+        categoria: categoria, era_exclusiva: era ? era : null,
+        faccion_requerida: faccion ? faccion : null,
+        nivel_requerido: nivel,
+        cargas: cargas,
+        duracion_horas: duracion,
+        limite_diario: limite,
+        bono_xp_fijo: bonoXp == null ? 0 : bonoXp,
+        bono_accion: bonoAccion ? bonoAccion : null,
+        icono: icono ? icono : null
+      })
     });
     var data = await resp.json();
     if (!data.ok) throw new Error(data.error || 'No se pudo crear');
@@ -9348,6 +9459,14 @@ async function crearConsumible() {
     document.getElementById('consumible-precio').value = '';
     document.getElementById('consumible-categoria').value = 'general';
     document.getElementById('consumible-era').value = '';
+    document.getElementById('consumible-faccion').value = '';
+    document.getElementById('consumible-nivel').value = '';
+    document.getElementById('consumible-cargas').value = '1';
+    document.getElementById('consumible-duracion').value = '24';
+    document.getElementById('consumible-limite').value = '1';
+    document.getElementById('consumible-bonoxp').value = '0';
+    document.getElementById('consumible-bonoaccion').value = '';
+    document.getElementById('consumible-icono').value = '';
     showAdminToast('✅ ' + (data.mensaje || 'Consumible creado'), 'success');
     loadConsumibles();
   } catch (e) {
@@ -9365,6 +9484,17 @@ function abrirEditarConsumible(id) {
   document.getElementById('consumible-edit-precio').value = c.precio_xp != null ? c.precio_xp : '';
   document.getElementById('consumible-edit-categoria').value = c.categoria || 'general';
   document.getElementById('consumible-edit-era').value = c.era_exclusiva || '';
+  // Migracion 057: precarga de las 8 columnas de efecto. Un NULL de gate se
+  // muestra como campo vacio y los NOT NULL caen al DEFAULT de la columna si
+  // la fila es anterior a la 057 (lista degradada).
+  document.getElementById('consumible-edit-faccion').value = c.faccion_requerida || '';
+  document.getElementById('consumible-edit-nivel').value = c.nivel_requerido == null ? '' : c.nivel_requerido;
+  document.getElementById('consumible-edit-cargas').value = c.cargas == null ? 1 : c.cargas;
+  document.getElementById('consumible-edit-duracion').value = c.duracion_horas == null ? 24 : c.duracion_horas;
+  document.getElementById('consumible-edit-limite').value = c.limite_diario == null ? 0 : c.limite_diario;
+  document.getElementById('consumible-edit-bonoxp').value = c.bono_xp_fijo == null ? 0 : c.bono_xp_fijo;
+  document.getElementById('consumible-edit-bonoaccion').value = c.bono_accion || '';
+  document.getElementById('consumible-edit-icono').value = c.icono || '';
   document.getElementById('consumible-modal').style.display = 'flex';
 }
 
@@ -9381,6 +9511,14 @@ async function guardarEdicionConsumible() {
   var precio = parseFloat(String(document.getElementById('consumible-edit-precio').value || '').replace(',', '.'));
   var categoria = (document.getElementById('consumible-edit-categoria') || {}).value || 'general';
   var era = (document.getElementById('consumible-edit-era') || {}).value || '';
+  var faccion = (document.getElementById('consumible-edit-faccion') || {}).value || '';
+  var nivel = _numConsumible('consumible-edit-nivel');
+  var cargas = _numConsumible('consumible-edit-cargas');
+  var duracion = _numConsumible('consumible-edit-duracion');
+  var limite = _numConsumible('consumible-edit-limite');
+  var bonoXp = _numConsumible('consumible-edit-bonoxp');
+  var bonoAccion = String((document.getElementById('consumible-edit-bonoaccion') || {}).value || '').trim();
+  var icono = String((document.getElementById('consumible-edit-icono') || {}).value || '').trim();
 
   if (!nombre) { showAdminToast('El nombre no puede quedar vacío', 'error'); return; }
   if (!isFinite(precio) || precio < 0) { showAdminToast('Precio debe ser un número mayor o igual a 0', 'error'); return; }
@@ -9390,7 +9528,18 @@ async function guardarEdicionConsumible() {
     var resp = await fetch('/api/admin?recurso=consumibles&tipo=consumibles_editar', {
       method: 'POST',
       headers: _adminHeaders(),
-      body: JSON.stringify({ id: _consumiblesEditId, nombre: nombre, descripcion: descripcion, precio_xp: precio, categoria: categoria, era_exclusiva: era ? era : null })
+      body: JSON.stringify({
+        id: _consumiblesEditId, nombre: nombre, descripcion: descripcion, precio_xp: precio,
+        categoria: categoria, era_exclusiva: era ? era : null,
+        faccion_requerida: faccion ? faccion : null,
+        nivel_requerido: nivel,
+        cargas: cargas,
+        duracion_horas: duracion,
+        limite_diario: limite,
+        bono_xp_fijo: bonoXp == null ? 0 : bonoXp,
+        bono_accion: bonoAccion ? bonoAccion : null,
+        icono: icono ? icono : null
+      })
     });
     var data = await resp.json();
     if (!data.ok) throw new Error(data.error || 'No se pudo actualizar');

@@ -204,6 +204,45 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .inv-use{padding:5px 12px;background:rgba(255,74,0,.15);border:1px solid rgba(255,74,0,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.6px;transition:all .15s;font-family:'Outfit',sans-serif}
 .inv-use:hover{background:var(--gold);color:var(--black)}
 .inv-era{display:inline-block;margin-left:8px;font-family:'Outfit',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gold);background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.3);border-radius:999px;padding:1px 7px}
+/* ---- TIENDA DE FACCION: consumibles categoria 'faccion' (migracion 057) ----
+   Silo atomico (ADR-004): TODO lo nuevo cuelga de .pf-fac, con Reset de silo
+   explicito (* y box-sizing); nada suelto en :root. El gate lo decide el MOTOR
+   (bloqueado + motivo_bloqueo): esta capa solo lo pinta con el patron de
+   candado del resto del perfil (tarjeta atenuada + chip con el motivo) y
+   NUNCA oculta la tarjeta, porque esconder el motivo deja al usuario sin
+   saber que le falta. */
+.pf-fac{box-sizing:border-box;width:100%;margin-bottom:22px;display:flex;flex-direction:column;gap:12px}
+.pf-fac *,.pf-fac *::before,.pf-fac *::after{box-sizing:border-box}
+.pf-fac p{margin:0}
+.pf-fac .fac-vacio{font-size:12.5px;color:rgba(255,255,255,.4)}
+.pf-fac .fac-err{font-size:11.5px;color:#fca5a5;line-height:1.45}
+.pf-fac .fac-efecto{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(34,197,94,.14),rgba(34,197,94,.03));border:1px solid rgba(34,197,94,.38);border-radius:10px;padding:10px 12px}
+.pf-fac .fac-efecto-ico{font-size:18px;line-height:1}
+.pf-fac .fac-efecto-txt{flex:1;min-width:130px;font-size:11.5px;line-height:1.45;color:rgba(255,255,255,.72)}
+.pf-fac .fac-efecto-txt b{color:#fff}
+.pf-fac .fac-reloj{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:.8px;color:#22C55E;white-space:nowrap}
+.pf-fac .fac-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.pf-fac .fac-card{display:flex;flex-direction:column;gap:8px;background:linear-gradient(150deg,rgba(255,74,0,.13),rgba(255,255,255,.03));border:1px solid rgba(255,74,0,.32);border-radius:12px;padding:13px}
+.pf-fac .fac-card.bloqueada{border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.02)}
+.pf-fac .fac-card.bloqueada .fac-ico,.pf-fac .fac-card.bloqueada .fac-nombre,.pf-fac .fac-card.bloqueada .fac-desc,.pf-fac .fac-card.bloqueada .fac-precio{opacity:.45}
+.pf-fac .fac-top{display:flex;align-items:center;gap:8px}
+.pf-fac .fac-ico{font-size:22px;line-height:1}
+.pf-fac .fac-ico img{display:block;width:22px;height:22px;object-fit:contain;border-radius:4px}
+.pf-fac .fac-nombre{flex:1;min-width:0;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff;overflow:hidden;text-overflow:ellipsis}
+.pf-fac .fac-stock{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;color:var(--gold);background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.3);border-radius:999px;padding:1px 7px;white-space:nowrap}
+.pf-fac .fac-desc{font-size:11px;line-height:1.45;color:rgba(255,255,255,.55)}
+.pf-fac .fac-precio{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:900;color:var(--gold);line-height:1}
+.pf-fac .fac-rent{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:6px 8px;font-size:11px;color:rgba(255,255,255,.62)}
+.pf-fac .fac-neto{font-weight:900;color:#22C55E;white-space:nowrap}
+.pf-fac .fac-neto.negativo{color:#fca5a5}
+.pf-fac .fac-ops{font-size:10.5px;line-height:1.4;color:rgba(255,255,255,.42)}
+.pf-fac .fac-lock{display:flex;align-items:center;gap:6px;font-family:'Barlow Condensed',sans-serif;font-size:11.5px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.55);background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.22);border-radius:8px;padding:5px 8px}
+.pf-fac .fac-acts{display:flex;gap:8px;margin-top:2px}
+.pf-fac .fac-btn{flex:1;padding:8px 10px;background:var(--gold);border:none;border-radius:6px;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;cursor:pointer;transition:opacity .15s}
+.pf-fac .fac-btn:hover:not(:disabled){opacity:.88}
+.pf-fac .fac-btn.ghost{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);color:#fff}
+.pf-fac .fac-btn:disabled{opacity:.38;cursor:not-allowed}
+@media (max-width:600px){.pf-fac .fac-grid{grid-template-columns:1fr}}
 /* BONO DE BIENVENIDA POR REFERIDO (referidos) */
 .pf-bono{display:none;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(255,74,0,.14),rgba(255,74,0,.04));border:1px solid rgba(255,74,0,.35);border-radius:10px;padding:14px;margin-bottom:14px}
 .pf-bono-ico{font-size:24px;line-height:1}
@@ -1108,6 +1147,16 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
   <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F392; Mi Inventario</div>
   <div id="pf-inventario" data-tab="inventario"></div>
 
+  <!-- TIENDA DE FACCION (consumibles categoria 'faccion', migracion 057).
+       Se anyade a la tienda de consumibles que ya existe, en el mismo sitio
+       donde el usuario ve su XP y su inventario. El CSS nuevo cuelga del silo
+       .pf-fac (ADR-004) y el estado de bloqueo lo manda el motor
+       (bloqueado + motivo_bloqueo): aqui no se recalcula ningun gate. -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F6E1;&#xFE0F; Tienda de faccion</div>
+  <div class="pf-fac" id="pf-fac-tienda" data-tab="inventario" aria-live="polite">
+    <div class="fac-vacio">Cargando tienda de faccion&#8230;</div>
+  </div>
+
   <!-- MIS REGALIAS (regalias pasivas del autor) -->
   <section id="pf-regalias" data-tab="inventario" style="margin-top:20px">
     <div class="pf-section-title">&#x1F381; Mis regalias</div>
@@ -1786,6 +1835,9 @@ function renderPerfil() {
   /* inventario/cromos (Gamificacion v4): la pestana Inventario lista SOLO
      lo que el usuario posee; el catalogo de la tienda se retiro (T5). */
   cargarInventario(u.id);
+  /* Tienda de faccion (057): consume el mismo endpoint de consumibles que ya
+     usa la pagina, filtrado por categoria. */
+  pfFacCargar(u.id);
   cargarCromos(u.id);
   cargarBonoReferido(u.id);
   cargarMisRegalias(u.id);
@@ -3114,6 +3166,366 @@ function cargarInventario(uid) {
     .catch(function(){
       el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar el inventario.</div>';
     });
+}
+
+/* ---- TIENDA DE FACCION: consumibles categoria 'faccion' (migracion 057) ----
+   Se anyade a la tienda de consumibles que YA existe en esta pagina
+   (comprarConsumible / usarConsumible) en vez de montar un flujo paralelo:
+   mismos endpoints (comprar_consumible / usar_consumible), mismos helpers
+   (nombreConsumible, fmtXp, esc) y el mismo toast de la pagina (nunca alert).
+   Solo es propio lo que el catalogo clasico no tenia: desglose de
+   rentabilidad CALCULADO desde cargas x bono_xp_fijo - precio_xp, candado por
+   faccion/nivel/era, stock por clave y efecto vigente con cuenta atras.
+   El GATE no se decide aqui: el motor manda bloqueado + motivo_bloqueo. */
+var PF_FAC_TOPE = 30;
+var PF_FAC_ESTADO = { cat: null, stock: {}, efecto: null, reloj: null };
+/* Codigo -> texto legible. El motor manda la forma larga
+   ('FACCION_INSUFICIENTE') y el contrato corto la forma corta ('faccion'):
+   las dos caen al mismo texto via pfFacMotivoClave, de modo que un cambio de
+   forma no deja al usuario leyendo un codigo de maquina. */
+var PF_FAC_ERR = {
+  FACCION_INSUFICIENTE: 'Tu faccion no puede comprar este consumible',
+  NIVEL_INSUFICIENTE: 'Tu nivel todavia no alcanza para este consumible',
+  ERA_INSUFICIENTE: 'Este consumible pertenece a otra era',
+  LIMITE_DIARIO: 'Alcanzaste el limite diario de este consumible',
+  STOCK_LLENO: 'Ya tienes el maximo de este consumible (' + PF_FAC_TOPE + ')',
+  SIN_STOCK: 'No te quedan unidades de este consumible',
+  EFECTO_YA_ACTIVO: 'Ya tienes un bono de faccion vigente: espera a que termine'
+};
+function pfFacNum(n) {
+  var v = Number(n);
+  if (!isFinite(v)) v = 0;
+  return v % 1 === 0 ? String(v) : fmtXp(v);
+}
+function pfFacFaccion(id) {
+  var f = String(id || '').trim().toLowerCase().replace(/\s+/g, '');
+  if (!f) return null;
+  for (var i = 0; i < FACCION_META.length; i++) {
+    if (String(FACCION_META[i].id).toLowerCase() === f) return FACCION_META[i];
+  }
+  return null;
+}
+function pfFacMotivoClave(motivo) {
+  var m = String(motivo || '').trim().toUpperCase();
+  if (!m) return '';
+  if (m.indexOf('FACCION') === 0) return 'faccion';
+  if (m.indexOf('NIVEL') === 0) return 'nivel';
+  if (m.indexOf('ERA') === 0) return 'era';
+  if (m === 'FACCION' || m === 'NIVEL' || m === 'ERA') return m.toLowerCase();
+  return 'otro';
+}
+function pfFacErr(codigo, res) {
+  var c = String(codigo || '').trim().toUpperCase();
+  if (PF_FAC_ERR[c]) return PF_FAC_ERR[c];
+  if (PF_FAC_ERR[c.replace(/^.*_/, '')]) return PF_FAC_ERR[c.replace(/^.*_/, '')];
+  return (res && res.error) ? String(res.error) : 'No se pudo completar la accion';
+}
+function pfFacLista() {
+  var cat = PF_FAC_ESTADO.cat || {};
+  var raw = cat.data;
+  var lista = [];
+  if (Array.isArray(raw)) {
+    lista = raw.slice();
+  } else if (raw && typeof raw === 'object') {
+    Object.keys(raw).forEach(function(k){
+      var it = raw[k];
+      if (!it || typeof it !== 'object') return;
+      if (!it.clave) it.clave = k;
+      lista.push(it);
+    });
+  }
+  return lista.filter(function(it){
+    if (!it || it.activo === false) return false;
+    return String(it.categoria || '').toLowerCase() === 'faccion';
+  });
+}
+function pfFacItem(clave) {
+  var lista = pfFacLista();
+  for (var i = 0; i < lista.length; i++) {
+    if (String(lista[i].clave || '') === String(clave || '')) return lista[i];
+  }
+  return null;
+}
+function pfFacNombre(clave) {
+  var it = pfFacItem(clave);
+  if (it && it.nombre) return String(it.nombre);
+  return nombreConsumible(clave);
+}
+/* Stock por clave. El contrato manda data.stock; si esa clave no llega (motor
+   anterior a la 057) cae a data.consumibles.cantidad, que es la MISMA fuente
+   (capacidades->'consumibles') y evita pintar 0 donde si hay unidades. */
+function pfFacStockMap(inv) {
+  var out = {};
+  if (!inv || typeof inv !== 'object') return out;
+  var raw = (inv.stock && typeof inv.stock === 'object') ? inv.stock
+    : ((inv.consumibles && typeof inv.consumibles === 'object') ? inv.consumibles : {});
+  Object.keys(raw).forEach(function(k){
+    var v = raw[k];
+    var n = (v && typeof v === 'object') ? parseInt(v.cantidad, 10) : parseInt(v, 10);
+    out[k] = (isFinite(n) && n > 0) ? n : 0;
+  });
+  return out;
+}
+function pfFacStock(clave) {
+  var n = parseInt(PF_FAC_ESTADO.stock[String(clave || '')], 10);
+  return (isFinite(n) && n > 0) ? n : 0;
+}
+function pfFacAcciones(v) {
+  if (!v) return [];
+  var arr = Array.isArray(v) ? v : String(v).replace(/[{}"]/g, '').split(',');
+  return arr.map(function(a){ return String(a || '').trim(); })
+    .filter(function(a){ return !!a; });
+}
+/* Icono: URL -> img con onerror (ADR-008); emoji -> texto escapado; sin
+   icono -> emoji de la faccion del item y, en ultimo termino, el escudo. */
+function pfFacIcono(item) {
+  var ico = item && item.icono ? String(item.icono) : '';
+  if (/^https?:\/\//i.test(ico)) {
+    return '<img src="' + esc(ico) + '" alt="" loading="lazy" onerror="this.style.display=&#39;none&#39;">';
+  }
+  if (ico) return esc(ico);
+  var f = pfFacFaccion(item && item.faccion_requerida);
+  return (f && f.emoji) ? f.emoji : '\uD83D\uDEE1\uFE0F';
+}
+/* Rentabilidad: NO se hardcodea. bruto = cargas x bono_xp_fijo, neto = bruto -
+   precio_xp. Sin bono positivo no hay desglose que ensenar (seria un 0 vacio). */
+function pfFacRentabilidad(item) {
+  var cargas = parseInt(item.cargas, 10);
+  if (!isFinite(cargas) || cargas < 1) cargas = 1;
+  var bono = Number(item.bono_xp_fijo);
+  var precio = Number(item.precio_xp);
+  if (!isFinite(bono)) bono = 0;
+  if (!isFinite(precio)) precio = 0;
+  if (!(bono > 0)) return '';
+  var bruto = cargas * bono;
+  var neto = bruto - precio;
+  return '<div class="fac-rent">'
+    + '<span class="fac-rent-op">' + cargas + ' carga' + (cargas === 1 ? '' : 's')
+    + ' x ' + pfFacNum(bono) + ' XP = ' + pfFacNum(bruto) + ' XP</span>'
+    + '<span class="fac-neto' + (neto < 0 ? ' negativo' : '') + '">'
+    + (neto < 0 ? '\u2212 ' : '+ ') + pfFacNum(Math.abs(neto)) + ' XP neto</span>'
+    + '</div>';
+}
+/* Candado: texto derivado de faccion_requerida / nivel_requerido contra el
+   valor ACTUAL que manda el motor (faccion_usuario / nivel_usuario). Reutiliza
+   el patron de candado del perfil: chip con el motivo, tarjeta atenuada. */
+function pfFacCandado(item) {
+  var cat = PF_FAC_ESTADO.cat || {};
+  var mk = pfFacMotivoClave(item.motivo_bloqueo);
+  if (!item.bloqueado) return '';
+  if (mk === 'faccion') {
+    var f = pfFacFaccion(item.faccion_requerida);
+    var nombre = f ? f.nombre : nombreConsumible(item.faccion_requerida);
+    var actual = cat.faccion_usuario ? String(cat.faccion_usuario) : 'sin faccion';
+    return 'Solo ' + nombre + ' (tu faccion: ' + actual + ')';
+  }
+  if (mk === 'nivel') {
+    var req = parseInt(item.nivel_requerido, 10);
+    var mio = cat.nivel_usuario;
+    var tengo = (mio === null || mio === undefined || mio === '') ? 'sin nivel' : ('tu nivel: ' + mio);
+    return 'Requiere nivel ' + (isFinite(req) ? req : '?') + ' (' + tengo + ')';
+  }
+  if (mk === 'era') {
+    return 'Disponible en la era ' + String(item.era_exclusiva || 'exclusiva');
+  }
+  return 'Bloqueado para tu cuenta';
+}
+function pfFacCardHtml(item) {
+  var clave = String(item.clave || '');
+  var stock = pfFacStock(clave);
+  var bloq = !!item.bloqueado;
+  var lleno = stock >= PF_FAC_TOPE;
+  var candado = pfFacCandado(item);
+  var conEfecto = !!PF_FAC_ESTADO.efecto;
+  var usarBloq = stock < 1 || conEfecto;
+  var motivoCompra = bloq ? candado
+    : (lleno ? 'Ya tienes el maximo de este consumible (' + PF_FAC_TOPE + ')' : '');
+  var motivoUso = conEfecto ? 'Ya tienes un bono de faccion vigente'
+    : (stock < 1 ? 'No te quedan unidades de este consumible' : '');
+  var ops = pfFacAcciones(item.bono_accion);
+  return '<div class="fac-card' + (bloq ? ' bloqueada' : '') + '">'
+    + '<div class="fac-top">'
+    + '<span class="fac-ico" aria-hidden="true">' + pfFacIcono(item) + '</span>'
+    + '<span class="fac-nombre">' + esc(item.nombre || nombreConsumible(clave)) + '</span>'
+    + '<span class="fac-stock" title="Unidades en tu inventario">x' + stock + '</span>'
+    + '</div>'
+    + '<div class="fac-desc">' + esc(item.descripcion || '') + '</div>'
+    + '<div class="fac-precio">' + pfFacNum(item.precio_xp) + ' XP</div>'
+    + pfFacRentabilidad(item)
+    + (ops.length ? '<div class="fac-ops">Bono en: ' + esc(ops.join(', ')) + '</div>' : '')
+    + (candado ? '<div class="fac-lock"><span aria-hidden="true">\uD83D\uDD12</span>'
+        + '<span>' + esc(candado) + '</span></div>' : '')
+    + '<div class="fac-acts">'
+    + '<button type="button" class="fac-btn"'
+    + ' onclick="pfFacComprar(\'' + esc(clave) + '\',this)"'
+    + (bloq || lleno ? ' disabled title="' + esc(motivoCompra) + '"' : '')
+    + '>' + (lleno && !bloq ? 'Stock lleno' : 'Comprar') + '</button>'
+    + '<button type="button" class="fac-btn ghost"'
+    + ' onclick="pfFacUsar(\'' + esc(clave) + '\',this)"'
+    + (usarBloq ? ' disabled title="' + esc(motivoUso) + '"' : '')
+    + '>Usar</button>'
+    + '</div>'
+    + '</div>';
+}
+function pfFacEfectoHtml() {
+  var ef = PF_FAC_ESTADO.efecto;
+  if (!ef) return '';
+  var cargas = parseInt(ef.cargas_restantes, 10);
+  if (!isFinite(cargas)) cargas = 0;
+  return '<div class="fac-efecto">'
+    + '<span class="fac-efecto-ico" aria-hidden="true">\u26A1</span>'
+    + '<span class="fac-efecto-txt"><b>' + esc(pfFacNombre(ef.clave)) + '</b> activo.'
+    + ' Cargas restantes: <b id="pf-fac-cargas">' + cargas + '</b></span>'
+    + '<span class="fac-reloj" id="pf-fac-reloj">-- h -- m</span>'
+    + '</div>';
+}
+function pfFacPintar() {
+  var el = document.getElementById('pf-fac-tienda');
+  if (!el) return;
+  var lista = pfFacLista();
+  var html = pfFacEfectoHtml();
+  if (!lista.length) {
+    el.innerHTML = html + '<div class="fac-vacio">No hay consumibles de faccion activos.</div>';
+  } else {
+    el.innerHTML = html + '<div class="fac-grid">'
+      + lista.map(pfFacCardHtml).join('')
+      + '</div>';
+  }
+  pfFacReloj();
+}
+/* Cuenta atras propia del efecto ('12 h 04 m') sin recargar: un solo
+   intervalo vivo, se mata al re-pintar o al llegar a 0. Al expirar se relee la
+   seccion para que el stock y los botones reflejen el estado real del motor. */
+function pfFacReloj() {
+  if (PF_FAC_ESTADO.reloj) { clearInterval(PF_FAC_ESTADO.reloj); PF_FAC_ESTADO.reloj = null; }
+  var ef = PF_FAC_ESTADO.efecto;
+  if (!ef || !ef.expira_en) return;
+  var fin = Date.parse(ef.expira_en);
+  if (!isFinite(fin)) return;
+  function tic() {
+    var nodo = document.getElementById('pf-fac-reloj');
+    if (!nodo) {
+      if (PF_FAC_ESTADO.reloj) { clearInterval(PF_FAC_ESTADO.reloj); PF_FAC_ESTADO.reloj = null; }
+      return;
+    }
+    var ms = fin - Date.now();
+    if (ms <= 0) {
+      nodo.textContent = 'expirado';
+      if (PF_FAC_ESTADO.reloj) { clearInterval(PF_FAC_ESTADO.reloj); PF_FAC_ESTADO.reloj = null; }
+      var u = sesion();
+      if (u && u.id) pfFacCargar(u.id);
+      return;
+    }
+    var h = Math.floor(ms / 3600000);
+    var m = Math.floor((ms % 3600000) / 60000);
+    nodo.textContent = h + ' h ' + (m < 10 ? '0' + m : String(m)) + ' m';
+  }
+  tic();
+  PF_FAC_ESTADO.reloj = setInterval(tic, 30000);
+}
+function pfFacCargar(uid) {
+  var el = document.getElementById('pf-fac-tienda');
+  if (!el) return;
+  var u = sesion();
+  var id = uid || (u && u.id);
+  if (!id) return;
+  el.innerHTML = '<div class="fac-vacio">Cargando tienda de faccion\u2026</div>';
+  Promise.all([
+    fetch('/api/interacciones?tipo=consumibles&usuario_id=' + encodeURIComponent(id))
+      .then(function(r){ return r.json(); }).catch(function(){ return null; }),
+    fetch('/api/interacciones?tipo=inventario&usuario_id=' + encodeURIComponent(id))
+      .then(function(r){ return r.json(); }).catch(function(){ return null; })
+  ]).then(function(re) {
+    var cat = (re[0] && re[0].ok) ? re[0] : null;
+    var inv = (re[1] && re[1].ok && re[1].data) ? re[1].data : null;
+    if (!cat) {
+      el.innerHTML = '<div class="fac-err">No se pudo cargar la tienda de faccion.</div>';
+      return;
+    }
+    PF_FAC_ESTADO.cat = cat;
+    PF_FAC_ESTADO.stock = pfFacStockMap(inv);
+    PF_FAC_ESTADO.efecto = (inv && inv.efecto) ? inv.efecto : null;
+    pfFacPintar();
+  }).catch(function() {
+    el.innerHTML = '<div class="fac-err">No se pudo cargar la tienda de faccion.</div>';
+  });
+}
+/* Relee TODO tras una accion: el motor es la fuente de verdad del stock y del
+   efecto, y el inventario clasico comparte la misma fuente. */
+function pfFacRefrescar() {
+  var u = sesion();
+  if (!u || !u.id) return;
+  pfFacCargar(u.id);
+  cargarInventario(u.id);
+  refrescarSesion();
+}
+/* Mecanismo de XP ya existente: xp_total_nuevo a la sesion local + toast. Si
+   la accion trae bono_faccion se avisa con la MISMA via (nunca alert). */
+function pfFacXpSync(res) {
+  if (res.xp_total_nuevo != null && window.ExploraCO && window.ExploraCO.usuario) {
+    window.ExploraCO.usuario.xp_total = res.xp_total_nuevo;
+    try { localStorage.setItem('exploraco_user', JSON.stringify(window.ExploraCO.usuario)); } catch(e) {}
+  }
+  var bf = res.bono_faccion;
+  if (bf && Number(bf.xp) > 0) {
+    showToast('+' + pfFacNum(bf.xp) + ' XP de ' + pfFacNombre(bf.clave), '#22C55E');
+    var cargas = parseInt(bf.cargas_restantes, 10);
+    if (isFinite(cargas) && PF_FAC_ESTADO.efecto) PF_FAC_ESTADO.efecto.cargas_restantes = cargas;
+  }
+}
+/* Un solo POST para compra y uso: mismo body (usuario_id + clave), mismo
+   manejo de error y mismo refresco. Las claves 'perfil_*' con dato extra NO
+   pasan por aqui (siguen en usarConsumible / pfPedirDatoConsumible). */
+function pfFacPost(tipo, clave, btn, verbo, listo) {
+  var u = sesion();
+  if (!u || !u.id) return;
+  var previo = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = verbo + '\u2026'; }
+  fetch('/api/interacciones?tipo=' + encodeURIComponent(tipo), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usuario_id: u.id, clave: clave })
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(res) {
+      if (res && res.ok) {
+        pfFacXpSync(res);
+        if (listo) listo(res);
+        return;
+      }
+      showToast(pfFacErr(res && res.error, res), '#ef4444');
+      if (btn) { btn.disabled = false; btn.textContent = previo; }
+    })
+    .catch(function() {
+      showToast('Error de conexion', '#ef4444');
+      if (btn) { btn.disabled = false; btn.textContent = previo; }
+    });
+}
+function pfFacComprar(clave, btn) {
+  var item = pfFacItem(clave);
+  if (item && (item.bloqueado || pfFacStock(clave) >= PF_FAC_TOPE)) {
+    showToast(pfFacCandado(item) || 'Ya tienes el maximo de este consumible', '#fcd34d');
+    return;
+  }
+  pfFacPost('comprar_consumible', clave, btn, 'Comprar', function(res) {
+    showToast('Consumible comprado: ' + pfFacNombre(clave));
+    if (res && res.bajo_nivel) showToast('Bajaste de nivel al gastar XP', '#ef4444');
+    pfFacRefrescar();
+  });
+}
+function pfFacUsar(clave, btn) {
+  if (pfFacStock(clave) < 1) {
+    showToast('No te quedan unidades de este consumible', '#fcd34d');
+    return;
+  }
+  if (PF_FAC_ESTADO.efecto) {
+    showToast('Ya tienes un bono de faccion vigente: espera a que termine', '#fcd34d');
+    return;
+  }
+  pfFacPost('usar_consumible', clave, btn, 'Usar', function() {
+    showToast('Efecto aplicado: ' + pfFacNombre(clave));
+    pfFacRefrescar();
+  });
 }
 
 /* ---- BONO DE BIENVENIDA POR REFERIDO (feature referidos) ----
@@ -6609,7 +7021,7 @@ function pfTab(tab) {
   if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
   if (tab === 'museo' && u && u.id) { cargarMuseoPreview(u.id); museoRefrescar(); }
-  if (tab === 'inventario' && u && u.id) { cargarInventario(u.id); pfSlotsCargar(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); cargarCartas(u.id); cargarMercadoCartas(); cargarMoneda(u.id); }
+  if (tab === 'inventario' && u && u.id) { cargarInventario(u.id); pfFacCargar(u.id); pfSlotsCargar(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); cargarCartas(u.id); cargarMercadoCartas(); cargarMoneda(u.id); }
   if (tab === 'mensajes' && u && u.id) cargarMensajes(u.id);
   if (tab === 'contratos' && u && u.id) cargarContratos(u.id);
   if (tab === 'cuenta' && u) renderCuentaPanel();

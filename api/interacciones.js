@@ -2081,6 +2081,25 @@ function calcularEraVisibleLocal(xpTotal, nivelMax) {
   return calcularEraLocal(Math.max(n, nm));
 }
 
+// Nivel canonico del usuario con la regla ADR-053: GREATEST(nivel derivado de
+// xp_total, nivel_max). Espejo local de conNivel() en api/usuarios.js. Se usa
+// para el gate de nivel de los consumibles de faccion (migracion 057): gastar
+// XP no baja el nivel ganado, igual que no baja la era.
+function calcularNivelVisibleLocal(xpTotal, nivelMax) {
+  var n = calcularNivelLocal(xpTotal).nivel;
+  var nm = parseInt(nivelMax, 10) || 1;
+  return Math.max(n, nm);
+}
+
+// Normalizacion de faccion para comparar contra consumibles.faccion_requerida
+// (migracion 057): minusculas y sin espacios, de modo que 'Curadores ' y
+// 'curadores' son la misma faccion. Vacio/NULL/undefined -> null (sin faccion).
+function normalizarFaccionConsumible(valor) {
+  if (valor === null || valor === undefined) return null;
+  var s = String(valor).toLowerCase().replace(/\s+/g, '');
+  return s ? s : null;
+}
+
 // ADR-040 (v22): nivel que desbloquea cada mision que abre capacidad.
 // Los valores son el nivel (1-based) cuyo umbral minimo vive en el mismo
 // catalogo NIVELES_LOCAL; nivelDeMisionServidor valida contra ESE catalogo
@@ -4532,6 +4551,152 @@ function actualizarCapacidad(sql, usuarioId, clave, valor) {
     + " || jsonb_build_object($1, $2::jsonb) WHERE id=$3",
     [clave, JSON.stringify(valor), usuarioId]
   ).catch(function(){});
+}
+
+// ============================================================
+// Consumibles de FACCION (migracion 057): bono PLANO por accion.
+// El efecto vigente vive en usuarios.capacidades->'consumible_efecto'
+// con la forma exacta { clave, activo_desde, expira_en,
+// cargas_restantes, bono_accion, bono_xp_fijo }; es el contrato que
+// lee GET ?tipo=inventario. bono_accion es un ARREGLO en el JSONB
+// (el catalogo lo guarda como CSV en consumibles.bono_accion).
+// Un solo efecto vigente a la vez.
+// ADR-003: al llegar cargas_restantes a 0 la clave NO se borra, se
+// CONSERVA como rastro (traceabilidad); el lector de inventario la
+// descarta por cargas 0 y efectoFaccionVigente la ignora igual.
+// ============================================================
+
+// CSV del catalogo (o arreglo ya sellado) -> arreglo normalizado de
+// acciones: minusculas, sin espacios y sin duplicados. Entrada nula o
+// vacia -> arreglo vacio (nunca null, nunca lanza).
+function accionesBonoFaccion(valor) {
+  var salida = [];
+  if (valor === null || valor === undefined) return salida;
+  var lista = Array.isArray(valor) ? valor : String(valor).split(',');
+  for (var i = 0; i < lista.length; i++) {
+    var acc = String(lista[i] === null || lista[i] === undefined ? '' : lista[i])
+      .trim().toLowerCase();
+    if (acc && salida.indexOf(acc) === -1) salida.push(acc);
+  }
+  return salida;
+}
+
+// Efecto de faccion VIGENTE o null. Vigente = expira_en en el futuro Y
+// cargas_restantes > 0 (misma regla que GET ?tipo=inventario, para que
+// cliente y servidor no discrepen). Nunca lanza.
+function efectoFaccionVigente(caps) {
+  if (!caps || typeof caps !== 'object') return null;
+  var ef = caps.consumible_efecto;
+  if (!ef || typeof ef !== 'object') return null;
+  var cargas = parseInt(ef.cargas_restantes, 10);
+  if (!isFinite(cargas) || cargas <= 0) return null;
+  var hasta = ef.expira_en ? new Date(ef.expira_en).getTime() : 0;
+  if (!isFinite(hasta) || hasta <= Date.now()) return null;
+  return ef;
+}
+
+// Ventana de faccion ABIERTA (el efecto sellado o null). DIFERENCIA con
+// efectoFaccionVigente, que es un predicado mas estricto: aqui SOLO se
+// mira expira_en en el futuro y se IGNORA cargas_restantes a proposito.
+// Uso: gate de REUTILIZACION al activar otro consumible de faccion =
+// 1 activacion por ventana de 24 h. Con el predicado estricto la ventana
+// "colapsaba" al llegar cargas_restantes a 0 y se podia licuar el stock
+// entero el mismo dia. efectoFaccionVigente sigue siendo la regla del
+// CONSUMO del bono (con 0 cargas no se paga bono). Son dos predicados
+// parecidos y NO son intercambiables.
+function ventanaFaccionAbierta(caps) {
+  if (!caps || typeof caps !== 'object') return null;
+  var ef = caps.consumible_efecto;
+  if (!ef || typeof ef !== 'object') return null;
+  var hasta = ef.expira_en ? new Date(ef.expira_en).getTime() : 0;
+  if (!isFinite(hasta) || hasta <= Date.now()) return null;
+  return ef;
+}
+
+// Consume UNA carga del efecto de faccion vigente y acredita el bono
+// PLANO de esa accion. ADR-038: NO pasa por calcularXpFinal, NO aplica
+// mult_nivel ni el multiplicador de Origen/lejania (es bono plano).
+// El decremento de cargas_restantes y la suma a xp_total van en el
+// MISMO UPDATE condicionado: si el WHERE no encuentra fila (efecto
+// agotado, expirado o reemplazado por otro turno) NO hay bono, lo que
+// evita la doble acreditacion por concurrencia. Asiento PROPIO en
+// xp_ledger (accion bono_faccion_era1) para que la suma de xp_final
+// siga cuadrando con el delta de xp_total: la accion madre no incluye
+// este bono. Nunca lanza (BUG-021: catch con log real, no vacio).
+async function consumirBonoFaccion(sql, usuarioId, accion, ctxExtra) {
+  var salida = { acreditado: false, xp: 0, clave: null, cargas_restantes: null };
+  if (!usuarioId) return salida;
+  var accionOk = String(accion || '').trim().toLowerCase();
+  if (!accionOk) return salida;
+  try {
+    var caps = await leerCapacidades(sql, usuarioId);
+    var ef = efectoFaccionVigente(caps);
+    if (!ef) return salida;
+    if (accionesBonoFaccion(ef.bono_accion).indexOf(accionOk) === -1) return salida;
+    var bono = red2(numXp(ef.bono_xp_fijo));
+    if (!(bono > 0)) return salida;
+    var claveEf = ef.clave ? String(ef.clave) : '';
+    if (!claveEf) return salida;
+    // La ventana se compara por TEXTO contra la MISMA fecha leida arriba:
+    // no se castea timestamptz (un valor raro en el JSONB tumbaria la
+    // sentencia) y ademas detecta que el efecto fue reemplazado.
+    var expiraTxt = ef.expira_en ? String(ef.expira_en) : '';
+    var upd = await sql(
+      'UPDATE usuarios SET '
+      + 'xp_total = xp_total + $3::numeric, '
+      + 'capacidades = jsonb_set(COALESCE(capacidades,\'{}\'::jsonb), '
+      + '\'{consumible_efecto,cargas_restantes}\', '
+      + 'to_jsonb(COALESCE(NULLIF(capacidades->\'consumible_efecto\'->>\'cargas_restantes\',\'\')::int,0) - 1), '
+      + 'true) '
+      + 'WHERE id=$1::uuid '
+      + 'AND capacidades->\'consumible_efecto\'->>\'clave\' = $2::text '
+      + 'AND COALESCE(capacidades->\'consumible_efecto\'->>\'expira_en\',\'\') = $4::text '
+      + 'AND COALESCE(NULLIF(capacidades->\'consumible_efecto\'->>\'cargas_restantes\',\'\')::int,0) > 0 '
+      + 'RETURNING xp_total, (capacidades->\'consumible_efecto\'->>\'cargas_restantes\') AS cargas_restantes',
+      [usuarioId, claveEf, bono, expiraTxt]
+    );
+    if (!upd || !upd.length) return salida;
+    var cargasRestantes = parseInt(upd[0].cargas_restantes, 10);
+    if (!isFinite(cargasRestantes)) cargasRestantes = 0;
+    var ctxBono = {
+      consumible_clave: claveEf,
+      accion_origen: accionOk,
+      carga_restante: cargasRestantes
+    };
+    if (ctxExtra && typeof ctxExtra === 'object') {
+      Object.keys(ctxExtra).forEach(function(k){ ctxBono[k] = ctxExtra[k]; });
+    }
+    salida = { acreditado: true, xp: bono, clave: claveEf, cargas_restantes: cargasRestantes };
+    // Asiento PROPIO y exento: xp_base 0 y todo el monto en bonos_planos,
+    // mults en 1 (bono plano, ADR-038). Sin 'nivel': el bono no toca
+    // nivel_max, que lo gobiernan las acciones madre.
+    await registrarXpLedger(sql, {
+      usuario_id: usuarioId, accion: 'bono_faccion_era1',
+      xp_base: 0, mult_nivel: 1, mult_stack: 1, mult_final: 1,
+      cap_aplicado: 'ninguno', bonos_planos: bono, xp_final: bono,
+      es_exento: true, contexto: ctxBono
+    });
+    return salida;
+  } catch (eBono) {
+    console.warn('[interacciones] bono de faccion no acreditado ('
+      + (eBono && eBono.code ? eBono.code + ' ' : '')
+      + (eBono && eBono.message ? eBono.message : String(eBono)) + ')');
+    return salida;
+  }
+}
+
+// Forma PUBLICA del bono para el JSON de la accion madre: null si no se
+// acredito; { clave, xp, cargas_restantes } si se acredito. Va en su
+// propio campo 'bono_faccion' y NUNCA dentro de xp/xp_final: el bono es
+// plano y tiene asiento propio (ADR-038), sumarlo al xp de la accion
+// seria doble conteo visual en el cliente. Nunca lanza.
+function bonoFaccionRespuesta(resBono) {
+  if (!resBono || !resBono.acreditado) return null;
+  return {
+    clave: resBono.clave,
+    xp: resBono.xp,
+    cargas_restantes: resBono.cargas_restantes
+  };
 }
 
 // Amuleto de Doble XP (clave amuleto_x2): si capacidades->
@@ -9069,24 +9234,44 @@ module.exports = async function handler(req, res) {
         var catalogoConsumibles = [];
         try {
           catalogoConsumibles = await sql(
-            'SELECT clave, nombre, descripcion, precio_xp, categoria, era_exclusiva FROM consumibles'
+            'SELECT clave, nombre, descripcion, precio_xp, categoria, era_exclusiva,'
+            + ' faccion_requerida, nivel_requerido, cargas, duracion_horas,'
+            + ' bono_accion, bono_xp_fijo, limite_diario, icono FROM consumibles'
             + ' WHERE activo = true AND ($1::text IS NULL OR categoria = $1::text)'
             + ' ORDER BY precio_xp ASC, clave ASC',
             [catCons || null]
           );
         } catch (eCatCons) {
-          // Degradacion (migracion 018 o 035 pendiente): catalogo completo
-          // sin categoria ni era_exclusiva; el contrato se uniforma abajo.
-          console.warn('TRACE: GET consumibles sin categoria: ' + (eCatCons && eCatCons.message));
-          catalogoConsumibles = await sql(
-            'SELECT clave, nombre, descripcion, precio_xp FROM consumibles'
-            + ' WHERE activo = true ORDER BY precio_xp ASC, clave ASC',
-            []
-          ).catch(function(){ return []; });
+          // Degradacion escalonada (cero rotura). Escalon 1: faltan las
+          // columnas de efecto de la 057 -> se reintenta con el contrato
+          // 018/035, que es EXACTAMENTE el comportamiento previo (filtro por
+          // categoria + era_exclusiva). Escalon 2: sin 018/035 -> catalogo
+          // minimo completo (sin filtro, como antes).
+          console.warn('TRACE: GET consumibles sin columnas de efecto 057: ' + (eCatCons && eCatCons.message));
+          try {
+            catalogoConsumibles = await sql(
+              'SELECT clave, nombre, descripcion, precio_xp, categoria, era_exclusiva FROM consumibles'
+              + ' WHERE activo = true AND ($1::text IS NULL OR categoria = $1::text)'
+              + ' ORDER BY precio_xp ASC, clave ASC',
+              [catCons || null]
+            );
+          } catch (eCatCons035) {
+            console.warn('TRACE: GET consumibles sin categoria: ' + (eCatCons035 && eCatCons035.message));
+            catalogoConsumibles = await sql(
+              'SELECT clave, nombre, descripcion, precio_xp FROM consumibles'
+              + ' WHERE activo = true ORDER BY precio_xp ASC, clave ASC',
+              []
+            ).catch(function(){ return []; });
+          }
         }
         // Era ganada del usuario (ADR-053/ADR-056): solo se calcula si viene
         // usuario_id. Sin fila o sin columnas -> era_usuario null y sin gate.
+        // Junto a la era se calculan el nivel canonico (GREATEST con nivel_max)
+        // y la faccion normalizada, que alimentan el bloqueo de los consumibles
+        // de faccion de la 057 (prioridad faccion > nivel > era).
         var catEraUsuario = null;
+        var catNivelUsuario = null;
+        var catFaccionUsuario = null;
         if (usuarioId) {
           var catUsrRows = await sql(
             'SELECT xp_total, nivel_max FROM usuarios WHERE id=$1',
@@ -9094,7 +9279,18 @@ module.exports = async function handler(req, res) {
           ).catch(function(){ return []; });
           if (catUsrRows.length) {
             catEraUsuario = calcularEraVisibleLocal(catUsrRows[0].xp_total, catUsrRows[0].nivel_max);
+            catNivelUsuario = calcularNivelVisibleLocal(catUsrRows[0].xp_total, catUsrRows[0].nivel_max);
           }
+          // faccion va en consulta aparte: si la columna no existe (esquema
+          // previo) degrada a null sin tumbar el catalogo ni la era.
+          var catFacRows = await sql(
+            'SELECT faccion FROM usuarios WHERE id=$1',
+            [usuarioId]
+          ).catch(function(eCatFac) {
+            console.warn('TRACE: GET consumibles sin faccion de usuario: ' + (eCatFac && eCatFac.message));
+            return [];
+          });
+          if (catFacRows.length) catFaccionUsuario = normalizarFaccionConsumible(catFacRows[0].faccion);
         }
         // Bono de bienvenida (036): los 3 consumibles bienvenida_* son
         // regalo del flujo de referidos, NO comprables; se excluyen de la
@@ -9106,13 +9302,45 @@ module.exports = async function handler(req, res) {
         // numeric(12,2) llega como string: normalizar el precio (ADR-035).
         // era_exclusiva se uniforma a null cuando la columna no existe o el
         // valor es vacio; bloqueado solo aplica con usuario_id presente.
+        // Campos de efecto de la 057 (faccion/nivel/cargas/bono/limite/icono):
+        // si la columna no existe salen null y NINGUNA fila clasica se bloquea
+        // por faccion ni por nivel (sus valores son NULL/0).
         catalogoConsumibles = catalogoConsumibles.map(function(c) {
           c.precio_xp = red2(numXp(c.precio_xp));
           c.era_exclusiva = c.era_exclusiva || null;
+          c.faccion_requerida = normalizarFaccionConsumible(c.faccion_requerida);
+          c.nivel_requerido = (c.nivel_requerido === null || c.nivel_requerido === undefined)
+            ? null : (parseInt(c.nivel_requerido, 10) || null);
+          c.cargas = (c.cargas === null || c.cargas === undefined) ? 1 : (parseInt(c.cargas, 10) || 1);
+          c.duracion_horas = (c.duracion_horas === null || c.duracion_horas === undefined)
+            ? 24 : (parseInt(c.duracion_horas, 10) || 24);
+          c.bono_accion = c.bono_accion || null;
+          c.bono_xp_fijo = red2(numXp(c.bono_xp_fijo));
+          c.limite_diario = parseInt(c.limite_diario, 10) || 0;
+          c.icono = c.icono || null;
+          // Bloqueo con prioridad faccion > nivel > era. Mismo contrato que el
+          // gate de era previo: sin usuario_id no se bloquea nada (tienda
+          // publica). Un usuario sin faccion cuenta como bloqueado por faccion.
           c.bloqueado = !!(c.era_exclusiva && catEraUsuario && c.era_exclusiva !== catEraUsuario);
+          c.motivo_bloqueo = c.bloqueado ? 'ERA_INSUFICIENTE' : null;
+          if (usuarioId && c.faccion_requerida
+              && (!catFaccionUsuario || catFaccionUsuario !== c.faccion_requerida)) {
+            c.bloqueado = true;
+            c.motivo_bloqueo = 'FACCION_INSUFICIENTE';
+          } else if (usuarioId && c.nivel_requerido
+              && catNivelUsuario !== null && catNivelUsuario < c.nivel_requerido) {
+            c.bloqueado = true;
+            c.motivo_bloqueo = 'NIVEL_INSUFICIENTE';
+          }
           return c;
         });
-        return res.status(200).json({ ok: true, data: catalogoConsumibles, era_usuario: catEraUsuario });
+        return res.status(200).json({
+          ok: true,
+          data: catalogoConsumibles,
+          era_usuario: catEraUsuario,
+          nivel_usuario: catNivelUsuario,
+          faccion_usuario: catFaccionUsuario
+        });
       }
 
       // Bono de bienvenida por referido (036): estado del reclamo + catalogo
@@ -9246,10 +9474,54 @@ module.exports = async function handler(req, res) {
             era_exclusiva: invEras[clave] || null,
           };
         });
+        // Stock por clave de consumibles (migracion 057, solo LECTURA: la
+        // escritura vive en el flujo de consumo). Misma fuente que el resto
+        // del inventario (usuarios.capacidades->'consumibles'); degradacion
+        // silenciosa a objeto vacio si no hay claves o el tipo no es objeto.
+        var invStock = {};
+        try {
+          var invStockCrudo = capsInv.consumibles;
+          if (invStockCrudo && typeof invStockCrudo === 'object') {
+            Object.keys(invStockCrudo).forEach(function(k) {
+              var n = parseInt(invStockCrudo[k], 10);
+              invStock[k] = (isFinite(n) && n > 0) ? n : 0;
+            });
+          }
+        } catch (eInvStock) {
+          console.warn('[interacciones] inventario stock no leido: ' + (eInvStock && eInvStock.message));
+          invStock = {};
+        }
+        // Efecto vigente del bono de accion (057): se expone SOLO lectura con
+        // su expira_en y cargas_restantes. Se descarta si ya expiro o si no
+        // quedan cargas, para que el contrato devuelva el efecto VIGENTE.
+        // Si la clave no existe (esquema previo) sale null sin romper.
+        var invEfecto = null;
+        try {
+          var invEfectoCrudo = capsInv.consumible_efecto;
+          if (invEfectoCrudo && typeof invEfectoCrudo === 'object') {
+            var invEfectoHasta = invEfectoCrudo.expira_en ? new Date(invEfectoCrudo.expira_en).getTime() : 0;
+            var invEfectoCargas = parseInt(invEfectoCrudo.cargas_restantes, 10);
+            if (!isFinite(invEfectoCargas)) invEfectoCargas = 0;
+            if (invEfectoHasta > Date.now() && invEfectoCargas > 0) {
+              invEfecto = {
+                clave: invEfectoCrudo.clave || null,
+                bono_accion: invEfectoCrudo.bono_accion || null,
+                bono_xp_fijo: red2(numXp(invEfectoCrudo.bono_xp_fijo)),
+                expira_en: invEfectoCrudo.expira_en || null,
+                cargas_restantes: invEfectoCargas,
+              };
+            }
+          }
+        } catch (eInvEfecto) {
+          console.warn('[interacciones] inventario efecto no leido: ' + (eInvEfecto && eInvEfecto.message));
+          invEfecto = null;
+        }
         return res.status(200).json({
           ok: true,
           data: {
             consumibles: inventarioCons,
+            stock: invStock,
+            efecto: invEfecto,
             nivel: invNivel.nivel,
             xp_total: invXp,
             era: invEra,
@@ -11614,6 +11886,8 @@ module.exports = async function handler(req, res) {
           mult_final: resFoto.mult_global_c, cap_aplicado: resFoto.cap_aplicado,
           xp_final: xpFotoFinal, contexto: { destino_id: destinoId2, tipo: 'foto' }
         }, origenLedger(resFoto, 'destino', fotoPunto)));
+        // Bono de faccion (057, Lente del Artista): accion 'foto'.
+        var bonoFacFoto = await consumirBonoFaccion(sql, usuarioId2, 'foto', { destino_id: destinoId2 });
         misionesFoto = await evaluarMisiones(sql, usuarioId2);
         logrosFoto = await evaluarLogros(sql, usuarioId2);
         // FASE 2B (T5.4 / ADR-065): el dueno del spot puede llevarse el 10%
@@ -11623,7 +11897,7 @@ module.exports = async function handler(req, res) {
           fuente_interaccion_id: fotoIns[0] ? fotoIns[0].id : null,
           xp_bruto_base: XP_BASES.foto_viajero, tipo_medio: 'foto'
         });
-        return res.status(200).json({ ok: true, id: fotoIns[0].id, xp: xpFotoFinal, xp_detalle: armarXpDetalle(XP_BASES.foto_viajero, resFoto, 0), misiones: misionesFoto, logros: logrosFoto });
+        return res.status(200).json({ ok: true, id: fotoIns[0].id, xp: xpFotoFinal, xp_detalle: armarXpDetalle(XP_BASES.foto_viajero, resFoto, 0), misiones: misionesFoto, logros: logrosFoto, bono_faccion: bonoFaccionRespuesta(bonoFacFoto) });
       }
 
       // -- Voto en foto (+5 XP al votante) --
@@ -12364,6 +12638,13 @@ module.exports = async function handler(req, res) {
         if (mvRes.tope)
           return res.status(429).json({ ok: false, error: 'Limite de 20 votos por dia alcanzado' });
 
+        // Bono de faccion (057, Lupa del Curador): la carga se consume al
+        // VOTAR un medio (no al subirlo) y solo si el voto se registro.
+        var bonoFacMedia = null;
+        if (mvRes.es_alta)
+          bonoFacMedia = await consumirBonoFaccion(sql, usuarioId2, 'media_voto',
+            { fuente: mvFuente, item_id: mvItem });
+
         var mvMisiones = await evaluarMisiones(sql, usuarioId2);
         var mvLogros = await evaluarLogros(sql, usuarioId2);
         if (mvRes.xp > 0) await repartirXpReferidos(sql, usuarioId2, mvRes.xp);
@@ -12378,6 +12659,7 @@ module.exports = async function handler(req, res) {
           ya_votado: true, es_alta: mvRes.es_alta,
           xp_detalle: mvRes.xp_detalle || undefined,
           misiones: mvMisiones, logros: mvLogros,
+          bono_faccion: bonoFaccionRespuesta(bonoFacMedia),
         });
       }
 
@@ -13115,13 +13397,22 @@ module.exports = async function handler(req, res) {
         if (!ccClave)
           return res.status(400).json({ ok: false, error: 'clave requerida' });
         var ccCons = await sql(
-          'SELECT id, clave, precio_xp, categoria, era_exclusiva FROM consumibles WHERE clave=$1 AND activo=true LIMIT 1',
+          'SELECT id, clave, precio_xp, categoria, era_exclusiva,'
+          + ' faccion_requerida, nivel_requerido, limite_diario FROM consumibles'
+          + ' WHERE clave=$1 AND activo=true LIMIT 1',
           [ccClave]
         ).catch(function(){ return []; });
         if (!ccCons.length) {
-          // Degradacion si consumibles.categoria no existe todavia
-          // (migracion 017 / WP-6 pendiente): la compra sigue sin
-          // descuento en vez de romper.
+          // Degradacion escalonada sin cambiar el contrato de error. Escalon 1:
+          // faltan las columnas de efecto de la 057 -> se reintenta con el
+          // SELECT previo (categoria + era_exclusiva). Escalon 2: sin categoria
+          // (migracion 017 / WP-6) -> la compra sigue sin descuento.
+          ccCons = await sql(
+            'SELECT id, clave, precio_xp, categoria, era_exclusiva FROM consumibles WHERE clave=$1 AND activo=true LIMIT 1',
+            [ccClave]
+          ).catch(function(){ return []; });
+        }
+        if (!ccCons.length) {
           ccCons = await sql(
             'SELECT id, clave, precio_xp FROM consumibles WHERE clave=$1 AND activo=true LIMIT 1',
             [ccClave]
@@ -13150,6 +13441,39 @@ module.exports = async function handler(req, res) {
         var ccUsr = await sql('SELECT xp_total, COALESCE(xp_gastado_sinks, 0) AS xp_gastado_sinks, capacidades, nivel_max FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
         if (!ccUsr.length)
           return res.status(404).json({ ok: false, error: 'No encontrado' });
+        // Gate 2 (migracion 057): FACILIDAD DE COMPRA -> FACCION. Solo aplica
+        // si faccion_requerida no es NULL (los 4 items de faccion). Un usuario
+        // sin faccion cuenta como insuficiente. Va ANTES del gate de nivel y
+        // del de era, y antes del cobro.
+        var ccFacReq = normalizarFaccionConsumible(ccCons[0].faccion_requerida);
+        if (ccFacReq) {
+          var ccFacRows = await sql(
+            'SELECT faccion FROM usuarios WHERE id=$1',
+            [usuarioId2]
+          ).catch(function(eCcFac) {
+            console.warn('[interacciones] comprar_consumible faccion no leida: ' + (eCcFac && eCcFac.message));
+            return [];
+          });
+          var ccFacUsr = ccFacRows.length ? normalizarFaccionConsumible(ccFacRows[0].faccion) : null;
+          if (!ccFacUsr || ccFacUsr !== ccFacReq)
+            return res.status(403).json({
+              ok: false, error: 'FACCION_INSUFICIENTE',
+              faccion_requerida: ccFacReq, faccion_actual: ccFacUsr
+            });
+        }
+        // Gate 3 (migracion 057): NIVEL. Solo aplica si nivel_requerido no es
+        // NULL. El nivel se evalua como GREATEST(nivel(xp_total), nivel_max)
+        // (ADR-053): gastar XP no desbloquea ni bloquea este gate.
+        var ccNivReq = (ccCons[0].nivel_requerido === null || ccCons[0].nivel_requerido === undefined)
+          ? null : (parseInt(ccCons[0].nivel_requerido, 10) || null);
+        if (ccNivReq) {
+          var ccNivUsr = calcularNivelVisibleLocal(ccUsr[0].xp_total, ccUsr[0].nivel_max);
+          if (ccNivUsr < ccNivReq)
+            return res.status(403).json({
+              ok: false, error: 'NIVEL_INSUFICIENTE',
+              nivel_requerido: ccNivReq, nivel_actual: ccNivUsr
+            });
+        }
         // Gate de era (ADR-056): compra exclusiva por era. El item solo se
         // compra si la era ganada del usuario coincide con era_exclusiva.
         // NULL = sin gate (tienda base). Va antes del chequeo de XP, del
@@ -13169,6 +13493,25 @@ module.exports = async function handler(req, res) {
         var ccDisp = Math.max(ccXp - numXp(ccUsr[0].xp_gastado_sinks), 0);
         if (ccDisp < ccPrecio)
           return res.status(409).json({ ok: false, error: 'XP insuficiente', xp_disponible: red2(ccDisp), xp_total: red2(ccXp), precio: ccPrecio });
+        // Gate 5 (migracion 057): LIMITE DIARIO POR CLAVE. SOLO para categoria
+        // 'faccion' con limite_diario > 0 (0 = sin tope por clave, valor de las
+        // filas clasicas). Cuenta las compras de ESTE consumible en 24 h.
+        var ccLimDia = parseInt(ccCons[0].limite_diario, 10) || 0;
+        if (ccCategoria === 'faccion' && ccLimDia > 0) {
+          var ccLimRows = await sql(
+            "SELECT COUNT(*)::int AS n FROM compra_consumibles WHERE usuario_id=$1 AND consumible_id=$2 AND creado_en > NOW() - INTERVAL '1 day'",
+            [usuarioId2, ccCons[0].id]
+          ).catch(function(eCcLim) {
+            console.warn('[interacciones] comprar_consumible limite diario no leido: ' + (eCcLim && eCcLim.message));
+            return [];
+          });
+          var ccLimN = (ccLimRows[0] && ccLimRows[0].n) ? ccLimRows[0].n : 0;
+          if (ccLimN >= ccLimDia)
+            return res.status(409).json({
+              ok: false, error: 'LIMITE_DIARIO',
+              limite_diario: ccLimDia, compras_24h: ccLimN
+            });
+        }
         // Anti-farming: max 5 compras por dia por usuario
         var ccCount = await sql(
           "SELECT COUNT(*)::int AS n FROM compra_consumibles WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL '1 day'",
@@ -13181,17 +13524,52 @@ module.exports = async function handler(req, res) {
         if (ccClave === 'amuleto_x2' && (parseInt(ccCaps.multiplicador_x2_usos, 10) || 0) > 0)
           return res.status(409).json({ ok: false, error: 'Ya tienes un amuleto x2 activo' });
         var ccNivelAnt = calcularNivelLocal(ccXp).nivel;
+        // Gate 7 (migracion 057): STOCK. Solo categoria 'faccion': si el stock
+        // de esa clave en capacidades->'consumibles' ya llego al tope de 30 no
+        // se cobra ni se incrementa.
+        var ccStockTope = 30;
+        var ccStockAct = parseInt((ccCaps.consumibles || {})[ccClave], 10) || 0;
+        // Normalizado (mismo patron que usar_consumible): el predicado de
+        // stock del WHERE no depende del casing que traiga la fila.
+        var ccEsFaccion = String(ccCategoria || '').trim().toLowerCase() === 'faccion';
+        if (ccCategoria === 'faccion' && ccStockAct >= ccStockTope)
+          return res.status(409).json({
+            ok: false, error: 'STOCK_LLENO',
+            stock_actual: ccStockAct, stock_maximo: ccStockTope
+          });
         // Resta atomica + merge del inventario (nunca deja xp negativo:
-        // el WHERE de disponible >= $1 protege la escritura)
+        // el WHERE de disponible >= $1 protege la escritura).
+        // El incremento de stock va DENTRO de este mismo UPDATE, con la misma
+        // expresion de merge de actualizarCapacidad: jsonb_build_object sobre
+        // COALESCE(capacidades->'consumibles','{}'). No se usa la llamada
+        // aparte a actualizarCapacidad porque toma un valor literal y
+        // reemplazaria el objeto entero de consumibles (rompe ADR-003 y abre
+        // carrera); esta forma es el incremento en UNA sola operacion.
+        // TOCTOU (tope de stock 30): el pre-chequeo de arriba es solo una
+        // cortesia; el tope REAL va en el WHERE. $4 lleva el tope cuando la
+        // categoria es 'faccion' y NULL en cualquier otra (predicado inerte:
+        // $4::int IS NULL). Se reutiliza $2 como clave, sin placeholders
+        // nuevos de clave ni renumeracion: siguen siendo 4 placeholders y 4
+        // parametros en el mismo orden.
         var ccUpd = await sql(
           'UPDATE usuarios SET xp_total = xp_total - $1,'
           + " capacidades = COALESCE(capacidades,'{}'::jsonb)"
           + " || jsonb_build_object('consumibles', COALESCE(capacidades->'consumibles','{}'::jsonb)"
           + ' || jsonb_build_object($2, COALESCE((capacidades->\'consumibles\'->>$2)::int, 0) + 1))'
           + ' WHERE id=$3 AND xp_total >= $1'
-          + ' AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $1 RETURNING xp_total',
-          [ccPrecio, ccClave, usuarioId2]
-        ).catch(function(){ return []; });
+          + ' AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $1'
+          + ' AND ($4::int IS NULL'
+          + ' OR COALESCE((capacidades->\'consumibles\'->>$2)::int, 0) < $4::int)'
+          + ' RETURNING xp_total',
+          [ccPrecio, ccClave, usuarioId2, ccEsFaccion ? ccStockTope : null]
+        ).catch(function(eCcUpd){
+          console.warn('[interacciones] comprar_consumible UPDATE no ejecutado: '
+            + (eCcUpd && eCcUpd.message));
+          return [];
+        });
+        // 0 filas = disponible insuficiente o (carrera) stock ya en el tope:
+        // el pre-chequeo de stock cubre el caso no concurrente, y el WHERE
+        // lo cubre siempre. Se conserva el texto historico del contrato.
         if (!ccUpd.length)
           return res.status(409).json({ ok: false, error: 'XP insuficiente para la compra' });
         // Ledger append-only
@@ -13237,6 +13615,99 @@ module.exports = async function handler(req, res) {
         var ucCaps = await leerCapacidades(sql, usuarioId2);
         var ucInv = ucCaps.consumibles || {};
         var ucQty = parseInt(ucInv[ucClave], 10) || 0;
+        // Consumibles de FACCION (migracion 057): rama propia ANTES de las
+        // claves clasicas, que conservan su comportamiento intacto. El
+        // catalogo se lee en un SELECT aparte (columnas de 057): si esa
+        // migracion no esta aplicada la consulta falla, la rama se omite y
+        // el flujo clasico sigue exactamente igual.
+        var ucFacCat = null;
+        try {
+          var ucFacRows = await sql(
+            'SELECT categoria, cargas, duracion_horas, bono_accion, bono_xp_fijo'
+            + ' FROM consumibles WHERE id=$1::uuid LIMIT 1',
+            [ucCons[0].id]
+          );
+          if (ucFacRows && ucFacRows.length) ucFacCat = ucFacRows[0];
+        } catch (eUcFac) {
+          console.warn('[interacciones] usar_consumible catalogo de faccion no leido: '
+            + (eUcFac && eUcFac.message));
+        }
+        if (ucFacCat && String(ucFacCat.categoria || '').toLowerCase() === 'faccion') {
+          if (ucQty < 1)
+            return res.status(409).json({ ok: false, error: 'SIN_STOCK' });
+          // Un solo efecto vigente a la vez: con un bono en curso no se
+          // descuenta stock ni se escribe nada. El gate usa la VENTANA
+          // (expira_en futuro, cargas ignoradas) y no efectoFaccionVigente:
+          // si no, al agotar cargas se reabria la ventana y se licuaba el
+          // stock (N activaciones y N bonos el mismo dia). El consumo del
+          // bono sigue usando efectoFaccionVigente, sensible a cargas.
+          var ucFacVigente = ventanaFaccionAbierta(ucCaps);
+          if (ucFacVigente)
+            return res.status(409).json({
+              ok: false,
+              error: 'EFECTO_YA_ACTIVO',
+              efecto: {
+                clave: ucFacVigente.clave || null,
+                expira_en: ucFacVigente.expira_en || null,
+                cargas_restantes: parseInt(ucFacVigente.cargas_restantes, 10) || 0
+              }
+            });
+          var ucFacCargas = parseInt(ucFacCat.cargas, 10);
+          if (!isFinite(ucFacCargas) || ucFacCargas < 1) ucFacCargas = 1;
+          var ucFacHoras = parseInt(ucFacCat.duracion_horas, 10);
+          if (!isFinite(ucFacHoras) || ucFacHoras < 1) ucFacHoras = 24;
+          var ucFacBonoAc = accionesBonoFaccion(ucFacCat.bono_accion);
+          var ucFacBonoXp = red2(numXp(ucFacCat.bono_xp_fijo));
+          var ucFacAhoraMs = Date.now();
+          var ucFacActivo = new Date(ucFacAhoraMs).toISOString();
+          var ucFacExpira = new Date(ucFacAhoraMs + (ucFacHoras * 3600000)).toISOString();
+          var ucEfectoFac = {
+            clave: ucClave,
+            activo_desde: ucFacActivo,
+            expira_en: ucFacExpira,
+            cargas_restantes: ucFacCargas,
+            bono_accion: ucFacBonoAc,
+            bono_xp_fijo: ucFacBonoXp
+          };
+          // ATOMICO (ADR-003): el descuento de 1 del stock y el sello del
+          // efecto van en el MISMO UPDATE de capacidades, con merge
+          // jsonb_build_object sobre COALESCE; nunca dos UPDATE separados ni
+          // reemplazo del objeto capacidades. El WHERE sobre el stock >= 1
+          // impide el doble consumo por concurrencia: 0 filas -> SIN_STOCK.
+          var ucFacUpd = await sql(
+            'UPDATE usuarios SET capacidades = '
+            + "COALESCE(capacidades,'{}'::jsonb)"
+            + " || jsonb_build_object('consumibles',"
+            + "   COALESCE(capacidades->'consumibles','{}'::jsonb)"
+            + "   || jsonb_build_object($2::text,"
+            + "        COALESCE(NULLIF(capacidades->'consumibles'->>$2::text,'')::int,0) - 1),"
+            + "   'consumible_efecto', jsonb_build_object("
+            + "     'clave', $2::text,"
+            + "     'activo_desde', $3::text,"
+            + "     'expira_en', $4::text,"
+            + "     'cargas_restantes', $5::int,"
+            + "     'bono_accion', $6::jsonb,"
+            + "     'bono_xp_fijo', $7::jsonb))"
+            + ' WHERE id=$1::uuid'
+            + " AND COALESCE(NULLIF(capacidades->'consumibles'->>$2::text,'')::int,0) >= 1"
+            + ' RETURNING capacidades',
+            [usuarioId2, ucClave, ucFacActivo, ucFacExpira, ucFacCargas,
+              JSON.stringify(ucFacBonoAc), JSON.stringify(ucFacBonoXp)]
+          );
+          if (!ucFacUpd || !ucFacUpd.length)
+            return res.status(409).json({ ok: false, error: 'SIN_STOCK' });
+          // Ledger de uso append-only (columnas reales de consumo_consumibles,
+          // migracion 010: usuario_id, consumible_id, efecto_detalle).
+          await sql(
+            'INSERT INTO consumo_consumibles (usuario_id, consumible_id, efecto_detalle)'
+            + ' VALUES ($1,$2,$3::jsonb)',
+            [usuarioId2, ucCons[0].id, JSON.stringify(ucEfectoFac)]
+          ).catch(function(eUcFacIns){
+            console.warn('[interacciones] consumo_consumibles no registrado: '
+              + (eUcFacIns && eUcFacIns.message));
+          });
+          return res.status(200).json({ ok: true, efecto: ucEfectoFac });
+        }
         if (ucQty < 1)
           return res.status(409).json({ ok: false, error: 'No tienes este consumible' });
         // Validaciones anti-stacking (spec seccion 8). ADR-056: amuleto_x2 y
@@ -16008,6 +16479,15 @@ module.exports = async function handler(req, res) {
             });
         }
 
+        // Consumibles de faccion (057): la Pluma del Creador solo paga con
+        // resena de 400 caracteres o mas (trim y SIN el prefijo de autor:
+        // se mide body.texto, no el texto ya prefijado que se persiste).
+        // Una resena corta NO se rechaza: se publica con normalidad, no
+        // consume carga y no acredita bono (la Pluma simplemente no paga).
+        var resenaTextoPluma = (body.texto === null || body.texto === undefined)
+          ? '' : String(body.texto).trim();
+        var resenaLargaPluma = resenaTextoPluma.length >= 400;
+
         // usuario_nombre no existe en la tabla -> guardarlo en texto como prefijo
         var nombrePrefijo = body.usuario_nombre
           ? '[' + body.usuario_nombre.slice(0,50) + '] '
@@ -16066,6 +16546,7 @@ module.exports = async function handler(req, res) {
         var resResena = null;
         var detalleResena = null;
         var cromoResena = null;
+        var bonoFacResena = null;
         if (usuarioId2) {
           // ADR-058: punto del destino resenado (1 lectura).
           var puntoResena = await coordsDestino(sql, destinoId2);
@@ -16100,6 +16581,13 @@ module.exports = async function handler(req, res) {
             mult_final: resResena.mult_global_c, cap_aplicado: resResena.cap_aplicado,
             xp_final: xpResenaEntregado, contexto: { destino_id: destinoId2 }
           }, origenLedger(resResena, 'destino', puntoResena)));
+          // Bono de faccion (057): DESPUES de que la resena y su XP base ya
+          // se asentaron. Solo con texto de 400 caracteres o mas. El bono es
+          // plano y va en su propio asiento; nunca suma al de la resena.
+          if (resenaLargaPluma) {
+            bonoFacResena = await consumirBonoFaccion(sql, usuarioId2, 'resena',
+              { destino_id: destinoId2, interaccion_id: result[0].id });
+          }
           misionesNuevas = await evaluarMisiones(sql, usuarioId2);
           logrosNuevas = await evaluarLogros(sql, usuarioId2);
           // v9 (ADR-018): chance de cromo (15%) y aporte de fama a la
@@ -16163,7 +16651,7 @@ module.exports = async function handler(req, res) {
           }
         } catch(_) {}
 
-        return res.status(200).json({ ok: true, id: result[0].id, xp: xpResenaEntregado, xp_detalle: detalleResena || undefined, misiones: misionesNuevas, logros: logrosNuevas, cromo: cromoResena || undefined, amuleto_x2: amuletoResena.doubled || undefined, reto_completado: retoResena || null });
+        return res.status(200).json({ ok: true, id: result[0].id, xp: xpResenaEntregado, xp_detalle: detalleResena || undefined, misiones: misionesNuevas, logros: logrosNuevas, cromo: cromoResena || undefined, amuleto_x2: amuletoResena.doubled || undefined, reto_completado: retoResena || null, bono_faccion: bonoFaccionRespuesta(bonoFacResena) });
       }
 
       // -- Guardado --
@@ -16180,7 +16668,7 @@ module.exports = async function handler(req, res) {
         );
 
         if (existe.length > 0 && existe[0].activo)
-          return res.status(200).json({ ok: true, ya_guardado: true, misiones: [], logros: [] });
+          return res.status(200).json({ ok: true, ya_guardado: true, misiones: [], logros: [], bono_faccion: null });
 
         if (existe.length > 0 && !existe[0].activo) {
           // Reactivar un guardado previamente quitado. Cero Borrado
@@ -16191,7 +16679,7 @@ module.exports = async function handler(req, res) {
             'UPDATE interacciones SET activo=true WHERE id=$1',
             [existe[0].id]
           );
-          return res.status(200).json({ ok: true, reactivado: true, xp: 0, misiones: [], logros: [] });
+          return res.status(200).json({ ok: true, reactivado: true, xp: 0, misiones: [], logros: [], bono_faccion: null });
         }
 
         var xpGuardado = XP_BASES.guardado;
@@ -16228,6 +16716,8 @@ module.exports = async function handler(req, res) {
           mult_final: resGuardado.mult_global_c, cap_aplicado: resGuardado.cap_aplicado,
           xp_final: xpGuardadoFinal, contexto: { destino_id: destinoId2 }
         }, origenLedger(resGuardado, 'destino', puntoGuardado)));
+        // Bono de faccion (057, Catalejo): accion 'guardado' del efecto.
+        var bonoFacGuardado = await consumirBonoFaccion(sql, usuarioId2, 'guardado', { destino_id: destinoId2 });
 
         var misionesGuardado = await evaluarMisiones(sql, usuarioId2);
         var logrosGuardado = await evaluarLogros(sql, usuarioId2);
@@ -16255,7 +16745,7 @@ module.exports = async function handler(req, res) {
         }
         // v9 contrato final (punto 8): progreso de retos de parche.
         var retoGuardado = await progresarPandillaRetos(sql, usuarioId2, 'guardado');
-        return res.status(200).json({ ok: true, xp: xpGuardadoFinal, xp_detalle: armarXpDetalle(xpGuardado, resGuardado, 0), misiones: misionesGuardado, logros: logrosGuardado, cromo: cromoGuardado || undefined, amuleto_x2: amuletoGuardado.doubled || undefined, reto_completado: retoGuardado || null });
+        return res.status(200).json({ ok: true, xp: xpGuardadoFinal, xp_detalle: armarXpDetalle(xpGuardado, resGuardado, 0), misiones: misionesGuardado, logros: logrosGuardado, cromo: cromoGuardado || undefined, amuleto_x2: amuletoGuardado.doubled || undefined, reto_completado: retoGuardado || null, bono_faccion: bonoFaccionRespuesta(bonoFacGuardado) });
       }
 
       // -- Quitar guardado --
@@ -16303,10 +16793,10 @@ module.exports = async function handler(req, res) {
           [destinoId2, usuarioId2]
         );
         if (yaVisitado.length > 0 && yaVisitado[0].activo)
-          return res.status(200).json({ ok: true, ya_visitado: true, xp: 0, misiones: [], logros: [] });
+          return res.status(200).json({ ok: true, ya_visitado: true, xp: 0, misiones: [], logros: [], bono_faccion: null });
         if (yaVisitado.length > 0 && !yaVisitado[0].activo) {
           await sql('UPDATE interacciones SET activo=true WHERE id=$1', [yaVisitado[0].id]);
-          return res.status(200).json({ ok: true, reactivado: true, xp: 0, misiones: [], logros: [] });
+          return res.status(200).json({ ok: true, reactivado: true, xp: 0, misiones: [], logros: [], bono_faccion: null });
         }
 
         // 4) Destino real.
@@ -16480,6 +16970,9 @@ module.exports = async function handler(req, res) {
           bonos_planos: bonoRuralVisita, xp_final: xpTotalVisita,
           contexto: { destino_id: destinoId2, zona: zonaVisita }
         }, origenLedger(resVisita, 'destino', puntoVisita)));
+        // Bono de faccion (057, Catalejo): accion 'visita' del efecto. Las
+        // cargas son las MISMAS que consume el guardado.
+        var bonoFacVisita = await consumirBonoFaccion(sql, usuarioId2, 'visita', { destino_id: destinoId2 });
 
         var misionesVisita = await evaluarMisiones(sql, usuarioId2);
         var logrosVisita = await evaluarLogros(sql, usuarioId2);
@@ -16527,7 +17020,8 @@ module.exports = async function handler(req, res) {
           logros: logrosVisita,
           cromo: cromoVisita || undefined,
           amuleto_x2: amuletoVisita.doubled || undefined,
-          reto_completado: retoVisita || null
+          reto_completado: retoVisita || null,
+          bono_faccion: bonoFaccionRespuesta(bonoFacVisita)
         });
       }
 
