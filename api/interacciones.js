@@ -1507,6 +1507,127 @@ async function acumularPozoReclamable(sql, ctx) {
 }
 
 // ---------------------------------------------------------------------
+// ADR-107 (Marcas self-service): resolucion de la marca activa y helpers
+// del Panel de Marca. ASCII-safe, CommonJS, sin dependencias nuevas.
+// ---------------------------------------------------------------------
+
+// D2: la marca que opera un usuario es la que apunta el puntero UNICO
+// usuarios.marca_activa_id, NO una fila arbitraria de marcas (el UNIQUE
+// (usuario_id) cae en la 058). Ambas cabezas se usan via
+// sqlMarcaPresenciaCte() para no duplicar el resto del SQL.
+var MARCA_CTE_PTR = ' SELECT m.id FROM marcas m JOIN usuarios u ON u.id = m.usuario_id'
+  + ' WHERE u.id = $1::uuid AND m.id = u.marca_activa_id AND m.activa = true';
+var MARCA_CTE_027 = ' SELECT id FROM marcas WHERE usuario_id = $1::uuid AND activa = true LIMIT 1';
+
+// Cuerpo unico de la CTE de marca_presencia (T10.2 / ADR-064).
+function sqlMarcaPresenciaCte(marcaSelect) {
+  return 'WITH marca AS (' + marcaSelect
+    + '), dest AS ('
+    + ' SELECT id FROM destinos WHERE id=$2::uuid LIMIT 1'
+    + '), ins AS ('
+    + ' INSERT INTO spot_presencia (marca_id, destino_id, estado, activo, creado_en)'
+    + ' SELECT marca.id, dest.id, \'pendiente\', true, NOW() FROM marca, dest'
+    + ' ON CONFLICT (marca_id, destino_id) WHERE activo = true'
+    + ' DO UPDATE SET estado = \'pendiente\''
+    + ' RETURNING id, estado'
+    + ')'
+    + ' SELECT (SELECT COUNT(*)::int FROM marca) AS marca_ok,'
+    + ' (SELECT COUNT(*)::int FROM dest) AS dest_ok,'
+    + ' (SELECT id::text FROM ins) AS presencia_id,'
+    + ' (SELECT estado FROM ins) AS estado';
+}
+
+// D3/D4: tunables del premio semanal. gamificacion_config.valor es
+// numeric(12,4) y NO admite texto (por eso 'alcance' vive en el jsonb
+// marcas.premios_config, D7). Los defaults son los sembrados por la 058.
+var MARCA_PREMIO_DEF = {
+  xp_por_unidad: 2500,
+  unidades_max: 6,
+  xp_minimo_semana: 1000,
+  peso_1: 1,
+  peso_2: 0.5,
+  peso_3: 0.25,
+  factor_retorno: 0.35,
+  tasa_cop_por_xp: 12
+};
+
+var MARCA_PREMIO_TZ = 'America/Bogota';
+
+// ADR-107 D11: catalogo de recetas en CODIGO (no en tabla). EXACTAMENTE dos
+// y NINGUNA inversa: 4 pocimas = 1 media y 2 medias = 1 botella, luego una
+// inversa permitiria ciclar y duplicar valor (duping). fusiones_marca.
+// receta_clave es varchar(60) libre (ADR-028): una clave desconocida se
+// rechaza en la rama (400 RECETA_DESCONOCIDA), no con un CHECK.
+var RECETAS_V1 = [
+  {
+    clave: 'pocima_a_media',
+    entrada: 'ancestral_pocima_50ml',
+    salida: 'ancestral_media_375ml',
+    consumo: 4,
+    produce: 1
+  },
+  {
+    clave: 'media_a_botella',
+    entrada: 'ancestral_media_375ml',
+    salida: 'ancestral_botella_750ml',
+    consumo: 2,
+    produce: 1
+  }
+];
+
+// Semana ISO (YYYY-Www) de una fecha. Se calcula sobre UTC para no depender
+// del TZ del proceso de Vercel.
+function marcaSemanaIso(d) {
+  var t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  var dow = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - dow);
+  var y = t.getUTCFullYear();
+  var ini = Date.UTC(y, 0, 1);
+  var sem = Math.ceil(((t.getTime() - ini) / 86400000 + 1) / 7);
+  return y + '-W' + (sem < 10 ? '0' + sem : String(sem));
+}
+
+// Semana ISO en curso en hora local de operacion (ADR-107 D3).
+function marcaSemanaActual() {
+  return marcaSemanaIso(new Date(Date.now() - 5 * 3600000));
+}
+
+function marcaSemanaValida(s) {
+  return /^[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$/.test(String(s || ''));
+}
+
+// Config de premios (D7) fusionada con los tunables vigentes de la 058.
+function marcaPremioConfig(premiosConfig, cfg) {
+  var pc = (premiosConfig && typeof premiosConfig === 'object' && !Array.isArray(premiosConfig))
+    ? premiosConfig : {};
+  var num = function (clave, def) {
+    var n = numXp(cfg[clave]);
+    return (isFinite(n) && n > 0) ? n : def;
+  };
+  var tope = null;
+  if (pc.tope_unidades !== null && pc.tope_unidades !== undefined) {
+    var t = parseInt(pc.tope_unidades, 10);
+    if (isFinite(t) && t >= 0) tope = t;
+  }
+  return {
+    alcance: pc.alcance ? String(pc.alcance) : 'global',
+    orden_premios: Array.isArray(pc.orden_premios) ? pc.orden_premios : [],
+    tope_unidades: tope,
+    xp_por_unidad: num('marca_premio_xp_por_unidad', MARCA_PREMIO_DEF.xp_por_unidad),
+    unidades_max: num('marca_premio_unidades_max', MARCA_PREMIO_DEF.unidades_max),
+    xp_minimo_semana: num('marca_premio_xp_minimo_semana', MARCA_PREMIO_DEF.xp_minimo_semana),
+    pesos: [
+      num('marca_premio_peso_1', MARCA_PREMIO_DEF.peso_1),
+      num('marca_premio_peso_2', MARCA_PREMIO_DEF.peso_2),
+      num('marca_premio_peso_3', MARCA_PREMIO_DEF.peso_3)
+    ],
+    factor_retorno: num('marca_premio_factor_retorno', MARCA_PREMIO_DEF.factor_retorno),
+    tasa_cop_por_xp: num('marca_premio_tasa_cop_por_xp', MARCA_PREMIO_DEF.tasa_cop_por_xp),
+    calibrado: false
+  };
+}
+
+// ---------------------------------------------------------------------
 // FASE 2B (T6 / ADR-063): Gobernanza de 3 capas.
 // ---------------------------------------------------------------------
 
@@ -1547,10 +1668,27 @@ async function validarGateGobernanza(sql, usuarioId, capa, capaId, exigirRol) {
     }
 
     if (c === 'marca') {
-      var m = await sql(
-        'SELECT id FROM marcas WHERE usuario_id=$1::uuid AND activa=true LIMIT 1',
-        [usuarioId]
-      );
+      // ADR-107 D2 (consulta 2 de 5): la capa la da LA MARCA ACTIVA del
+      // puntero usuarios.marca_activa_id, no una fila arbitraria. Con N
+      // marcas la lectura vieja (LIMIT 1) deja de ser determinista.
+      // D8: si la 058 no esta aplicada (42703) se degrada a la forma de la
+      // 027, que sigue siendo legal; la semantica de 403 no cambia.
+      var m;
+      try {
+        m = await sql(
+          'SELECT m.id FROM marcas m JOIN usuarios u ON u.id = m.usuario_id'
+          + ' WHERE u.id = $1::uuid AND m.id = u.marca_activa_id AND m.activa = true',
+          [usuarioId]
+        );
+      } catch (eGobMarca) {
+        if (!eGobMarca || eGobMarca.code !== '42703') throw eGobMarca;
+        console.warn('[gobernanza] capa marca sin marca_activa_id (' + eGobMarca.code
+          + '): lectura de la 027');
+        m = await sql(
+          'SELECT id FROM marcas WHERE usuario_id=$1::uuid AND activa=true LIMIT 1',
+          [usuarioId]
+        );
+      }
       if (!m.length) return { ok: false, status: 403, error: 'MARCA_INACTIVA' };
       return { ok: true, capa: c, capa_id: String(m[0].id) };
     }
@@ -6582,6 +6720,309 @@ module.exports = async function handler(req, res) {
           });
         }
         return res.json({ ok: true, data: msRows, total: msRows.length });
+      }
+
+      // ADR-107 D6: GET ?tipo=marca_premios (PUBLICO, solo preview: NO
+      // escribe). Formula cerrada de D3, config D7 y topes de D4. Todo valor
+      // en COP viaja con calibrado:false (la tasa es una convencion contable,
+      // no una tasa de cambio medida).
+      // D8: sin la 058 degrada a premios vacios con degradado:true. Nunca 500.
+      if (tipo === 'marca_premios') {
+        var mpMarca = String(req.query.marca_id || '').trim();
+        if (!MERCADO_UUID_RE.test(mpMarca))
+          return res.status(400).json({ ok: false, error: 'marca_id invalido' });
+        var mpSemana = String(req.query.semana || '').trim();
+        if (mpSemana && !marcaSemanaValida(mpSemana))
+          return res.status(400).json({ ok: false, error: 'SEMANA_INVALIDA' });
+        if (!mpSemana) mpSemana = marcaSemanaActual();
+        var mpSemParts = mpSemana.split('-W');
+        var mpDegradado = false;
+
+        var mpFila;
+        try {
+          mpFila = await sql(
+            'SELECT m.id::text AS id, m.usuario_id::text AS usuario_id,'
+            + ' m.activa, m.estado_promo,'
+            + ' COALESCE(m.premios_config, \'{}\'::jsonb) AS premios_config'
+            + ' FROM marcas m WHERE m.id=$1::uuid LIMIT 1',
+            [mpMarca]
+          );
+        } catch (eMpMarca) {
+          if (!esEsquemaFaltante(eMpMarca)) throw eMpMarca;
+          console.warn('[marcas] marca_premios sin 058 ('
+            + (eMpMarca && eMpMarca.code) + '): degradado');
+          return res.json({
+            ok: true, semana: mpSemana, marca_id: mpMarca,
+            premios: [], config: { alcance: 'global', calibrado: false },
+            degradado: true
+          });
+        }
+        if (!mpFila.length)
+          return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+
+        var mpCfgNum = {};
+        try {
+          var mpCfgRows = await sql(
+            'SELECT clave, valor FROM gamificacion_config'
+            + ' WHERE clave IN (\'marca_premio_xp_por_unidad\','
+            + '\'marca_premio_unidades_max\',\'marca_premio_xp_minimo_semana\','
+            + '\'marca_premio_peso_1\',\'marca_premio_peso_2\',\'marca_premio_peso_3\','
+            + '\'marca_premio_factor_retorno\',\'marca_premio_tasa_cop_por_xp\')'
+          );
+          mpCfgRows.forEach(function (r) { mpCfgNum[r.clave] = numXp(r.valor); });
+        } catch (eMpCfg) {
+          if (!esEsquemaFaltante(eMpCfg)) throw eMpCfg;
+          mpDegradado = true;
+          mpCfgNum = {};
+        }
+        var mpConfig = marcaPremioConfig(mpFila[0].premios_config, mpCfgNum);
+
+        // D3.1: sin marca activa Y con la promo encendida no se reparte nada.
+        // Se responde 200 con el podio vacio: es una lectura, no un error.
+        if (mpFila[0].activa !== true || mpFila[0].estado_promo !== true) {
+          return res.json({
+            ok: true, semana: mpSemana, marca_id: mpMarca, premios: [],
+            config: mpConfig, degradado: mpDegradado
+          });
+        }
+
+        var mpRank = [];
+        var mpProds = [];
+        try {
+          // D3.2 + D3.3: ranking GLOBAL de la semana ISO, con el dueno de la
+          // marca excluido ANTES de cortar el Top 3. Desempate determinista
+          // por MIN(creado_en) y, como ultimo recurso, por usuario_id.
+          mpRank = await sql(
+            'WITH w AS ('
+            + ' SELECT (to_date($2::text || \'-\' || $3::text, \'IYYY-IW\')'
+            + ' AT TIME ZONE \'' + MARCA_PREMIO_TZ + '\') AS ini'
+            + '), r AS ('
+            + ' SELECT l.usuario_id::text AS usuario_id, SUM(l.xp_final) AS xp_semana,'
+            + ' MIN(l.creado_en) AS primero'
+            + ' FROM xp_ledger l, w'
+            + ' WHERE l.xp_final > 0 AND l.creado_en >= w.ini'
+            + ' AND l.creado_en < w.ini + interval \'7 days\''
+            + ' AND l.usuario_id <> $1::uuid'
+            + ' GROUP BY l.usuario_id'
+            + ')'
+            + ' SELECT usuario_id, xp_semana FROM r'
+            + ' ORDER BY xp_semana DESC, primero ASC, usuario_id ASC LIMIT 3',
+            [mpFila[0].usuario_id, mpSemParts[0], mpSemParts[1]]
+          );
+          // D3.7: elegibles = premio_semanal + stock. marca_id en un producto
+          // premio_semanal identifica al PATROCINADOR, no restringe.
+          mpProds = await sql(
+            'SELECT c.clave, v.precio_xp_efectivo, v.stock_disponible,'
+            + ' COALESCE(c.precio_cop,0) AS precio_cop'
+            + ' FROM consumibles_precio v JOIN consumibles c ON c.id = v.id'
+            + ' WHERE c.premio_semanal = true AND v.stock_disponible >= 1'
+            + ' ORDER BY v.precio_xp_efectivo DESC, c.clave ASC'
+          );
+        } catch (eMpRank) {
+          if (!esEsquemaFaltante(eMpRank)) throw eMpRank;
+          console.warn('[marcas] marca_premios degradado ('
+            + (eMpRank && eMpRank.code) + ')');
+          return res.json({
+            ok: true, semana: mpSemana, marca_id: mpMarca, premios: [],
+            config: mpConfig, degradado: true
+          });
+        }
+
+        // D3.10: una entrega por (marca, semana, puesto) ya otorgada se marca.
+        var mpOtorg = {};
+        try {
+          var mpOtRows = await sql(
+            'SELECT puesto, id::text AS canje_id FROM canjes_tienda'
+            + ' WHERE marca_id=$1::uuid AND semana=$2'
+            + ' AND origen=\'premio_semanal\' AND estado<>\'anulado\'',
+            [mpMarca, mpSemana]
+          );
+          mpOtRows.forEach(function (r) {
+            if (r.puesto !== null && r.puesto !== undefined)
+              mpOtorg[Number(r.puesto)] = r.canje_id;
+          });
+        } catch (eMpOt) {
+          if (!esEsquemaFaltante(eMpOt)) throw eMpOt;
+          mpDegradado = true;
+        }
+
+        var mpPremios = [];
+        for (var mpI = 0; mpI < mpRank.length; mpI++) {
+          var mpPuesto = mpI + 1;
+          var mpXp = red2(numXp(mpRank[mpI].xp_semana));
+          var mpUnid = 0;
+          var mpClave = null;
+          var mpValXp = 0;
+          var mpValCop = 0;
+          // D3.4: semana muerta -> U=0 para este puesto y los siguientes.
+          if (mpXp >= mpConfig.xp_minimo_semana) {
+            var mpBrutas = Math.floor(mpXp / mpConfig.xp_por_unidad);
+            if (!isFinite(mpBrutas) || mpBrutas < 0) mpBrutas = 0;
+            if (mpBrutas > mpConfig.unidades_max) mpBrutas = mpConfig.unidades_max;
+            // D3.6: FLOOR, nunca ROUND (el sistema no redondea hacia arriba).
+            var mpU = Math.floor(mpBrutas * mpConfig.pesos[mpI]);
+            if (mpU < 0) mpU = 0;
+            // D7: tope_unidades SOLO puede reducir el techo global (LEAST).
+            if (mpConfig.tope_unidades !== null && mpU > mpConfig.tope_unidades)
+              mpU = mpConfig.tope_unidades;
+            var mpTopeXp = Math.floor(mpXp * mpConfig.factor_retorno);
+            var mpTopeCop = Math.floor(mpXp * mpConfig.tasa_cop_por_xp
+              * mpConfig.factor_retorno);
+            var mpLista = mpProds.slice();
+            if (mpConfig.orden_premios.length) {
+              mpLista = [];
+              mpConfig.orden_premios.forEach(function (cl) {
+                mpProds.forEach(function (c) {
+                  if (String(c.clave) === String(cl)) mpLista.push(c);
+                });
+              });
+            }
+            for (var mpJ = 0; mpJ < mpLista.length && mpClave === null; mpJ++) {
+              var mpProd = mpLista[mpJ];
+              var mpPx = numXp(mpProd.precio_xp_efectivo);
+              var mpPc = numXp(mpProd.precio_cop);
+              // D3.8: solo se REDUCEN unidades hasta que quepa el tope.
+              var mpFit = mpU;
+              while (mpFit >= 1) {
+                var mpOkXp = (mpPx <= 0) ? true : (mpFit * mpPx <= mpTopeXp);
+                var mpOkCop = (mpPc <= 0) ? true : (mpFit * mpPc <= mpTopeCop);
+                if (mpOkXp && mpOkCop) break;
+                mpFit = mpFit - 1;
+              }
+              if (mpFit >= 1 && numXp(mpProd.stock_disponible) >= mpFit) {
+                mpUnid = mpFit;
+                mpClave = String(mpProd.clave);
+                mpValXp = red2(mpUnid * mpPx);
+                mpValCop = (mpPc > 0)
+                  ? red2(mpUnid * mpPc)
+                  : red2(mpValXp * mpConfig.tasa_cop_por_xp);
+              }
+            }
+          }
+          mpPremios.push({
+            puesto: mpPuesto,
+            usuario_id: mpRank[mpI].usuario_id,
+            xp_semana: mpXp,
+            unidades: mpUnid,
+            consumible_clave: mpClave,
+            valor_xp: mpValXp,
+            valor_cop_estimado: mpValCop,
+            calibrado: false,
+            otorgado: !!mpOtorg[mpPuesto]
+          });
+        }
+        return res.json({
+          ok: true, semana: mpSemana, marca_id: mpMarca,
+          premios: mpPremios, config: mpConfig, degradado: mpDegradado
+        });
+      }
+
+      // ADR-107 D6: GET ?tipo=canjes_marca (JWT del dueno de la marca o
+      // ADMIN_SECRET) + metricas del Panel de Marca. Multi-marca: sin
+      // marca_id se resuelve por el puntero usuarios.marca_activa_id (D2).
+      // D8: es una LECTURA, luego degrada a lista vacia con degradado:true.
+      if (tipo === 'canjes_marca') {
+        var cmBear = String(req.headers.authorization || '');
+        var cmEsAdmin = cmBear.indexOf('Bearer ') === 0
+          && cmBear.slice(7) === (process.env.ADMIN_SECRET || 'exploraco12345');
+        var cmUid = null;
+        if (!cmEsAdmin) {
+          var cmSes = usuarioDeSesion(req);
+          if (!cmSes.ok) return responderSesion(res, cmSes.razon);
+          cmUid = cmSes.usuario_id;
+        }
+        var cmMarcaParam = req.query.marca_id ? String(req.query.marca_id).trim() : null;
+        if (cmMarcaParam && !MERCADO_UUID_RE.test(cmMarcaParam))
+          return res.status(400).json({ ok: false, error: 'marca_id invalido' });
+        var cmEstado = req.query.estado ? String(req.query.estado).trim() : null;
+        if (cmEstado && ['pendiente', 'entregado', 'anulado'].indexOf(cmEstado) === -1)
+          return res.status(400).json({ ok: false, error: 'estado invalido' });
+
+        var cmMarcaId = cmMarcaParam;
+        var cmData = [];
+        var cmMetricas = {
+          canjes_total: 0, pocimas_otorgadas: 0, pocimas_entregadas: 0,
+          productos_entregados: 0,
+          pendientes: 0, xp_canjeado: 0, fusiones: 0
+        };
+        var cmDegradado = false;
+        try {
+          if (!cmEsAdmin) {
+            // Ownership por id AND usuario_id (o el puntero si no llega
+            // marca_id). 404 y nunca 403: no se filtra existencia ajena.
+            var cmOwn = await sql(
+              'SELECT m.id::text AS id FROM marcas m'
+              + ' JOIN usuarios u ON u.id = m.usuario_id'
+              + ' WHERE u.id=$1::uuid AND m.id = COALESCE($2::uuid, u.marca_activa_id)',
+              [cmUid, cmMarcaParam]
+            );
+            if (!cmOwn.length)
+              return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+            cmMarcaId = String(cmOwn[0].id);
+          }
+          if (!cmMarcaId)
+            return res.status(400).json({ ok: false, error: 'MARCA_ID_REQUERIDO' });
+          var cmParams = [cmMarcaId];
+          var cmWhere = 'marca_id=$1::uuid';
+          if (cmEstado) { cmParams.push(cmEstado); cmWhere += ' AND estado=$2'; }
+          cmData = await sql(
+            'SELECT id::text AS id, usuario_id::text AS usuario_id,'
+            + ' consumible_clave, cantidad, origen, semana, puesto, estado,'
+            + ' precio_xp_unitario, xp_total, atendido_por::text AS atendido_por,'
+            + ' codigo_publico_snapshot, creado_en, entregado_en'
+            + ' FROM canjes_tienda WHERE ' + cmWhere
+            + ' ORDER BY creado_en DESC LIMIT 200',
+            cmParams
+          );
+          var cmMet = await sql(
+            'SELECT COUNT(*)::int AS canjes_total,'
+            + ' COALESCE(SUM(CASE WHEN origen=\'premio_semanal\''
+            + ' AND estado<>\'anulado\' THEN cantidad ELSE 0 END),0)::int'
+            + ' AS pocimas_otorgadas,'
+            + ' COALESCE(SUM(CASE WHEN origen=\'premio_semanal\''
+            + ' AND estado=\'entregado\' THEN cantidad ELSE 0 END),0)::int'
+            + ' AS pocimas_entregadas,'
+            + ' COUNT(*) FILTER (WHERE origen=\'mostrador\''
+            + ' AND estado=\'entregado\')::int AS productos_entregados,'
+            + ' COUNT(*) FILTER (WHERE estado=\'pendiente\')::int AS pendientes,'
+            + ' COALESCE(SUM(CASE WHEN estado<>\'anulado\' THEN xp_total ELSE 0 END),0)'
+            + ' AS xp_canjeado'
+            + ' FROM canjes_tienda WHERE marca_id=$1::uuid'
+            + ' AND ($2::text IS NULL OR estado = $2::text)',
+            [cmMarcaId, cmEstado]
+          );
+          if (cmMet.length) {
+            cmMetricas.canjes_total = Number(cmMet[0].canjes_total) || 0;
+            cmMetricas.pocimas_otorgadas = Number(cmMet[0].pocimas_otorgadas) || 0;
+            cmMetricas.pocimas_entregadas = Number(cmMet[0].pocimas_entregadas) || 0;
+            cmMetricas.productos_entregados = Number(cmMet[0].productos_entregados) || 0;
+            cmMetricas.pendientes = Number(cmMet[0].pendientes) || 0;
+            cmMetricas.xp_canjeado = red2(numXp(cmMet[0].xp_canjeado));
+          }
+        } catch (eCm) {
+          if (!esEsquemaFaltante(eCm)) throw eCm;
+          console.warn('[marcas] canjes_marca degradado (' + (eCm && eCm.code) + ')');
+          return res.json({
+            ok: true, marca_id: cmMarcaId, data: [], metricas: cmMetricas,
+            degradado: true
+          });
+        }
+        // Las fusiones viven en su propia tabla (metricas D6): si falta, el
+        // panel muestra 0 y no tumba la lectura de canjes.
+        try {
+          var cmFus = await sql(
+            'SELECT COUNT(*)::int AS fusiones FROM fusiones_marca WHERE marca_id=$1::uuid',
+            [cmMarcaId]
+          );
+          if (cmFus.length) cmMetricas.fusiones = Number(cmFus[0].fusiones) || 0;
+        } catch (eCmFus) {
+          if (!esEsquemaFaltante(eCmFus)) throw eCmFus;
+          cmDegradado = true;
+        }
+        return res.json({
+          ok: true, marca_id: cmMarcaId, data: cmData,
+          total: cmData.length, metricas: cmMetricas, degradado: cmDegradado
+        });
       }
 
       // FASE 2D (T11 / ADR-062): GET publico ?tipo=cartas_ofertas con el
@@ -15364,24 +15805,19 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ ok: false, error: 'destino_id invalido' });
         var mprRes;
         try {
-          mprRes = await sql(
-            'WITH marca AS ('
-            + ' SELECT id FROM marcas WHERE usuario_id=$1::uuid AND activa=true LIMIT 1'
-            + '), dest AS ('
-            + ' SELECT id FROM destinos WHERE id=$2::uuid LIMIT 1'
-            + '), ins AS ('
-            + ' INSERT INTO spot_presencia (marca_id, destino_id, estado, activo, creado_en)'
-            + ' SELECT marca.id, dest.id, \'pendiente\', true, NOW() FROM marca, dest'
-            + ' ON CONFLICT (marca_id, destino_id) WHERE activo = true'
-            + ' DO UPDATE SET estado = \'pendiente\''
-            + ' RETURNING id, estado'
-            + ')'
-            + ' SELECT (SELECT COUNT(*)::int FROM marca) AS marca_ok,'
-            + ' (SELECT COUNT(*)::int FROM dest) AS dest_ok,'
-            + ' (SELECT id::text FROM ins) AS presencia_id,'
-            + ' (SELECT estado FROM ins) AS estado',
-            [mprUid, mprDest]
-          );
+          // ADR-107 D2 (consulta 3 de 5): la marca que captura el spot es la
+          // ACTIVA del puntero usuarios.marca_activa_id. Sin esto el spot se
+          // colgaria de una marca arbitraria en cuanto haya mas de una.
+          // D8: sin la 058 (42703) degrada a la forma de la 027; el resto del
+          // catch conserva el 503 SCHEMA_NOT_MIGRATED de la 040.
+          try {
+            mprRes = await sql(sqlMarcaPresenciaCte(MARCA_CTE_PTR), [mprUid, mprDest]);
+          } catch (eMprPtr) {
+            if (!eMprPtr || eMprPtr.code !== '42703') throw eMprPtr;
+            console.warn('[marcas] presencia sin marca_activa_id (' + eMprPtr.code
+              + '): lectura de la 027');
+            mprRes = await sql(sqlMarcaPresenciaCte(MARCA_CTE_027), [mprUid, mprDest]);
+          }
         } catch (eMpr) {
           if (!esEsquemaFaltante(eMpr)) throw eMpr;
           console.warn('[marcas] presencia no registrada (027/040 pendientes): '
@@ -15400,6 +15836,751 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({
           ok: true, presencia_id: mprR.presencia_id, destino_id: mprDest,
           estado: mprR.estado || 'pendiente'
+        });
+      }
+
+      // ADR-107 (Panel de Marca): POST tipo=marca_panel. Enciende o apaga la
+      // promocion semanal (marcas.estado_promo) y guarda la config del premio
+      // (marcas.premios_config) con MERGE JSONB (ADR-003 / D7): nunca se
+      // reemplaza el objeto entero.
+      // 'alcance' vive en el jsonb porque gamificacion_config.valor es
+      // numeric(12,4) y NO admite texto (D3/D7): en v1 solo 'global'.
+      // Auth: JWT propio (BUG-061) + ownership por marcas.id AND usuario_id.
+      if (tipo2 === 'marca_panel') {
+        var mpnSes = usuarioDeSesion(req);
+        if (!mpnSes.ok) return responderSesion(res, mpnSes.razon);
+        var mpnUid = mpnSes.usuario_id;
+        var mpnMarca = body.marca_id ? String(body.marca_id).trim() : null;
+        if (mpnMarca && !MERCADO_UUID_RE.test(mpnMarca))
+          return res.status(400).json({ ok: false, error: 'marca_id invalido' });
+
+        // estado_promo: opcional. Solo booleanos explicitos; "false" en texto
+        // se acepta porque el fetch de la UI manda strings en form-data.
+        var mpnPromo = null;
+        if (Object.prototype.hasOwnProperty.call(body, 'estado_promo')
+            && body.estado_promo !== null && body.estado_promo !== undefined) {
+          var mpnRaw = body.estado_promo;
+          if (typeof mpnRaw === 'boolean') mpnPromo = mpnRaw;
+          else if (String(mpnRaw) === 'true' || String(mpnRaw) === '1') mpnPromo = true;
+          else if (String(mpnRaw) === 'false' || String(mpnRaw) === '0') mpnPromo = false;
+          else return res.status(400).json({ ok: false, error: 'ESTADO_PROMO_INVALIDO' });
+        }
+
+        // premios_config: objeto parcial. Whitelist cerrada de D7 (tres claves
+        // y ninguna mas en v1): lo desconocido se rechaza, no se ignora.
+        var mpnCfg = null;
+        if (Object.prototype.hasOwnProperty.call(body, 'premios_config')
+            && body.premios_config !== null && body.premios_config !== undefined) {
+          var mpnObj = body.premios_config;
+          if (typeof mpnObj === 'string') {
+            try { mpnObj = JSON.parse(mpnObj); } catch (eMpnJson) { mpnObj = null; }
+          }
+          if (!mpnObj || typeof mpnObj !== 'object' || Array.isArray(mpnObj))
+            return res.status(400).json({ ok: false, error: 'PREMIOS_CONFIG_INVALIDO' });
+          var mpnKeys = Object.keys(mpnObj);
+          for (var mpnK = 0; mpnK < mpnKeys.length; mpnK++) {
+            var mpnKey = mpnKeys[mpnK];
+            if (['alcance', 'orden_premios', 'tope_unidades'].indexOf(mpnKey) === -1)
+              return res.status(400).json({ ok: false, error: 'PREMIOS_CONFIG_CLAVE_INVALIDA', clave: mpnKey });
+          }
+          var mpnMerge = {};
+          if (Object.prototype.hasOwnProperty.call(mpnObj, 'alcance')) {
+            var mpnAlc = String(mpnObj.alcance || '').trim().toLowerCase();
+            // D7: 'zona' queda declarado y RECHAZADO en v1, nunca ignorado.
+            if (mpnAlc !== 'global')
+              return res.status(400).json({ ok: false, error: 'AMBITO_NO_SOPORTADO' });
+            mpnMerge.alcance = 'global';
+          }
+          if (Object.prototype.hasOwnProperty.call(mpnObj, 'orden_premios')) {
+            if (!Array.isArray(mpnObj.orden_premios) || mpnObj.orden_premios.length > 20)
+              return res.status(400).json({ ok: false, error: 'ORDEN_PREMIOS_INVALIDO' });
+            mpnMerge.orden_premios = mpnObj.orden_premios.map(function (cl) {
+              return String(cl || '').trim().slice(0, 50);
+            }).filter(function (cl) { return cl.length > 0; });
+          }
+          if (Object.prototype.hasOwnProperty.call(mpnObj, 'tope_unidades')) {
+            if (mpnObj.tope_unidades === null) {
+              mpnMerge.tope_unidades = null;
+            } else {
+              var mpnTope = parseInt(mpnObj.tope_unidades, 10);
+              if (!isFinite(mpnTope) || mpnTope < 0)
+                return res.status(400).json({ ok: false, error: 'TOPE_UNIDADES_INVALIDO' });
+              mpnMerge.tope_unidades = mpnTope;
+            }
+          }
+          mpnCfg = JSON.stringify(mpnMerge);
+        }
+        if (mpnPromo === null && mpnCfg === null)
+          return res.status(400).json({ ok: false, error: 'SIN_CAMBIOS' });
+
+        var mpnFila;
+        try {
+          // D2: la marca operada es la del puntero; si llega marca_id, se
+          // exige que sea del mismo dueno (ownership, 404 nunca 403).
+          var mpnOwn = await sql(
+            'SELECT m.id::text AS id FROM marcas m'
+            + ' JOIN usuarios u ON u.id = m.usuario_id'
+            + ' WHERE u.id=$1::uuid AND m.id = COALESCE($2::uuid, u.marca_activa_id)'
+            + ' AND m.activa = true',
+            [mpnUid, mpnMarca]
+          );
+          if (!mpnOwn.length)
+            return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+          mpnFila = await sql(
+            'UPDATE marcas SET'
+            + ' estado_promo = COALESCE($2::boolean, estado_promo),'
+            + ' premios_config = COALESCE(premios_config, \'{}\'::jsonb) || $3::jsonb'
+            + ' WHERE id=$1::uuid AND usuario_id=$4::uuid'
+            + ' RETURNING id::text AS id, estado_promo,'
+            + ' COALESCE(premios_config, \'{}\'::jsonb) AS premios_config',
+            [String(mpnOwn[0].id), mpnPromo, mpnCfg || '{}', mpnUid]
+          );
+        } catch (eMpn) {
+          if (!esEsquemaFaltante(eMpn)) throw eMpn;
+          console.warn('[marcas] marca_panel sin 058 ('
+            + (eMpn && eMpn.code) + '): escritura cerrada');
+          return res.status(503).json({
+            ok: false,
+            error: 'Panel de marca no disponible (migracion 058 pendiente)',
+            code: 'SCHEMA_NOT_MIGRATED'
+          });
+        }
+        if (!mpnFila.length)
+          return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+        return res.status(200).json({
+          ok: true,
+          marca: {
+            id: mpnFila[0].id,
+            estado_promo: mpnFila[0].estado_promo === true,
+            premios_config: mpnFila[0].premios_config || {}
+          }
+        });
+      }
+
+      // =====================================================================
+      // ADR-107 D11 (ECONOMIA): POST tipo=consumible_fusionar.
+      // Catalogo de recetas en CODIGO (RECETAS_V1): EXACTAMENTE dos y ninguna
+      // inversa. Atomico sobre usuarios.capacidades->'consumibles': la
+      // validacion de stock vive en el MISMO UPDATE que descuenta y el alta
+      // en fusiones_marca viaja en la MISMA sentencia, luego no puede quedar
+      // el inventario a medias ni aparecer unidades negativas. Se reusa la
+      // tecnica JSONB del fragmento sqlMergeInventario() ('||' encadenado),
+      // NO se escribe SQL de inventario nuevo.
+      // D8: sin la 058 (42P01 / 42703) falla CERRADO con 503, nunca 500.
+      // =====================================================================
+      if (tipo2 === 'consumible_fusionar') {
+        var cfSes = usuarioDeSesion(req);
+        if (!cfSes.ok) return responderSesion(res, cfSes.razon);
+        var cfUid = cfSes.usuario_id;
+
+        var cfReceta = String(body.receta_clave || '').trim().toLowerCase();
+        if (!cfReceta)
+          return res.status(400).json({ ok: false, error: 'RECETA_REQUERIDA' });
+        var cfDef = null;
+        for (var cfR = 0; cfR < RECETAS_V1.length; cfR++) {
+          if (RECETAS_V1[cfR].clave === cfReceta) cfDef = RECETAS_V1[cfR];
+        }
+        if (!cfDef)
+          return res.status(400).json({ ok: false, error: 'RECETA_DESCONOCIDA' });
+
+        var cfMarca = body.marca_id ? String(body.marca_id).trim() : null;
+        if (cfMarca && !MERCADO_UUID_RE.test(cfMarca))
+          return res.status(400).json({ ok: false, error: 'marca_id invalido' });
+        var cfIdem = body.clave_idempotencia
+          ? String(body.clave_idempotencia).trim().slice(0, 120) : null;
+
+        var cfMarcaId = cfMarca;
+        var cfRes;
+        try {
+          // D2: sin marca_id se opera la marca ACTIVA del puntero.
+          if (!cfMarcaId) {
+            var cfPtr = await sql(
+              'SELECT m.id::text AS id FROM marcas m'
+              + ' JOIN usuarios u ON u.id = m.usuario_id'
+              + ' WHERE u.id=$1::uuid AND m.id = u.marca_activa_id'
+              + ' AND m.activa = true LIMIT 1',
+              [cfUid]
+            );
+            if (!cfPtr.length)
+              return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+            cfMarcaId = String(cfPtr[0].id);
+          } else {
+            var cfOwn = await sql(
+              'SELECT m.id::text AS id FROM marcas m'
+              + ' JOIN usuarios u ON u.id = m.usuario_id'
+              + ' WHERE u.id=$1::uuid AND m.id=$2::uuid AND m.activa = true'
+              + ' LIMIT 1',
+              [cfUid, cfMarcaId]
+            );
+            if (!cfOwn.length)
+              return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+            cfMarcaId = String(cfOwn[0].id);
+          }
+
+          var cfSalidas = {};
+          cfSalidas[cfDef.salida] = cfDef.produce;
+          cfRes = await sql(
+            'WITH inv AS ('
+            + ' SELECT COALESCE((u.capacidades->\'consumibles\'->>$2::text)::int, 0) AS tengo'
+            + ' FROM usuarios u WHERE u.id=$1::uuid'
+            + '), d AS ('
+            + ' UPDATE usuarios u SET capacidades = COALESCE(u.capacidades, \'{}\'::jsonb)'
+            + ' || jsonb_build_object(\'consumibles\','
+            + ' COALESCE(u.capacidades->\'consumibles\', \'{}\'::jsonb)'
+            + ' || jsonb_build_object($3::text,'
+            + ' COALESCE((u.capacidades->\'consumibles\'->>$3::text)::int, 0) + $5::int)'
+            + ' || jsonb_build_object($2::text,'
+            + ' COALESCE((u.capacidades->\'consumibles\'->>$2::text)::int, 0) - $4::int))'
+            + ' FROM inv'
+            + ' WHERE u.id=$1::uuid AND inv.tengo >= $4::int'
+            + ' RETURNING u.id'
+            + '), f AS ('
+            + ' INSERT INTO fusiones_marca (usuario_id, marca_id, receta_clave,'
+            + ' entradas, salidas, estado, clave_idempotencia, contexto, aplicado_en)'
+            + ' SELECT $1::uuid, $6::uuid, $7, COALESCE($8::jsonb, \'[]\'::jsonb),'
+            + ' COALESCE($9::jsonb, \'{}\'::jsonb), \'aplicada\', $10::text,'
+            + ' COALESCE($11::jsonb, \'{}\'::jsonb), NOW()'
+            + ' FROM d RETURNING id::text AS id'
+            + ')'
+            + ' SELECT (SELECT tengo FROM inv) AS tenia,'
+            + ' (SELECT COUNT(*)::int FROM d) AS aplicado,'
+            + ' (SELECT id FROM f) AS fusion_id',
+            [cfUid, cfDef.entrada, cfDef.salida, cfDef.consumo, cfDef.produce,
+              cfMarcaId, cfDef.clave,
+              JSON.stringify([{ clave: cfDef.entrada, cantidad: cfDef.consumo }]),
+              JSON.stringify(cfSalidas), cfIdem,
+              JSON.stringify({ receta_clave: cfDef.clave })]
+          );
+        } catch (eCf) {
+          if (!esEsquemaFaltante(eCf)) throw eCf;
+          console.warn('[marcas] consumible_fusionar sin 058 ('
+            + (eCf && eCf.code) + '): escritura cerrada');
+          return res.status(503).json({
+            ok: false,
+            error: 'Fusion de consumibles no disponible (migracion 058 pendiente)',
+            code: 'SCHEMA_NOT_MIGRATED'
+          });
+        }
+
+        var cfR0 = cfRes[0] || {};
+        // Sin fila en d no hay f: cero cambios en el inventario (fail-closed).
+        if (Number(cfR0.aplicado) !== 1) {
+          return res.status(409).json({
+            ok: false,
+            error: 'INVENTARIO_INSUFICIENTE',
+            receta_clave: cfDef.clave,
+            consumible_clave: cfDef.entrada,
+            requerido: cfDef.consumo,
+            disponible: Number(cfR0.tenia) || 0
+          });
+        }
+        return res.status(200).json({
+          ok: true,
+          fusion_id: cfR0.fusion_id || null,
+          marca_id: cfMarcaId,
+          receta_clave: cfDef.clave,
+          estado: 'aplicada',
+          consumido: [{ clave: cfDef.entrada, cantidad: cfDef.consumo }],
+          producido: [{ clave: cfDef.salida, cantidad: cfDef.produce }],
+          inventario: {
+            tenia: Number(cfR0.tenia) || 0,
+            queda: (Number(cfR0.tenia) || 0) - cfDef.consumo
+          }
+        });
+      }
+
+      // =====================================================================
+      // ADR-107 D6/D12 (ECONOMIA): POST tipo=consumible_entregar.
+      // Canje FISICO en mostrador, sin QR: el mostrador teclea el
+      // billeteras.codigo_publico del cliente. Verifica sesion firmada del
+      // DUENO de la marca (atendido_por = UUID del dueno, NUNCA del body),
+      // que el consumible pertenezca a SU marca (consumibles.marca_id), que
+      // el cliente tenga stock y entonces DESCUENTA y SELLA en canjes_tienda
+      // con atendido_por + el codigo_publico usado en el contexto.
+      // Idempotente y a prueba de doble escaneo: la fila se inserta ANTES de
+      // tocar el inventario y el descuento CUELGA de la insercion, luego una
+      // segunda peticion igual no entrega dos veces ni descuenta dos veces.
+      // D8: sin la 058 falla CERRADO con 503, nunca 500 ni 42703 crudo.
+      // =====================================================================
+      if (tipo2 === 'consumible_entregar') {
+        var ceSes = usuarioDeSesion(req);
+        if (!ceSes.ok) return responderSesion(res, ceSes.razon);
+        var ceUid = ceSes.usuario_id;
+
+        var ceCodigo = String(body.codigo_publico || '').trim();
+        if (!ceCodigo)
+          return res.status(400).json({ ok: false, error: 'CODIGO_REQUERIDO' });
+        if (ceCodigo.length < 4 || ceCodigo.length > 64)
+          return res.status(400).json({ ok: false, error: 'CODIGO_INVALIDO' });
+        var ceClave = String(body.consumible_clave || '').trim().toLowerCase();
+        if (!ceClave || ceClave.length > 50)
+          return res.status(400).json({ ok: false, error: 'CONSUMIBLE_REQUERIDO' });
+        var ceCantRaw = (body.cantidad === undefined || body.cantidad === null)
+          ? 1 : body.cantidad;
+        var ceCant = parseInt(ceCantRaw, 10);
+        if (!isFinite(ceCant) || ceCant < 1 || ceCant > 50)
+          return res.status(400).json({ ok: false, error: 'CANTIDAD_INVALIDA' });
+        var ceMarca = body.marca_id ? String(body.marca_id).trim() : null;
+        if (ceMarca && !MERCADO_UUID_RE.test(ceMarca))
+          return res.status(400).json({ ok: false, error: 'marca_id invalido' });
+
+        // CONTRATO DE IDEMPOTENCIA: clave_idempotencia es OBLIGATORIA en el
+        // body y la genera el PANEL por INTENTO (un reintento del mismo
+        // intento reusa la misma clave; una venta NUEVA genera otra clave).
+        // NO se deriva clave natural (marca, codigo, producto, cantidad):
+        // esa derivacion convertia dos visitas legitimas del mismo cliente
+        // por el mismo producto en una sola entrega para siempre.
+        // Falta o no es valida -> 400 CLAVE_IDEMPOTENCIA_REQUERIDA.
+        var ceIdemRaw = body.clave_idempotencia
+          ? String(body.clave_idempotencia).trim() : '';
+        if (ceIdemRaw.length < 4 || ceIdemRaw.length > 100
+            || !/^[A-Za-z0-9._:-]+$/.test(ceIdemRaw)) {
+          return res.status(400).json({
+            ok: false,
+            error: 'clave_idempotencia requerida (4-100 chars [A-Za-z0-9._:-])',
+            code: 'CLAVE_IDEMPOTENCIA_REQUERIDA'
+          });
+        }
+        var ceIdem = 'entrega:' + ceIdemRaw;
+
+        var ceMarcaId = ceMarca;
+        var ceCtx;
+        try {
+          if (!ceMarcaId) {
+            var cePtr = await sql(
+              'SELECT m.id::text AS id FROM marcas m'
+              + ' JOIN usuarios u ON u.id = m.usuario_id'
+              + ' WHERE u.id=$1::uuid AND m.id = u.marca_activa_id'
+              + ' AND m.activa = true LIMIT 1',
+              [ceUid]
+            );
+            if (!cePtr.length)
+              return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+            ceMarcaId = String(cePtr[0].id);
+          }
+          ceCtx = await sql(
+            'SELECT (SELECT b.id::text FROM billeteras b'
+            + ' WHERE b.codigo_publico=$2 LIMIT 1) AS billetera_id,'
+            + ' (SELECT m.id::text FROM marcas m'
+            + ' WHERE m.id=$3::uuid AND m.usuario_id=$1::uuid) AS marca_id,'
+            + ' (SELECT c.id::text FROM consumibles c'
+            + ' WHERE c.clave=$4 AND c.marca_id=$3::uuid LIMIT 1) AS consumible_id,'
+            + ' (SELECT COALESCE((u.capacidades->\'consumibles\'->>$4::text)::int, 0)'
+            + ' FROM usuarios u JOIN billeteras b ON b.usuario_id = u.id'
+            + ' WHERE b.codigo_publico=$2 LIMIT 1) AS tengo,'
+            + ' (SELECT ct.id::text FROM canjes_tienda ct'
+            + ' WHERE ct.clave_idempotencia=$5 LIMIT 1) AS existente',
+            [ceUid, ceCodigo, ceMarcaId, ceClave, ceIdem]
+          );
+        } catch (eCeCtx) {
+          if (!esEsquemaFaltante(eCeCtx)) throw eCeCtx;
+          console.warn('[marcas] consumible_entregar sin 058/042 ('
+            + (eCeCtx && eCeCtx.code) + '): escritura cerrada');
+          return res.status(503).json({
+            ok: false,
+            error: 'Entrega en tienda no disponible (migracion 058 pendiente)',
+            code: 'SCHEMA_NOT_MIGRATED'
+          });
+        }
+
+        var ceC0 = ceCtx[0] || {};
+        if (!ceC0.billetera_id)
+          return res.status(404).json({ ok: false, error: 'CODIGO_NO_ENCONTRADO' });
+        // Ownership por marcas.id AND usuario_id: 404, nunca 403 (no se
+        // filtra la existencia de marcas ajenas).
+        if (!ceC0.marca_id)
+          return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+        if (!ceC0.consumible_id)
+          return res.status(404).json({ ok: false, error: 'CONSUMIBLE_NO_DISPONIBLE' });
+        if (ceC0.existente) {
+          return res.status(200).json({
+            ok: true, duplicado: true, canje_id: ceC0.existente,
+            codigo_publico: ceCodigo, consumible_clave: ceClave,
+            cantidad: ceCant, atendido_por: ceUid
+          });
+        }
+        var ceTengo = parseInt(ceC0.tengo, 10);
+        if (!isFinite(ceTengo) || ceTengo < 0) ceTengo = 0;
+        if (ceTengo < ceCant) {
+          return res.status(409).json({
+            ok: false, error: 'STOCK_INSUFICIENTE',
+            consumible_clave: ceClave, requerido: ceCant, disponible: ceTengo
+          });
+        }
+
+        var ceRes;
+        try {
+          ceRes = await sql(
+            'WITH c AS ('
+            + ' SELECT c.id AS consumible_id, c.clave,'
+            + ' COALESCE(v.precio_xp_efectivo, c.precio_xp, 0) AS precio'
+            + ' FROM consumibles c'
+            + ' LEFT JOIN consumibles_precio v ON v.id = c.id'
+            + ' WHERE c.clave = $3 AND c.marca_id = $4::uuid LIMIT 1'
+            + '), w AS ('
+            + ' SELECT b.id AS billetera_id, b.usuario_id AS uid, b.codigo_publico'
+            + ' FROM billeteras b WHERE b.codigo_publico = $2 LIMIT 1'
+            + '), ins AS ('
+            + ' INSERT INTO canjes_tienda (usuario_id, marca_id, billetera_id,'
+            + ' codigo_publico_snapshot, consumible_id, consumible_clave, cantidad,'
+            + ' precio_xp_unitario, xp_total, origen, estado, atendido_por,'
+            + ' contexto, clave_idempotencia, entregado_en)'
+            + ' SELECT w.uid, $4::uuid, w.billetera_id, w.codigo_publico,'
+            + ' c.consumible_id, c.clave, $5::int, c.precio, (c.precio * $5::int),'
+            + ' \'mostrador\', \'entregado\', $1::uuid,'
+            + ' jsonb_build_object(\'codigo_publico\', w.codigo_publico),'
+            + ' $6::text, NOW()'
+            + ' FROM w, c'
+            + ' WHERE EXISTS (SELECT 1 FROM usuarios u WHERE u.id = w.uid'
+            + ' AND COALESCE((u.capacidades->\'consumibles\'->>$3::text)::int, 0)'
+            + ' >= $5::int)'
+            + ' ON CONFLICT (clave_idempotencia) DO NOTHING'
+            + ' RETURNING usuario_id::text AS uid'
+            + '), d AS ('
+            + ' UPDATE usuarios u SET capacidades = COALESCE(u.capacidades, \'{}\'::jsonb)'
+            + ' || jsonb_build_object(\'consumibles\','
+            + ' COALESCE(u.capacidades->\'consumibles\', \'{}\'::jsonb)'
+            + ' || jsonb_build_object($3::text,'
+            + ' COALESCE((u.capacidades->\'consumibles\'->>$3::text)::int, 0) - $5::int))'
+            + ' FROM ins WHERE u.id = ins.uid::uuid'
+            + ' RETURNING u.id'
+            + ')'
+            + ' SELECT (SELECT COUNT(*)::int FROM ins) AS creado,'
+            + ' (SELECT COUNT(*)::int FROM d) AS descontado,'
+            + ' (SELECT id::text FROM canjes_tienda'
+            + ' WHERE clave_idempotencia=$6 LIMIT 1) AS canje_id',
+            [ceUid, ceCodigo, ceClave, ceMarcaId, ceCant, ceIdem]
+          );
+        } catch (eCe) {
+          if (!esEsquemaFaltante(eCe)) throw eCe;
+          console.warn('[marcas] consumible_entregar sin 058 ('
+            + (eCe && eCe.code) + '): escritura cerrada');
+          return res.status(503).json({
+            ok: false,
+            error: 'Entrega en tienda no disponible (migracion 058 pendiente)',
+            code: 'SCHEMA_NOT_MIGRATED'
+          });
+        }
+
+        var ceR0 = ceRes[0] || {};
+        if (Number(ceR0.creado) !== 1 || Number(ceR0.descontado) !== 1) {
+          // Carrera perdida contra otra peticion identica: la fila ya existe
+          // y NO se desconto nada. Se devuelve como duplicado, no como error.
+          if (ceR0.canje_id) {
+            return res.status(200).json({
+              ok: true, duplicado: true, canje_id: ceR0.canje_id,
+              codigo_publico: ceCodigo, consumible_clave: ceClave,
+              cantidad: ceCant, atendido_por: ceUid
+            });
+          }
+          return res.status(409).json({
+            ok: false, error: 'STOCK_INSUFICIENTE',
+            consumible_clave: ceClave, requerido: ceCant, disponible: ceTengo
+          });
+        }
+        return res.status(200).json({
+          ok: true,
+          duplicado: false,
+          canje: {
+            id: ceR0.canje_id,
+            estado: 'entregado',
+            origen: 'mostrador',
+            marca_id: ceMarcaId,
+            codigo_publico: ceCodigo,
+            consumible_clave: ceClave,
+            cantidad: ceCant,
+            atendido_por: ceUid
+          },
+          inventario: { tenia: ceTengo, queda: ceTengo - ceCant }
+        });
+      }
+
+      // =====================================================================
+      // ADR-107 D3/D4/D6/D10 (PREMIOS): POST tipo=marca_premio_otorgar.
+      // SOLO ADMIN_SECRET: es una operacion de SISTEMA, no de usuario (D12).
+      // NO hay cron ni disparo automatico (hecho 18): la ejecuta el operador.
+      // Formula y topes de D3/D4 sobre el leaderboard GLOBAL de la semana
+      // ISO, con el dueno de la marca excluido ANTES de cortar el Top 3.
+      // Idempotencia por (marca, semana, puesto, usuario) via
+      // canjes_tienda.clave_idempotencia: reejecutar NO duplica premios.
+      // D8: sin la 058 falla CERRADO con 503, nunca 500.
+      // =====================================================================
+      if (tipo2 === 'marca_premio_otorgar') {
+        var moBear = String(req.headers.authorization || '');
+        var moEsAdmin = moBear.indexOf('Bearer ') === 0
+          && moBear.slice(7) === (process.env.ADMIN_SECRET || 'exploraco12345');
+        if (!moEsAdmin)
+          return res.status(401).json({ ok: false, error: 'No autorizado' });
+
+        var moMarca = String(body.marca_id || '').trim();
+        if (!MERCADO_UUID_RE.test(moMarca))
+          return res.status(400).json({ ok: false, error: 'marca_id invalido' });
+        var moSemana = String(body.semana || '').trim();
+        if (moSemana && !marcaSemanaValida(moSemana))
+          return res.status(400).json({ ok: false, error: 'SEMANA_INVALIDA' });
+        if (!moSemana) moSemana = marcaSemanaActual();
+        var moSemParts = moSemana.split('-W');
+
+        var moFila, moConfig, moRank, moProds;
+        try {
+          moFila = await sql(
+            'SELECT m.id::text AS id, m.usuario_id::text AS usuario_id,'
+            + ' m.activa, m.estado_promo,'
+            + ' COALESCE(m.premios_config, \'{}\'::jsonb) AS premios_config'
+            + ' FROM marcas m WHERE m.id=$1::uuid LIMIT 1',
+            [moMarca]
+          );
+          if (!moFila.length)
+            return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+
+          // D3.1: se exige marca ACTIVA Y promo ENCENDIDA. Pausada no es un
+          // error: se reporta y no se otorga nada.
+          if (moFila[0].activa !== true || moFila[0].estado_promo !== true) {
+            return res.status(200).json({
+              ok: true, semana: moSemana, marca_id: moMarca,
+              pausada: true, motivo: 'PROMO_PAUSADA',
+              premios: [], otorgados: [], omitidos: [],
+              calibrado: false
+            });
+          }
+
+          var moCfgNum = {};
+          var moCfgRows = await sql(
+            'SELECT clave, valor FROM gamificacion_config'
+            + ' WHERE clave IN (\'marca_premio_xp_por_unidad\','
+            + '\'marca_premio_unidades_max\',\'marca_premio_xp_minimo_semana\','
+            + '\'marca_premio_peso_1\',\'marca_premio_peso_2\',\'marca_premio_peso_3\','
+            + '\'marca_premio_factor_retorno\',\'marca_premio_tasa_cop_por_xp\')'
+          );
+          moCfgRows.forEach(function (r) { moCfgNum[r.clave] = numXp(r.valor); });
+          moConfig = marcaPremioConfig(moFila[0].premios_config, moCfgNum);
+          // D7/D10: en v1 'global' es el unico alcance aceptado.
+          if (String(moConfig.alcance).toLowerCase() !== 'global')
+            return res.status(400).json({ ok: false, error: 'AMBITO_NO_SOPORTADO' });
+
+          // D3.2 + D3.3: ranking GLOBAL de la semana ISO, dueno excluido,
+          // desempate determinista por MIN(creado_en) y usuario_id.
+          moRank = await sql(
+            'WITH w AS ('
+            + ' SELECT (to_date($2::text || \'-\' || $3::text, \'IYYY-IW\')'
+            + ' AT TIME ZONE \'' + MARCA_PREMIO_TZ + '\') AS ini'
+            + '), r AS ('
+            + ' SELECT l.usuario_id::text AS usuario_id, SUM(l.xp_final) AS xp_semana,'
+            + ' MIN(l.creado_en) AS primero'
+            + ' FROM xp_ledger l, w'
+            + ' WHERE l.xp_final > 0 AND l.creado_en >= w.ini'
+            + ' AND l.creado_en < w.ini + interval \'7 days\''
+            + ' AND l.usuario_id <> $1::uuid'
+            + ' GROUP BY l.usuario_id'
+            + ')'
+            + ' SELECT usuario_id, xp_semana FROM r'
+            + ' ORDER BY xp_semana DESC, primero ASC, usuario_id ASC LIMIT 3',
+            [moFila[0].usuario_id, moSemParts[0], moSemParts[1]]
+          );
+          // D3.7: elegibles = premio_semanal + stock. marca_id en un producto
+          // premio_semanal identifica al PATROCINADOR, no restringe.
+          moProds = await sql(
+            'SELECT c.clave, v.precio_xp_efectivo, v.stock_disponible,'
+            + ' COALESCE(c.precio_cop, 0) AS precio_cop'
+            + ' FROM consumibles_precio v JOIN consumibles c ON c.id = v.id'
+            + ' WHERE c.premio_semanal = true AND v.stock_disponible >= 1'
+            + ' ORDER BY v.precio_xp_efectivo DESC, c.clave ASC'
+          );
+        } catch (eMo) {
+          if (!esEsquemaFaltante(eMo)) throw eMo;
+          console.warn('[marcas] marca_premio_otorgar sin 058 ('
+            + (eMo && eMo.code) + '): escritura cerrada');
+          return res.status(503).json({
+            ok: false,
+            error: 'Premios de marca no disponibles (migracion 058 pendiente)',
+            code: 'SCHEMA_NOT_MIGRATED'
+          });
+        }
+
+        var moPremios = [];
+        var moOtorgados = [];
+        var moOmitidos = [];
+        for (var moI = 0; moI < moRank.length; moI++) {
+          var moPuesto = moI + 1;
+          var moUsuario = String(moRank[moI].usuario_id);
+          var moXp = red2(numXp(moRank[moI].xp_semana));
+          var moUnid = 0;
+          var moClave = null;
+          var moValXp = 0;
+          var moValCop = 0;
+          // D3.4: semana muerta -> U = 0 para este puesto y los siguientes.
+          if (moXp >= moConfig.xp_minimo_semana) {
+            var moBrutas = Math.floor(moXp / moConfig.xp_por_unidad);
+            if (!isFinite(moBrutas) || moBrutas < 0) moBrutas = 0;
+            if (moBrutas > moConfig.unidades_max) moBrutas = moConfig.unidades_max;
+            // D3.6: FLOOR, nunca ROUND (no se redondea hacia arriba).
+            var moU = Math.floor(moBrutas * moConfig.pesos[moI]);
+            if (moU < 0) moU = 0;
+            // D7: tope_unidades SOLO puede reducir el techo global (LEAST).
+            if (moConfig.tope_unidades !== null && moU > moConfig.tope_unidades)
+              moU = moConfig.tope_unidades;
+            var moTopeXp = Math.floor(moXp * moConfig.factor_retorno);
+            var moTopeCop = Math.floor(moXp * moConfig.tasa_cop_por_xp
+              * moConfig.factor_retorno);
+            var moLista = moProds.slice();
+            if (moConfig.orden_premios.length) {
+              moLista = [];
+              moConfig.orden_premios.forEach(function (cl) {
+                moProds.forEach(function (c) {
+                  if (String(c.clave) === String(cl)) moLista.push(c);
+                });
+              });
+            }
+            for (var moJ = 0; moJ < moLista.length && moClave === null; moJ++) {
+              var moProd = moLista[moJ];
+              var moPx = numXp(moProd.precio_xp_efectivo);
+              var moPc = numXp(moProd.precio_cop);
+              // D3.8: solo se REDUCEN unidades hasta que quepa el tope.
+              var moFit = moU;
+              while (moFit >= 1) {
+                var moOkXp = (moPx <= 0) ? true : (moFit * moPx <= moTopeXp);
+                var moOkCop = (moPc <= 0) ? true : (moFit * moPc <= moTopeCop);
+                if (moOkXp && moOkCop) break;
+                moFit = moFit - 1;
+              }
+              if (moFit >= 1 && numXp(moProd.stock_disponible) >= moFit) {
+                moUnid = moFit;
+                moClave = String(moProd.clave);
+                moValXp = red2(moUnid * moPx);
+                moValCop = (moPc > 0)
+                  ? red2(moUnid * moPc)
+                  : red2(moValXp * moConfig.tasa_cop_por_xp);
+              }
+            }
+          }
+
+          moPremios.push({
+            puesto: moPuesto,
+            usuario_id: moUsuario,
+            xp_semana: moXp,
+            unidades: moUnid,
+            consumible_clave: moClave,
+            valor_xp: moValXp,
+            valor_cop_estimado: moValCop,
+            calibrado: false
+          });
+
+          var moIdem = 'premio:' + moMarca + ':' + moSemana + ':' + moPuesto
+            + ':' + moUsuario;
+          // D3/D4 replay: PRE-CHEQUEO de idempotencia ANTES de elegir
+          // producto y ANTES de tocar stock. Si la clave ya existe, el premio
+          // ya se otorgo: se reporta YA_OTORGADO aunque hoy no haya stock y
+          // NO se descuenta inventario (no hay compensacion posterior).
+          var moYa;
+          try {
+            moYa = await sql(
+              'SELECT id::text AS id FROM canjes_tienda'
+              + ' WHERE clave_idempotencia = $1::text LIMIT 1',
+              [moIdem]
+            );
+          } catch (eMoYa) {
+            if (!esEsquemaFaltante(eMoYa)) throw eMoYa;
+            console.warn('[marcas] marca_premio_otorgar sin 058 ('
+              + (eMoYa && eMoYa.code) + '): escritura cerrada');
+            return res.status(503).json({
+              ok: false,
+              error: 'Premios de marca no disponibles (migracion 058 pendiente)',
+              code: 'SCHEMA_NOT_MIGRATED'
+            });
+          }
+          if (moYa.length) {
+            moOmitidos.push({
+              puesto: moPuesto, usuario_id: moUsuario, motivo: 'YA_OTORGADO'
+            });
+            continue;
+          }
+
+          if (!moClave || moUnid < 1) {
+            moOmitidos.push({
+              puesto: moPuesto, usuario_id: moUsuario,
+              motivo: (moXp < moConfig.xp_minimo_semana) ? 'SIN_XP_MINIMO' : 'SIN_UNIDADES'
+            });
+            continue;
+          }
+
+          var moUni = red2(moValXp / moUnid);
+          try {
+            var moRes = await sql(
+              'WITH st AS ('
+              + ' UPDATE consumibles c SET'
+              + ' stock_usado = COALESCE(c.stock_usado, 0) + $2::int'
+              + ' WHERE c.clave = $1::text'
+              + ' AND (c.stock_total IS NULL'
+              + ' OR COALESCE(c.stock_usado, 0) + $2::int <= c.stock_total)'
+              + ' AND NOT EXISTS (SELECT 1 FROM canjes_tienda ct'
+              + ' WHERE ct.clave_idempotencia = $8::text)'
+              + ' RETURNING c.id, c.clave'
+              + '), ins AS ('
+              + ' INSERT INTO canjes_tienda (usuario_id, marca_id, billetera_id,'
+              + ' codigo_publico_snapshot, consumible_id, consumible_clave, cantidad,'
+              + ' precio_xp_unitario, xp_total, origen, semana, puesto, estado,'
+              + ' contexto, clave_idempotencia)'
+              + ' SELECT $3::uuid, $4::uuid, w.id, COALESCE(w.codigo_publico, \'\'),'
+              + ' st.id, st.clave, $2::int, $5::numeric, ($5::numeric * $2::int),'
+              + ' \'premio_semanal\', $6::text, $7::int, \'pendiente\','
+              + ' jsonb_build_object(\'semana\', $6::text, \'puesto\', $7::int,'
+              + ' \'calibrado\', false), $8::text'
+              + ' FROM st LEFT JOIN billeteras w ON w.usuario_id = $3::uuid'
+              + ' ON CONFLICT (clave_idempotencia) DO NOTHING'
+              + ' RETURNING id::text AS id'
+              + ')'
+              + ' SELECT (SELECT COUNT(*)::int FROM st) AS stock_ok,'
+              + ' (SELECT id FROM ins) AS canje_id',
+              [moClave, moUnid, moUsuario, moMarca, moUni, moSemana, moPuesto, moIdem]
+            );
+            var moR0 = moRes[0] || {};
+            if (Number(moR0.stock_ok) !== 1) {
+              moOmitidos.push({
+                puesto: moPuesto, usuario_id: moUsuario, motivo: 'STOCK_INSUFICIENTE'
+              });
+              continue;
+            }
+            if (!moR0.canje_id) {
+              // Ventana concurrente: el pre-chequeo no vio la clave y otra
+              // pasada la inserto antes de este UPDATE. El premio NO se
+              // duplica (ON CONFLICT DO NOTHING + guarda NOT EXISTS en st),
+              // el stock no se toca y se reporta YA_OTORGADO. Se elimino la
+              // compensacion en sentencia aparte, que no era atomica.
+              moOmitidos.push({
+                puesto: moPuesto, usuario_id: moUsuario, motivo: 'YA_OTORGADO'
+              });
+              continue;
+            }
+            moOtorgados.push({
+              puesto: moPuesto,
+              usuario_id: moUsuario,
+              unidades: moUnid,
+              consumible_clave: moClave,
+              canje_id: moR0.canje_id,
+              valor_xp: moValXp,
+              valor_cop_estimado: moValCop
+            });
+          } catch (eMoOt) {
+            if (!esEsquemaFaltante(eMoOt)) throw eMoOt;
+            console.warn('[marcas] premio puesto ' + moPuesto + ' sin 058 ('
+              + (eMoOt && eMoOt.code) + '): omitido');
+            moOmitidos.push({
+              puesto: moPuesto, usuario_id: moUsuario, motivo: 'SCHEMA_NOT_MIGRATED'
+            });
+          }
+        }
+
+        return res.status(200).json({
+          ok: true,
+          semana: moSemana,
+          marca_id: moMarca,
+          pausada: false,
+          config: moConfig,
+          premios: moPremios,
+          otorgados: moOtorgados,
+          omitidos: moOmitidos,
+          // D4: la tasa XP/COP es una convencion contable NO calibrada.
+          calibrado: false
         });
       }
 

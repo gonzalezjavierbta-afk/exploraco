@@ -10022,3 +10022,736 @@ El orden importa porque cada gate tiene un codigo de error distinto y el cliente
 5. **El umbral de 400 caracteres de la Pluma y el tope de stock 30 son CONSTANTES en codigo, no configuracion.** No estan en `gamificacion_config` ni en la fila del catalogo: cambiarlos exige **deploy**. Se acepta porque son dos numeros de producto (calidad de resena y freno de inventario), no palancas de operacion diaria.
 6. **`precio_xp_base` NO se expone en la lista de consumibles que sirve el backend** (`consumibles_lista` publica `precio_xp`, no la base). La columna existe, se mantiene igual a `precio_xp` (H-3) y la usa la vista `consumibles_precio`; si algun dia hay oferta/demanda por consumible, exponerla sera un **cambio de contrato declarado**, no un campo silencioso mas.
 7. **Excepcion estrecha a la regla de T5** (prohibido reintroducir la **tienda general** en `mi-perfil.html`). El modulo `pf-fac` **no es la tienda general**: es una tienda **de faccion** con gate de nivel 4 y un unico item comprable por usuario. La excepcion **no queda como nota**, queda **codificada en el smoke** como **`4g-2` / `4g-2a` / `4g-2b` / `4g-2c`**, de modo que reintroducir la tienda general rompe el test en vez de depender de que alguien lo recuerde.
+
+---
+
+## ADR-107: **Marcas Self-Service** separa **tres actos** (crear con gate de nivel + coste en XP como *sink*, operar **varias marcas** con un **puntero unico** `usuarios.marca_activa_id`, y premiar por **formula dinamica** anclada al XP REAL de la semana), cae `UNIQUE (usuario_id)` en `marcas` y el **canje en tienda se identifica con `billeteras.codigo_publico`**, sin QR en v1 [NO deroga ADR-059/ADR-064 M-6; **acota** su supuesto "1 marca por usuario"]
+
+**ID:** ADR-107
+**Fecha:** 2026-10-27
+**Autor:** `@architect` (diseno). Gate de riesgo CONFIRMADO implicitamente: este ADR **no escribe codigo**. La implementacion toca `api/usuarios.js`, `api/interacciones.js`, `mi-perfil.html`, `admin.html` y un unico fichero nuevo de migracion (NO hay endpoint nuevo: 8/8 funciones serverless agotadas).
+**Estado:** **ACEPTADO / PENDIENTE DE IMPLEMENTAR.** Es un ADR de **diseno**. Las **6 decisiones del operador** (QR fuera de alcance pero canje en tienda dentro, ANCESTRAL por triple via, premio semanal dinamico con balanceo, varias marcas por usuario, gate de nivel + coste en XP, ANCESTRAL creada como cualquier marca) se registran como **premisa**: no se reabren ni se "mejoran". Lo que este ADR decide es todo lo que esas 6 premisas **no** dicen: el DDL exacto, la resolucion de la marca activa, la formula cerrada, la tasa XP/COP, el destino del XP, el contrato de las ramas y la degradacion.
+**Revision 2 (2026-10-27):** el operador cierra las **6 deudas** de la revision 1 con decision final. Se incorporan como **D10-D16**, se parchea el DDL (seccion 7: 3 productos ANCESTRAL; `atendido_por` pasa a `uuid`; `canjes_tienda.contexto`), se renombra el coste a **`marca_alta_xp`**, el ambito pasa a **leaderboard global** y la tasa XP/COP queda **aplicada** a precios reales dados por el operador. **No quedan deudas abiertas.**
+**Revision 3 (2026-10-27):** enmienda de **contrato**, no de diseno. El codigo ya existe: `api/interacciones.js` contiene `GET marca_premios` (`:6708`), `GET canjes_marca` (`:6902`) y `POST marca_panel` (`:15820`), y la implementacion hubo de cubrir **escritura** (encender la promo y guardar la config) y **metricas** que el **D6 original no contrataba**. Esta revision fija **5 puntos vinculantes** — (1) una sola rama de escritura -> **R3-E2**; (2) metricas dentro de `canjes_marca` -> **R3-E3**; (3) `unidades=0` viajan -> **R3-E4**; (4) parametros por marca -> **R3-E5**; (5) sin disparo automatico -> **R3-E6** —, publica la **tabla vigente** en **R3-E1** y la **trazabilidad** en **R3-E7**, y marca como **SUPERADA** la tabla de `api/interacciones.js` de D6. **Nada mas se reabre**: D1-D5, D8-D16 y el DDL de la 058 quedan intactos, y el numero sigue siendo **107** (es una revision, no un ADR nuevo).
+**Numeracion (ADR-006, verificado contra el archivo real):** el patron `^## ADR-0` es **trampa**: devuelve `ADR-099` (linea 8720) y **oculta** los ADR de tres cifras que empiezan por `1`. El mayor encabezado real se obtiene con `^## ADR-(\d{3})` y es **`ADR-106`** (linea 9774); **no existia ningun `ADR-107`**. Se escribe como **107**, el siguiente consecutivo libre. Encabezados `^## ADR-(\d{3})` antes de esta seccion: **106**. Tamano real medido justo antes de esta seccion: **1.539,6 KB / 10.024 lineas**. La migracion se numera **058**: el mayor fichero en `db/migrations/` es `057_consumibles_faccion_nivel4.sql` y **052 no existe** (hueco ya conocido). El nombre exacto propuesto es **`058_marcas_self_service_premios_canje.sql`** y debe confirmarse contra `schema_migrations` en el precheck (P-1).
+
+### Problema
+
+El modelo de marca nacio con **tres supuestos que hoy son tres techos**:
+
+1. **Una marca por usuario** (`UNIQUE (usuario_id)`, `db/migrations/027_zonas_marcas.sql:210`). Un usuario con dos negocios no puede operarlos, y el `ON CONFLICT (usuario_id)` de `api/usuarios.js:2352` convierte "crear la segunda" en "sobrescribir la primera" en silencio.
+2. **Crear una marca es gratis** una vez alcanzado el nivel: no hay coste, luego el alta no compite con ningun otro destino del XP y no hay freno a crear marcas vacias.
+3. **El premio no existe como mecanica**: no hay forma de premiar la actividad semanal de la zona de una marca, y no hay trazabilidad de la entrega fisica. `spot_presencia` (040) mide presencia, no retorno.
+
+A esto se suma que la creacion estaba **acoplada a la edicion** en una sola rama (`marca_activar`) que hace INSERT-or-UPDATE. Al caer el UNIQUE, esa rama **deja de compilar en runtime**: `ON CONFLICT (usuario_id)` sin constraint unico equivalente produce **42P10** en cada llamada. Ese es el motivo real de que este ADR no sea "un modulo nuevo" sino una **migracion de contrato**.
+
+### Datos medidos (2026-10-27, contra el archivo real; ADR-006)
+
+1. **`marcas`** (`027:197-215`): `id uuid PK`, `usuario_id uuid NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE`, `nombre`, `logo_url`, `banner_url`, `descripcion`, `areas_influencia jsonb DEFAULT '[]'`, `enlaces jsonb DEFAULT '{}'`, `activa boolean NOT NULL DEFAULT TRUE`, `verificada boolean NOT NULL DEFAULT FALSE`, **`nivel_requerido integer NOT NULL DEFAULT 5`**, `creado_en`, y `UNIQUE (usuario_id)` (constraint `marcas_usuario_id_key`). Indice `idx_marcas_activa` parcial sobre `activa`.
+2. **Discrepancia de default ya existente:** la columna dice **5** (`027:208`) y el codigo usa **`MARCA_NIVEL_REQUERIDO_DEFAULT = 6`** (`api/usuarios.js:356`) cuando no hay fila. Se resuelve en D6 sin tocar la columna.
+3. **Las tres consultas que el DROP vuelve ambiguas** (las tres hacen `WHERE usuario_id=$1 ... LIMIT 1`):
+   - `api/usuarios.js:766-771` (GET `mi_marca`, el `LIMIT 1` en `:769`),
+   - `api/interacciones.js:1549-1556` (capa `marca` de `validarCapa`, `:1551`),
+   - `api/interacciones.js:15365-15384` (`marca_presencia`, la CTE `marca` en `:15369`).
+4. **Dos puntos mas que el brief NO listaba y que el DROP rompe** (hallazgo de este ADR):
+   - `api/usuarios.js:2347-2360` `INSERT ... ON CONFLICT (usuario_id) DO UPDATE` -> **42P10** en toda llamada a `marca_activar` tras el DROP.
+   - `api/usuarios.js:2332-2335` `LEFT JOIN marcas m ON m.usuario_id = u.id` sin `LIMIT`: con dos marcas devuelve **dos filas** y `maUser[0]` (`:2340`) elige **una arbitraria**, luego el gate de nivel de esa rama pasa a ser **no determinista**.
+5. **El patron de sink del repo NO es "restar de `xp_total`":** `046_market_multimoneda_sinks.sql:39-44` anade `usuarios.xp_gastado_sinks` y documenta que **los sinks NUNCA tocan `xp_total`**, porque `xp_gastado_sinks` es un contador que solo crece y asi `XP_DISPONIBLE = xp_total - xp_gastado_sinks` y `calcularNivel(xp_total)` quedan **monotonos**. El consumo se verifica con `GREATEST(xp_total - COALESCE(xp_gastado_sinks,0),0) >= costo` (`api/interacciones.js:1349`, `:1358`, `:4864`).
+6. **El ledger admite un evento de GASTO con `xp_final` negativo:** el diezmo de parche escribe `accion:'tithe_parche'`, `es_exento:true`, `xp_final: red2(-monto)` (`api/interacciones.js:4896-4901`). Es el precedente exacto para registrar el coste de alta sin inventar semantica de ledger.
+7. **`xp_ledger`** (`031:225-241`): columna **`accion`** (no `motivo`), `xp_final numeric(12,2)`, `es_exento`, `contexto jsonb`, `creado_en timestamptz`. **No** es un ledger de items: no sirve para inventario.
+8. **Inventario = `usuarios.capacidades->'consumibles'`** y el repo YA tiene las tres piezas: el fragmento de merge `sqlMergeInventario()` (`api/interacciones.js:3030-3035`), `descontarInventario()` (`:3039-3047`) y `acreditarInventario()` (`:3050`). **No se escribe SQL de inventario nuevo.**
+9. **`gamificacion_config`** (`031:164-169`): `clave text PK`, **`valor numeric(12,4) NOT NULL`**, `descripcion`, `actualizado_en`. Semilla con `ON CONFLICT (clave) DO NOTHING` (`:174-181`) y otra tanda en `038:282+`. **Consecuencia dura: todo tunable nuevo tiene que ser NUMERICO**; nada de porcentajes en texto.
+10. **`consumibles`** (`010:16-24` + `027` + `057`): `clave varchar(50) UNIQUE`, `precio_xp numeric(12,2)` (021), `precio_xp_base/precio_xp_actual`, `stock_total`, `stock_usado`, `tipo_canje text`, `activo`, `categoria`, `faccion_requerida`. **NO existe ninguna columna de precio en pesos colombianos en todo el esquema.**
+11. **La vista `consumibles_precio`** (`027:283-301`) ya calcula `precio_xp_efectivo` (nunca por debajo de la base, sube con `stock_usado/stock_total`) y `stock_disponible` (99999 si ilimitado). **Se reusa; no se reimplementa la formula de precio.**
+12. **Rango REAL de `precio_xp` del catalogo** (semillas de `010:159-170`, `015:99`, `017:101`, `057`): **250, 300, 400, 450, 500, 600, 700, 800, 900, 1500**. Es el unico ancla objetiva del valor de un producto dentro del sistema.
+13. **Umbrales de nivel** (`api/usuarios.js:81-122`): N5 = **1650 XP** (`:86`, `{min:1650}`), "nivel alto" = **27400 XP** (`:101`), techo = **100000 XP** (`:121`). El nivel se DERIVA de `xp_total` (`calcularNivel`, `:184`).
+14. **Patron de degradacion por esquema ausente**: `esEsquemaFaltante(e)` = `e.code === '42P01' || e.code === '42703'` (`api/interacciones.js:5761-5763`), usado en ~15 puntos; las ramas de marca ya devuelven **503 `SCHEMA_NOT_MIGRATED`** (`:6578-6582` y `:15389-15393`).
+15. **Router real, no inventado.** `api/usuarios.js`: GET por `tipo === '...'` con `const { id, tipo, limit } = req.query` (`:760`) y POST por `c.tipo === '...'` con `c = {...req.query, ...req.body}` (`:1662-1671`), auth propia con `validarSesionUsuario(req, uid)` (`:2322`) y admin con `esAdminUsuario(req)` (`:2296`). `api/interacciones.js`: POST por `tipo2 = body.tipo || req.query.tipo` (`:10453-10455`), auth con `usuarioDeSesion(req)` + `responderSesion(res, razon)` (`:15359-15360`) o con `validarSesion(req, usuarioId2)` cuando el id viene en el body (`:10469-10470`); admin por `Authorization: Bearer <ADMIN_SECRET>` (`:6401-6402`, `:8261`).
+16. **`billeteras`** (`042:96-107`): `id uuid PK`, `usuario_id uuid NOT NULL UNIQUE`, **`codigo_publico text NOT NULL UNIQUE`**, `estado`, `activo`. Es el identificador que el mostrador teclea en v1.
+17. **8/8 funciones serverless.** Cero endpoint nuevo. Toda rama nueva entra en `api/usuarios.js` o `api/interacciones.js`.
+18. **No hay cron:** `vercel.json` existe y **no declara `crons`** (0 coincidencias). El otorgamiento semanal es **disparado por el operador**, no por reloj.
+19. **Runner real:** `scripts/apply_sql_file.js` con ledger `schema_migrations` (`nombre`, `numero`, `resultado`, `checksum`) creada por `045_schema_migrations.sql`; se niega a aplicar sobre una base sin la 045 y acepta `--notas`.
+
+### Opciones
+
+**Sobre la resolucion de la marca activa (D2, punto bloqueante):**
+
+- **(A) Solo `usuarios.marca_activa_id`.** Una columna, un puntero, una verdad. Las tres consultas pasan a un `JOIN` por PK. Integridad de propiedad garantizable **solo con DDL** mediante FK compuesta contra `marcas(id, usuario_id)`.
+- **(B) Solo `marcas.es_principal boolean`** con indice unico parcial `(usuario_id) WHERE es_principal`. Ventaja: el `ON CONFLICT (usuario_id) WHERE es_principal` seguiria siendo legal (Postgres infiere indices parciales), luego la rama `marca_activar` se arreglaria con una linea. Coste: cambiar de marca activa son **dos UPDATE** (desmarcar + marcar) sin transaccion de puntero unico, y "no tener principal" es un estado legal que hay que tratar en cada lectura.
+- **(C) Ambas.** Dos fuentes de verdad que pueden divergir; cualquiera de las dos que se consulte primero gana y el bug aparece solo con datos reales.
+
+Elegida: **(A)**. Razon: el problema a resolver es **"cual de mis marcas estoy operando"**, y eso es **un puntero**, no una propiedad de la fila. Con (B) cada lectura necesita ademas un `ORDER BY`/fallback para el caso "sin principal"; con (A) la lectura es una igualdad por PK y el `LIMIT 1` desaparece porque **no puede haber dos filas**. (C) se descarta sin discusion: ADR-006 existe precisamente para no tener dos baselines.
+
+**Sobre donde vive el premio semanal (D3):**
+
+- **(A) En `fusiones_marca` como "receta aplicada".** Reusa la tabla pedida, pero ensancha su semantica en silencio y mezcla metricas de receta con entregas fisicas.
+- **(B) Nueva tabla `premios_semanales`.** Contradice la restriccion de superficies y duplica el flujo de entrega que ya existe para el mostrador.
+- **(C) En `canjes_tienda` con una columna `origen`.** El premio semanal **es** una entrega: el ganador va al mostrador con su `codigo_publico` exactamente igual que el que compro con XP. Un solo flujo, un solo estado, un solo listado para el Panel de Marca.
+
+Elegida: **(C)**. `fusiones_marca` queda **solo** como log de recetas/fusiones (metricas), que es lo que el operador pidio que fuera.
+
+**Sobre la tasa XP <-> COP (D4):**
+
+- **(A) Derivarla de un precio de mercado real.** Imposible: **no existe ninguna columna de pesos en el esquema** (hecho 10) y el ADR no puede afirmar un precio comercial como hecho.
+- **(B) Derivarla del catalogo:** 250-1500 XP por producto, techo de nivel 100000 XP. Cualquier cociente que salga de ahi es **una convencion contable interna**, no una tasa de cambio.
+- **(C) No tener tasa y bloquear el balanceo en COP.** Incumple la premisa 3 del operador.
+
+Elegida: **(B) declarada como parametro NO CALIBRADO** (`gamificacion_config.marca_premio_tasa_cop_por_xp`), con dos consecuencias vinculantes: **(i)** la tasa **nunca** es un tope; el tope que muerde es el de **XP-equivalente** contra el catalogo real; **(ii)** todo valor en COP que devuelve el backend viaja con `calibrado:false` y la UI lo rotula como estimacion. Ver D4.
+
+### Decision
+
+#### D1. Modelo de datos: migracion `058_marcas_self_service_premios_canje.sql`
+
+Caracter: **ADITIVA e IDEMPOTENTE** (ADR-008) salvo **una** operacion de catalogo declarada: `DROP CONSTRAINT marcas_usuario_id_key`, que **no borra ninguna fila** (ADR-003 se cumple por construccion: es DDL de catalogo, los datos se conservan y el puntero los reubica). Requiere `027` (marcas), `031` (config, ledger), `042` (billeteras), `046` (`xp_gastado_sinks`). Cero bytes > 127, cero backticks, sin `DELETE`/`DROP TABLE`.
+
+```sql
+-- ============================================================================
+-- Migration 058: Marcas self-service (multi-marca, premio semanal, canje en
+--   tienda por codigo_publico, trazabilidad). ADR-107.
+-- ADITIVA / IDEMPOTENTE / ASCII-SAFE. Requiere 027, 031, 042, 046.
+-- Unica operacion de catalogo: DROP CONSTRAINT marcas_usuario_id_key (no
+-- borra filas; el puntero usuarios.marca_activa_id las reubica).
+-- ============================================================================
+
+-- (1) MARCA: promocion y receta del premio -----------------------------------
+ALTER TABLE marcas
+  ADD COLUMN IF NOT EXISTS estado_promo boolean NOT NULL DEFAULT false;
+ALTER TABLE marcas
+  ADD COLUMN IF NOT EXISTS premios_config jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+DO $m058a$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conrelid = 'public.marcas'::regclass
+                   AND conname  = 'chk_marcas_premios_config_obj') THEN
+    ALTER TABLE marcas ADD CONSTRAINT chk_marcas_premios_config_obj
+      CHECK (jsonb_typeof(premios_config) = 'object');
+  END IF;
+END $m058a$;
+
+-- (2) RESOLUCION DE LA MARCA ACTIVA (D2) ------------------------------------
+-- 2.a Unicidad de (id, usuario_id): la necesita la FK compuesta del paso 2.d.
+DO $m058b$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conrelid = 'public.marcas'::regclass
+                   AND conname  = 'marcas_id_usuario_id_key') THEN
+    ALTER TABLE marcas ADD CONSTRAINT marcas_id_usuario_id_key
+      UNIQUE (id, usuario_id);
+  END IF;
+END $m058b$;
+
+-- 2.b Puntero unico: cual de MIS marcas estoy operando.
+ALTER TABLE usuarios
+  ADD COLUMN IF NOT EXISTS marca_activa_id uuid;
+
+-- 2.c BACKFILL DETERMINISTA: se ejecuta ANTES del DROP del UNIQUE
+--     (aqui todavia hay como maximo 1 marca por usuario, luego el UPDATE
+--     no puede elegir entre dos). Idempotente por el IS NULL.
+UPDATE usuarios u
+   SET marca_activa_id = m.id
+  FROM marcas m
+ WHERE m.usuario_id = u.id
+   AND u.marca_activa_id IS NULL;
+
+-- 2.d FK COMPUESTA: el puntero solo puede apuntar a una marca DEL MISMO dueno.
+--     OJO, TRAMPA DOCUMENTADA: esta FK NO admite ON DELETE SET NULL, porque
+--     SET NULL pondria a NULL TODAS las columnas referenciantes, incluida
+--     usuarios.id (NOT NULL) y la sentencia fallaria. Debe quedarse en
+--     NO ACTION, que es ademas lo coherente con cero borrado logico (ADR-003):
+--     una marca se desactiva (activa=false), no se borra.
+DO $m058c$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conrelid = 'public.usuarios'::regclass
+                   AND conname  = 'usuarios_marca_activa_fk') THEN
+    ALTER TABLE usuarios ADD CONSTRAINT usuarios_marca_activa_fk
+      FOREIGN KEY (marca_activa_id, id) REFERENCES marcas (id, usuario_id)
+      DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+END $m058c$;
+
+-- 2.e CAIDA DEL UNIQUE (usuario_id). Idempotente por IF EXISTS.
+ALTER TABLE marcas DROP CONSTRAINT IF EXISTS marcas_usuario_id_key;
+
+-- 2.f El indice unico que sostenia el UNIQUE desaparece con el; se sustituye
+--     por un indice NO unico: las tres consultas de D2 filtran por usuario_id.
+CREATE INDEX IF NOT EXISTS idx_marcas_usuario ON marcas (usuario_id);
+
+-- (3) CATALOGO: precio en pesos y elegibilidad del premio --------------------
+--     precio_cop = 0 significa "sin precio en pesos declarado": el techo en
+--     COP se omite y solo muerde el techo en XP-equivalente (D4).
+ALTER TABLE consumibles
+  ADD COLUMN IF NOT EXISTS precio_cop numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE consumibles
+  ADD COLUMN IF NOT EXISTS premio_semanal boolean NOT NULL DEFAULT false;
+
+DO $m058d$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conrelid = 'public.consumibles'::regclass
+                   AND conname  = 'chk_consumibles_precio_cop') THEN
+    ALTER TABLE consumibles ADD CONSTRAINT chk_consumibles_precio_cop
+      CHECK (precio_cop >= 0);
+  END IF;
+END $m058d$;
+
+-- (4) TRAZABILIDAD DE RECETAS / FUSIONES (metricas) --------------------------
+--     APPEND-ONLY: no se actualiza ninguna fila salvo el paso a 'aplicada'.
+--     receta_clave es texto libre a proposito (catalogo administrable sin
+--     CHECK de dominio, ADR-028): el vocabulario de recetas no esta cerrado y
+--     no debe cerrarse desde una migracion.
+CREATE TABLE IF NOT EXISTS fusiones_marca (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id         uuid NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  marca_id           uuid NOT NULL REFERENCES marcas(id) ON DELETE NO ACTION,
+  receta_clave       varchar(60) NOT NULL,
+  entradas           jsonb NOT NULL DEFAULT '[]'::jsonb,
+  salidas            jsonb NOT NULL DEFAULT '{}'::jsonb,
+  xp_consumido       numeric(12,2) NOT NULL DEFAULT 0,
+  estado             text NOT NULL DEFAULT 'registrada',
+  clave_idempotencia text,
+  contexto           jsonb NOT NULL DEFAULT '{}'::jsonb,
+  creado_en          timestamptz NOT NULL DEFAULT now(),
+  aplicado_en        timestamptz,
+  CONSTRAINT chk_fusiones_marca_estado
+    CHECK (estado IN ('registrada', 'aplicada', 'anulada')),
+  CONSTRAINT chk_fusiones_marca_xp CHECK (xp_consumido >= 0),
+  CONSTRAINT chk_fusiones_marca_entradas CHECK (jsonb_typeof(entradas) = 'array'),
+  CONSTRAINT chk_fusiones_marca_salidas  CHECK (jsonb_typeof(salidas)  = 'object'),
+  CONSTRAINT uq_fusiones_marca_idem UNIQUE (clave_idempotencia)
+);
+
+CREATE INDEX IF NOT EXISTS idx_fusiones_marca_usuario
+  ON fusiones_marca (usuario_id, creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_fusiones_marca_marca
+  ON fusiones_marca (marca_id, creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_fusiones_marca_receta
+  ON fusiones_marca (receta_clave, creado_en DESC);
+
+-- (5) ENTREGA EN MOSTRADOR (y entrega del premio semanal) --------------------
+--     Un solo flujo: el premio semanal es una fila origen='premio_semanal' con
+--     estado='pendiente' y codigo_publico_snapshot ya resuelto; el mostrador la
+--     cierra igual que una compra. NO se borra nunca (ADR-003): 'anulado'.
+CREATE TABLE IF NOT EXISTS canjes_tienda (
+  id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id              uuid NOT NULL REFERENCES usuarios(id) ON DELETE NO ACTION,
+  marca_id                uuid NOT NULL REFERENCES marcas(id) ON DELETE NO ACTION,
+  billetera_id            uuid REFERENCES billeteras(id) ON DELETE NO ACTION,
+  codigo_publico_snapshot text NOT NULL,
+  consumible_id           uuid REFERENCES consumibles(id) ON DELETE NO ACTION,
+  consumible_clave        varchar(50) NOT NULL,
+  cantidad                integer NOT NULL DEFAULT 1,
+  precio_xp_unitario      numeric(12,2) NOT NULL DEFAULT 0,
+  xp_total                numeric(12,2) NOT NULL DEFAULT 0,
+  origen                  text NOT NULL DEFAULT 'mostrador',
+  semana                  varchar(8),
+  puesto                  smallint,
+  estado                  text NOT NULL DEFAULT 'pendiente',
+  atendido_por            uuid REFERENCES usuarios(id) ON DELETE NO ACTION,
+  nota                    text,
+  contexto                jsonb NOT NULL DEFAULT '{}'::jsonb,
+  clave_idempotencia      text,
+  creado_en               timestamptz NOT NULL DEFAULT now(),
+  entregado_en            timestamptz,
+  CONSTRAINT chk_canjes_tienda_estado
+    CHECK (estado IN ('pendiente', 'entregado', 'anulado')),
+  CONSTRAINT chk_canjes_tienda_origen
+    CHECK (origen IN ('mostrador', 'premio_semanal')),
+  CONSTRAINT chk_canjes_tienda_cantidad CHECK (cantidad > 0),
+  CONSTRAINT chk_canjes_tienda_puesto
+    CHECK (puesto IS NULL OR puesto BETWEEN 1 AND 3),
+  CONSTRAINT chk_canjes_tienda_precios
+    CHECK (precio_xp_unitario >= 0 AND xp_total >= 0),
+  CONSTRAINT chk_canjes_tienda_contexto
+    CHECK (jsonb_typeof(contexto) = 'object'),
+  CONSTRAINT uq_canjes_tienda_idem UNIQUE (clave_idempotencia)
+);
+
+CREATE INDEX IF NOT EXISTS idx_canjes_tienda_usuario
+  ON canjes_tienda (usuario_id, creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_canjes_tienda_marca_estado
+  ON canjes_tienda (marca_id, estado);
+CREATE INDEX IF NOT EXISTS idx_canjes_tienda_codigo
+  ON canjes_tienda (codigo_publico_snapshot);
+
+-- (6) TUNABLES (gamificacion_config.valor es numeric(12,4): solo numeros) ----
+--     ON CONFLICT DO NOTHING: re-ejecutar NO reescribe una recalibracion.
+INSERT INTO gamificacion_config (clave, valor, descripcion) VALUES
+  ('marca_alta_xp',               1650.0000,
+   'Coste en XP de crear una marca (sink, no resta xp_total). ADR-107 D5/D14'),
+  ('marca_premio_xp_por_unidad',  2500.0000,
+   'XP de la semana por unidad bruta de premio. ADR-107 D3'),
+  ('marca_premio_unidades_max',      6.0000,
+   'Tope de unidades BRUTAS por puesto y semana. ADR-107 D3'),
+  ('marca_premio_xp_minimo_semana', 1000.0000,
+   'Por debajo de este XP semanal el premio es 0. ADR-107 D3'),
+  ('marca_premio_peso_1',            1.0000,
+   'Peso del 1er puesto. ADR-107 D3'),
+  ('marca_premio_peso_2',            0.5000,
+   'Peso del 2do puesto. ADR-107 D3'),
+  ('marca_premio_peso_3',            0.2500,
+   'Peso del 3er puesto. ADR-107 D3'),
+  ('marca_premio_factor_retorno',    0.3500,
+   'Techo de valor del premio en XP-equivalente / XP de la semana. ADR-107 D4'),
+  ('marca_premio_tasa_cop_por_xp',  12.0000,
+   'NO CALIBRADO: convencion contable COP por XP. Solo reporte. ADR-107 D4')
+ON CONFLICT (clave) DO NOTHING;
+
+-- (7) CATALOGO ANCESTRAL (cierre de DEUDA-4 y DEUDA-5) -----------------------
+--     precio_cop = precio comercial REAL dado por el operador (dato, no
+--     estimacion). precio_xp = ROUND(precio_cop / marca_premio_tasa_cop_por_xp, 2)
+--     con la tasa sembrada (12.0000): es una DERIVACION contable con un
+--     parametro de calibracion, NO un precio medido ni una tasa de cambio.
+--     Editable por admin (precio_xp + precio_xp_actual).
+--     marca_id arranca NULL y la vincula el paso 6 del plan de aplicacion
+--     (D16): la marca ANCESTRAL la crea el operador por la via comun
+--     (gate de nivel + coste), NO esta migracion.
+--     premio_semanal = true: ANCESTRAL es el premio del Top 3 (premisa 2).
+--     stock_total NULL = sin tope declarado; lo fija el admin.
+INSERT INTO consumibles
+  (clave, nombre, descripcion, precio_xp, precio_xp_base, precio_cop,
+   tipo_canje, premio_semanal, activo)
+VALUES
+  ('ancestral_pocima_50ml', 'Ancestral Pocima 50 ml',
+   'Producto fisico 50 ml. Entrega en mostrador con codigo publico.',
+   1166.67, 1166.67, 14000.00, 'tienda', true, true),
+  ('ancestral_media_375ml', 'Ancestral Media 375 ml',
+   'Producto fisico 375 ml. Entrega en mostrador con codigo publico.',
+   3416.67, 3416.67, 41000.00, 'tienda', true, true),
+  ('ancestral_botella_750ml', 'Ancestral Botella 750 ml',
+   'Producto fisico 750 ml. Entrega en mostrador con codigo publico.',
+   6333.33, 6333.33, 76000.00, 'tienda', true, true)
+ON CONFLICT (clave) DO NOTHING;
+```
+
+**Nota de idempotencia de la seccion (2):** `ADD COLUMN IF NOT EXISTS` y `DROP CONSTRAINT IF EXISTS` son idempotentes por si mismos; los `ADD CONSTRAINT` van guardados contra `pg_constraint` porque Postgres no tiene `ADD CONSTRAINT IF NOT EXISTS` (precedente: `031:255-260`). Segunda corrida = no-op funcional. **Orden obligatorio** `2.b -> 2.c -> 2.d -> 2.e`: si se invierte 2.c y 2.e el backfill se vuelve no determinista (elegiria una marca al azar entre varias).
+
+#### D2. Resolucion de la marca activa (punto BLOQUEANTE)
+
+**Elegido: `usuarios.marca_activa_id`, puntero unico, con FK compuesta contra `marcas(id, usuario_id)`.** Se **rechaza** `marcas.es_principal` (opcion B de Opciones): seria una segunda verdad y el estado "sin principal" obligaria a un fallback en cada lectura.
+
+**Cinco consultas, no tres** (correccion de baseline de este ADR): las **tres** del brief pasan a ambiguas con el DROP, y hay **dos mas** en `api/usuarios.js` que el brief no listaba y que el DROP **rompe en runtime**. Impacto exacto de cada una:
+
+| # | Archivo:linea | Hoy | Despues | Efecto |
+|---|---|---|---|---|
+| 1 | `api/usuarios.js:766-771` (GET `mi_marca`) | `FROM marcas m WHERE m.usuario_id=$1 LIMIT 1` | `FROM marcas m JOIN usuarios u ON u.id=m.usuario_id WHERE u.id=$1::uuid AND m.id=u.marca_activa_id` | Devuelve **la marca operada**. Con 1 marca el resultado es identico (el backfill 2.c lo garantiza); con N, deja de ser arbitrario. Se conserva el `data:null` + `nivel_requerido` de `:780-782` |
+| 2 | `api/interacciones.js:1549-1556` (capa `marca`) | `SELECT id FROM marcas WHERE usuario_id=$1::uuid AND activa=true LIMIT 1` | `SELECT m.id FROM marcas m JOIN usuarios u ON u.id=m.usuario_id WHERE u.id=$1::uuid AND m.id=u.marca_activa_id AND m.activa=true` | El stack/capa lo da **la marca activa**. Si la activa esta `activa=false` -> `403 MARCA_INACTIVA`, que es la semantica correcta y hoy no cambia (solo hay una) |
+| 3 | `api/interacciones.js:15365-15384` (`marca_presencia`) | CTE `marca AS (SELECT id FROM marcas WHERE usuario_id=$1::uuid AND activa=true LIMIT 1)` | CTE con el mismo `JOIN` por `marca_activa_id` | **Sin esto el modulo de spots cambia de comportamiento en silencio**: el spot se colgaria de una marca arbitraria. Se mantiene el 503 `SCHEMA_NOT_MIGRATED` de `:15389` |
+| 4 | `api/usuarios.js:2347-2360` (`marca_activar`) | `INSERT ... ON CONFLICT (usuario_id) DO UPDATE` | **Reescritura obligatoria** (D6): `UPDATE marcas SET ... WHERE id=COALESCE($marca_id, marca_activa_id) AND usuario_id=$1`. **Sin esto, 42P10 en cada llamada** | Bloqueante duro: la rama muere entera al aplicar la 058 |
+| 5 | `api/usuarios.js:2332-2335` (lectura previa) | `LEFT JOIN marcas m ON m.usuario_id = u.id` | `LEFT JOIN marcas m ON m.id = u.marca_activa_id AND m.usuario_id = u.id` | Hoy puede devolver N filas y `maUser[0]` (`:2340`) elige arbitraria: el gate de nivel es **no determinista** |
+
+**Invariante que la FK compuesta hace cumplir y que ningun codigo puede violar:** `usuarios.marca_activa_id` es siempre NULL o una marca **cuyo `usuario_id` es ese mismo usuario**. Un bug que intente apuntar a la marca de otro revienta en la base, no en produccion dias despues.
+
+**Backfill:** obligatorio y previo al DROP (2.c). Cubre el 100% de los usuarios que hoy tienen marca; los que no la tienen quedan en NULL, que es el estado correcto ("no estoy operando ninguna").
+
+#### D3. Formula del premio semanal dinamico (cerrada y acotada)
+
+**Fuente del XP: `xp_ledger`, no `usuarios.xp_total`.** `xp_total` es acumulado historico y no permite ventanas; `xp_ledger.creado_en` + `xp_final` si. Solo cuentan filas `xp_final > 0` (las negativas son diezmos, `:4896`).
+
+**Ventana:** semana ISO en hora local de operacion. `inicio = date_trunc('week', now() AT TIME ZONE 'America/Bogota')` y `fin = inicio + interval '7 days'`, comparando `(l.creado_en AT TIME ZONE 'America/Bogota')`. La zona horaria es **parametro de codigo** (`PREMIO_TZ`), no de config (no cabe en `numeric(12,4)`).
+
+**Ambito (v1): LEADERBOARD GLOBAL (DEUDA-1 cerrada por el operador).** El XP que compite es el del **ranking global de la semana ISO**, que es el unico que ya existe (`api/usuarios.js:1136`). **No hay "zona del evento"**: el repo no tiene fuente de verdad de zona para un evento de `xp_ledger`, y fabricarla seria inventar el dato.
+
+```
+XP_semana(u) = SUM(l.xp_final)  sobre xp_ledger l
+  WHERE l.usuario_id = u
+    AND l.xp_final > 0
+    AND l.creado_en >= W.inicio AND l.creado_en < W.fin
+```
+
+El parametro logico se llama **`marca_premio_alcance`** y su valor por defecto es **`'global'`**. **Donde vive, y por que no en `gamificacion_config`:** `gamificacion_config.valor` es `numeric(12,4) NOT NULL` (hecho 9, `031:166`), luego **no puede almacenar la cadena `'global'`**. Se guarda como texto en el jsonb que ya crea esta migracion: **`marcas.premios_config->>'alcance'`**, con default `'global'` cuando la clave falta o esta vacia. Consecuencia buscada: admitir `'zona'` en el futuro es **cero DDL** (es la misma clave jsonb), y mientras el valor sea `'global'` el SQL de arriba es el unico que se ejecuta. Cualquier `INSERT` de `'global'` en `gamificacion_config` **falla en la base** (22P02): es la trampa que este parrafo evita.
+
+El ambito `'zona'` queda **declarado y rechazado** en v1: `400 AMBITO_NO_SOPORTADO` (D7). Cuando se implemente, necesitara una fuente de verdad de zona que hoy no existe; el ADR no la promete.
+
+**La formula no necesita ni una tabla ni una escritura nueva:** `xp_ledger` existe desde 031 y ya guarda `xp_final` por evento con `creado_en`; el ranking global de la semana es un `SUM` con `GROUP BY usuario_id` sobre esa tabla. `spot_presencia` **no participa**: se queda como modulo de presencia, ajeno al premio (D10).
+
+**Reglas duras (en este orden):**
+
+1. **Elegibilidad:** `M.activa = true` **y** `M.estado_promo = true`. Sin las dos, el endpoint devuelve `premios: []` y no otorga nada.
+2. **Exclusion del dueno:** el `M.usuario_id` **no compite en su propia marca**. Se excluye **del ranking global antes de cortar el Top 3**, luego el podio de cada marca es el global con su dueno fuera (si el dueno es el `#1` global, su marca reparte a los puestos `#2`, `#3`, `#4`). Sin esto el premio es un bucle cerrado de XP a producto.
+3. **Ranking:** por `XP_semana` DESC; desempate por `MIN(l.creado_en)` ASC (quien lo logro antes). Determinista, sin `random()`.
+4. **Semana sin actividad:** si `XP_semana(p) < marca_premio_xp_minimo_semana` -> **`U(p) = 0` para ese puesto y para todos los siguientes**. Prohibido regalar producto de valor alto en una semana muerta.
+5. **Unidades brutas:** `B(p) = LEAST(GREATEST(FLOOR(XP_semana(p) / xp_por_unidad), 0), unidades_max)`. `FLOOR`, nunca `ROUND`: el sistema **no redondea hacia arriba** un premio.
+6. **Peso por puesto:** `U(p) = FLOOR(B(p) * peso_p)`, con `peso = [marca_premio_peso_1, _2, _3] = [1.00, 0.50, 0.25]`. Como los pesos son decrecientes, `U(1) >= U(2) >= U(3)` **por construccion**: es invariante verificable, no una promesa.
+7. **Eleccion de producto (determinista):** de `consumibles_precio` (la vista de `027:283`), los elegibles son `premio_semanal = true AND stock_disponible >= U(p)`. **`marca_id` en un producto `premio_semanal` identifica al PATROCINADOR, no restringe la elegibilidad**: es lo que permite que ANCESTRAL sea el premio del Top 3 de **cualquier** marca (premisa 2). Si `M.premios_config->'orden_premios'` es un array no vacio, se recorre **en ese orden**; si no, se elige el de **mayor `precio_xp_efectivo` que quepa bajo el tope**. Cero azar: el mismo estado da el mismo premio. La atribucion de quien paga queda en `consumibles.marca_id`; la de quien convoca, en `canjes_tienda.marca_id`.
+8. **Tope de valor (D4)** aplicado tras 7: `U_max(p, c) = LEAST(U(p), FLOOR(tope_xp(p) / precio_xp_efectivo(c)))` y, si `precio_cop > 0`, ademas `FLOOR(tope_cop(p) / precio_cop(c))`. Se recorre la lista de elegibles **reduciendo unidades hasta que quepa** (nunca aumentando); si ningun elegible admite `>= 1` unidad, el puesto queda **sin premio** (`U = 0`). La reduccion conserva `U(1) >= U(2) >= U(3)` porque parte de un `U(p)` ya decreciente y solo puede bajar. **Nunca se redondea hacia arriba para "llegar" a un producto.**
+9. **Stock:** al otorgar, `stock_usado = stock_usado + U(p)` (la vista ya refleja el nuevo `precio_xp_efectivo`). Si el `UPDATE` no alcanza stock, no se otorga (fail-closed).
+10. **Idempotencia:** `clave_idempotencia = 'premio:' || M.id || ':' || W || ':' || p || ':' || u` en `canjes_tienda`. Reintentar la misma semana no duplica la entrega (UNIQUE).
+
+**Ejemplo aritmetico con los defaults sembrados y los precios REALES de ANCESTRAL** (`pocima` 1166.67 XP / 14.000 COP; `media` 3416.67 XP / 41.000 COP; `botella` 6333.33 XP / 76.000 COP), `XP_semana = 6000 / 3000 / 1200`:
+
+| Puesto | XP_semana | B = floor(XP/2500) | peso | U(p) | tope_xp (35%) | elegido | U_final | valor_xp | valor_cop |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 6000 | 2 | 1.00 | 2 | 2100 | pocima (media y botella no caben) | **1** | 1166.67 | 14.000 |
+| 2 | 3000 | 1 | 0.50 | **0** (`floor(0.5)`) | 1050 | -- | **0** | 0 | 0 |
+| 3 | 1200 | 0 | 0.25 | **0** | 420 | -- | **0** | 0 | 0 |
+
+**Consecuencia de calibracion que el operador debe ver escrita (no se esconde):** con `xp_por_unidad = 2500` y `peso_2 = 0.50` / `peso_3 = 0.25`, el **2do puesto necesita 5000 XP** y el **3ro 10000 XP** para recibir 1 unidad; y el tope del 35% limita al 1er puesto a **1 pocima** hasta los 6670 XP semanales. Si el operador quiere que el podio reparta con menos XP, mueve `marca_premio_xp_por_unidad` o los pesos en `gamificacion_config` (sin deploy, sin migracion). **No se toca la formula**: los pesos son suyos.
+
+Con `unidades_max = 6` el techo bruto es 6 unidades (15000 XP de la semana); por encima de eso el premio **no crece**, que es el freno anti-inflacion.
+
+#### D4. Tasa XP <-> COP: **parametro por defecto NO CALIBRADO**
+
+**Hecho:** **hasta la 058** no existe ninguna relacion XP/pesos en el repo (hecho 10: `consumibles` no tiene columna de pesos). El unico ancla objetiva es interna: catalogo 250-1500 XP (hecho 12) y niveles 1650 / 27400 / 100000 XP (hecho 13). Los **precios comerciales en COP de ANCESTRAL los dio el operador** (14.000 / 41.000 / 76.000) y por eso son **dato**, no estimacion; la tasa que los convierte a XP, en cambio, **sigue sin calibrar**.
+
+**Decision, en tres partes:**
+
+1. **Se siembra `marca_premio_tasa_cop_por_xp = 12.0000` como CONVENCION CONTABLE, no como tasa de cambio.** Su unica virtud verificable es que deja el catalogo en un orden de magnitud razonable (1167 / 3417 / 6333 XP para 14.000 / 41.000 / 76.000 COP). **No es una tasa de mercado ni esta medida**, y el ADR **no afirma ningun precio comercial como hecho**: los precios los dio el operador, la equivalencia XP la produce esta constante. Toda respuesta del backend que use esta tasa lleva `calibrado: false`.
+2. **La tasa NUNCA es un tope por si sola.** El tope que muerde es el de **XP-equivalente**, en la unidad que el sistema mide de verdad:
+   `tope_xp(p) = FLOOR(XP_semana(p) * marca_premio_factor_retorno)` y el premio debe cumplir `U(p) * precio_xp_efectivo <= tope_xp(p)`.
+3. **El segundo tope en pesos ya esta activo**, porque los 3 productos ANCESTRAL se siembran con `precio_cop > 0` (seccion 7 del DDL): `U(p) * precio_cop <= FLOOR(XP_semana(p) * marca_premio_tasa_cop_por_xp * marca_premio_factor_retorno)`. Como `precio_xp` se DERIVA de `precio_cop` con **esta misma** tasa, ambos topes son **el mismo numero expresado en dos unidades**: el primero es el que manda y el segundo es su espejo en pesos. Se aplica **el minimo de los dos** igualmente, para que un producto con `precio_xp` editado a mano por admin (y que por tanto se desalinee) quede **acotado por el tope en pesos real**.
+
+**Recalibracion (procedimiento, no promesa):** cuando existan 4 semanas de `canjes_tienda` con `origen='mostrador'` y `precio_cop > 0`, el operador recalcula `marca_premio_tasa_cop_por_xp` con `UPDATE gamificacion_config`, sin deploy (la semilla usa `DO NOTHING`, luego no la pisa). **Prohibido** que un ADR posterior presente esta tasa como medida.
+
+#### D5. Coste de creacion de marca: *sink* sobre `xp_gastado_sinks`, NO resta de `xp_total`
+
+**Decision:** crear una marca cuesta **`gamificacion_config.marca_alta_xp` = 1650 XP** (**default**, recalibrable por el operador sin deploy), = umbral de N5 en `api/usuarios.js:86`, es decir el mismo XP con el que se abre el gate: **se puede crear exactamente al llegar al nivel**, dejando 0 disponible. El coste **no toca `xp_total`**: incrementa `usuarios.xp_gastado_sinks`, exactamente como manda `046:39-44`. Consecuencias, todas queridas:
+
+- `calcularNivel(xp_total)` sigue siendo **monotono**: crear una marca **no baja el nivel** y por tanto **no puede desactivar una marca ya creada** (el grandfathering de `api/usuarios.js:2316-2318` se conserva sin codigo extra).
+- `XP_DISPONIBLE = xp_total - xp_gastado_sinks` es la unica vara: el gate de XP se evalua contra el disponible, no contra el bruto (leccion documentada en `:4827-4832`).
+- **Ledger con `accion` propia:** `accion:'marca_crear'`, `es_exento:true`, `xp_base: costo`, `mult_*: 1`, `cap_aplicado:'ninguno'`, `xp_final: red2(-costo)`, `contexto:{ marca_id, costo }`. Es **el mismo shape** que `tithe_parche` (`:4896-4901`), el unico precedente de un evento de gasto en el ledger. `marca_crear` es una accion **nueva** y no colisiona con ninguna existente.
+- **No se usa `sink_acciones`/`sink_slots`:** esas tablas modelan **capacidad** (slots que se liberan y un precio que decae con el historico, `046:152-173`). Una marca no es un slot: es un objeto con identidad propia y ciclo de vida (`activa`). Mezclarlos obligaria a inventar un `slot_index` que no significa nada.
+
+**Gate de nivel: `nivel_requerido` = 5, y el fallback del codigo pasa de 6 a 5 (decision, no nota).** El umbral se lee de `marcas.nivel_requerido` cuando el usuario ya tiene marca (grandfathering de edicion intacto) y, cuando **no tiene ninguna**, cae a la constante de codigo, que hoy es **`MARCA_NIVEL_REQUERIDO_DEFAULT = 6`** (`api/usuarios.js:356`) mientras la columna dice **5** (`027:208`). **Se unifica en 5**: la constante se cambia a 5 y con ella las tres lecturas (`:779`, `:782`, `:2341`). Razon: el 6 es una deriva historica sin fuente; el 5 es el `DEFAULT` de la columna desde la 027 y es el valor que el operador fija. La migracion **no toca la columna** (`nivel_requerido integer NOT NULL DEFAULT 5` ya es 5); el cambio es una linea de codigo y se verifica en T13.
+
+**Fallo de gate:** `403 {error:'NIVEL_INSUFICIENTE', nivel, nivel_requerido}` (mismo shape que `:2344`) y `403 {error:'XP_INSUFICIENTE', xp_disponible, costo_xp}` (vocabulario ya usado en `:2783`).
+
+**Sentencia atomica (un solo round-trip, fail-closed):**
+
+```sql
+WITH g AS (
+  SELECT COALESCE(GREATEST(xp_total - COALESCE(xp_gastado_sinks,0),0), -1) AS disp
+    FROM usuarios WHERE id=$1::uuid
+), d AS (
+  UPDATE usuarios u
+     SET xp_gastado_sinks = COALESCE(u.xp_gastado_sinks,0) + $2::numeric
+    FROM g
+   WHERE u.id=$1::uuid AND g.disp >= $2::numeric
+  RETURNING u.id
+), n AS (
+  INSERT INTO marcas (usuario_id, nombre, logo_url, banner_url, descripcion,
+                      areas_influencia, enlaces, nivel_requerido)
+  SELECT $1::uuid, $3, $4, $5, $6,
+         COALESCE($7::jsonb,'[]'::jsonb), COALESCE($8::jsonb,'{}'::jsonb), $9
+    FROM d
+  ON CONFLICT DO NOTHING
+  RETURNING id, nombre, activa, verificada
+), p AS (
+  UPDATE usuarios u SET marca_activa_id = n.id
+    FROM n WHERE u.id=$1::uuid
+  RETURNING u.marca_activa_id
+)
+SELECT (SELECT disp FROM g) AS xp_disponible_previo,
+       (SELECT id::text FROM n) AS marca_id;
+```
+
+Sin fila en `d` no hay `n` ni `p`: cobrar es lo que necesita prueba, no la excepcion (mismo criterio que `:4840-4845`). El `ON CONFLICT DO NOTHING` de `n` existe solo por si la 058 se aplica **despues** que el codigo (no deberia ocurrir, BUG-021/BUG-060: la migracion va antes del deploy).
+
+#### D6. Contrato de las ramas nuevas (router REAL, cero endpoint nuevo)
+
+**SUPERADO PARCIALMENTE por la revision 3 (2026-10-27).** La tabla de `api/interacciones.js` de esta seccion **ya no es el contrato vigente**: el codigo real tiene **2 GET + 1 POST** (`marca_premios`, `canjes_marca`, `marca_panel`), no las 2 GET + 4 POST que aqui se describen, y la **escritura del panel** (`estado_promo` + `premios_config`) y las **metricas** no estaban contratadas aqui. El contrato vigente es la tabla de R3-E1/R3-E2 en la seccion "Enmienda (revision 3)". La tabla de `api/usuarios.js` **sigue vigente tal cual** (presencia de sus 5 ramas verificada en el archivo real: `:798` `mi_marca`, `:849` `marcas_mias`, `:2433` `marca_crear`, `:2536` `marca_activa_set`, `:2577` `marca_activar`). Lo de abajo **se conserva sin borrar** (ADR-003): es el registro de lo que se diseno, no de lo que se implemento.
+
+`api/usuarios.js` -- GET por `tipo ===` sobre `req.query` (`:760`); POST por `c.tipo ===` sobre `{...req.query, ...req.body}` (`:1662-1671`); auth `validarSesionUsuario(req, uid)`, admin `esAdminUsuario(req)`.
+
+| Rama | Verbo | Payload | Auth / ownership | Respuesta OK | Errores |
+|---|---|---|---|---|---|
+| `marcas_mias` | GET | `usuario_id` (query) | **Publica** (misma exposicion que el `mi_marca` de hoy: nombre, logo, verificada) | `{ok:true, data:[...], marca_activa_id, total, nivel_requerido, costo_xp_creacion}` | 400 `USUARIO_ID_INVALIDO` |
+| `mi_marca` (existente, reescrita) | GET | `usuario_id` (query) | publica | igual que hoy, resolviendo por `marca_activa_id` | 503 `SCHEMA_NOT_MIGRATED` solo si falta la columna |
+| `marca_crear` | POST | `usuario_id, nombre, logo_url?, banner_url?, descripcion?, areas_influencia?, enlaces?` | **JWT propio obligatorio**; el `usuario_id` NUNCA se confia (BUG-061) | `{ok:true, data:{id,nombre,activa,verificada}, costo_xp, xp_disponible_previo}` | 401 `No autorizado`; 403 `NIVEL_INSUFICIENTE`; 403 `XP_INSUFICIENTE`; 503 `SCHEMA_NOT_MIGRATED` |
+| `marca_activar` (existente, **reescrita**) | POST | `usuario_id, marca_id?, nombre, ...` | JWT propio; `WHERE ... AND usuario_id=$1` | `{ok:true, data:{id,nombre,activa,verificada}}` | 400 `marca_id requerido` si hay >1 marca y no se envia; 404 si la marca no es suya (**nunca 403: no se filtra existencia**) |
+| `marca_activa_set` | POST | `usuario_id, marca_id` | JWT propio + ownership por `id AND usuario_id` | `{ok:true, marca_activa_id}` | 400 `MARCA_ID_REQUERIDO`; 404 no propia |
+
+`api/interacciones.js` -- GET por `tipo ===` en el bloque `:6552`; POST por `tipo2` en `:10453-10455`; auth `usuarioDeSesion(req)` + `responderSesion`; admin `Bearer <ADMIN_SECRET>`.
+
+| Rama | Verbo | Payload | Auth / ownership | Respuesta OK | Errores |
+|---|---|---|---|---|---|
+| `marca_premios` | GET | `marca_id`, `semana=YYYY-Www` (opcional, default semana en curso) | **Publica** (preview; no escribe) | `{ok:true, semana, marca_id, premios:[{puesto, usuario_id, xp_semana, unidades, consumible_clave, valor_xp, valor_cop_estimado, calibrado:false, otorgado}], config:{...}}` | 400 `marca_id invalido`; 400 `SEMANA_INVALIDA` |
+| `canjes_marca` | GET | `marca_id`, `estado?` | **JWT del dueno de la marca** o `ADMIN_SECRET` | `{ok:true, data:[...]}` | 401; 404 no propia |
+| `marca_premio_otorgar` | POST | `marca_id, semana, clave_idempotencia?` | **Solo `ADMIN_SECRET`** (`:8261`): no es una accion de usuario | `{ok:true, semana, otorgados:[{puesto, usuario_id, unidades, consumible_clave, canje_id}], omitidos:[{puesto, motivo}]}` | 401; 409 `PREMIO_YA_OTORGADO`; 503 `SCHEMA_NOT_MIGRATED` |
+| `canje_tienda_registrar` | POST | `codigo_publico, marca_id, consumible_clave, cantidad` | **JWT del dueno de la marca** (ownership por `marcas.id AND usuario_id`) | `{ok:true, canje:{id, estado:'pendiente', usuario_id, consumible_clave, cantidad, precio_xp_unitario, xp_total, atendido_por}}` | 401; 404 `CODIGO_NO_ENCONTRADO`; 404 no propia; 409 `STOCK_INSUFICIENTE`; 503 |
+| `canje_tienda_cerrar` | POST | `canje_id` | **JWT del dueno de `canjes_tienda.marca_id`**; `atendido_por` se toma **de la sesion**, no del body | `{ok:true, canje:{id, estado:'entregado', entregado_en, atendido_por}}` | 401; 404; 409 `CANJE_YA_CERRADO` |
+| `fusion_marca_registrar` | POST | `marca_id, receta_clave, entradas, salidas, xp_consumido?` | **JWT del dueno** | `{ok:true, fusion:{id, estado:'registrada'}}` | 401; 404 no propia; 503 |
+
+Reglas transversales del contrato, todas ya presentes en el router: **(i)** el `usuario_id` del body **nunca** es la fuente de identidad cuando hay sesion; **(ii)** todo id de ruta se valida con el regex UUID antes de `$1::uuid` para no acabar en el 500 global (`:10471-10474`); **(iii)** toda rama nueva se envuelve en `try/catch` con `esEsquemaFaltante` y responde 503 `SCHEMA_NOT_MIGRATED` en escrituras; **(iv)** cero ramas nuevas fuera de estos dos ficheros.
+
+**`canje_tienda_registrar` y el inventario:** son dos origenes distintos y no se mezclan. **(a) Canje de un producto del catalogo (`tipo_canje='tienda'`, p. ej. ANCESTRAL):** el camino con XP **descuenta** el inventario del usuario con `descontarInventario()` (`:3039`) sobre `capacidades->'consumibles'` **solo si habia unidades**, y registra la fila `canjes_tienda` con `origen='mostrador'` en estado `pendiente`. **(b) Premio semanal:** `origen='premio_semanal'`, **no toca el inventario del usuario**; la unidad la pone el stock del sponsor (`consumibles.stock_usado`). El descuento de inventario y el alta del canje van en la **misma transaccion logica**: si el `UPDATE` de inventario no afecta filas, **no se crea la fila** (409 `STOCK_INSUFICIENTE` o `INVENTARIO_INSUFICIENTE` segun el origen). **Nunca se entrega en mostrador lo que no se desconto o no se reservo.**
+
+#### D7. `premios_config`: esquema cerrado
+
+`marcas.premios_config` es un objeto JSON con **tres claves conocidas y ninguna mas en v1**:
+
+```json
+{"alcance":"global","orden_premios":["ancestral_pocima_50ml"],"tope_unidades":null}
+```
+
+- `alcance`: valor por defecto **`"global"`** (DEUDA-1 cerrada). Es el parametro logico **`marca_premio_alcance`**; su respaldo fisico es este jsonb porque `gamificacion_config.valor` es `numeric(12,4)` y no admite texto (D3). En v1 **`"global"` es el unico valor aceptado** y `"zona"` se rechaza con **400 `AMBITO_NO_SOPORTADO`** (no se ignora en silencio). Admitir `"zona"` en el futuro es **cero DDL**, no una migracion nueva.
+- `orden_premios`: array de `consumibles.clave`. Si esta presente y vacio, se usa el criterio determinista de D3.7.
+- `tope_unidades`: entero o `null`. Si no es `null`, **solo puede reducir** `marca_premio_unidades_max` (`LEAST`), nunca ampliarlo. Un parametro por marca no puede romper el techo global.
+
+**Cero borrado logico (ADR-003):** el merge de `premios_config` es **siempre** `COALESCE(premios_config,'{}'::jsonb) || $N::jsonb`. **Prohibido** el reemplazo total: un `UPDATE ... SET premios_config = $1` borra `orden_premios` al guardar solo `alcance` y es exactamente el bug que ADR-003 previene.
+
+#### D8. Degradacion: leer antes de que la 058 este aplicada
+
+Regla unica: **las lecturas degradan, las escrituras fallan cerrado.**
+
+| Superficie | Codigo | Si falta la 058 (`42703` / `42P01`) |
+|---|---|---|
+| `GET ?tipo=marcas_mias` | `api/usuarios.js` | `esEsquemaFaltante` -> `{ok:true, data:[], total:0, nivel_requerido:5, costo_xp_creacion:<marca_alta_xp o 1650>, degradado:true}`. **Nunca 500.** |
+| `GET ?tipo=mi_marca` | `api/usuarios.js` | degrada al shape de `027` **sin** `marca_activa_id`: `WHERE usuario_id=$1 LIMIT 1` sigue siendo legal mientras el UNIQUE exista o el usuario tenga 1 marca. `degradado:true` |
+| `GET ?tipo=marca_premios` | `api/interacciones.js` | `{ok:true, premios:[], degradado:true}` (la marca sin datos no reparte) |
+| `GET ?tipo=canjes_marca` | `api/interacciones.js` | `{ok:true, data:[], degradado:true}` |
+| `POST marca_crear` / `marca_activa_set` | `api/usuarios.js` | **503 `SCHEMA_NOT_MIGRATED`**. Crear sin poder fijar el puntero deja un estado incoherente; aqui NO se degrada |
+| `POST marca_activar` | `api/usuarios.js` | **503** si la columna falta (la rama nueva depende de ella) |
+| `POST marca_premio_otorgar` / `canje_*` / `fusion_*` | `api/interacciones.js` | **503 `SCHEMA_NOT_MIGRATED`** (patron ya usado en `:6578-6582` y `:15389-15393`) |
+
+`mi-perfil.html` **no necesita logica de version**: si la 058 no esta, recibe `degradado:true` y dibuja lo que ya dibuja hoy (una marca). Es el unico consumidor de UI del contrato de lectura, y esa es la razon de que `marcas_mias` devuelva forma de lista **y** `marca_activa_id` en la raiz: una sola ida y vuelta, cero ramas en cliente.
+
+#### D9. Plan de aplicacion (orden obligatorio, es un cambio de contrato)
+
+1. **Precheck** (leer, no escribir):
+   `node scripts/apply_sql_file.js --help` para confirmar la superficie del runner, y contra Neon:
+   `SELECT numero, nombre, resultado FROM schema_migrations ORDER BY numero DESC LIMIT 3;` (debe salir `057`, y **ninguna** fila `058`).
+   `SELECT conname FROM pg_constraint WHERE conrelid='public.marcas'::regclass AND conname='marcas_usuario_id_key';` (debe existir **una** fila: si falta, este ADR se aplica sobre un esquema que no es el del repo).
+   `SELECT version FROM schema_migrations WHERE nombre LIKE '058%';` (cero filas).
+   `SELECT COUNT(*) FROM marcas;` y `SELECT COUNT(*) FROM usuarios u JOIN marcas m ON m.usuario_id=u.id;` (deben coincidir: si no, la base ya tiene multi-marca y el `UNIQUE` no existe).
+2. **Backup de Neon** (el ledger no es un backup: `045` lo dice en su propia cabecera).
+3. `node scripts/apply_sql_file.js db/migrations/058_marcas_self_service_premios_canje.sql --notas "ADR-107 marcas self-service: multi-marca, premio semanal, canje tienda"`
+4. **Postcheck:** `SELECT COUNT(*) FROM marcas WHERE usuario_id NOT IN (SELECT id FROM usuarios);` = 0; `SELECT COUNT(*) FROM usuarios WHERE marca_activa_id IS NOT NULL AND marca_activa_id NOT IN (SELECT id FROM marcas);` = 0; `SELECT nombre, resultado FROM schema_migrations WHERE numero=58;`; que la FK compuesta exista en `pg_constraint` y que `marcas_usuario_id_key` **ya no** exista.
+5. **Deploy del codigo en el MISMO COMMIT que la 058** (D9-bis): las **5** consultas de D2 reescritas, `marca_activar` sin `ON CONFLICT (usuario_id)`, `MARCA_NIVEL_REQUERIDO_DEFAULT` en **5** y las ramas nuevas. **Invertir el orden es un 42P10 en produccion**: la 058 aplicada con el `ON CONFLICT (usuario_id)` vivo deja `marca_activar` roto al 100%.
+6. **Alta de la marca ANCESTRAL + vinculacion de los 3 productos** (D16 pasos 2 y 3): el operador la crea por `marca_crear` y despues corre el `UPDATE` de vinculacion. Idempotente por `c.marca_id IS NULL`.
+7. **Smoke:** `node scripts/gold_shield` equivalente por skill `gold-shield` (`node --check`, ASCII, balance de divs) + los smokes existentes de `mi-perfil`.
+
+**Prohibido invertir el orden 3 -> 5.** BUG-021/BUG-060 es literalmente "COMMITteada != APLICADA", y aqui ademas el codigo viejo **depende** de un constraint que la migracion elimina: no es solo que el esquema vaya por delante, es que **deja de compilar en runtime**.
+
+### Impacto
+
+- **`api/usuarios.js`:** 1 rama GET reescrita (`mi_marca`), 2 GET nuevas (`marcas_mias`), 2 POST nuevas (`marca_crear`, `marca_activa_set`), 1 POST reescrita (`marca_activar`) y **2 consultas corregidas** (`:2332`, `:2347`). Sin endpoint nuevo.
+- **`api/interacciones.js`:** 1 CTE corregida (`marca_presencia`), 1 query corregida (capa `marca`), 2 GET nuevas (`marca_premios`, `canjes_marca`) y 4 POST nuevas (`marca_premio_otorgar`, `canje_tienda_registrar`, `canje_tienda_cerrar`, `fusion_marca_registrar`). Reusa `sqlMergeInventario`/`descontarInventario`/`acreditarInventario` y `registrarXpLedger` (`:1771`). Sin endpoint nuevo.
+- **`mi-perfil.html`:** panel "Mi Marca" pasa a lista + selector de activa; lee `marcas_mias`. Consumo de `degradado:true`.
+- **`admin.html`:** Panel de Marca: cola de `canjes_tienda` (`pendiente` -> `entregado`), preview y boton de otorgamiento semanal, editor de `premios_config` con merge JSONB.
+- **Base de datos:** `marcas` +2 columnas; `usuarios` +1 columna y +1 FK compuesta; `consumibles` +2 columnas y **3 filas nuevas** (ANCESTRAL); 2 tablas nuevas; 6 indices; **9 claves de config** (`marca_alta_xp` + 8 `marca_premio_*`).
+- **Coste de Vercel:** cero. 8/8 funciones intactas.
+
+### Cierre de deudas (revision 2, 2026-10-27): las 6 deudas quedan CERRADAS
+
+**Las 6 deudas de la revision 1 se cierran por decision del operador y pasan a ser decisiones vinculantes.** No son notas: son contrato para `@data-migration` y `@backend-dev`.
+
+#### D10. DEUDA-1 CERRADA: el Top 3 es el **leaderboard GLOBAL**
+
+El XP que compite es el del **ranking global de la semana ISO**, el unico que ya existe (`api/usuarios.js:1136`). **No se implementa "zona del evento"**: no hay fuente de verdad de zona para un evento de `xp_ledger` y fabricarla seria inventar el dato. Parametro logico **`marca_premio_alcance`** con default **`'global'`** y respaldo fisico en `marcas.premios_config->>'alcance'` (D3/D7: `gamificacion_config.valor` es `numeric(12,4)` y no admite texto). `'zona'` queda **admitido en el contrato y rechazado en v1** con 400 `AMBITO_NO_SOPORTADO`, y activarlo **no exigira migracion nueva** (misma clave jsonb). El SQL exacto es el de D3.
+
+Consecuencia explicita que el implementador no debe "arreglar": **el ranking no depende de la marca**. Dos marcas de la misma semana comparten el mismo Top 3 global, y cada una otorga su propio premio si `estado_promo = true`. Es lo que el operador decidio.
+
+#### D11. DEUDA-2 CERRADA: **dos recetas exactas, y ninguna inversa**
+
+| `receta_clave` | Consume | Produce |
+|---|---|---|
+| `pocima_a_media` | **4 x** `ancestral_pocima_50ml` | **1 x** `ancestral_media_375ml` |
+| `media_a_botella` | **2 x** `ancestral_media_375ml` | **1 x** `ancestral_botella_750ml` |
+
+**Prohibida la inversa** (`media_a_pocima`, `botella_a_media`): como 4 pocimas = 1 media y 2 medias = 1 botella, una inversa permitiria ciclar y **duplicar valor** (duping). El catalogo de recetas vive en **codigo** (`RECETAS_V1`), no en tabla: `fusiones_marca.receta_clave` es `varchar(60)` libre (ADR-028) y **no lleva CHECK**; el rechazo de una `receta_clave` desconocida es **400 `RECETA_DESCONOCIDA`** desde la rama, no desde la base.
+
+**Atomicidad obligatoria (nunca inventario a medias):** se valida el stock **dentro del mismo UPDATE** que descuenta (si no alcanza, no se descuenta nada), extendiendo el fragmento ya existente `sqlMergeInventario()` (`api/interacciones.js:3030-3035`) a **dos claves** en una sola sentencia. Es la misma tecnica JSONB (`||` encadenado), no SQL de inventario nuevo:
+
+```sql
+WITH inv AS (
+  SELECT COALESCE((capacidades->'consumibles'->>$2::text)::int, 0) AS tengo
+    FROM usuarios WHERE id=$1::uuid
+), d AS (
+  UPDATE usuarios u
+     SET capacidades = COALESCE(u.capacidades, '{}'::jsonb)
+       || jsonb_build_object('consumibles',
+            COALESCE(u.capacidades->'consumibles', '{}'::jsonb)
+            || jsonb_build_object($3::text,
+                 COALESCE((u.capacidades->'consumibles'->>$3::text)::int, 0) + $5::int)
+            || jsonb_build_object($2::text,
+                 COALESCE((u.capacidades->'consumibles'->>$2::text)::int, 0) - $4::int))
+    FROM inv
+   WHERE u.id = $1::uuid
+     AND inv.tengo >= $4::int
+  RETURNING u.id
+)
+SELECT (SELECT tengo FROM inv) AS tenia,
+       (SELECT COUNT(*)::int FROM d) AS aplicado;
+```
+
+`$2` = clave consumida, `$3` = clave producida, `$4` = `{4, 2}`, `$5` = `1`. Sin fila en `d` -> **409 `INVENTARIO_INSUFICIENTE`** y **cero cambios** (primero se suma la salida y luego se resta la entrada dentro del mismo `jsonb` encadenado: el resultado es identico y el `WHERE` es el unico guardia). Trazabilidad: una fila en `fusiones_marca` con `estado='aplicada'`, `receta_clave`, `entradas`/`salidas` jsonb y `aplicado_en`. `clave_idempotencia` es **opcional y del cliente**: aplicar la misma receta varias veces es legitimo y **no** debe deduplicarse por defecto.
+
+#### D12. DEUDA-3 CERRADA: `atendido_por` es **UUID del dueno de la marca**, con sesion firmada
+
+- Columna: `atendido_por uuid REFERENCES usuarios(id) ON DELETE NO ACTION` (ya en el DDL de D1). **Prohibido** texto libre y **prohibida** una tabla de staff en v1.
+- Se toma **siempre** de la sesion (`usuarioDeSesion(req)`), **nunca** del body: el mostrador no declara quien es, la firma lo dice.
+- Ownership: el `usuario_id` de la sesion debe ser `marcas.usuario_id` de `canjes_tienda.marca_id`. Si no, **404** (no 403: no se filtra existencia).
+- Trazabilidad adicional exigida: **el `codigo_publico` usado se guarda tambien en `canjes_tienda.contexto`** (`{"codigo_publico":"..."}`), ademas de la copia indexada en `codigo_publico_snapshot`. Doble registro a proposito: la columna es para consultar, el jsonb es para auditar sin depender del esquema de la columna.
+- `canje_tienda_registrar` **y** `canje_tienda_cerrar` pasan de `ADMIN_SECRET` a **JWT del dueno** (D6 ya actualizado). `marca_premio_otorgar` sigue en `ADMIN_SECRET`: es una operacion de sistema, no de mostrador.
+
+#### D13. DEUDA-4 CERRADA: precios comerciales REALES y `precio_xp` **derivado**
+
+Datos del operador (dato, no estimacion): **14.000 COP** (pocima 50 ml), **41.000 COP** (media 375 ml), **76.000 COP** (botella 750 ml). Se siembran en `consumibles.precio_cop` y `precio_xp`/`precio_xp_base` se **DERIVAN** con la tasa del ADR:
+
+| clave | COP | `precio_xp` = ROUND(COP / 12, 2) |
+|---|---|---|
+| `ancestral_pocima_50ml` | 14.000 | **1166.67** |
+| `ancestral_media_375ml` | 41.000 | **3416.67** |
+| `ancestral_botella_750ml` | 76.000 | **6333.33** |
+
+- `precio_xp` queda **editable por admin** (D13 no lo congela), y por eso D4.3 mantiene **el minimo de los dos topes**: si alguien sube `precio_xp` a mano, el tope en COP real sigue acotando.
+- **Sigue prohibido afirmar la tasa como medida.** `marca_premio_tasa_cop_por_xp = 12.0000` es **parametro de calibracion**: los COP son reales (los dio el operador), la equivalencia XP es un convenio interno. Toda respuesta que la use lleva `calibrado: false`. **El ADR no afirma ningun precio comercial como hecho propio**: los cita como dato del operador.
+
+#### D14. DEUDA-5 CERRADA: ANCESTRAL = **1 fila en `marcas` + 3 en `consumibles`**
+
+- **Una fila en `marcas`** (el sponsor, `nombre` = `ANCESTRAL`) creada por **la misma via que cualquier otra marca**: `POST {tipo:'marca_crear'}`, con **gate de nivel 5** y **coste `marca_alta_xp` = 1650 XP**. **La migracion 058 NO crea la marca** (no hay usuario dueno en tiempo de migracion y el coste es un acto, no un seed).
+- **Tres filas en `consumibles`** con `marca_id` apuntando a esa fila y `tipo_canje='tienda'`: `ancestral_pocima_50ml`, `ancestral_media_375ml`, `ancestral_botella_750ml` (seccion 7 del DDL de D1). `tipo_canje` es `TEXT` libre desde la 027 (ADR-028, sin CHECK): **`'tienda'` es un valor nuevo del dominio, no una columna nueva**, y convive con `'qr'`/`'codigo'`/`'ticket'`.
+- **Desacople obligatorio del seed:** `consumibles.marca_id` es **nullable** (`027:263`), asi que la 058 siembra los 3 productos con `marca_id = NULL` y **el paso 6 del plan (D16) los vincula** cuando la marca exista. Un `INSERT` con `marca_id` fijo en la migracion fallaria por FK o exigiria inventar la marca.
+- **`estado_promo` de la marca ANCESTRAL no afecta a la premisa 2:** un producto `premio_semanal` es elegible por **cualquier** marca (D3.7: `marca_id` identifica al patrocinador, no restringe). `estado_promo` solo gobierna si **ANCESTRAL convoca su propio Top 3**. Las tres vias de la premisa 2 quedan vivas: compra con XP (`precio_xp`), premio del Top 3 (`premio_semanal = true`) y canje en tienda (`tipo_canje='tienda'` + `codigo_publico`).
+
+#### D15. DEUDA-6 CERRADA: coste `marca_alta_xp` = 1650 y gate **5**
+
+Clave de config **`marca_alta_xp`** (renombrada desde `marca_crear_costo_xp`; recalibrable por el operador sin deploy) y **`nivel_requerido` = 5**, coherente con `027:208`. **Se corrige el fallback del codigo de 6 a 5** (`MARCA_NIVEL_REQUERIDO_DEFAULT`, `api/usuarios.js:356`, consumido en `:779`, `:782`, `:2341`): hoy el codigo asume 6 y la columna dice 5, y esa deriva se cierra aqui como **decision**, no como nota. La migracion **no altera la columna** (ya es `DEFAULT 5`); es una linea de codigo, verificada en T13.
+
+#### D16. Encadenado obligatorio de la 058 (no es una deuda: es el plan)
+
+1. Se aplica **la 058**.
+2. El operador **crea la marca ANCESTRAL** con `POST {tipo:'marca_crear', nombre:'ANCESTRAL', ...}` (gate 5, paga 1650 XP).
+3. Se ejecuta **una vez** el encadenado (documentado, idempotente, sin migracion nueva):
+
+```sql
+UPDATE consumibles c
+   SET marca_id = m.id
+  FROM marcas m
+ WHERE m.nombre = 'ANCESTRAL'
+   AND c.clave IN ('ancestral_pocima_50ml','ancestral_media_375ml','ancestral_botella_750ml')
+   AND c.marca_id IS NULL;
+```
+
+Sin el paso 3 los 3 productos siguen siendo elegibles como premio (`marca_id IS NULL` no bloquea, D3.7) pero **no quedan atribuidos al sponsor** en `consumibles.marca_id`, y las metricas de "que patrocina ANCESTRAL" salen vacias.
+
+### Enmienda (revision 3, 2026-10-27): D6 y D7 alineados al CODIGO REAL
+
+**Motivo (ADR-006):** el baseline es el archivo real, no el estado citado. `api/interacciones.js` ya implementa la superficie de marca y, al implementarla, hubo que resolver **dos cosas que el D6 original no contrataba**: **escribir** el panel (encender/apagar la promo y guardar su config) y **servir las metricas** del panel. Un ADR que describe menos de lo que el codigo hace deja de ser baseline: se alinea **el ADR al codigo**, nunca el codigo al ADR.
+
+**Alcance:** esta enmienda sustituye **solo** (i) la tabla de `api/interacciones.js` de D6 y (ii) la precedencia de lectura de los parametros `marca_premio_*` de D3/D7. **No toca** D1, D2, D4, D5, D8, D9, D10-D16, el DDL de la 058 ni el contrato de `api/usuarios.js`. El ADR sigue siendo **107**.
+
+**Mapeo de los 5 puntos del operador (no se reabren):** (1) **una sola rama de escritura** -> R3-E2; (2) **metricas** como bloque aditivo en `canjes_marca` -> R3-E3; (3) **`unidades = 0` viajan** -> R3-E4; (4) **parametros `marca_premio_*` por marca** -> R3-E5; (5) **sin disparo automatico** -> R3-E6. R3-E1 publica la tabla vigente y R3-E7 la trazabilidad de que D6 no contrataba escritura ni metricas.
+
+#### R3-E1. Contrato vigente de `api/interacciones.js` (sustituye la tabla de D6)
+
+Auth: `usuarioDeSesion(req)` + `responderSesion(res, razon)`; admin por `Authorization: Bearer <ADMIN_SECRET>`. Router intacto: GET por `tipo ===` y POST por `tipo2` (`:10453-10455`). **Cero endpoint nuevo (8/8).**
+
+| Rama | Verbo | Auth / ownership | Respuesta OK | Errores | Si falta la 058 |
+|---|---|---|---|---|---|
+| `marca_premios` | GET (**publica, preview: NO escribe**) | ninguna; `marca_id` UUID obligatorio, `semana=YYYY-Www` opcional (default: semana en curso) | `{ok:true, semana, marca_id, premios:[{puesto, usuario_id, xp_semana, unidades, consumible_clave, valor_xp, valor_cop_estimado, calibrado:false, otorgado}], config:{...}, degradado}` | 400 `marca_id invalido`; 400 `SEMANA_INVALIDA`; 404 `MARCA_NO_ENCONTRADA` | **200** `{premios:[], config:{alcance:'global', calibrado:false}, degradado:true}` |
+| `canjes_marca` | GET | **JWT del dueno** de la marca (ownership `marcas.id AND usuario_id`; si no llega `marca_id` se resuelve por el puntero `usuarios.marca_activa_id`) **o** `Bearer <ADMIN_SECRET>` | `{ok:true, marca_id, data:[...], total, metricas:{canjes_total, pocimas_repartidas, productos_entregados, pendientes, xp_canjeado, fusiones}, degradado}` | 401; 400 `marca_id invalido`; 400 `estado invalido` (fuera de `pendiente`/`entregado`/`anulado`); 400 `MARCA_ID_REQUERIDO`; 404 `MARCA_NO_ENCONTRADA` | **200** `{data:[], metricas:<ceros>, degradado:true}` |
+| `marca_panel` | POST | **JWT propio** + ownership `id AND usuario_id` (marca `activa = true`); el `usuario_id` del body **nunca** es identidad (BUG-061) | `{ok:true, marca:{id, estado_promo, premios_config}}` (el objeto **ya mergeado**) | 401; 400 `marca_id invalido`, `ESTADO_PROMO_INVALIDO`, `PREMIOS_CONFIG_INVALIDO`, `PREMIOS_CONFIG_CLAVE_INVALIDA`, `AMBITO_NO_SOPORTADO`, `ORDEN_PREMIOS_INVALIDO`, `TOPE_UNIDADES_INVALIDO`, `SIN_CAMBIOS`; 404 `MARCA_NO_ENCONTRADA` (nunca 403: no se filtra existencia ajena) | **503 `SCHEMA_NOT_MIGRATED`** |
+
+**Disenado y NO implementado (contrato intacto, se implementa tal cual, sin endpoint nuevo):** `marca_premio_otorgar` (**solo `ADMIN_SECRET`**), `canje_tienda_registrar`, `canje_tienda_cerrar` y `fusion_marca_registrar` (**JWT del dueno**). Con la 058 ausente: **503 `SCHEMA_NOT_MIGRATED`**. Mientras no existan, `canje_tienda_*` y `fusiones_marca` simplemente no se pueblan y sus metricas salen en **0**; **no es una degradacion silenciosa, es ausencia declarada.**
+
+#### R3-E2. UNA sola rama de escritura: `POST marca_panel`
+
+Se **descarta** partir la escritura en dos ramas (`marca_promo_set` + `marca_premios_config`). Una rama, un ownership, una sentencia:
+
+- **Payload:** `{tipo:'marca_panel', marca_id?, estado_promo?, premios_config?}`. Si `marca_id` falta, la marca operada es **el puntero** `usuarios.marca_activa_id` (D2), nunca "la primera del usuario".
+- **Ownership en dos pasos:** pre-chequeo `marcas.id = COALESCE($2::uuid, usuarios.marca_activa_id)` **AND** `m.activa = true` -> 404 si no es suya; y el `UPDATE` repite `id AND usuario_id`, de modo que un cambio de puntero entre ambas queries **no** puede escribir en marca ajena.
+- **Merge JSONB (ADR-003, no negociable):** `premios_config` se escribe **siempre** por merge; jamas por reemplazo:
+
+```sql
+-- Contrato de escritura de marca_panel (ADR-107 R3-E2). ASCII, sin backticks.
+UPDATE marcas
+   SET estado_promo = COALESCE($2::boolean, estado_promo),
+       premios_config = COALESCE(premios_config, '{}'::jsonb) || $3::jsonb
+ WHERE id = $1::uuid
+   AND usuario_id = $4::uuid
+RETURNING id::text AS id, estado_promo,
+          COALESCE(premios_config, '{}'::jsonb) AS premios_config;
+```
+
+  Con `$3 = '{}'` (config ausente) el merge es **no-op**: guardar solo `estado_promo` **no puede** borrar `orden_premios`. Es la forma exacta del bug que ADR-003 previene.
+- **Whitelist cerrada de 3 claves (D7):** `alcance`, `orden_premios`, `tope_unidades`. Una clave desconocida **se rechaza** (`400 PREMIOS_CONFIG_CLAVE_INVALIDA` + `clave`), **no se ignora**: ignorarla convierte un error de cliente en perdida silenciosa de configuracion.
+- **`alcance`:** en v1 **solo `global`**; cualquier otro valor -> **400 `AMBITO_NO_SOPORTADO`** (declarado y rechazado, nunca ignorado ni degradado a `global` por las bravas). Se normaliza a minusculas y se persiste `'global'`.
+- **Validacion por clave:** `orden_premios` array de <= 20 strings (recorte a 50 chars, vacios fuera) -> `400 ORDEN_PREMIOS_INVALIDO`; `tope_unidades` entero >= 0 o `null` -> `400 TOPE_UNIDADES_INVALIDO`; `estado_promo` booleano o `'true'`/`'false'`/`'1'`/`'0'` (form-data) -> `400 ESTADO_PROMO_INVALIDO`; sin nada que escribir -> `400 SIN_CAMBIOS`.
+- **Si falta la 058:** **503 `SCHEMA_NOT_MIGRATED`** (escritura falla cerrado, D8). Nunca un 200 optimista.
+- **Respuesta:** devuelve el estado **ya mergeado** para que la UI no tenga que releer; el panel es idempotente por naturaleza (misma entrada -> mismo estado).
+
+#### R3-E3. Las metricas viajan como bloque ADITIVO dentro de `GET canjes_marca`
+
+**No se crea rama de metricas.** Las metricas del Panel de Marca son un objeto `metricas` dentro de la respuesta de `canjes_marca`, **aditivo y opcional para el cliente** (`data` y `total` no cambian de forma, asi que un consumidor que ignore `metricas` sigue funcionando):
+
+| Clave | Significado | Fuente |
+|---|---|---|
+| `canjes_total` | filas de `canjes_tienda` de la marca (con el filtro `estado` aplicado si llega) | `canjes_tienda` |
+| `pocimas_repartidas` | unidades de premio semanal repartidas (pocimas) | `canjes_tienda` (`origen='premio_semanal'`) |
+| `productos_entregados` | canjes ya entregados en mostrador | `canjes_tienda` (`estado='entregado'`) |
+| `pendientes` | cola viva del mostrador | `canjes_tienda` (`estado='pendiente'`) |
+| `xp_canjeado` | **XP** canjeado en la marca (nunca COP: la tasa de D4 no se usa para reporting de XP) | `canjes_tienda` (`xp_total`) |
+| `fusiones` | fusiones registradas por la marca | `fusiones_marca` |
+
+- **Degradacion granular:** si falta **`fusiones_marca`** (`42P01`), `fusiones` queda en **0** y el resto de la respuesta **sobrevive**; solo si falta la superficie base (`canjes_tienda` / columna de la 058) la rama entera degrada a `data: []` + `metricas` en ceros con `degradado:true`. Un bloque de metricas **nunca** puede tumbar una lectura.
+- **D8 no cambia de regla**, solo de shape: `canjes_marca` degradado devuelve tambien `metricas` en ceros.
+
+#### R3-E4. `unidades = 0` SI viajan en el preview de `marca_premios`
+
+Se **prohibe filtrar** los puestos con `unidades: 0`. Viajan en `premios[]` **con `calibrado: false`**, igual que los demas, y con `consumible_clave: null` / `valor_xp: 0` / `valor_cop_estimado: 0`:
+
+- **Razon de contrato:** el podio es **informativo**: dice *quien gano la semana* y *cuanto le corresponde hoy*. Ocultar un puesto con `0` haria que la UI mostrara un Top 3 incompleto sin explicar por que, y **esconderia el problema de calibracion** (una semana en la que nadie alcanza `xp_minimo_semana` debe verse como `0/0/0`, no como "no hay premios").
+- **Consecuencia para la UI:** `unidades: 0` es un estado **legitimo y visible**, no un error; `calibrado: false` sigue marcando que los COP son convencion contable (D4).
+- **Distingue dos ceros:** `unidades: 0` (el puesto existe y no le toca unidad) es distinto de `premios: []` (no hay ranking / la marca no tiene promo / degradacion). El cliente no debe colapsarlos.
+
+#### R3-E5. Parametros `marca_premio_*`: por marca, con `gamificacion_config` como default global
+
+Precedencia **cerrada y unica** (por este orden):
+
+1. **`marcas.premios_config`** (jsonb, por marca) -> `alcance`, `orden_premios`, `tope_unidades`.
+2. **`gamificacion_config`** (global, `numeric(12,4)`, D3) -> `marca_premio_xp_por_unidad`, `marca_premio_unidades_max`, `marca_premio_xp_minimo_semana`, `marca_premio_peso_1..3`, `marca_premio_factor_retorno`, `marca_premio_tasa_cop_por_xp`.
+
+Reglas:
+
+- **Hoy solo `tope_unidades` es un parametro CUANTITATIVO por marca**, y **solo reduce**: se aplica con `LEAST` contra `marca_premio_unidades_max`. Un parametro de marca **nunca** puede ampliar el techo global. `alcance` y `orden_premios` tambien son por marca, pero no son numericos (por eso viven en jsonb: `gamificacion_config.valor` es `numeric(12,4)` y no admite texto).
+- **Cada marca tiene su bolsa.** El cupo se calcula por **(marca, semana, puesto)**: dos marcas de la misma semana **comparten el ranking global** (D10) y el catalogo elegible (D3.7), pero **no** comparten tope, no se descuentan cupos entre si y no compiten por el mismo presupuesto. Repartir en una marca **no** reduce lo que puede repartir la otra.
+- **Ningun valor ausente se inventa:** si falta la fila en `gamificacion_config`, se usa el default de codigo; si falta `tope_unidades`, no hay recorte por marca (`null`). Cero magia implicita por nombre de marca.
+- **Recalibrable sin deploy:** cambiar un `marca_premio_*` global o el `tope_unidades` de una marca **no** exige migracion ni despliegue.
+
+#### R3-E6. SIN disparo automatico de premios (hecho 18 reforzado)
+
+- **`marca_premio_otorgar` es solo `ADMIN_SECRET`** y lo dispara **el operador** desde un script de `scripts/`. No hay accion de usuario que acredite un premio.
+- **Se descarta de forma definitiva el "lazy trigger en el leaderboard"** (el trigger perezoso que acreditaba premios al pasar por una lectura publica). Un `GET` publico que **escribe** es un **vector de abuso**: se puede invocar sin limite, sin identidad y en paralelo, y convierte una lectura de ranking en una escritura con efecto economico. **Prohibido en cualquier ADR o implementacion futura.**
+- **Invariante que se reafirma (D8):** **ninguna lectura escribe.** Los `GET` degradan; las escrituras fallan cerrado (401/404/503).
+- **El hecho 18 ("cero cron") se mantiene y se refuerza:** cero `crons` en `vercel.json` **y** cero trigger perezoso => el **unico** camino para acreditar un premio es una llamada **explicita y autenticada como admin**, con `clave_idempotencia` y unicidad por `(marca, semana, puesto)`.
+- **Si el operador olvida otorgar, no pasa nada:** el premio simplemente **no se materializa** (`otorgado: false` es un estado legal del contrato). **Fallar a cero es preferible a auto-acreditar.** La idempotencia protege el reintento; la ausencia de trigger protege la caja.
+
+#### R3-E7. Trazabilidad: que contrataba D6 y que hubo que anadir
+
+| Punto | D6 original (rev 1 y 2) | Codigo real (2026-10-27) |
+|---|---|---|
+| **Escritura del panel** | **No contratada.** Solo el Impacto menciona un "editor de `premios_config` con merge JSONB" en `admin.html`, **sin rama, sin payload y sin auth asignados**. | `POST marca_panel` (una sola rama, R3-E1/R3-E2) |
+| **Metricas del panel** | **No contratadas.** El Impacto cita "cola de canjes" y "metricas" **sin rama ni shape**. | Bloque aditivo `metricas` en `GET canjes_marca` (R3-E3) |
+| **`unidades: 0` en el preview** | Contrataba el shape con `calibrado:false`, pero **no decia** que hacer con los puestos sin unidad. | Viajan con `calibrado:false` (R3-E4) |
+| **Parametros `marca_premio_*`** | D3/D7: defaults globales + `tope_unidades` por marca (`LEAST`), **sin explicitar la precedencia ni la titularidad de la bolsa**. | Precedencia y bolsa por marca explicitas (R3-E5) |
+| **Otorgamiento** | Hecho 18: "disparado por el operador, no por reloj". La alternativa del trigger perezoso **no quedaba cerrada por escrito**. | **Cerrada**: cero cron **y** cero lazy trigger (R3-E6) |
+
+**Criterios de verificacion afectados (no se reescriben, se acotan):**
+
+- **T8** cuenta **7 ramas de escritura** de diseno; las implementadas hoy son **4** (`marca_crear`, `marca_activa_set`, `marca_activar`, `marca_panel`). Las otras 3 (`marca_premio_otorgar`, `canje_tienda_*`, `fusion_marca_registrar`) siguen siendo criterio **de diseno** hasta que existan.
+- **T11 y T12** dependen de ramas **no implementadas** (`canje_tienda_*`, `fusion_*`, `marca_premio_otorgar`) y por tanto quedan **pendientes por definicion**, no fallidas.
+- **Nuevos criterios minimos de la revision 3:** (a) `marca_panel` con solo `estado_promo` **conserva** `orden_premios` (merge no destructivo); (b) clave desconocida en `premios_config` -> 400 y **estado intacto**; (c) `alcance:'zona'` -> 400 `AMBITO_NO_SOPORTADO`; (d) `canjes_marca` con `fusiones_marca` ausente devuelve `metricas.fusiones = 0` y **no** degrada la lista; (e) `marca_premios` de una semana muerta devuelve los puestos con `unidades: 0` (no `premios: []`); (f) `GET` de leaderboard **no** inserta ni actualiza ninguna fila de `canjes_tienda`.
+
+### Criterios de verificacion (los ejecuta `@qa-auditor`, no este ADR)
+
+1. **T1** `node --check api/usuarios.js` y `node --check api/interacciones.js` -> 0 errores.
+2. **T2** ASCII-safety: 0 bytes > 127 en `058_*.sql`; 0 backticks en el SQL; 0 `DELETE`/`DROP TABLE`.
+3. **T3** Idempotencia: aplicar la 058 **dos veces** seguidas -> segunda corrida sin error, `schema_migrations` con **una** fila `numero=58`, y `SELECT COUNT(*) FROM marcas` identico antes y despues.
+4. **T4** Integridad del puntero: `INSERT` de prueba con `usuarios.marca_activa_id` apuntando a la marca de **otro** usuario -> debe violar `usuarios_marca_activa_fk`.
+5. **T5** Las **5** consultas de D2 devuelven **lo mismo** para un usuario con 1 marca, antes y despues de la 058 (no-regresion). En particular `marca_activar` (`:2347`) devuelve 200 antes y despues: es el control de que no quedo ningun `ON CONFLICT (usuario_id)`.
+6. **T6** `marca_activar` responde 200 (no 42P10) tras el DROP, y con 2 marcas actualiza **solo** la enviada.
+7. **T7** Formula: con `XP_semana = 6000/3000/1200`, `precio_xp` reales y defaults -> `U = 1/0/0` con **pocima** (el tope del 35% recorta 2 -> 1); con `XP_semana = 900` en los tres -> `0/0/0`; `U(1) >= U(2) >= U(3)` en 100 casos aleatorios de `XP_semana`; `valor_cop` devuelto con `calibrado:false`.
+8. **T8** Degradacion: con la 058 **no** aplicada, `marcas_mias`/`mi_marca`/`marca_premios`/`canjes_marca` responden 200 con `degradado:true` y las 7 ramas de escritura responden **503 `SCHEMA_NOT_MIGRATED`**.
+9. **T9** 8/8 funciones serverless: `ls api/*.js | wc -l` no cambia.
+10. **T10** Recetas: `pocima_a_media` con **3** pocimas -> 409 `INVENTARIO_INSUFICIENTE` y el inventario **intacto** (mismo JSONB antes y despues); con **4** -> 4 a 0 y 1 media. `media_a_botella` con **2** medias -> 1 botella. `RECETAS_V1` tiene **exactamente 2** entradas y **ninguna** inversa.
+11. **T11** `atendido_por`: `canje_tienda_cerrar` **sin** JWT -> 401; con JWT de un usuario que **no** es dueno de `canjes_tienda.marca_id` -> 404; con el dueno -> 200 y `atendido_por` = uuid de la sesion (no del body). `INSERT` de `atendido_por` con uuid inexistente -> viola la FK.
+12. **T12** ANCESTRAL: los 3 productos existen con `precio_cop` 14000/41000/76000 y `precio_xp` 1166.67/3416.67/6333.33; tras D16.3 los 3 tienen `marca_id` = la marca ANCESTRAL ([DEUDA-5] cerrada). Rerun de D16.3 = no-op (`marca_id IS NULL` deja de cumplirse).
+13. **T13** Gate: un usuario con nivel derivado 4 recibe 403 `NIVEL_INSUFICIENTE` con `nivel_requerido: 5`; con nivel 5 y 1650 XP disponibles crea y queda `xp_gastado_sinks = 1650` con `xp_total` **sin cambios**; `marca_alta_xp` cambiado a 2000 exige 2000 sin deploy.
+
+### Estado
+
+**ACEPTADO / PENDIENTE DE IMPLEMENTAR. REVISION 2 (2026-10-27): las 6 deudas quedan CERRADAS (D10-D16) y el diseno esta listo para que `@data-migration` escriba la 058.** Es un ADR de **diseno**: no escribe codigo ni la migracion. El alcance queda cerrado en las **6 premisas** del operador, en la **revision 1** (D1-D9: DDL, marca activa, formula, tasa, coste, contrato de ramas, degradacion y plan) y en la **revision 2** (D10-D16: alcance global, 2 recetas, `atendido_por` uuid, precios reales con XP derivado, ANCESTRAL como marca + 3 productos, y coste/gate 5). **No queda ninguna deuda abierta**: lo que la revision 1 marcaba como pregunta hoy es contrato. El cierre documental (`TASKS.md`, `NEXT.md`, `BLUEPRINT.md`) corresponde al **pase unico R2** de `@docs-keeper`, no a este ADR. La implementacion exige **gate de riesgo confirmado** por tocar `api/usuarios.js`, `api/interacciones.js` y el esquema, y **la 058 va en el mismo commit que `@backend-dev`** (D9 paso 5).
+**REVISION 3 (2026-10-27):** las tres ramas de `api/interacciones.js` (`marca_premios`, `canjes_marca`, `marca_panel`) pasan a **IMPLEMENTADAS Y VERIFICADAS CONTRA EL ARCHIVO REAL**, con **D6 superado parcialmente** por la seccion "Enmienda (revision 3)" y el resto del ADR intacto. El pendiente ya no es "disenar el panel" sino **implementar `marca_premio_otorgar` + `canje_tienda_registrar` + `canje_tienda_cerrar` + `fusion_marca_registrar`** y el **script de otorgamiento del operador** en `scripts/` (jamas un trigger perezoso: R3-E6).

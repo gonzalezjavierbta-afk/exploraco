@@ -313,6 +313,23 @@ async function leerMinDiasOrigen(sql) {
   return 7;
 }
 
+// ADR-107 D5/D15: coste de alta de marca. Espejo de leerMinDiasOrigen: NUNCA
+// lanza, degrada al default 1650 con warn si gamificacion_config o la clave
+// marca_alta_xp no existen (patron BUG-021). El valor es recalibrable por el
+// operador sin deploy (T13: con 2000 exige 2000).
+async function leerMarcaAltaXp(sql) {
+  try {
+    var rows = await sql("SELECT valor FROM gamificacion_config WHERE clave='marca_alta_xp' LIMIT 1");
+    var v = (rows && rows.length) ? numXp(rows[0].valor) : 0;
+    if (isFinite(v) && v > 0) return red2(v);
+  } catch (eCfgAlta) {
+    var code = eCfgAlta && eCfgAlta.code;
+    console.warn('[marca] gamificacion_config no leida (' + code + '): marca_alta_xp por defecto '
+      + MARCA_ALTA_XP_DEFAULT);
+  }
+  return MARCA_ALTA_XP_DEFAULT;
+}
+
 function calcularNivel(xpTotal) {
   const xp = Number(xpTotal) || 0;
   let nivelIdx = 0;
@@ -349,11 +366,20 @@ function nodoMercadoPorNivelLocal(nivelJugador) {
   }
   return idx + 1;
 }
-// ADR-059 / ADR-064 (M-6 CERRADO): umbral de CREACION de Marca. La columna
-// marcas.nivel_requerido (migracion 027) es la fuente; este valor es el
-// fallback ASCII cuando la fila/columna aun no expone el dato (default
-// acordado 6). El grandfathering de EDICION vive en la rama marca_activar.
-var MARCA_NIVEL_REQUERIDO_DEFAULT = 6;
+// ADR-059 / ADR-064 (M-6 CERRADO) + ADR-107 D5/D15: umbral de CREACION de
+// Marca. La columna marcas.nivel_requerido (migracion 027) es la fuente; este
+// valor es el fallback ASCII cuando la fila/columna aun no expone el dato.
+// ADR-107 D15 CIERRA la deriva 6 vs 5: el DEFAULT real de la columna desde la
+// 027 es 5, luego el fallback de codigo pasa de 6 a 5 (decision, no nota).
+// El grandfathering de EDICION vive en la rama marca_activar.
+var MARCA_NIVEL_REQUERIDO_DEFAULT = 5;
+// ADR-107 D5: coste de ALTA de marca en XP, leido de gamificacion_config
+// (clave marca_alta_xp, recalibrable por el operador sin deploy). Degrada al
+// default 1650 si la tabla o la clave no existen todavia.
+var MARCA_ALTA_XP_DEFAULT = 1650;
+// ADR-107 D6 (regla ii): todo id de ruta se valida antes de $1::uuid para no
+// acabar en el 500 global. Mismo regex que usa el resto del backend.
+var UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 function calcularMercadoLocal(puntos, nivelJugador) {
   const p = Number(puntos) || 0;
@@ -369,11 +395,12 @@ function calcularMercadoLocal(puntos, nivelJugador) {
 
 // v20: instrumenta el gasto de XP en xp_ledger (best-effort) para el medidor
 // de "quemado" del dashboard. No debe romper si xp_ledger no existe (42P01).
-function registrarGastoXp(sqlFn, usuarioId, accion, monto) {
+function registrarGastoXp(sqlFn, usuarioId, accion, monto, contexto) {
   return sqlFn(
     'INSERT INTO xp_ledger (usuario_id, accion, xp_base, mult_nivel, mult_stack, mult_final, cap_aplicado, bonos_planos, xp_final, es_exento, contexto) '
     + "VALUES ($1,$2,$3,1,1,1,'ninguno',0,$4,true,$5::jsonb)",
-    [usuarioId, accion, monto, -monto, JSON.stringify({ origen: 'usuarios.js', monto: monto })]
+    [usuarioId, accion, monto, red2(-monto),
+     JSON.stringify(contexto || { origen: 'usuarios.js', monto: monto })]
   ).catch(function(){});
 }
 
@@ -419,13 +446,14 @@ function nivelVisibleDe(row) {
 }
 
 // ADR-061/ADR-062 (Fase 2C): 503 tipado si falta el esquema de la 040
-// (cartas_*/moneda_*). Nunca catch vacio.
-function responderSchemaPendiente(res, etiqueta, e) {
-  console.warn('[usuarios] ' + etiqueta + ' ausente (migracion 040 pendiente): '
+// (cartas_*/moneda_*). Nunca catch vacio. ADR-107 D8 reusa el MISMO 503 para
+// las ramas de marca que dependen de la 058 (texto opcional, code invariante).
+function responderSchemaPendiente(res, etiqueta, e, texto) {
+  console.warn('[usuarios] ' + etiqueta + ' ausente (esquema pendiente): '
     + (e && e.code ? e.code + ' ' : '') + (e && e.message));
   return res.status(503).json({
     ok: false,
-    error: 'Recurso no disponible (migracion 040 pendiente)',
+    error: texto || 'Recurso no disponible (migracion 040 pendiente)',
     code: 'SCHEMA_NOT_MIGRATED'
   });
 }
@@ -760,26 +788,110 @@ module.exports = async (req, res) => {
     const { id, tipo, limit = '10' } = req.query;
 
     if (req.method === 'GET') {
-      // ---- GET: mi_marca (TSK-122) --------------------------------
+      // ---- GET: mi_marca (TSK-122 / ADR-107 D2.1) ------------------
+      // ADR-107: la marca operada se resuelve por el puntero UNICO
+      // usuarios.marca_activa_id (FK compuesta contra marcas(id, usuario_id)).
+      // La lectura vieja (WHERE usuario_id LIMIT 1) deja de ser determinista
+      // en cuanto cae UNIQUE (usuario_id) en la 058.
+      // DEGRADACION (ADR-107 D8): sin la 058 (42703) se conserva la forma de
+      // la 027 y se marca degradado:true. Nunca 500.
       if (tipo === 'mi_marca' && (id || req.query.usuario_id)) {
         var mmId = String(id || req.query.usuario_id || '');
-        var mmRows = await sql(
-          'SELECT m.*, '
-          + '(SELECT COUNT(*)::int FROM patrocinios p WHERE p.marca_id=m.id AND p.activo=TRUE) AS total_patrocinios '
-          + 'FROM marcas m WHERE m.usuario_id=$1 LIMIT 1',
-          [mmId]
-        );
+        if (!UUID_RE.test(mmId))
+          return res.status(400).json({ ok: false, error: 'USUARIO_ID_INVALIDO' });
+        var mmCols = 'SELECT m.*, '
+          + '(SELECT COUNT(*)::int FROM patrocinios p WHERE p.marca_id=m.id AND p.activo=TRUE) AS total_patrocinios ';
+        var mmDegradado = false;
+        var mmRows;
+        try {
+          mmRows = await sql(
+            mmCols
+            + 'FROM marcas m JOIN usuarios u ON u.id = m.usuario_id '
+            + 'WHERE u.id = $1::uuid AND m.id = u.marca_activa_id LIMIT 1',
+            [mmId]
+          );
+        } catch (eMmPuntero) {
+          if (!eMmPuntero || (eMmPuntero.code !== '42703' && eMmPuntero.code !== '42P01'))
+            throw eMmPuntero;
+          console.warn('[usuarios] mi_marca sin marca_activa_id (' + eMmPuntero.code
+            + '): degradado a la forma de la 027');
+          mmDegradado = true;
+          mmRows = await sql(mmCols + 'FROM marcas m WHERE m.usuario_id = $1 LIMIT 1', [mmId]);
+        }
         // ADR-059 / ADR-064 (M-6): se expone de forma ADITIVA el umbral de
-        // Marca desde marcas.nivel_requerido (fallback 6 si NULL/ausente),
+        // Marca desde marcas.nivel_requerido (fallback 5, ADR-107 D15),
         // para que la UI no anuncie un gate distinto al real. Sin fila de
         // marca se responde data=null con el umbral a nivel raiz.
         if (mmRows.length) {
           var mmNr = parseInt(mmRows[0].nivel_requerido, 10);
           mmRows[0].nivel_requerido = (isFinite(mmNr) && mmNr >= 1)
             ? mmNr : MARCA_NIVEL_REQUERIDO_DEFAULT;
-          return res.json({ ok: true, data: mmRows[0] });
+          return res.json({
+            ok: true,
+            data: mmRows[0],
+            marca_activa_id: mmRows[0].id || null,
+            degradado: mmDegradado
+          });
         }
-        return res.json({ ok: true, data: null, nivel_requerido: MARCA_NIVEL_REQUERIDO_DEFAULT });
+        return res.json({
+          ok: true, data: null,
+          marca_activa_id: null,
+          nivel_requerido: MARCA_NIVEL_REQUERIDO_DEFAULT,
+          degradado: mmDegradado
+        });
+      }
+
+      // ---- GET: marcas_mias (ADR-107 D6) ---------------------------
+      // Lista TODAS las marcas del usuario + el puntero de la operada, en una
+      // sola ida y vuelta (mi-perfil.html no necesita segunda rama).
+      // Publica, con la MISMA exposicion que el mi_marca de hoy.
+      // DEGRADACION (ADR-107 D8): sin la 058 -> lista vacia con degradado.
+      if (tipo === 'marcas_mias') {
+        var mmsId = String(req.query.usuario_id || id || '').trim();
+        if (!UUID_RE.test(mmsId))
+          return res.status(400).json({ ok: false, error: 'USUARIO_ID_INVALIDO' });
+        var mmsCosto = await leerMarcaAltaXp(sql);
+        try {
+          var mmsRows = await sql(
+            'SELECT m.id, m.nombre, m.logo_url, m.banner_url, m.descripcion, '
+            + 'm.areas_influencia, m.enlaces, m.activa, m.verificada, m.nivel_requerido, '
+            + 'm.estado_promo, COALESCE(m.premios_config, \'{}\'::jsonb) AS premios_config, '
+            + 'u.marca_activa_id AS marca_activa_id '
+            + 'FROM marcas m JOIN usuarios u ON u.id = m.usuario_id '
+            + 'WHERE u.id = $1::uuid '
+            + 'ORDER BY m.creado_en ASC, m.id ASC',
+            [mmsId]
+          );
+          var mmsActiva = (mmsRows.length && mmsRows[0].marca_activa_id)
+            ? String(mmsRows[0].marca_activa_id) : null;
+          var mmsNr = parseInt(mmsRows.length ? mmsRows[0].nivel_requerido : '', 10);
+          if (!isFinite(mmsNr) || mmsNr < 1) mmsNr = MARCA_NIVEL_REQUERIDO_DEFAULT;
+          var mmsData = mmsRows.map(function (r) {
+            var o = {};
+            for (var k in r) { if (Object.prototype.hasOwnProperty.call(r, k) && k !== 'marca_activa_id') o[k] = r[k]; }
+            return o;
+          });
+          return res.json({
+            ok: true,
+            data: mmsData,
+            marca_activa_id: mmsActiva,
+            total: mmsData.length,
+            nivel_requerido: mmsNr,
+            costo_xp_creacion: mmsCosto,
+            degradado: false
+          });
+        } catch (eMmsMarca) {
+          if (!eMmsMarca || (eMmsMarca.code !== '42703' && eMmsMarca.code !== '42P01'))
+            throw eMmsMarca;
+          console.warn('[usuarios] marcas_mias degradado (' + eMmsMarca.code
+            + '): migracion 058 pendiente');
+          return res.json({
+            ok: true, data: [], marca_activa_id: null, total: 0,
+            nivel_requerido: MARCA_NIVEL_REQUERIDO_DEFAULT,
+            costo_xp_creacion: mmsCosto,
+            degradado: true
+          });
+        }
       }
 
       // ---- GET: mis cartas (Fase 2C, T7.1 / ADR-062) ---------------
@@ -2308,62 +2420,217 @@ module.exports = async (req, res) => {
         return res.json({ ok: true, usuario_id: vId, email_verificado: vVal });
       }
 
-      // ---- Rama: activar / actualizar Marca del usuario (TSK-120) ---
-      // POST { tipo:'marca_activar', usuario_id, nombre, logo_url?,
+      // ---- Rama: CREAR Marca (ADR-107 D5 / D6 / D15) ---------------
+      // POST { tipo:'marca_crear', usuario_id, nombre, logo_url?,
       //        banner_url?, descripcion?, areas_influencia?, enlaces? }
-      // Requiere JWT valido del propio usuario. Nivel minimo: el que fije
-      // marcas.nivel_requerido (ADR-059/ADR-064 M-6; default 6 si NULL).
-      // GRANDFATHERING de EDICION: una marca ya creada se puede editar/
-      // reactivar aunque el dueno haya bajado de nivel (el gate aplica a la
-      // CREACION). MERGE JSONB: cero reemplazo total (ADR-003).
+      // ADR-107: el ALTA se separa de la EDICION porque tiene gate de nivel
+      // (nivel_requerido = 5) y COSTE en XP (gamificacion_config.marca_alta_xp
+      // = 1650, recalibrable sin deploy). El coste NO resta usuarios.xp_total:
+      // incrementa xp_gastado_sinks (patron 046:39-44) y deja una fila en
+      // xp_ledger con xp_final negativo (mismo shape que tithe_parche), para
+      // que calcularNivel() siga siendo MONOTONO (crear no baja de nivel).
+      // Sentencia atomica unica (fail-closed): sin fila en d no hay marca.
+      if (c.tipo === 'marca_crear') {
+        var mcUid = String(c.usuario_id || '');
+        if (!mcUid) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        if (!UUID_RE.test(mcUid))
+          return res.status(400).json({ ok: false, error: 'USUARIO_ID_INVALIDO' });
+        var mcJwt = validarSesionUsuario(req, mcUid);
+        if (!mcJwt || !mcJwt.ok) return res.status(401).json({ ok: false, error: 'No autorizado' });
+        var mcNombre = String(c.nombre || '').trim().slice(0, 120);
+        if (!mcNombre) return res.status(400).json({ ok: false, error: 'nombre requerido' });
+        var mcCosto = await leerMarcaAltaXp(sql);
+        var mcUsr;
+        try {
+          mcUsr = await sql(
+            'SELECT xp_total, xp_gastado_sinks, marca_activa_id::text AS marca_activa_id '
+            + 'FROM usuarios WHERE id=$1::uuid LIMIT 1',
+            [mcUid]
+          );
+        } catch (eMcEsq) {
+          // ADR-107 D8: crear sin poder fijar el puntero deja un estado
+          // incoherente, luego esta escritura NO degrada: 503 tipado.
+          if (eMcEsq && (eMcEsq.code === '42703' || eMcEsq.code === '42P01'))
+            return responderSchemaPendiente(res, 'marca_crear', eMcEsq,
+              'Recurso no disponible (migracion 058 pendiente)');
+          throw eMcEsq;
+        }
+        if (!mcUsr.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        // El nivel se DERIVA de xp_total (usuarios.nivel esta STALE).
+        var mcNivel = calcularNivel(mcUsr[0].xp_total).nivel;
+        if (mcNivel < MARCA_NIVEL_REQUERIDO_DEFAULT)
+          return res.status(403).json({
+            ok: false, error: 'NIVEL_INSUFICIENTE',
+            nivel: mcNivel, nivel_requerido: MARCA_NIVEL_REQUERIDO_DEFAULT
+          });
+        // XP_DISPONIBLE = xp_total - xp_gastado_sinks: la unica vara.
+        var mcDisp = red2(Math.max(numXp(mcUsr[0].xp_total) - numXp(mcUsr[0].xp_gastado_sinks), 0));
+        if (mcDisp < mcCosto)
+          return res.status(403).json({
+            ok: false, error: 'XP_INSUFICIENTE',
+            xp_disponible: mcDisp, costo_xp: mcCosto
+          });
+        var mcAreas = c.areas_influencia ? JSON.stringify(c.areas_influencia) : null;
+        var mcLinks = c.enlaces ? JSON.stringify(c.enlaces) : null;
+        var mcFila = await sql(
+          'WITH g AS ('
+          + 'SELECT COALESCE(GREATEST(xp_total - COALESCE(xp_gastado_sinks,0),0), -1) AS disp '
+          + 'FROM usuarios WHERE id=$1::uuid'
+          + '), d AS ('
+          + 'UPDATE usuarios u SET xp_gastado_sinks = COALESCE(u.xp_gastado_sinks,0) + $2::numeric '
+          + 'FROM g WHERE u.id=$1::uuid AND g.disp >= $2::numeric RETURNING u.id'
+          + '), n AS ('
+          + 'INSERT INTO marcas (usuario_id, nombre, logo_url, banner_url, descripcion, '
+          + 'areas_influencia, enlaces, nivel_requerido) '
+          + 'SELECT $1::uuid, $3, $4, $5, $6, COALESCE($7::jsonb,\'[]\'::jsonb), '
+          + 'COALESCE($8::jsonb,\'{}\'::jsonb), $9 FROM d '
+          + 'ON CONFLICT DO NOTHING RETURNING id, nombre, activa, verificada'
+          + '), p AS ('
+          + 'UPDATE usuarios u SET marca_activa_id = n.id FROM n WHERE u.id=$1::uuid '
+          + 'RETURNING u.marca_activa_id'
+          + ') SELECT (SELECT disp FROM g) AS xp_disponible_previo, '
+          + '(SELECT id::text FROM n) AS marca_id, '
+          + '(SELECT nombre FROM n) AS nombre, '
+          + '(SELECT activa FROM n) AS activa, '
+          + '(SELECT verificada FROM n) AS verificada',
+          [mcUid, mcCosto, mcNombre,
+           c.logo_url ? String(c.logo_url).slice(0, 512) : null,
+           c.banner_url ? String(c.banner_url).slice(0, 512) : null,
+           c.descripcion ? String(c.descripcion).slice(0, 500) : null,
+           mcAreas, mcLinks, MARCA_NIVEL_REQUERIDO_DEFAULT]
+        );
+        if (!mcFila.length || !mcFila[0].marca_id) {
+          // Sin fila en d (carrera de XP) -> cero cambios, cero marca.
+          var mcDispFin = (mcFila.length && mcFila[0].xp_disponible_previo != null)
+            ? red2(Math.max(numXp(mcFila[0].xp_disponible_previo), 0)) : 0;
+          return res.status(403).json({
+            ok: false, error: 'XP_INSUFICIENTE',
+            xp_disponible: mcDispFin, costo_xp: mcCosto
+          });
+        }
+        // Ledger del sink (best-effort: si xp_ledger no existe, el alta vive).
+        registrarGastoXp(sql, mcUid, 'marca_crear', mcCosto,
+          { marca_id: String(mcFila[0].marca_id), costo: mcCosto });
+        return res.json({
+          ok: true,
+          data: {
+            id: mcFila[0].marca_id,
+            nombre: mcFila[0].nombre || mcNombre,
+            activa: mcFila[0].activa,
+            verificada: mcFila[0].verificada
+          },
+          costo_xp: mcCosto,
+          xp_disponible_previo: red2(Math.max(numXp(mcFila[0].xp_disponible_previo), 0)),
+          marca_activa_id: String(mcFila[0].marca_id)
+        });
+      }
+
+      // ---- Rama: fijar la marca ACTIVA (ADR-107 D2 / D6) ----------
+      // POST { tipo:'marca_activa_set', usuario_id, marca_id }
+      // El puntero usuarios.marca_activa_id es la unica verdad de "que marca
+      // estoy operando"; solo puede apuntar a una marca DEL MISMO dueno (la FK
+      // compuesta de la 058 lo hace cumplir tambien en la base). Ownership por
+      // id AND usuario_id: 404 si no es suya, NUNCA 403 (no se filtra
+      // existencia).
+      if (c.tipo === 'marca_activa_set') {
+        var masUid = String(c.usuario_id || '');
+        if (!masUid) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var masJwt = validarSesionUsuario(req, masUid);
+        if (!masJwt || !masJwt.ok) return res.status(401).json({ ok: false, error: 'No autorizado' });
+        var masMarcaId = String(c.marca_id || '').trim();
+        if (!masMarcaId)
+          return res.status(400).json({ ok: false, error: 'MARCA_ID_REQUERIDO' });
+        if (!UUID_RE.test(masMarcaId))
+          return res.status(400).json({ ok: false, error: 'MARCA_ID_INVALIDO' });
+        var masFila;
+        try {
+          masFila = await sql(
+            'UPDATE usuarios u SET marca_activa_id = m.id FROM marcas m '
+            + 'WHERE u.id = $1::uuid AND m.id = $2::uuid AND m.usuario_id = u.id '
+            + 'RETURNING u.marca_activa_id::text AS marca_activa_id',
+            [masUid, masMarcaId]
+          );
+        } catch (eMasEsq) {
+          if (eMasEsq && (eMasEsq.code === '42703' || eMasEsq.code === '42P01'))
+            return responderSchemaPendiente(res, 'marca_activa_set', eMasEsq,
+              'Recurso no disponible (migracion 058 pendiente)');
+          throw eMasEsq;
+        }
+        if (!masFila.length)
+          return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+        return res.json({ ok: true, marca_activa_id: masFila[0].marca_activa_id });
+      }
+
+      // ---- Rama: activar / actualizar Marca del usuario (TSK-120) ---
+      // POST { tipo:'marca_activar', usuario_id, marca_id?, nombre, logo_url?,
+      //        banner_url?, descripcion?, areas_influencia?, enlaces? }
+      // ADR-107 D2.5/D2.4/D6: la lectura previa resuelve por el puntero
+      // usuarios.marca_activa_id (con varias marcas, el LEFT JOIN por
+      // usuario_id devolvia N filas y elegia arbitraria) y la escritura es un
+      // UPDATE acotado por usuario_id. SE ELIMINA el INSERT ... ON CONFLICT
+      // (usuario_id): tras el DROP de la 058 no existe constraint equivalente
+      // y la sentencia moria con 42P10 en CADA llamada. Crear marca es
+      // marca_crear; esta rama solo edita una marca que ya es del usuario.
+      // GRANDFATHERING de EDICION intacto: editar no exige nivel.
+      // MERGE JSONB: cero reemplazo total (ADR-003).
       if (c.tipo === 'marca_activar') {
         var maUid = String(c.usuario_id || '');
         if (!maUid) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        if (!UUID_RE.test(maUid))
+          return res.status(400).json({ ok: false, error: 'USUARIO_ID_INVALIDO' });
         var maJwt = validarSesionUsuario(req, maUid);
         if (!maJwt || !maJwt.ok) return res.status(401).json({ ok: false, error: 'No autorizado' });
         var maNombre = String(c.nombre || '').trim().slice(0, 120);
         if (!maNombre) return res.status(400).json({ ok: false, error: 'nombre requerido' });
-        // ADR-059/ADR-064 (M-6): el gate de CREACION se lee de la columna
-        // marcas.nivel_requerido (fallback 6 si NULL/ausente); usuarios.nivel
-        // esta STALE y el nivel se DERIVA de xp_total con calcularNivel.
-        // GRANDFATHERING de EDICION: si el usuario YA tiene fila en marcas
-        // (marca_id no NULL), se permite el UPDATE aunque su nivel derivado
-        // sea menor al requerido (el gate solo aplica a la CREACION).
-        var maUser = await sql(
-          'SELECT u.xp_total, m.id AS marca_id, m.nivel_requerido AS marca_nivel_requerido '
-          + 'FROM usuarios u LEFT JOIN marcas m ON m.usuario_id = u.id '
-          + 'WHERE u.id=$1 LIMIT 1',
-          [maUid]
-        );
+        var maMarcaId = String(c.marca_id || '').trim();
+        if (maMarcaId && !UUID_RE.test(maMarcaId))
+          return res.status(400).json({ ok: false, error: 'marca_id invalido' });
+        var maUser;
+        try {
+          maUser = await sql(
+            'SELECT u.xp_total, u.marca_activa_id::text AS marca_activa_id, '
+            + '(SELECT COUNT(*)::int FROM marcas mm WHERE mm.usuario_id = u.id) AS total_marcas '
+            + 'FROM usuarios u WHERE u.id=$1::uuid LIMIT 1',
+            [maUid]
+          );
+        } catch (eMaEsq) {
+          // ADR-107 D8: la rama depende del puntero -> 503 si falta la 058.
+          if (eMaEsq && (eMaEsq.code === '42703' || eMaEsq.code === '42P01'))
+            return responderSchemaPendiente(res, 'marca_activar', eMaEsq,
+              'Recurso no disponible (migracion 058 pendiente)');
+          throw eMaEsq;
+        }
         if (!maUser.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
-        var maNivelReq = parseInt(maUser[0].marca_nivel_requerido, 10);
-        if (!isFinite(maNivelReq) || maNivelReq < 1) maNivelReq = MARCA_NIVEL_REQUERIDO_DEFAULT;
-        var maNivel = calcularNivel(maUser[0].xp_total).nivel;
-        if (!maUser[0].marca_id && maNivel < maNivelReq)
-          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE', nivel: maNivel, nivel_requerido: maNivelReq });
-        var maAreas  = c.areas_influencia ? JSON.stringify(c.areas_influencia) : null;
-        var maLinks  = c.enlaces          ? JSON.stringify(c.enlaces)           : null;
+        var maTotal = parseInt(maUser[0].total_marcas, 10) || 0;
+        if (!maTotal)
+          return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
+        if (!maMarcaId && maTotal > 1)
+          return res.status(400).json({ ok: false, error: 'marca_id requerido' });
+        var maAreas = c.areas_influencia ? JSON.stringify(c.areas_influencia) : null;
+        var maLinks = c.enlaces ? JSON.stringify(c.enlaces) : null;
         var maFila = await sql(
-          'INSERT INTO marcas (usuario_id, nombre, logo_url, banner_url, descripcion, areas_influencia, enlaces) '
-          + 'VALUES ($1,$2,$3,$4,$5,'
-          + 'COALESCE($6::jsonb,\'[]\'::jsonb),'
-          + 'COALESCE($7::jsonb,\'{}\'::jsonb)) '
-          + 'ON CONFLICT (usuario_id) DO UPDATE SET '
-          + 'nombre      = EXCLUDED.nombre, '
-          + 'logo_url    = COALESCE(EXCLUDED.logo_url, marcas.logo_url), '
-          + 'banner_url  = COALESCE(EXCLUDED.banner_url, marcas.banner_url), '
-          + 'descripcion = COALESCE(EXCLUDED.descripcion, marcas.descripcion), '
-          + 'areas_influencia = marcas.areas_influencia || COALESCE(EXCLUDED.areas_influencia, \'[]\'::jsonb), '
-          + 'enlaces     = marcas.enlaces || COALESCE(EXCLUDED.enlaces, \'{}\'::jsonb), '
-          + 'activa      = TRUE '
+          'UPDATE marcas SET '
+          + 'nombre = $2, '
+          + 'logo_url = COALESCE($3, logo_url), '
+          + 'banner_url = COALESCE($4, banner_url), '
+          + 'descripcion = COALESCE($5, descripcion), '
+          + 'areas_influencia = COALESCE(areas_influencia, \'[]\'::jsonb) || COALESCE($6::jsonb, \'[]\'::jsonb), '
+          + 'enlaces = COALESCE(enlaces, \'{}\'::jsonb) || COALESCE($7::jsonb, \'{}\'::jsonb), '
+          + 'activa = TRUE '
+          + 'WHERE usuario_id = $1::uuid '
+          + 'AND id = COALESCE($8::uuid, (SELECT u.marca_activa_id FROM usuarios u WHERE u.id=$1::uuid)) '
           + 'RETURNING id, nombre, activa, verificada',
           [maUid, maNombre,
-           c.logo_url    ? String(c.logo_url).slice(0,512)    : null,
-           c.banner_url  ? String(c.banner_url).slice(0,512)  : null,
-           c.descripcion ? String(c.descripcion).slice(0,500) : null,
-           maAreas, maLinks]
+           c.logo_url ? String(c.logo_url).slice(0, 512) : null,
+           c.banner_url ? String(c.banner_url).slice(0, 512) : null,
+           c.descripcion ? String(c.descripcion).slice(0, 500) : null,
+           maAreas, maLinks,
+           maMarcaId || null]
         );
+        if (!maFila.length)
+          return res.status(404).json({ ok: false, error: 'MARCA_NO_ENCONTRADA' });
         return res.json({ ok: true, data: maFila[0] });
       }
 
@@ -2386,10 +2653,28 @@ module.exports = async (req, res) => {
         if (TIPOS_VALIDOS.indexOf(mpTipo) === -1)
           return res.status(400).json({ ok: false, error: 'tipo_objetivo inv\u00e1lido' });
         // Verificar que la marca es del usuario y esta activa
-        var mpMarca = await sql(
-          'SELECT id FROM marcas WHERE usuario_id=$1 AND activa=TRUE LIMIT 1',
-          [mpUid]
-        );
+        // ADR-107 D2 (misma regla de resolucion): la marca que patrocina es la
+        // ACTIVA segun el puntero usuarios.marca_activa_id, no una fila
+        // arbitraria del usuario. El ADR lista las 5 consultas y no incluye
+        // esta; se corrige por coherencia con la MISMA regla. Sin la 058
+        // (42703) degrada a la lectura de la 027, que sigue siendo legal.
+        var mpMarca;
+        try {
+          mpMarca = await sql(
+            'SELECT m.id FROM marcas m JOIN usuarios u ON u.id = m.usuario_id '
+            + 'WHERE u.id = $1 AND m.id = u.marca_activa_id AND m.activa = TRUE',
+            [mpUid]
+          );
+        } catch (eMpMarca) {
+          if (!eMpMarca || (eMpMarca.code !== '42703' && eMpMarca.code !== '42P01'))
+            throw eMpMarca;
+          console.warn('[usuarios] marca_patrocinar sin marca_activa_id (' + eMpMarca.code
+            + '): lectura de la 027');
+          mpMarca = await sql(
+            'SELECT id FROM marcas WHERE usuario_id=$1 AND activa=TRUE LIMIT 1',
+            [mpUid]
+          );
+        }
         if (!mpMarca.length)
           return res.status(404).json({ ok: false, error: 'Marca activa no encontrada. Activa tu marca primero.' });
         var mpXp    = Math.max(0, parseInt(c.xp_aportada   || 0, 10));
