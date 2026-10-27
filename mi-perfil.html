@@ -8682,18 +8682,21 @@ function mmProductos() {
     vistos[c] = true;
     lista.push({ clave: c, nombre: String(nombre || c) });
   }
-  var i, j;
-  /* 1) catalogo del SERVIDOR (rama tipo=consumibles): nunca mercado.js */
-  for (i = 0; i < MM_ESTADO.productos.length; i++) {
-    add(MM_ESTADO.productos[i].clave, MM_ESTADO.productos[i].nombre);
+  var i;
+  /* 1) productos de ENTREGA de la marca: claves del bloque de canjes
+     (GET ?tipo=canjes_marca). El panel no pide el catalogo general de la
+     tienda: las unicas claves que necesita ofrecer son las de la marca. */
+  for (i = 0; i < MM_ESTADO.canjes.length; i++) {
+    add(MM_ESTADO.canjes[i].consumible_clave, MM_ESTADO.canjes[i].consumible_nombre);
   }
-  /* 2) claves que ya viven en la MARCA (config, preview y canjes) para que
-     un premio ya guardado siga siendo seleccionable aunque no este en el
-     catalogo visible. */
+  /* 2) producto del PREMIO: orden_premios de la marca (v1: una sola clave) y
+     el preview de premios, para que un premio ya guardado siga siendo
+     seleccionable. Sin nombre publico se muestra la clave cruda. */
   var orden = (MM_ESTADO.cfg && MM_ESTADO.cfg.orden_premios) || [];
   for (i = 0; i < orden.length; i++) add(orden[i], null);
-  for (i = 0; i < MM_ESTADO.premios.length; i++) add(MM_ESTADO.premios[i].consumible_clave, null);
-  for (i = 0; i < MM_ESTADO.canjes.length; i++) add(MM_ESTADO.canjes[i].consumible_clave, null);
+  for (i = 0; i < MM_ESTADO.premios.length; i++) {
+    add(MM_ESTADO.premios[i].consumible_clave, MM_ESTADO.premios[i].consumible_nombre);
+  }
   return lista;
 }
 function mmOpcionesHtml(lista, conUnidades) {
@@ -8706,11 +8709,14 @@ function mmOpcionesHtml(lista, conUnidades) {
     }
     html += '<option value="' + esc(lista[i].clave) + '">' + esc(etiqueta) + '</option>';
   }
-  if (!html) html = '<option value="">Sin productos disponibles</option>';
+  if (!html) html = '<option value="">sin catalogo de marca</option>';
   return html;
 }
 function mmPintarProductos() {
   var lista = mmProductos();
+  /* Sin claves de la marca no hay catalogo que ofrecer: un select vacio
+     habilitado es peor que uno deshabilitado con motivo. */
+  var sinCat = lista.length === 0;
   /* Etiqueta con las unidades del preview: unidades = 0 es un dato VALIDO
      (falta de calibracion) y se muestra, no se oculta. */
   var anota = {};
@@ -8727,12 +8733,16 @@ function mmPintarProductos() {
     selPremio.innerHTML = mmOpcionesHtml(lista, anota);
     var orden = (MM_ESTADO.cfg && MM_ESTADO.cfg.orden_premios) || [];
     if (orden.length) selPremio.value = String(orden[0]);
-    selPremio.disabled = !marca;
+    selPremio.disabled = !marca || sinCat;
+    if (sinCat) selPremio.title = 'sin catalogo de marca';
+    else selPremio.removeAttribute('title');
   }
   var selEntrega = mmEl('data-mm-producto-entrega');
   if (selEntrega) {
     selEntrega.innerHTML = mmOpcionesHtml(lista, null);
-    selEntrega.disabled = !marca;
+    selEntrega.disabled = !marca || sinCat;
+    if (sinCat) selEntrega.title = 'sin catalogo de marca';
+    else selEntrega.removeAttribute('title');
   }
 }
 function mmPintarPromo() {
@@ -8788,16 +8798,15 @@ function cargarMarcaPanel(uid) {
 }
 function mmCargarDatos(uid) {
   var uInv = '/api/interacciones?tipo=inventario&usuario_id=' + encodeURIComponent(uid);
-  var uCat = '/api/interacciones?tipo=consumibles';
   var uCan = '/api/interacciones?tipo=canjes_marca'
     + (MM_ESTADO.activa ? '&marca_id=' + encodeURIComponent(MM_ESTADO.activa) : '');
   var uPre = MM_ESTADO.activa
     ? '/api/interacciones?tipo=marca_premios&marca_id=' + encodeURIComponent(MM_ESTADO.activa)
     : '';
-  var tareas = [mmGet(uInv), mmGet(uCat), mmGet(uCan)];
+  var tareas = [mmGet(uInv), mmGet(uCan)];
   tareas.push(uPre ? mmGet(uPre) : Promise.resolve({}));
   return Promise.all(tareas).then(function (rr) {
-    var inv = rr[0] || {}, cat = rr[1] || {}, can = rr[2] || {}, pre = rr[3] || {};
+    var inv = rr[0] || {}, can = rr[1] || {}, pre = rr[2] || {};
     /* inventario: usuarios.capacidades->consumibles (clave -> cantidad) */
     var cons = (inv.data && inv.data.consumibles) ? inv.data.consumibles : {};
     var nuevo = {};
@@ -8807,7 +8816,9 @@ function mmCargarDatos(uid) {
       nuevo[k] = mmInt((c && c.cantidad !== undefined) ? c.cantidad : c, 0);
     }
     MM_ESTADO.inv = nuevo;
-    MM_ESTADO.productos = Array.isArray(cat.data) ? cat.data : [];
+    /* El catalogo de productos NO se pide al servidor: se deriva de la marca
+       en mmProductos() (canjes, orden_premios y preview). */
+    MM_ESTADO.productos = [];
     MM_ESTADO.canjes = Array.isArray(can.data) ? can.data : [];
     MM_ESTADO.premios = Array.isArray(pre.premios) ? pre.premios : [];
     MM_ESTADO.cfg = (pre.config && typeof pre.config === 'object') ? pre.config : {};

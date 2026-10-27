@@ -16100,6 +16100,11 @@ module.exports = async function handler(req, res) {
       // Idempotente y a prueba de doble escaneo: la fila se inserta ANTES de
       // tocar el inventario y el descuento CUELGA de la insercion, luego una
       // segunda peticion igual no entrega dos veces ni descuenta dos veces.
+      // D13 (BILLETERA): el stock del cliente SIEMPRE se lee de
+      // usuarios.capacidades->'consumibles' (es donde el premio semanal se
+      // acredita al otorgarse). Cerrar un premio pendiente DESCUENTA tambien
+      // de la billetera, porque el cliente se lleva el producto fisico; si no
+      // alcanza, la entrega NO se completa (fail-closed) y se responde 409.
       // D8: sin la 058 falla CERRADO con 503, nunca 500 ni 42703 crudo.
       // =====================================================================
       if (tipo2 === 'consumible_entregar') {
@@ -16171,19 +16176,8 @@ module.exports = async function handler(req, res) {
             + ' (SELECT ct.id::text FROM canjes_tienda ct'
             + ' WHERE ct.clave_idempotencia=$5::text'
             + ' OR ct.contexto->>\'clave_entrega\' = $5::text'
-            + ' LIMIT 1) AS existente,'
-            // Premio semanal PENDIENTE de ESTE cliente, marca, producto y
-            // MISMA cantidad: si existe, la entrega lo CIERRA sobre su propia
-            // fila (ADR-107 D3) en vez de insertar un canje de mostrador.
-            + ' (SELECT COUNT(*)::int FROM canjes_tienda ct'
-            + ' JOIN billeteras b2 ON b2.usuario_id = ct.usuario_id'
-            + ' WHERE b2.codigo_publico=$2'
-            + ' AND ct.marca_id=$3::uuid'
-            + ' AND ct.origen=\'premio_semanal\''
-            + ' AND ct.estado=\'pendiente\''
-            + ' AND ct.consumible_clave=$4'
-            + ' AND ct.cantidad=$6::int) AS premio_pendiente',
-            [ceUid, ceCodigo, ceMarcaId, ceClave, ceIdem, ceCant]
+            + ' LIMIT 1) AS existente',
+            [ceUid, ceCodigo, ceMarcaId, ceClave, ceIdem]
           );
         } catch (eCeCtx) {
           if (!esEsquemaFaltante(eCeCtx)) throw eCeCtx;
@@ -16214,13 +16208,11 @@ module.exports = async function handler(req, res) {
         }
         var ceTengo = parseInt(ceC0.tengo, 10);
         if (!isFinite(ceTengo) || ceTengo < 0) ceTengo = 0;
-        // El premio semanal NO vive en usuarios.capacidades: al otorgarse solo
-        // consumio stock del catalogo (consumibles.stock_usado). Por eso una
-        // entrega que cierra un premio pendiente no exige stock en capacidades;
-        // el descuento de capacidades sigue colgando del INSERT de mostrador.
-        var cePremioPend = parseInt(ceC0.premio_pendiente, 10);
-        if (!isFinite(cePremioPend) || cePremioPend < 0) cePremioPend = 0;
-        if (cePremioPend < 1 && ceTengo < ceCant) {
+        // D13: la billetera digital es la UNICA fuente de stock. El premio
+        // semanal se acredita ahi al otorgarse (marca_premio_otorgar), asi que
+        // tanto un canje de mostrador como el CIERRE de un premio pendiente
+        // exigen stock suficiente en capacidades. Sin stock no hay entrega.
+        if (ceTengo < ceCant) {
           return res.status(409).json({
             ok: false, error: 'STOCK_INSUFICIENTE',
             consumible_clave: ceClave, requerido: ceCant, disponible: ceTengo
@@ -16256,7 +16248,13 @@ module.exports = async function handler(req, res) {
             + ' \'codigo_publico\', (SELECT w.codigo_publico FROM w))'
             + ' FROM pick'
             + ' WHERE ct.id = pick.id AND ct.estado = \'pendiente\''
-            + ' RETURNING ct.id::text AS canje_id'
+            // D13 fail-closed: el cierre del premio SOLO ocurre si la
+            // billetera del cliente tiene stock. Si no alcanza, upd no
+            // escribe, ins tampoco (su NOT EXISTS(upd) sigue siendo cierto
+            // pero le falta stock) y 'd' no descuenta: no se hace NADA.
+            + ' AND COALESCE((SELECT (u.capacidades->\'consumibles\'->>$3::text)::int'
+            + ' FROM usuarios u WHERE u.id = ct.usuario_id), 0) >= $5::int'
+            + ' RETURNING ct.id::text AS canje_id, ct.usuario_id::text AS uid'
             + '), ins AS ('
             + ' INSERT INTO canjes_tienda (usuario_id, marca_id, billetera_id,'
             + ' codigo_publico_snapshot, consumible_id, consumible_clave, cantidad,'
@@ -16275,12 +16273,16 @@ module.exports = async function handler(req, res) {
             + ' ON CONFLICT (clave_idempotencia) DO NOTHING'
             + ' RETURNING usuario_id::text AS uid'
             + '), d AS ('
+            // Un unico descuento para las DOS vias: cierre de premio (upd) o
+            // canje de mostrador (ins). Son mutuamente excluyentes, asi que
+            // la sentencia descuenta exactamente una vez la cantidad.
             + ' UPDATE usuarios u SET capacidades = COALESCE(u.capacidades, \'{}\'::jsonb)'
             + ' || jsonb_build_object(\'consumibles\','
             + ' COALESCE(u.capacidades->\'consumibles\', \'{}\'::jsonb)'
             + ' || jsonb_build_object($3::text,'
             + ' COALESCE((u.capacidades->\'consumibles\'->>$3::text)::int, 0) - $5::int))'
-            + ' FROM ins WHERE u.id = ins.uid::uuid'
+            + ' FROM (SELECT uid FROM ins UNION ALL SELECT uid FROM upd) src'
+            + ' WHERE u.id = src.uid::uuid'
             + ' RETURNING u.id'
             + ')'
             + ' SELECT (SELECT COUNT(*)::int FROM upd) AS premio_cerrado,'
@@ -16306,8 +16308,9 @@ module.exports = async function handler(req, res) {
 
         var ceR0 = ceRes[0] || {};
         // Cierre del premio semanal sobre SU MISMA fila: no se crea canje de
-        // mostrador ni se descuenta usuarios.capacidades (el premio nunca se
-        // acredito ahi; su stock se consumio en marca_premio_otorgar).
+        // mostrador, pero SI se descuenta usuarios.capacidades (D13), porque
+        // el premio se acredito ahi al otorgarse y el cliente se lleva el
+        // producto fisico. La sentencia no cierra la fila sin descontar.
         var cePremioId = (Number(ceR0.premio_cerrado) === 1 && ceR0.premio_id)
           ? String(ceR0.premio_id) : null;
         if (cePremioId) {
@@ -16324,7 +16327,7 @@ module.exports = async function handler(req, res) {
               cantidad: ceCant,
               atendido_por: ceUid
             },
-            inventario: { tenia: ceTengo, queda: ceTengo }
+            inventario: { tenia: ceTengo, queda: ceTengo - ceCant }
           });
         }
         if (Number(ceR0.creado) !== 1 || Number(ceR0.descontado) !== 1) {
@@ -16367,6 +16370,12 @@ module.exports = async function handler(req, res) {
       // ISO, con el dueno de la marca excluido ANTES de cortar el Top 3.
       // Idempotencia por (marca, semana, puesto, usuario) via
       // canjes_tienda.clave_idempotencia: reejecutar NO duplica premios.
+      // D13 (BILLETERA): ademas de consumir stock del catalogo y crear la
+      // fila 'pendiente' en canjes_tienda, el premio se ACREDITA en
+      // usuarios.capacidades->'consumibles' del ganador en la MISMA sentencia,
+      // para que lo vea en su billetera y pueda fusionarlo (4x50 ml -> 750 ml).
+      // La acreditacion cuelga del INSERT (CTE ins): si el premio no se
+      // inserto, no se acredita nada -> el replay no duplica saldo.
       // D8: sin la 058 falla CERRADO con 503, nunca 500.
       // =====================================================================
       if (tipo2 === 'marca_premio_otorgar') {
@@ -16591,10 +16600,26 @@ module.exports = async function handler(req, res) {
               + ' \'calibrado\', false), $8::text'
               + ' FROM st LEFT JOIN billeteras w ON w.usuario_id = $3::uuid'
               + ' ON CONFLICT (clave_idempotencia) DO NOTHING'
-              + ' RETURNING id::text AS id'
+              + ' RETURNING id::text AS id, usuario_id::text AS uid'
+              + '), acc AS ('
+              // ADR-107 D13: el premio TAMBIEN se acredita en la billetera
+              // digital del ganador (usuarios.capacidades->'consumibles').
+              // Merge JSONB atomico (ADR-003) colgado de ins: si la fila no
+              // se inserto (replay / carrera), acc no escribe nada. La clave
+              // ausente se CREA sumando, nunca falla.
+              + ' UPDATE usuarios u SET capacidades ='
+              + ' COALESCE(u.capacidades, \'{}\'::jsonb)'
+              + ' || jsonb_build_object(\'consumibles\','
+              + ' COALESCE(u.capacidades->\'consumibles\', \'{}\'::jsonb)'
+              + ' || jsonb_build_object($1::text,'
+              + ' COALESCE((u.capacidades->\'consumibles\'->>$1::text)::int, 0)'
+              + ' + $2::int))'
+              + ' FROM ins WHERE u.id = ins.uid::uuid'
+              + ' RETURNING u.id'
               + ')'
               + ' SELECT (SELECT COUNT(*)::int FROM st) AS stock_ok,'
-              + ' (SELECT id FROM ins) AS canje_id',
+              + ' (SELECT id FROM ins) AS canje_id,'
+              + ' (SELECT COUNT(*)::int FROM acc) AS acreditado',
               [moClave, moUnid, moUsuario, moMarca, moUni, moSemana, moPuesto, moIdem]
             );
             var moR0 = moRes[0] || {};

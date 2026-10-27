@@ -2504,9 +2504,9 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **Cobertura permanente (2026-10-25, segundo y ULTIMO pase documental R2):** la regresion de este BUG ya no depende de un smoke ad-hoc. `scripts/smoke_media_caratula.js` (**191** lineas, CommonJS, `vm` + stub de `window`, **sin red**) prueba el caso "miniatura `/embed/` -> derivada" junto con las 4 formas del link y "medio no-YouTube -> placeholder", y esta enganchado al final de la cadena de `npm test` (`package.json:5`). Medido: **104 PASS / 0 FAIL**; prueba negativa: rompiendo `youtubeThumb` el mismo script da **87 PASS / 17 FAIL**. El BUG **sigue CERRADO**: esto no lo reabre, solo congela la red que lo detecta.
 
-## BUG-141: la migracion **058** cayo el `UNIQUE (usuario_id)` de `marcas` **antes** del deploy del codigo que lo consume, y `marca_activar` en produccion responde **42P10** -- **ABIERTO (ventana de deploy, 2026-10-27)** -- bug de **PROCESO**, no de codigo
+## BUG-141: la migracion **058** cayo el `UNIQUE (usuario_id)` de `marcas` **antes** del deploy del codigo que lo consume, y `marca_activar` en produccion responde **42P10** -- ~~**ABIERTO (ventana de deploy, 2026-10-27)**~~ **RESUELTO el 2026-10-27 por el deploy de `fb38b5a` (ver ACTUALIZACION al final)** -- bug de **PROCESO**, no de codigo
 
-**Severidad: MEDIA (hoy sin victima medible: **16 usuarios, 0 marcas**, luego ninguna llamada real ha fallado). Estado: ABIERTO -- se cierra solo con el deploy del operador. No se "arregla" con codigo.**
+**Severidad: MEDIA (hoy sin victima medible: **16 usuarios, 0 marcas**, luego ninguna llamada real ha fallado). Estado: ABIERTO -- se cierra solo con el deploy del operador. No se "arregla" con codigo.** **[Estado actualizado 2026-10-27: RESUELTO por el deploy de `fb38b5a`; el texto se conserva como registro (ADR-003).]**
 
 **Sintoma:** en produccion, cualquier `POST ?tipo=marca_activar` sobre el codigo **desplegado** falla con error Postgres **`42P10`** (*"there is no unique or exclusion constraint matching the ON CONFLICT specification"*). La rama entera muere: no activa, no actualiza y no registra el gasto de XP.
 
@@ -2521,6 +2521,26 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **Relacion con otros BUG (sin duplicar):** no es **BUG-137/138/139/140** (render, fotos, atribucion). Tampoco es el `42703`/`42P01` que el codigo nuevo degrada a proposito: aqui el error es **`42P10`**, que ninguna rama captura porque en el codigo nuevo **no puede ocurrir**.
 
 **Registro:** detectado al cerrar **TSK-242 / ADR-107 rev.4**, donde se documento que el modulo tiene **"DESPLIEGUE PENDIENTE"** (y se corrigio en el mismo pase la linea de estado del ADR, que decia "IMPLEMENTADO Y DESPLEGADO").
+
+**ACTUALIZACION 2026-10-27 (ADR-107 rev.6, TSK-242 "Revision 6"): pasa a RESUELTO.** El commit **`fb38b5a` SI esta en produccion**, medido con canario externo: `GET https://latawel.com/api/interacciones?tipo=canjes_marca` -> **401**, y esa rama **no existia antes del modulo**. Con el codigo nuevo desplegado, `marca_activar` ya no ejecuta `INSERT ... ON CONFLICT (usuario_id)`, luego el **`42P10` deja de ocurrir** y la ventana de deploy que este bug describia queda **cerrada**. El **patron de falla** (DDL destructivo antes del deploy del codigo que lo consume) **se conserva como leccion** y el registro no se borra (ADR-003). Lo unico pendiente ya no es este bug: es el **deploy del commit final** (`ee5e19c` en HEAD y los cambios de la rev.6 sin commitear).
+
+## BUG-142: la metrica `pocimas_entregadas` era **INALCANZABLE** -- valia **0 para siempre** porque ningun codigo ponia `estado='entregado'` en `canjes_tienda` -- **RESUELTO (2026-10-27, ADR-107 rev.5 + rev.6)**
+
+**Severidad: MEDIA (metrica muerta, no perdida de datos: el premio fisico se entregaba; lo que no se podia medir era la entrega). Estado: RESUELTO en el worktree, PENDIENTE DE COMMIT Y DEPLOY.**
+
+**Sintoma:** en el Panel de Marca, `pocimas_entregadas` salia **0 siempre** y el contador de `pendientes` **nunca drenaba**: una marca con premios ya entregados en mostrador mostraba la misma "deuda de mostrador" que una sin entregar. Sin error, sin 500, sin log: el numero era **plausible y falso**, que es el peor modo de fallo de una metrica.
+
+**Causa (de semantica, no de SQL):** `pocimas_entregadas` se calcula como `SUM(cantidad)` con `origen='premio_semanal' AND estado='entregado'`, pero en **todo el repositorio no existia ni un solo `UPDATE canjes_tienda`**: las filas del premio nacian en `estado='pendiente'` (`marca_premio_otorgar`) y **nadie las pasaba nunca** a `'entregado'`. Ademas, `consumible_entregar` **insertaba una fila NUEVA** con `origen='mostrador'` y `estado='entregado'`, que cae en `productos_entregados` y **no toca** la fila del premio: el mismo acto fisico se registraba **dos veces y en dos origenes distintos**, y por eso la metrica del premio no podia moverse aunque el mostrador trabajara.
+
+**Fix (decision del operador, ADR-107 R5-E4):** al entregar un premio semanal **se cierra la MISMA fila** (`origen='premio_semanal'`, `pendiente` -> `entregado`) con `entregado_en` y `atendido_por`, en vez de insertar la gemela de mostrador; el `INSERT` de `origen='mostrador'` queda **solo como respaldo** para el canje de tienda. Implementado en `api/interacciones.js`, rama `consumible_entregar` (bloque **`:16160-16260`**, **cita de fecha**) y complementado por la **D13 rev.6**: el cierre **descuenta** la unidad de `usuarios.capacidades->'consumibles'` y es **fail-closed** (sin saldo -> **409**; no se cierra la fila ni se descuenta).
+
+**Por que se registra como BUG y no como nota de diseno:** una metrica **inalcanzable** no es una metrica en cero, es una **mentira estable**. El patron es repetible en cualquier modulo: *si una columna de estado solo se escribe en el `INSERT`, toda consulta que filtre por otro estado devuelve vacio para siempre, y nadie lo nota porque el resultado es un numero valido*. Regla que sale de aqui: **toda metrica que filtre por un estado necesita un escritor de ese estado VERIFICADO en el repo**, no solo en el papel.
+
+**Verificacion:** `Select-String "UPDATE canjes_tienda"` en `api/interacciones.js` -> **existe** el `UPDATE ... SET estado='entregado', atendido_por=$1::uuid, entregado_en=NOW()` de la rama `consumible_entregar`; antes de este modulo habia **0 coincidencias**. Lo verificado es el **escritor**, no el numero: la metrica **no se ha re-medido contra datos reales** (el repo no lleva credenciales de Neon).
+
+**Relacion con otros BUG (sin duplicar):** no es **BUG-141** (42P10 por orden de despliegue, ya resuelto por `fb38b5a` ni **BUG-137/138/139/140** (render, fotos, atribucion). Es el defecto que **R5-E4** declaro en el papel antes de que existiera el codigo.
+
+**Registro:** detectado por `@architect-review` al revisar **ADR-107 rev.4**; cerrado en la **rev.5** (decision: cerrar sobre la misma fila) y en la **rev.6** (billetera). Se registra aqui en el pase de cierre de **TSK-242** porque es **semantica de producto**, no una revision de papel.
 
 
 

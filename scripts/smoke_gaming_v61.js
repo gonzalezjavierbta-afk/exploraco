@@ -60,9 +60,15 @@ check('G1: Casa exige nivel derivado >= 5 (ceNivelAnt < 5 + nivel_requerido 5)',
   reCasa.test(srcUsu) && srcUsu.indexOf('nivel_requerido: 5') !== -1);
 check('G2: Clase exige nivel derivado >= 3 (clNivelAnt < 3 + nivel_requerido 3)',
   reClase.test(srcUsu) && srcUsu.indexOf('nivel_requerido: 3') !== -1);
-check('G3: Marca lee marcas.nivel_requerido con default 6',
+// ADR-107 D15: el fallback de codigo debe igualar el DEFAULT real de la columna
+// (027). Se DERIVAN los dos numeros del codigo real en vez de duplicar el
+// literal, para que el check siga midiendo la igualdad y no una foto del valor.
+var mig027 = read('db/migrations/027_zonas_marcas.sql');
+var mCteDef = srcUsu.match(/MARCA_NIVEL_REQUERIDO_DEFAULT\s*=\s*(\d+)/);
+var mColDef = mig027.match(/nivel_requerido\s+INTEGER\s+NOT NULL\s+DEFAULT\s+(\d+)/);
+check('G3: Marca lee marcas.nivel_requerido y su fallback iguala el DEFAULT de la columna (027)',
   srcUsu.indexOf('marcas.nivel_requerido') !== -1
-  && srcUsu.indexOf('MARCA_NIVEL_REQUERIDO_DEFAULT = 6') !== -1);
+  && !!mCteDef && !!mColDef && mCteDef[1] === mColDef[1]);
 
 // === 3. OWN THE SPOT: dividendo DESCUENTO con tope + debito exige saldo ===
 check('S1: tope del dividendo en codigo (0.50 + red2ConTopeSpin)',
