@@ -330,6 +330,26 @@ async function leerMarcaAltaXp(sql) {
   return MARCA_ALTA_XP_DEFAULT;
 }
 
+// O4-b: nivel GLOBAL de ALTA de marca. Al CREAR no existe fila en marcas, asi
+// que marcas.nivel_requerido (dato POR MARCA, usado por spots) no puede decidir
+// el gate del alta: la fuente es gamificacion_config.marca_nivel_requerido.
+// NUNCA lanza: degrada al default 5 con warn si la tabla o la clave no existen
+// (patron BUG-021 / ADR-107 D5). El MISMO valor se devuelve a los clientes
+// (mi_marca / marcas_mias) para pintar el requisito, de modo que UI y servidor
+// no puedan divergir.
+async function leerMarcaNivelRequerido(sql) {
+  try {
+    var rows = await sql("SELECT valor FROM gamificacion_config WHERE clave='marca_nivel_requerido' LIMIT 1");
+    var v = parseInt((rows && rows.length) ? rows[0].valor : '', 10);
+    if (isFinite(v) && v >= 1) return v;
+  } catch (eCfgNivel) {
+    var code = eCfgNivel && eCfgNivel.code;
+    console.warn('[marca] gamificacion_config no leida (' + code + '): marca_nivel_requerido por defecto '
+      + MARCA_NIVEL_REQUERIDO_DEFAULT);
+  }
+  return MARCA_NIVEL_REQUERIDO_DEFAULT;
+}
+
 function calcularNivel(xpTotal) {
   const xp = Number(xpTotal) || 0;
   let nivelIdx = 0;
@@ -366,9 +386,12 @@ function nodoMercadoPorNivelLocal(nivelJugador) {
   }
   return idx + 1;
 }
-// ADR-059 / ADR-064 (M-6 CERRADO) + ADR-107 D5/D15: umbral de CREACION de
-// Marca. La columna marcas.nivel_requerido (migracion 027) es la fuente; este
-// valor es el fallback ASCII cuando la fila/columna aun no expone el dato.
+// ADR-059 / ADR-064 (M-6 CERRADO) + ADR-107 D5/D15 + O4-b: umbral de CREACION
+// de Marca. La FUENTE es gamificacion_config.marca_nivel_requerido (helper
+// leerMarcaNivelRequerido); esta constante es solo el fallback ASCII cuando la
+// tabla o la clave no existen. marcas.nivel_requerido (027:208, DEFAULT 5)
+// sigue existiendo como dato POR MARCA (spots / marca_patrocinar), pero NO
+// decide el alta: al crear todavia no hay fila.
 // ADR-107 D15 CIERRA la deriva 6 vs 5: el DEFAULT real de la columna desde la
 // 027 es 5, luego el fallback de codigo pasa de 6 a 5 (decision, no nota).
 // El grandfathering de EDICION vive en la rama marca_activar.
@@ -818,25 +841,27 @@ module.exports = async (req, res) => {
           mmDegradado = true;
           mmRows = await sql(mmCols + 'FROM marcas m WHERE m.usuario_id = $1 LIMIT 1', [mmId]);
         }
-        // ADR-059 / ADR-064 (M-6): se expone de forma ADITIVA el umbral de
-        // Marca desde marcas.nivel_requerido (fallback 5, ADR-107 D15),
-        // para que la UI no anuncie un gate distinto al real. Sin fila de
-        // marca se responde data=null con el umbral a nivel raiz.
+        // ADR-059 / ADR-064 (M-6) + O4-b: se expone el umbral GLOBAL del ALTA
+        // (gamificacion_config.marca_nivel_requerido, fallback 5) tanto con
+        // marca como sin ella, para que la UI no anuncie un gate distinto al
+        // real. data.nivel_requerido sigue siendo el dato POR MARCA.
+        var mmNivelReq = await leerMarcaNivelRequerido(sql);
         if (mmRows.length) {
           var mmNr = parseInt(mmRows[0].nivel_requerido, 10);
           mmRows[0].nivel_requerido = (isFinite(mmNr) && mmNr >= 1)
-            ? mmNr : MARCA_NIVEL_REQUERIDO_DEFAULT;
+            ? mmNr : mmNivelReq;
           return res.json({
             ok: true,
             data: mmRows[0],
             marca_activa_id: mmRows[0].id || null,
+            nivel_requerido: mmNivelReq,
             degradado: mmDegradado
           });
         }
         return res.json({
           ok: true, data: null,
           marca_activa_id: null,
-          nivel_requerido: MARCA_NIVEL_REQUERIDO_DEFAULT,
+          nivel_requerido: mmNivelReq,
           degradado: mmDegradado
         });
       }
@@ -851,6 +876,9 @@ module.exports = async (req, res) => {
         if (!UUID_RE.test(mmsId))
           return res.status(400).json({ ok: false, error: 'USUARIO_ID_INVALIDO' });
         var mmsCosto = await leerMarcaAltaXp(sql);
+        // O4-b: el requisito que se PINTA es el GLOBAL del alta, no la columna
+        // por marca (mi-perfil.html lee esta clave raiz).
+        var mmsNivelReq = await leerMarcaNivelRequerido(sql);
         try {
           var mmsRows = await sql(
             'SELECT m.id, m.nombre, m.logo_url, m.banner_url, m.descripcion, '
@@ -864,8 +892,6 @@ module.exports = async (req, res) => {
           );
           var mmsActiva = (mmsRows.length && mmsRows[0].marca_activa_id)
             ? String(mmsRows[0].marca_activa_id) : null;
-          var mmsNr = parseInt(mmsRows.length ? mmsRows[0].nivel_requerido : '', 10);
-          if (!isFinite(mmsNr) || mmsNr < 1) mmsNr = MARCA_NIVEL_REQUERIDO_DEFAULT;
           var mmsData = mmsRows.map(function (r) {
             var o = {};
             for (var k in r) { if (Object.prototype.hasOwnProperty.call(r, k) && k !== 'marca_activa_id') o[k] = r[k]; }
@@ -876,7 +902,7 @@ module.exports = async (req, res) => {
             data: mmsData,
             marca_activa_id: mmsActiva,
             total: mmsData.length,
-            nivel_requerido: mmsNr,
+            nivel_requerido: mmsNivelReq,
             costo_xp_creacion: mmsCosto,
             degradado: false
           });
@@ -887,7 +913,7 @@ module.exports = async (req, res) => {
             + '): migracion 058 pendiente');
           return res.json({
             ok: true, data: [], marca_activa_id: null, total: 0,
-            nivel_requerido: MARCA_NIVEL_REQUERIDO_DEFAULT,
+            nivel_requerido: mmsNivelReq,
             costo_xp_creacion: mmsCosto,
             degradado: true
           });
@@ -2424,7 +2450,8 @@ module.exports = async (req, res) => {
       // POST { tipo:'marca_crear', usuario_id, nombre, logo_url?,
       //        banner_url?, descripcion?, areas_influencia?, enlaces? }
       // ADR-107: el ALTA se separa de la EDICION porque tiene gate de nivel
-      // (nivel_requerido = 5) y COSTE en XP (gamificacion_config.marca_alta_xp
+      // (gamificacion_config.marca_nivel_requerido, fallback 5, O4-b) y COSTE
+      // en XP (gamificacion_config.marca_alta_xp
       // = 1650, recalibrable sin deploy). El coste NO resta usuarios.xp_total:
       // incrementa xp_gastado_sinks (patron 046:39-44) y deja una fila en
       // xp_ledger con xp_final negativo (mismo shape que tithe_parche), para
@@ -2440,6 +2467,9 @@ module.exports = async (req, res) => {
         var mcNombre = String(c.nombre || '').trim().slice(0, 120);
         if (!mcNombre) return res.status(400).json({ ok: false, error: 'nombre requerido' });
         var mcCosto = await leerMarcaAltaXp(sql);
+        // O4-b: el gate del alta se decide por el valor GLOBAL configurable,
+        // el mismo que mi_marca / marcas_mias devuelven para pintar.
+        var mcNivelReq = await leerMarcaNivelRequerido(sql);
         var mcUsr;
         try {
           mcUsr = await sql(
@@ -2459,10 +2489,10 @@ module.exports = async (req, res) => {
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
         // El nivel se DERIVA de xp_total (usuarios.nivel esta STALE).
         var mcNivel = calcularNivel(mcUsr[0].xp_total).nivel;
-        if (mcNivel < MARCA_NIVEL_REQUERIDO_DEFAULT)
+        if (mcNivel < mcNivelReq)
           return res.status(403).json({
             ok: false, error: 'NIVEL_INSUFICIENTE',
-            nivel: mcNivel, nivel_requerido: MARCA_NIVEL_REQUERIDO_DEFAULT
+            nivel: mcNivel, nivel_requerido: mcNivelReq
           });
         // XP_DISPONIBLE = xp_total - xp_gastado_sinks: la unica vara.
         var mcDisp = red2(Math.max(numXp(mcUsr[0].xp_total) - numXp(mcUsr[0].xp_gastado_sinks), 0));
@@ -2498,7 +2528,7 @@ module.exports = async (req, res) => {
            c.logo_url ? String(c.logo_url).slice(0, 512) : null,
            c.banner_url ? String(c.banner_url).slice(0, 512) : null,
            c.descripcion ? String(c.descripcion).slice(0, 500) : null,
-           mcAreas, mcLinks, MARCA_NIVEL_REQUERIDO_DEFAULT]
+           mcAreas, mcLinks, mcNivelReq]
         );
         if (!mcFila.length || !mcFila[0].marca_id) {
           // Sin fila en d (carrera de XP) -> cero cambios, cero marca.

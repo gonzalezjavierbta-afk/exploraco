@@ -1012,6 +1012,88 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
 [style*="font-size:11px"],[style*="font-size:10px"],[style*="font-size:9px"],[style*="font-size:8px"]{font-size:12px!important}
 
 }
+
+/* ---- LATAWEL: MARCAS SELF-SERVICE, panel "Mi Marca" ----
+   Silo atomico (ADR-004): TODO cuelga de .mi-marca, declarado una sola vez
+   aqui, y no se agrega ningun token nuevo en :root (se reutilizan --gold,
+   --gold-l, --gold-d y --black). Los estados se pintan por atributo
+   data-mm-*: nunca se borra un nodo (ADR-003), solo se oculta con [hidden]. */
+.mi-marca{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-top:28px;color:#fff;font-family:'Outfit',sans-serif}
+.mi-marca,.mi-marca *{box-sizing:border-box}
+.mi-marca [hidden]{display:none !important}
+.mi-marca h3,.mi-marca h4,.mi-marca h5,.mi-marca p,.mi-marca span{margin:0}
+.mi-marca .mm-ico{font-size:14px;line-height:1}
+.mi-marca .mm-titulo{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.6);padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:6px}
+.mi-marca .mm-sub{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1.2px;color:var(--gold);display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.mi-marca .mm-sub2{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.9px;color:rgba(255,255,255,.65);margin-bottom:6px}
+.mi-marca .mm-nota{font-size:12px;color:rgba(255,255,255,.45);line-height:1.55;margin-top:8px}
+.mi-marca .mm-bloque{margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}
+.mi-marca .mm-cab{margin-top:10px}
+.mi-marca .mm-lab{display:block;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.9px;color:rgba(255,255,255,.5);margin-bottom:5px}
+.mi-marca .mm-campo{margin-bottom:12px}
+.mi-marca .mm-hint{display:block;font-size:11px;color:rgba(255,255,255,.35);line-height:1.45;margin-top:5px}
+.mi-marca .mm-inp,.mi-marca .mm-sel{display:block;width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:#fff;font-family:'Outfit',sans-serif;font-size:16px;min-height:44px;padding:0 10px}
+.mi-marca .mm-inp::placeholder{color:rgba(255,255,255,.3)}
+.mi-marca .mm-inp:focus,.mi-marca .mm-sel:focus{outline:none;border-color:var(--gold);background:rgba(255,74,0,.06)}
+.mi-marca .mm-inp-fijo{color:rgba(255,255,255,.45);border-style:dashed;cursor:not-allowed}
+.mi-marca .mm-inp-codigo{font-family:'Geist','Barlow Condensed',monospace;letter-spacing:1.5px;text-transform:uppercase}
+.mi-marca .mm-vacio{font-size:12px;color:rgba(255,255,255,.4);line-height:1.5;background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.12);border-radius:8px;padding:10px;margin-bottom:12px}
+.mi-marca .mm-estados{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.mi-marca .mm-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:999px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.6);background:rgba(255,255,255,.04)}
+.mi-marca .mm-pill-ok{color:#86efac;border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.1)}
+.mi-marca .mm-pill-off{color:rgba(255,255,255,.45)}
+.mi-marca .mm-pill-promo{color:rgba(255,255,255,.5)}
+.mi-marca [data-mm-promo-estado="activa"] .mm-pill-promo{color:var(--gold-d);border-color:rgba(255,184,77,.5);background:rgba(255,184,77,.1)}
+.mi-marca .mm-crear{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,74,0,.06);border:1px solid rgba(255,74,0,.28);border-radius:10px;padding:10px 12px}
+.mi-marca .mm-crear-txt{flex:1;min-width:140px;display:flex;flex-direction:column;gap:2px}
+.mi-marca .mm-crear-t{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.8px}
+.mi-marca .mm-crear-c{font-size:11px;color:rgba(255,255,255,.55)}
+.mi-marca .mm-crear-c b{color:var(--gold)}
+.mi-marca .mm-dot{color:rgba(255,255,255,.3);margin:0 2px}
+.mi-marca .mm-motivo{font-size:11px;color:#fca5a5;line-height:1.45;margin-top:6px}
+.mi-marca .mm-btn{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;min-height:44px;padding:0 16px;border-radius:6px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.75);cursor:pointer;transition:all .15s}
+.mi-marca .mm-btn:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+.mi-marca .mm-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.mi-marca .mm-btn-gold{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.mi-marca .mm-btn-gold:hover:not(:disabled){opacity:.88;color:var(--black)}
+.mi-marca .mm-btn:disabled{opacity:.4;cursor:not-allowed}
+.mi-marca .mm-toggle-fila{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:14px}
+.mi-marca .mm-toggle-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.mi-marca .mm-toggle-t{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.75)}
+.mi-marca .mm-toggle-h{font-size:11px;color:rgba(255,255,255,.4);line-height:1.45}
+.mi-marca .mm-switch{position:relative;flex:0 0 auto;width:54px;height:30px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);cursor:pointer;padding:0;transition:background .18s,border-color .18s}
+.mi-marca .mm-switch-knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.55);transition:left .18s,background .18s}
+.mi-marca .mm-switch[aria-checked="true"]{background:var(--gold);border-color:var(--gold)}
+.mi-marca .mm-switch[aria-checked="true"] .mm-switch-knob{left:27px;background:var(--black)}
+.mi-marca .mm-switch:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.mi-marca .mm-grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.mi-marca .mm-aviso{font-size:11px;color:rgba(255,255,255,.45);line-height:1.5;background:rgba(255,255,255,.04);border-left:2px solid rgba(255,255,255,.18);border-radius:0 6px 6px 0;padding:8px 10px}
+.mi-marca .mm-aviso b{color:rgba(255,255,255,.8)}
+.mi-marca .mm-metricas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mi-marca .mm-met{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 8px;text-align:center;display:flex;flex-direction:column;gap:2px}
+.mi-marca .mm-met-v{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1.1;color:var(--gold)}
+.mi-marca .mm-met-l{font-size:10px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.5px;line-height:1.3}
+.mi-marca .mm-receta{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.mi-marca .mm-receta-cab{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}
+.mi-marca .mm-receta-n{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.8)}
+.mi-marca .mm-receta-cuenta{font-family:'Geist','Barlow Condensed',sans-serif;font-size:12px;font-weight:900;color:var(--gold)}
+.mi-marca .mm-barra{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden;margin-bottom:8px}
+.mi-marca .mm-barra-fill{height:100%;width:0;background:var(--gold);border-radius:4px;transition:width .25s ease}
+.mi-marca .mm-receta[data-mm-completa="1"] .mm-barra-fill{background:#22C55E}
+.mi-marca .mm-receta[data-mm-completa="1"] .mm-receta-cuenta{color:#86efac}
+.mi-marca .mm-receta .mm-btn{padding:0 12px;min-height:40px;font-size:12px}
+.mi-marca .mm-falta{font-size:10px;color:rgba(255,255,255,.4);margin-left:8px}
+.mi-marca .mm-entrega{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07)}
+.mi-marca .mm-acciones{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
+.mi-marca .mm-res{font-size:12px;line-height:1.45;margin-top:8px;color:rgba(255,255,255,.7)}
+.mi-marca .mm-res[data-mm-estado="ok"]{color:#86efac}
+.mi-marca .mm-res[data-mm-estado="error"]{color:#fca5a5}
+.mi-marca .mm-alta{margin-bottom:12px}
+.mi-marca .mm-alta .mm-campo{margin-bottom:10px}
+.mi-marca .mm-area{min-height:78px;padding:9px 10px;line-height:1.45;resize:vertical}
+.mi-marca .mm-op{font-family:'Outfit',sans-serif;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:rgba(255,255,255,.35)}
+.mi-marca .mm-error{font-size:12px;line-height:1.45;margin-top:6px;color:#fca5a5}
+@media (max-width:600px){.mi-marca .mm-grid2{grid-template-columns:1fr}.mi-marca .mm-metricas{grid-template-columns:repeat(2,1fr)}.mi-marca .mm-crear{flex-direction:column;align-items:stretch}.mi-marca .mm-crear .mm-btn{width:100%}.mi-marca .mm-receta .mm-btn{width:100%}}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -1057,6 +1139,9 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
          data-nivel-requerido: son visibles desde nivel 1. Esta exige 11
          (capacidad organizar_actividad) porque ordena tu especializacion. -->
     <button type="button" class="pf-tab" role="tab" data-tab="tabla_destino" data-nivel-requerido="11" aria-selected="false" title="Requiere nivel 11" onclick="pfTab('tabla_destino')">&#x1F9ED; Tabla</button>
+    <!-- Marcas Self-Service: pestana abierta desde nivel 1; el gate de nivel 5
+         vive en el boton "Crear marca" (bloque 1), no en la pestana. -->
+    <button type="button" class="pf-tab" role="tab" data-tab="marca" aria-selected="false" onclick="pfTab('marca')">&#x1F3F7;&#xFE0F; Marca</button>
   </nav>
 
   <!-- HERO -->
@@ -1630,6 +1715,187 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
     <div id="td-grid" aria-live="polite">
       <div class="td-cargando">Cargando tu Tabla de Destino&#8230;</div>
     </div>
+  </div>
+
+  <!-- LATAWEL / Marcas Self-Service: panel "Mi Marca".
+       SOLO PRESENTACION: aqui no hay fetch, listeners ni logica. El modulo de
+       comportamiento consume los ganchos data-mm-* (prefijo unico del panel).
+       Patron del fichero: titulo DENTRO del panel, nodo hijo directo de
+       #profile con data-tab (pfAplicarTab) y estados por atributo sin borrar
+       nodos (ADR-003). Silo CSS unico: .mi-marca (ADR-004). -->
+  <div class="mi-marca" id="pf-marca" data-tab="marca" data-mm-panel="marca">
+
+    <!-- BLOQUE 1: cabecera de marca activa (multi-marca) -->
+    <div class="mm-cab" data-mm-bloque="cabecera">
+      <h3 class="mm-titulo"><span class="mm-ico" aria-hidden="true">&#x1F3F7;&#xFE0F;</span> Mi Marca</h3>
+      <p class="mm-nota">Una cuenta puede operar varias marcas. Elige la activa: la promocion, las metricas y la billetera trabajan siempre sobre la marca seleccionada.</p>
+
+      <div class="mm-campo">
+        <label class="mm-lab" for="mm-marca-sel">Marca activa</label>
+        <select class="mm-sel" id="mm-marca-sel" data-mm-marca-activa aria-describedby="mm-marca-hint">
+          <option value="">Sin marcas todavia</option>
+        </select>
+        <span class="mm-hint" id="mm-marca-hint">El selector admite N marcas: se repuebla con las que devuelva la sesion.</span>
+      </div>
+
+      <p class="mm-vacio" id="mm-sin-marca" data-mm-sin-marca hidden>Crea tu primera marca para activar la promocion semanal y la billetera.</p>
+
+      <div class="mm-estados" id="mm-estados" data-mm-verificada="0" data-mm-promo-estado="pausada">
+        <span class="mm-pill mm-pill-ok" id="mm-pill-verificada" data-mm-badge="verificada" hidden>Verificada</span>
+        <span class="mm-pill mm-pill-off" id="mm-pill-noverificada" data-mm-badge="noverificada" hidden>Sin verificar</span>
+        <span class="mm-pill mm-pill-promo" id="mm-pill-promo" data-mm-badge="promo">Promocion pausada</span>
+      </div>
+
+      <div class="mm-alta" id="mm-alta">
+        <div class="mm-campo">
+          <label class="mm-lab" for="mm-nombre-marca">Nombre de la marca</label>
+          <input class="mm-inp" type="text" id="mm-nombre-marca" name="mm-nombre-marca" maxlength="60" autocomplete="off" required placeholder="Ej.: Cafe del Quindio" aria-describedby="mm-alta-hint mm-nombre-error">
+          <span class="mm-hint" id="mm-alta-hint">Obligatorio &middot; max. 60 caracteres. El alta cuesta <b>1650 XP</b> y pide <b>nivel 5</b>.</span>
+          <p class="mm-error" id="mm-nombre-error" role="alert" hidden></p>
+        </div>
+        <div class="mm-campo">
+          <label class="mm-lab" for="mm-desc-marca">Descripci&oacute;n <span class="mm-op">(opcional)</span></label>
+          <textarea class="mm-inp mm-area" id="mm-desc-marca" name="mm-desc-marca" rows="3" maxlength="240" autocomplete="off" placeholder="Que ofrece tu marca, en dos lineas."></textarea>
+        </div>
+      </div>
+
+      <div class="mm-crear" id="mm-crear">
+        <span class="mm-crear-txt">
+          <span class="mm-crear-t">Crear marca</span>
+          <span class="mm-crear-c">Coste <b>1650 XP</b> <span class="mm-dot">&#x00B7;</span> requiere <b>nivel 5</b></span>
+        </span>
+        <button type="button" class="mm-btn mm-btn-gold" id="mm-btn-crear" data-mm-btn-crear disabled aria-describedby="mm-motivo-nivel mm-motivo-xp">Crear marca</button>
+      </div>
+      <p class="mm-motivo" id="mm-motivo-nivel" data-mm-motivo="nivel" hidden>Bloqueado por nivel: crear marca pide nivel 5.</p>
+      <p class="mm-motivo" id="mm-motivo-xp" data-mm-motivo="xp" hidden>Bloqueado por XP: crear marca cuesta 1650 XP.</p>
+    </div>
+
+    <!-- BLOQUE 2: promocion semanal (estado_promo) -->
+    <div class="mm-bloque" data-mm-bloque="promo">
+      <h4 class="mm-sub"><span class="mm-ico" aria-hidden="true">&#x1F4E3;</span> Promoci&oacute;n semanal</h4>
+
+      <div class="mm-toggle-fila">
+        <span class="mm-toggle-txt">
+          <span class="mm-toggle-t" id="mm-promo-label">Promoci&oacute;n pausada</span>
+          <span class="mm-toggle-h">Arranca pausada. Al activarla, tu marca entra en el reparto semanal de premios.</span>
+        </span>
+        <button type="button" class="mm-switch" id="mm-promo-switch" data-mm-promo-toggle="pausada" role="switch" aria-checked="false" aria-labelledby="mm-promo-label">
+          <span class="mm-switch-knob" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <div class="mm-grid2">
+        <div class="mm-campo">
+          <label class="mm-lab" for="mm-premio-item">Producto del premio</label>
+          <select class="mm-sel" id="mm-premio-item" data-mm-premio-item disabled>
+            <option value="">Sin producto</option>
+          </select>
+        </div>
+        <div class="mm-campo">
+          <label class="mm-lab" for="mm-tope-unidades">Tope de unidades</label>
+          <input class="mm-inp" id="mm-tope-unidades" data-mm-tope-unidades type="number" min="1" step="1" inputmode="numeric" placeholder="Sin tope">
+          <span class="mm-hint">Vac&iacute;o = sin tope.</span>
+        </div>
+        <div class="mm-campo">
+          <label class="mm-lab" for="mm-alcance">Alcance</label>
+          <input class="mm-inp mm-inp-fijo" id="mm-alcance" data-mm-alcance="global" type="text" value="global" readonly disabled aria-readonly="true">
+          <span class="mm-hint">v1 solo soporta alcance global: no editable.</span>
+        </div>
+      </div>
+
+      <p class="mm-aviso" id="mm-promo-aviso" data-mm-aviso="premios">Los premios <b>no se reparten solos</b>: los otorga el operador al revisar la promoci&oacute;n.</p>
+    </div>
+
+    <!-- BLOQUE 3: metricas de la marca (las seis, sin inventar) -->
+    <div class="mm-bloque" data-mm-bloque="metricas">
+      <h4 class="mm-sub"><span class="mm-ico" aria-hidden="true">&#x1F4CA;</span> M&eacute;tricas</h4>
+      <div class="mm-metricas" id="mm-metricas" data-mm-metricas aria-live="polite">
+        <div class="mm-met" data-mm-metrica="pocimas_otorgadas">
+          <span class="mm-met-v" data-mm-valor="pocimas_otorgadas">0</span>
+          <span class="mm-met-l">P&oacute;cimas otorgadas</span>
+        </div>
+        <div class="mm-met" data-mm-metrica="pocimas_entregadas">
+          <span class="mm-met-v" data-mm-valor="pocimas_entregadas">0</span>
+          <span class="mm-met-l">P&oacute;cimas entregadas</span>
+        </div>
+        <div class="mm-met" data-mm-metrica="productos_entregados">
+          <span class="mm-met-v" data-mm-valor="productos_entregados">0</span>
+          <span class="mm-met-l">Productos entregados</span>
+        </div>
+        <div class="mm-met" data-mm-metrica="pendientes">
+          <span class="mm-met-v" data-mm-valor="pendientes">0</span>
+          <span class="mm-met-l">Pendientes</span>
+        </div>
+        <div class="mm-met" data-mm-metrica="xp_canjeado">
+          <span class="mm-met-v" data-mm-valor="xp_canjeado">0</span>
+          <span class="mm-met-l">XP canjeado</span>
+        </div>
+        <div class="mm-met" data-mm-metrica="fusiones">
+          <span class="mm-met-v" data-mm-valor="fusiones">0</span>
+          <span class="mm-met-l">Fusiones</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLOQUE 4: billetera y canje -->
+    <div class="mm-bloque" data-mm-bloque="billetera">
+      <h4 class="mm-sub"><span class="mm-ico" aria-hidden="true">&#x1F9EA;</span> Billetera y canje</h4>
+
+      <div class="mm-receta" data-mm-receta="pocima_a_media" data-mm-completa="0">
+        <div class="mm-receta-cab">
+          <span class="mm-receta-n">P&oacute;cima a media</span>
+          <span class="mm-receta-cuenta" data-mm-receta-cuenta="pocima_a_media">[0/4]</span>
+        </div>
+        <div class="mm-barra" role="progressbar" id="mm-barra-pocima" data-mm-barra="pocima_a_media" data-mm-actual="0" data-mm-objetivo="4" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0" aria-label="Progreso de pocima a media">
+          <div class="mm-barra-fill" data-mm-barra-fill="pocima_a_media" style="width:0%"></div>
+        </div>
+        <button type="button" class="mm-btn" data-mm-fusion="pocima_a_media" disabled>Fusionar</button>
+        <span class="mm-falta" data-mm-falta="pocima_a_media" hidden>Faltan materiales</span>
+      </div>
+
+      <div class="mm-receta" data-mm-receta="media_a_botella" data-mm-completa="0">
+        <div class="mm-receta-cab">
+          <span class="mm-receta-n">Media a botella</span>
+          <span class="mm-receta-cuenta" data-mm-receta-cuenta="media_a_botella">[0/2]</span>
+        </div>
+        <div class="mm-barra" role="progressbar" id="mm-barra-botella" data-mm-barra="media_a_botella" data-mm-actual="0" data-mm-objetivo="2" aria-valuemin="0" aria-valuemax="2" aria-valuenow="0" aria-label="Progreso de media a botella">
+          <div class="mm-barra-fill" data-mm-barra-fill="media_a_botella" style="width:0%"></div>
+        </div>
+        <button type="button" class="mm-btn" data-mm-fusion="media_a_botella" disabled>Fusionar</button>
+        <span class="mm-falta" data-mm-falta="media_a_botella" hidden>Faltan materiales</span>
+      </div>
+
+      <div class="mm-entrega" data-mm-bloque="entrega">
+        <h5 class="mm-sub2">Entrega en tienda (canje f&iacute;sico)</h5>
+        <p class="mm-hint">Sin QR: el mostrador teclea el c&oacute;digo p&uacute;blico del cliente.</p>
+        <div class="mm-grid2">
+          <div class="mm-campo">
+            <label class="mm-lab" for="mm-codigo-publico">C&oacute;digo p&uacute;blico</label>
+            <input class="mm-inp mm-inp-codigo" id="mm-codigo-publico" data-mm-codigo-publico type="text" autocomplete="off" spellcheck="false" maxlength="24" placeholder="LATA-XXXXXX">
+          </div>
+          <div class="mm-campo">
+            <label class="mm-lab" for="mm-producto-entrega">Producto de la marca</label>
+            <select class="mm-sel" id="mm-producto-entrega" data-mm-producto-entrega disabled>
+              <option value="">Sin productos</option>
+            </select>
+          </div>
+          <div class="mm-campo">
+            <label class="mm-lab" for="mm-cantidad-entrega">Cantidad</label>
+            <input class="mm-inp" id="mm-cantidad-entrega" data-mm-cantidad-entrega type="number" min="1" step="1" value="1" inputmode="numeric">
+          </div>
+        </div>
+        <!-- IDEMPOTENCIA POR INTENTO: el modulo de comportamiento escribe aqui
+             una clave nueva (uuid) antes de cada POST y la limpia tras exito,
+             para que un reintento no reutilice la clave del intento anterior.
+             Este marcado NO la genera: nace vacia en value="". -->
+        <input type="hidden" id="mm-clave-idempotencia" data-mm-clave-idempotencia value="">
+        <div class="mm-acciones">
+          <button type="button" class="mm-btn mm-btn-gold" id="mm-btn-entregar" data-mm-btn-entregar>Entregar</button>
+        </div>
+        <p class="mm-res" id="mm-entrega-resultado" data-mm-entrega-resultado data-mm-estado="idle" role="status" aria-live="polite" hidden></p>
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -6925,7 +7191,7 @@ function showToast(msg,color){
    La pestana activa vive en el hash (#clase, #museo...) y por defecto
    es PERFIL.
    ADR-085: tabla_destino es la unica pestana con data-nivel-requerido. */
-var PF_TABS = ['perfil','clase','red','museo','inventario','mensajes','contratos','cuenta','tabla_destino'];
+var PF_TABS = ['perfil','clase','red','museo','inventario','mensajes','contratos','cuenta','tabla_destino','marca'];
 var PF_TAB_ACTIVO = 'perfil';
 var PF_TAB_SEGURA = 'perfil';
 function pfTabDesdeHash() {
@@ -7026,6 +7292,7 @@ function pfTab(tab) {
   if (tab === 'contratos' && u && u.id) cargarContratos(u.id);
   if (tab === 'cuenta' && u) renderCuentaPanel();
   if (tab === 'tabla_destino' && u && u.id) { cargarTablaDestino(); tdTutorialDesbloqueo(); }
+  if (tab === 'marca' && u && u.id) { mmInit(); cargarMarcaPanel(u.id); }
   try { if (('#' + tab) !== window.location.hash) history.replaceState(null, '', '#' + tab); }
   catch (e) { window.location.hash = tab; }
 }
@@ -8139,7 +8406,777 @@ function albumTrasSubir(r) {
   if (sel && r && r.tipo) sel.value = r.tipo;
 }
 
+/* ==== ADR-107: PANEL "MI MARCA" (COMPORTAMIENTO) =====================
+   El marcado (#pf-marca) y el CSS .mi-marca ya existen: aqui solo se
+   CABLEA. Todos los ganchos llevan el prefijo data-mm- y el bloque entero
+   se guarda con [data-mm-panel="marca"]: si la pagina no trae el panel,
+   no se engancha ningun listener ni se hace un solo fetch.
+   Fuente de verdad: el SERVIDOR. La marca operada es
+   usuarios.marca_activa_id y solo se cambia con POST tipo=marca_activa_set
+   (nunca URL ni localStorage). El gate de alta (nivel 5 / 1650 XP) lo
+   decide marca_crear: aqui solo se pinta lo que devuelve marcas_mias y,
+   si el servidor contesta XP_INSUFICIENTE, se muestra tal cual.
+   Degradacion (ADR-008): cualquier rama caida deja el panel en "modulo no
+   disponible" sin romper el resto del perfil. Nada de esto lanza. */
+var MM_ESTADO = {
+  enganchado: false,
+  cargando: false,
+  cargado: false,
+  marcas: [],
+  activa: null,
+  inv: {},
+  productos: [],
+  premios: [],
+  canjes: [],
+  cfg: {},
+  nivel_requerido: 0,
+  costo_xp: 0
+};
+var MM_RECETAS = {
+  pocima_a_media: {
+    entrada: 'ancestral_pocima_50ml', consumo: 4,
+    salida: 'ancestral_media_375ml', produce: 1
+  },
+  media_a_botella: {
+    entrada: 'ancestral_media_375ml', consumo: 2,
+    salida: 'ancestral_botella_750ml', produce: 1
+  }
+};
+function mmRaiz() { return document.querySelector('[data-mm-panel="marca"]'); }
+function mmEl(attr) {
+  var r = mmRaiz();
+  if (!r || !attr) return null;
+  try { return r.querySelector('[' + attr + ']'); } catch (e) { return null; }
+}
+function mmTodos(attr) {
+  var r = mmRaiz();
+  if (!r || !attr) return [];
+  try { return r.querySelectorAll('[' + attr + ']'); } catch (e) { return []; }
+}
+function mmInt(v, def) {
+  var n = parseInt(v, 10);
+  return (isFinite(n)) ? n : def;
+}
+function mmValor(attr) {
+  var el = mmEl(attr);
+  return el ? String(el.value === undefined || el.value === null ? '' : el.value) : '';
+}
+function mmNum(n) {
+  var v = Number(n);
+  if (!isFinite(v)) return '0';
+  return v.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+}
+function mmTexto(attr, txt) {
+  var el = mmEl(attr);
+  if (el) el.textContent = txt;
+}
+function mmGet(url) {
+  return fetchConJwt(url, { method: 'GET' }).catch(function () { return {}; });
+}
+function mmPost(url, cuerpo) {
+  return fetchConJwt(url, { method: 'POST', body: JSON.stringify(cuerpo || {}) })
+    .catch(function () { return {}; });
+}
+function mmResultado(txt, estado) {
+  var el = mmEl('data-mm-entrega-resultado');
+  if (!el) { showToast(txt, estado === 'error' ? '#ef4444' : '#22C55E'); return; }
+  el.textContent = txt;
+  el.setAttribute('data-mm-estado', estado || 'idle');
+  el.hidden = false;
+}
+var MM_MSG_OFF = 'Mi Marca: modulo no disponible. El resto del perfil sigue funcionando.';
+function mmNoDisponible(motivo) {
+  var raiz = mmRaiz();
+  if (!raiz) return;
+  raiz.setAttribute('data-mm-modulo', 'no-disponible');
+  raiz.setAttribute('data-mm-motivo-http', String(motivo || '').slice(0, 60));
+  /* Se guarda el disabled ORIGINAL de cada control antes de apagarlo, para
+     que la recuperacion restaure el estado real y no encienda a ciegas
+     botones que por negocio deben seguir cerrados (crear sin nivel, fusion
+     sin material): esos los repinta el render normal. */
+  var ctr = raiz.querySelectorAll('button, input, select');
+  for (var i = 0; i < ctr.length; i++) {
+    var el = ctr[i];
+    if (el.__mmOffOrig === undefined) el.__mmOffOrig = (el.disabled === true);
+    el.disabled = true;
+  }
+  mmResultado(MM_MSG_OFF, 'error');
+}
+function mmDisponible() {
+  var raiz = mmRaiz();
+  if (!raiz) return;
+  /* Restaura el disabled previo de los controles que apago mmNoDisponible;
+     los nodos nuevos (creados por un render posterior) no tienen marca y se
+     dejan como los dejo su pintado. Mm Marca vuelve a estar viva sin
+     recargar la pagina. */
+  var ctr = raiz.querySelectorAll('button, input, select');
+  for (var i = 0; i < ctr.length; i++) {
+    var el = ctr[i];
+    if (el.__mmOffOrig === undefined) continue;
+    el.disabled = (el.__mmOffOrig === true);
+    el.__mmOffOrig = undefined;
+  }
+  raiz.setAttribute('data-mm-modulo', 'ok');
+  raiz.setAttribute('data-mm-motivo-http', '');
+  var res = mmEl('data-mm-entrega-resultado');
+  if (res && res.getAttribute('data-mm-estado') === 'error'
+    && String(res.textContent || '') === MM_MSG_OFF) {
+    res.textContent = '';
+    res.setAttribute('data-mm-estado', 'idle');
+    res.hidden = true;
+  }
+}
+function mmMarcaActiva() {
+  var id = MM_ESTADO.activa;
+  if (!id) return null;
+  for (var i = 0; i < MM_ESTADO.marcas.length; i++) {
+    if (String(MM_ESTADO.marcas[i].id) === String(id)) return MM_ESTADO.marcas[i];
+  }
+  return null;
+}
+function mmXpDisponible() {
+  var u = sesion() || {};
+  if (u.xp_total === undefined || u.xp_total === null || u.xp_total === '') return null;
+  var t = Number(u.xp_total);
+  if (!isFinite(t)) return null;
+  var g = Number(u.xp_gastado_sinks);
+  if (!isFinite(g)) g = 0;
+  return t - g;
+}
+function mmClaveNueva() {
+  var s = 'mm';
+  try { s = s + '-' + Date.now().toString(36); }
+  catch (e) { s = s + '-' + Math.round(Math.random() * 1e9).toString(36); }
+  s = s + '-' + Math.round(Math.random() * 1e12).toString(36);
+  var limpia = s.replace(/[^A-Za-z0-9._:-]/g, '');
+  if (limpia.length < 4) limpia = 'mm-0001';
+  return limpia.slice(0, 80);
+}
+/* ---- pintado: cabecera, estados y gate de alta ---------------------- */
+function mmPintarMarcas() {
+  var sel = mmEl('data-mm-marca-activa');
+  var html = '', i;
+  for (i = 0; i < MM_ESTADO.marcas.length; i++) {
+    var m = MM_ESTADO.marcas[i];
+    html += '<option value="' + esc(String(m.id)) + '">'
+      + esc(String(m.nombre || 'Marca sin nombre')) + '</option>';
+  }
+  if (sel) {
+    if (html) {
+      sel.innerHTML = html;
+      sel.value = MM_ESTADO.activa ? String(MM_ESTADO.activa) : '';
+      sel.disabled = false;
+    } else {
+      sel.innerHTML = '<option value="">Sin marca</option>';
+      sel.value = '';
+      sel.disabled = true;
+    }
+  }
+  var sin = mmEl('data-mm-sin-marca');
+  if (sin) sin.hidden = MM_ESTADO.marcas.length > 0;
+  var marca = mmMarcaActiva();
+  var ver = !!(marca && marca.verificada === true);
+  var promoOn = !!(marca && marca.estado_promo === true);
+  var est = mmEl('data-mm-verificada');
+  if (est) {
+    est.setAttribute('data-mm-verificada', ver ? '1' : '0');
+    est.setAttribute('data-mm-promo-estado', marca ? (promoOn ? 'activa' : 'pausada') : 'pausada');
+  }
+  var pv = mmEl('data-mm-badge="verificada"');
+  if (pv) pv.hidden = !ver;
+  var pn = mmEl('data-mm-badge="noverificada"');
+  if (pn) pn.hidden = ver;
+  var pp = mmEl('data-mm-badge="promo"');
+  if (pp) pp.textContent = promoOn ? 'Promocion activa' : 'Promocion pausada';
+}
+function mmPintarGate() {
+  var req = MM_ESTADO.nivel_requerido;
+  var costo = MM_ESTADO.costo_xp;
+  var mNivel = mmEl('data-mm-motivo="nivel"');
+  var mXp = mmEl('data-mm-motivo="xp"');
+  /* El nivel sale del nucleo compartido (pfNivelActual), que devuelve -1 sin
+     sesion y 0 con sesion sin dato de nivel. Ojo: 0 NO es "nivel cero", es
+     DATO AUSENTE. Ausencia de dato nunca habilita el alta: si el nivel no es
+     un entero >= 1 el boton queda cerrado con motivo nivel y el usuario no
+     llega a comerse el error del servidor. */
+  var nivel = Number(pfNivelActual());
+  var nivelValido = isFinite(nivel) && Math.floor(nivel) === nivel && nivel >= 1;
+  var bloqNivel = (nivelValido) ? (req > 0 && nivel < req) : true;
+  if (mNivel) {
+    if (!nivelValido) {
+      mNivel.textContent = 'Bloqueado por nivel: no hay dato de nivel en tu cuenta.';
+    } else if (req > 0) {
+      mNivel.textContent = 'Bloqueado por nivel: crear marca pide nivel ' + req + '.';
+    }
+  }
+  if (mXp && costo > 0) {
+    mXp.textContent = 'Bloqueado por XP: crear marca cuesta ' + mmNum(costo) + ' XP.';
+  }
+  var xpDisp = mmXpDisponible();
+  var bloqXp = (costo > 0 && xpDisp !== null && xpDisp < costo);
+  if (mNivel) mNivel.hidden = !bloqNivel;
+  if (mXp) mXp.hidden = !bloqXp;
+  var btn = mmEl('data-mm-btn-crear');
+  if (btn) btn.disabled = (bloqNivel || bloqXp);
+}
+/* ---- pintado: metricas ---------------------------------------------- */
+function mmPintarMetricas(met) {
+  var m = met || {};
+  var claves = ['pocimas_otorgadas', 'pocimas_entregadas', 'productos_entregados',
+    'pendientes', 'xp_canjeado', 'fusiones'];
+  for (var i = 0; i < claves.length; i++) {
+    var nodos = mmTodos('data-mm-valor="' + claves[i] + '"');
+    for (var j = 0; j < nodos.length; j++) {
+      nodos[j].textContent = mmNum(m[claves[i]] === undefined ? 0 : m[claves[i]]);
+    }
+  }
+}
+/* ---- pintado: billetera (recetas 0/4, 4/4, 0/2, 2/2) --------------- */
+function mmPintarReceta(nodo) {
+  if (!nodo) return;
+  var clave = nodo.getAttribute('data-mm-receta');
+  var def = (clave && MM_RECETAS[clave]) ? MM_RECETAS[clave] : null;
+  if (!def) return;
+  var obj = mmInt(nodo.getAttribute('data-mm-objetivo'), def.consumo);
+  if (obj < 1) obj = def.consumo;
+  var tengo = mmInt(MM_ESTADO.inv[def.entrada], 0);
+  if (!isFinite(tengo) || tengo < 0) tengo = 0;
+  var actual = (tengo > obj) ? obj : tengo;
+  if (actual < 0) actual = 0;
+  var pct = (obj > 0) ? (actual * 100) / obj : 0;
+  if (pct > 100) pct = 100;
+  if (pct < 0) pct = 0;
+  nodo.setAttribute('data-mm-actual', String(actual));
+  nodo.setAttribute('data-mm-completa', actual >= obj ? '1' : '0');
+  var barra = nodo.querySelector('[data-mm-barra]');
+  if (barra) {
+    barra.setAttribute('data-mm-liquidado', '1');
+    barra.setAttribute('data-mm-actual', String(actual));
+    barra.setAttribute('data-mm-objetivo', String(obj));
+    barra.setAttribute('aria-valuemax', String(obj));
+    barra.setAttribute('aria-valuenow', String(actual));
+  }
+  var fill = nodo.querySelector('[data-mm-barra-fill]');
+  if (fill) {
+    fill.style.width = pct + '%';
+    if (actual >= obj && obj > 0) fill.setAttribute('data-mm-lleno', '1');
+    else fill.removeAttribute('data-mm-lleno');
+  }
+  var cuenta = nodo.querySelector('[data-mm-receta-cuenta]');
+  if (cuenta) cuenta.textContent = '[' + actual + '/' + obj + ']';
+  var falta = nodo.querySelector('[data-mm-falta]');
+  if (falta) falta.hidden = (actual >= obj);
+  var btn = nodo.querySelector('[data-mm-fusion]');
+  if (btn) btn.disabled = (actual < obj);
+}
+function mmPintarBilletera() {
+  var nodos = mmTodos('data-mm-receta');
+  for (var i = 0; i < nodos.length; i++) mmPintarReceta(nodos[i]);
+}
+/* ---- pintado: promo + selects de productos ------------------------- */
+function mmProductos() {
+  var vistos = {}, lista = [];
+  function add(clave, nombre) {
+    var c = String(clave === undefined || clave === null ? '' : clave).trim();
+    if (!c || vistos[c]) return;
+    vistos[c] = true;
+    lista.push({ clave: c, nombre: String(nombre || c) });
+  }
+  var i, j;
+  /* 1) catalogo del SERVIDOR (rama tipo=consumibles): nunca mercado.js */
+  for (i = 0; i < MM_ESTADO.productos.length; i++) {
+    add(MM_ESTADO.productos[i].clave, MM_ESTADO.productos[i].nombre);
+  }
+  /* 2) claves que ya viven en la MARCA (config, preview y canjes) para que
+     un premio ya guardado siga siendo seleccionable aunque no este en el
+     catalogo visible. */
+  var orden = (MM_ESTADO.cfg && MM_ESTADO.cfg.orden_premios) || [];
+  for (i = 0; i < orden.length; i++) add(orden[i], null);
+  for (i = 0; i < MM_ESTADO.premios.length; i++) add(MM_ESTADO.premios[i].consumible_clave, null);
+  for (i = 0; i < MM_ESTADO.canjes.length; i++) add(MM_ESTADO.canjes[i].consumible_clave, null);
+  return lista;
+}
+function mmOpcionesHtml(lista, conUnidades) {
+  var html = '', i;
+  for (i = 0; i < lista.length; i++) {
+    var etiqueta = lista[i].nombre;
+    if (conUnidades) {
+      var u = conUnidades[lista[i].clave];
+      if (u) etiqueta = etiqueta + ' - ' + u;
+    }
+    html += '<option value="' + esc(lista[i].clave) + '">' + esc(etiqueta) + '</option>';
+  }
+  if (!html) html = '<option value="">Sin productos disponibles</option>';
+  return html;
+}
+function mmPintarProductos() {
+  var lista = mmProductos();
+  /* Etiqueta con las unidades del preview: unidades = 0 es un dato VALIDO
+     (falta de calibracion) y se muestra, no se oculta. */
+  var anota = {};
+  for (var i = 0; i < MM_ESTADO.premios.length; i++) {
+    var p = MM_ESTADO.premios[i];
+    var cl = String(p.consumible_clave || '');
+    if (!cl) continue;
+    anota[cl] = 'puesto ' + (mmInt(p.puesto, i + 1)) + ', '
+      + mmNum(mmInt(p.unidades, 0)) + ' u.';
+  }
+  var selPremio = mmEl('data-mm-premio-item');
+  var marca = mmMarcaActiva();
+  if (selPremio) {
+    selPremio.innerHTML = mmOpcionesHtml(lista, anota);
+    var orden = (MM_ESTADO.cfg && MM_ESTADO.cfg.orden_premios) || [];
+    if (orden.length) selPremio.value = String(orden[0]);
+    selPremio.disabled = !marca;
+  }
+  var selEntrega = mmEl('data-mm-producto-entrega');
+  if (selEntrega) {
+    selEntrega.innerHTML = mmOpcionesHtml(lista, null);
+    selEntrega.disabled = !marca;
+  }
+}
+function mmPintarPromo() {
+  var marca = mmMarcaActiva();
+  var on = !!(marca && marca.estado_promo === true);
+  var sw = mmEl('data-mm-promo-toggle');
+  if (sw) {
+    sw.setAttribute('aria-checked', on ? 'true' : 'false');
+    sw.setAttribute('data-mm-promo-toggle', on ? 'activa' : 'pausada');
+    sw.disabled = !marca;
+  }
+  var cfg = MM_ESTADO.cfg || {};
+  var tope = mmEl('data-mm-tope-unidades');
+  if (tope) {
+    tope.value = (cfg.tope_unidades === null || cfg.tope_unidades === undefined)
+      ? '' : String(cfg.tope_unidades);
+    tope.disabled = !marca;
+  }
+  var alc = mmEl('data-mm-alcance');
+  if (alc) alc.value = cfg.alcance ? String(cfg.alcance) : 'global';
+  var btnEnt = mmEl('data-mm-btn-entregar');
+  if (btnEnt) btnEnt.disabled = !marca;
+}
+/* ---- carga ---------------------------------------------------------- */
+function cargarMarcaPanel(uid) {
+  var raiz = mmRaiz();
+  if (!raiz || !uid) return Promise.resolve(false);
+  if (MM_ESTADO.cargando) return Promise.resolve(false);
+  MM_ESTADO.cargando = true;
+  var url = '/api/usuarios?tipo=marcas_mias&usuario_id=' + encodeURIComponent(String(uid));
+  return mmGet(url).then(function (res) {
+    MM_ESTADO.cargando = false;
+    var r = res || {};
+    if (r.ok !== true) {
+      mmNoDisponible(r.code || r.error || 'marcas_mias');
+      return false;
+    }
+    mmDisponible();
+    MM_ESTADO.marcas = Array.isArray(r.data) ? r.data : [];
+    MM_ESTADO.activa = r.marca_activa_id ? String(r.marca_activa_id) : null;
+    MM_ESTADO.nivel_requerido = mmInt(r.nivel_requerido, 0);
+    MM_ESTADO.costo_xp = mmInt(r.costo_xp_creacion, 0);
+    MM_ESTADO.cargado = true;
+    mmPintarMarcas();
+    mmPintarGate();
+    mmPintarAltaHint();
+    return mmCargarDatos(String(uid));
+  }).catch(function () {
+    MM_ESTADO.cargando = false;
+    mmNoDisponible('sin respuesta');
+    return false;
+  });
+}
+function mmCargarDatos(uid) {
+  var uInv = '/api/interacciones?tipo=inventario&usuario_id=' + encodeURIComponent(uid);
+  var uCat = '/api/interacciones?tipo=consumibles';
+  var uCan = '/api/interacciones?tipo=canjes_marca'
+    + (MM_ESTADO.activa ? '&marca_id=' + encodeURIComponent(MM_ESTADO.activa) : '');
+  var uPre = MM_ESTADO.activa
+    ? '/api/interacciones?tipo=marca_premios&marca_id=' + encodeURIComponent(MM_ESTADO.activa)
+    : '';
+  var tareas = [mmGet(uInv), mmGet(uCat), mmGet(uCan)];
+  tareas.push(uPre ? mmGet(uPre) : Promise.resolve({}));
+  return Promise.all(tareas).then(function (rr) {
+    var inv = rr[0] || {}, cat = rr[1] || {}, can = rr[2] || {}, pre = rr[3] || {};
+    /* inventario: usuarios.capacidades->consumibles (clave -> cantidad) */
+    var cons = (inv.data && inv.data.consumibles) ? inv.data.consumibles : {};
+    var nuevo = {};
+    for (var k in cons) {
+      if (!Object.prototype.hasOwnProperty.call(cons, k)) continue;
+      var c = cons[k];
+      nuevo[k] = mmInt((c && c.cantidad !== undefined) ? c.cantidad : c, 0);
+    }
+    MM_ESTADO.inv = nuevo;
+    MM_ESTADO.productos = Array.isArray(cat.data) ? cat.data : [];
+    MM_ESTADO.canjes = Array.isArray(can.data) ? can.data : [];
+    MM_ESTADO.premios = Array.isArray(pre.premios) ? pre.premios : [];
+    MM_ESTADO.cfg = (pre.config && typeof pre.config === 'object') ? pre.config : {};
+    mmPintarMetricas(can.metricas);
+    mmPintarBilletera();
+    mmPintarPromo();
+    mmPintarProductos();
+    return true;
+  }).catch(function () { return false; });
+}
+/* ---- acciones ------------------------------------------------------- */
+function mmCambiarMarca(valor) {
+  var u = sesion();
+  var id = String(valor || '').trim();
+  if (!u || !u.id || !id) return;
+  var sel = mmEl('data-mm-marca-activa');
+  if (sel) sel.disabled = true;
+  mmPost('/api/usuarios', { tipo: 'marca_activa_set', usuario_id: String(u.id), marca_id: id })
+    .then(function (res) {
+      var r = res || {};
+      if (r.ok !== true) {
+        if (sel) { sel.disabled = false; sel.value = MM_ESTADO.activa ? String(MM_ESTADO.activa) : ''; }
+        if (r.code === 'SCHEMA_NOT_MIGRATED') { mmNoDisponible(r.code); return; }
+        showToast(r.error === 'MARCA_NO_ENCONTRADA'
+          ? 'Esa marca no esta en tu cuenta.' : 'No se pudo cambiar la marca activa.', '#ef4444');
+        return;
+      }
+      /* la respuesta del servidor es la verdad: se re-renderiza desde ella */
+      MM_ESTADO.activa = r.marca_activa_id ? String(r.marca_activa_id) : id;
+      var uid = String(u.id);
+      MM_ESTADO.cargando = false;
+      cargarMarcaPanel(uid);
+    });
+}
+/* Campo del formulario de alta (marcado nuevo del panel Mi Marca) */
+function mmInpNombre() {
+  return mmEl('id="mm-nombre-marca"');
+}
+function mmInpDesc() {
+  return mmEl('id="mm-desc-marca"');
+}
+/* Normalizacion del nombre: trim + colapso de espacios internos */
+function mmNombreLimpio(v) {
+  var s = String(v === undefined || v === null ? '' : v);
+  s = s.replace(/\s+/g, ' ');
+  return s.replace(/^ /, '').replace(/ $/, '');
+}
+/* La descripcion conserva sus saltos de linea: solo se recorta en extremos */
+function mmTextoLimpio(v) {
+  var s = String(v === undefined || v === null ? '' : v);
+  return s.replace(/^\s+/, '').replace(/\s+$/, '');
+}
+function mmErrorNombre(txt) {
+  var e = mmEl('id="mm-nombre-error"');
+  var i = mmInpNombre();
+  var msg = txt ? String(txt) : '';
+  if (e) {
+    e.textContent = msg;
+    e.hidden = !msg;
+  }
+  if (i) {
+    if (msg) i.setAttribute('aria-invalid', 'true');
+    else i.removeAttribute('aria-invalid');
+  }
+}
+/* Coste real del alta: solo se escribe si marcas_mias lo trae (nunca se inventa) */
+function mmPintarAltaHint() {
+  var h = mmEl('id="mm-alta-hint"');
+  if (!h) return;
+  var costo = mmInt(MM_ESTADO.costo_xp, 0);
+  if (costo <= 0) return;
+  var req = mmInt(MM_ESTADO.nivel_requerido, 0);
+  var txt = String(costo) + ' XP';
+  if (req > 0) txt += ' - nivel ' + req;
+  h.textContent = txt;
+}
+function mmCrearMarca() {
+  var u = sesion();
+  if (!u || !u.id) { showToast('Inicia sesion para crear una marca', '#ef4444'); return; }
+  var inpNom = mmInpNombre();
+  var inpDes = mmInpDesc();
+  var nombre = mmNombreLimpio(inpNom ? inpNom.value : '');
+  var desc = mmTextoLimpio(inpDes ? inpDes.value : '');
+  if (nombre.length < 2) {
+    mmErrorNombre('Escribe un nombre de marca de al menos 2 caracteres.');
+    if (inpNom) { try { inpNom.focus(); } catch (eF) {} }
+    return;
+  }
+  if (nombre.length > 60) nombre = nombre.slice(0, 60);
+  var btn = mmEl('data-mm-btn-crear');
+  if (btn) btn.disabled = true;
+  var cuerpo = { tipo: 'marca_crear', usuario_id: String(u.id), nombre: nombre };
+  /* descripcion vacia: se omite (el servidor la guarda como null) */
+  if (desc) cuerpo.descripcion = desc.slice(0, 240);
+  mmPost('/api/usuarios', cuerpo)
+    .then(function (res) {
+      var r = res || {};
+      if (btn) btn.disabled = false;
+      if (r.ok === true) {
+        showToast('Marca creada', '#22C55E');
+        mmErrorNombre('');
+        if (inpNom) inpNom.value = '';
+        if (inpDes) inpDes.value = '';
+        MM_ESTADO.cargando = false;
+        cargarMarcaPanel(String(u.id));
+        return;
+      }
+      /* el servidor manda: sus motivos se muestran TAL CUAL */
+      if (r.error === 'XP_INSUFICIENTE') {
+        showToast('XP_INSUFICIENTE: tienes ' + mmNum(r.xp_disponible)
+          + ' y crear marca cuesta ' + mmNum(r.costo_xp) + '.', '#ef4444');
+        var mx = mmEl('data-mm-motivo="xp"');
+        if (mx) mx.hidden = false;
+        return;
+      }
+      if (r.error === 'NIVEL_INSUFICIENTE') {
+        showToast('NIVEL_INSUFICIENTE: crear marca pide nivel ' + mmInt(r.nivel_requerido, 5) + '.', '#ef4444');
+        var mn = mmEl('data-mm-motivo="nivel"');
+        if (mn) mn.hidden = false;
+        return;
+      }
+      if (r.code === 'SCHEMA_NOT_MIGRATED') { mmNoDisponible(r.code); return; }
+      showToast(r.error ? String(r.error) : 'No se pudo crear la marca', '#ef4444');
+    });
+}
+function mmTogglePromo() {
+  var marca = mmMarcaActiva();
+  if (!marca) return;
+  var sw = mmEl('data-mm-promo-toggle');
+  var on = !!(sw && sw.getAttribute('aria-checked') === 'true');
+  var siguiente = !on;
+  if (sw) sw.disabled = true;
+  var cuerpo = { tipo: 'marca_panel', marca_id: String(marca.id), estado_promo: siguiente };
+  mmPost('/api/interacciones?tipo=marca_panel', cuerpo).then(function (res) {
+    if (sw) sw.disabled = false;
+    var r = res || {};
+    if (r.ok === true && r.marca) {
+      marca.estado_promo = (r.marca.estado_promo === true);
+      MM_ESTADO.cfg = (r.marca.premios_config && typeof r.marca.premios_config === 'object')
+        ? r.marca.premios_config : MM_ESTADO.cfg;
+      mmPintarMarcas();
+      mmPintarPromo();
+      showToast(marca.estado_promo ? 'Promocion activa' : 'Promocion pausada', '#22C55E');
+      return;
+    }
+    mmPintarPromo();
+    if (r.code === 'SCHEMA_NOT_MIGRATED') { mmNoDisponible(r.code); return; }
+    showToast(r.error === 'MARCA_NO_ENCONTRADA'
+      ? 'Marca no encontrada en tu cuenta.' : 'No se pudo guardar la promocion.', '#ef4444');
+  });
+}
+function mmGuardarPremios(cfgParcial, alTerminar) {
+  var marca = mmMarcaActiva();
+  if (!marca) return;
+  mmPost('/api/interacciones?tipo=marca_panel', {
+    tipo: 'marca_panel',
+    marca_id: String(marca.id),
+    premios_config: cfgParcial
+  }).then(function (res) {
+    var r = res || {};
+    if (r.ok === true && r.marca) {
+      MM_ESTADO.cfg = (r.marca.premios_config && typeof r.marca.premios_config === 'object')
+        ? r.marca.premios_config : MM_ESTADO.cfg;
+      if (typeof alTerminar === 'function') alTerminar(true, r);
+      return;
+    }
+    if (typeof alTerminar === 'function') alTerminar(false, r);
+    if (r.code === 'SCHEMA_NOT_MIGRATED') { mmNoDisponible(r.code); return; }
+    showToast(r.error ? String(r.error) : 'No se pudo guardar la configuracion', '#ef4444');
+  });
+}
+function mmGuardarOrden() {
+  var sel = mmEl('data-mm-premio-item');
+  if (!sel) return;
+  var clave = String(sel.value || '').trim();
+  if (!clave) { showToast('Elige un producto premio', '#ef4444'); return; }
+  mmGuardarPremios({ orden_premios: [clave] }, function (ok) {
+    if (ok) showToast('Premio guardado', '#22C55E');
+  });
+}
+function mmGuardarTope() {
+  var inp = mmEl('data-mm-tope-unidades');
+  if (!inp) return;
+  var bruto = String(inp.value || '').trim();
+  var tope = null;
+  if (bruto !== '') {
+    /* Vacio = sin tope (null). Si hay valor debe ser un ENTERO >= 1:
+       0 no es un tope valido y se rechaza aqui, sin llamar al endpoint. */
+    tope = mmInt(bruto, -1);
+    if (!/^[0-9]+$/.test(bruto) || !isFinite(tope) || tope < 1) {
+      inp.setAttribute('aria-invalid', 'true');
+      showToast('Tope invalido: escribe un entero de 1 o mas, o deja el campo vacio para no poner tope', '#ef4444');
+      return;
+    }
+  }
+  inp.removeAttribute('aria-invalid');
+  mmGuardarPremios({ tope_unidades: tope }, function (ok) {
+    if (ok) showToast(tope === null ? 'Tope sin limite' : ('Tope ' + tope + ' unidades'), '#22C55E');
+  });
+}
+function mmFusionar(clave) {
+  var rec = String(clave || '').trim();
+  var def = rec ? MM_RECETAS[rec] : null;
+  if (!def) return;
+  var btn = mmEl('data-mm-fusion="' + rec + '"');
+  if (btn) btn.disabled = true;
+  mmPost('/api/interacciones?tipo=consumible_fusionar', {
+    receta_clave: rec,
+    marca_id: MM_ESTADO.activa || null,
+    clave_idempotencia: mmClaveNueva()
+  }).then(function (res) {
+    var r = res || {};
+    if (r.ok === true) {
+      /* recrecalculo local desde la respuesta: se descuenta la entrada y se
+         suma la salida de ESTA receta, y se repintan ambas barras */
+      var queda = (r.inventario && r.inventario.queda !== undefined)
+        ? mmInt(r.inventario.queda, 0) : mmInt(MM_ESTADO.inv[def.entrada], 0) - def.consumo;
+      if (queda < 0) queda = 0;
+      MM_ESTADO.inv[def.entrada] = queda;
+      MM_ESTADO.inv[def.salida] = mmInt(MM_ESTADO.inv[def.salida], 0) + def.produce;
+      mmPintarBilletera();
+      showToast('Fusion aplicada: ' + def.produce + ' x ' + def.salida, '#22C55E');
+      return;
+    }
+    mmPintarBilletera();
+    if (r.code === 'SCHEMA_NOT_MIGRATED') { mmNoDisponible(r.code); return; }
+    if (r.error === 'INVENTARIO_INSUFICIENTE') {
+      showToast('Faltan materiales: necesitas ' + mmInt(r.requerido, def.consumo)
+        + ' y tienes ' + mmNum(mmInt(r.disponible, 0)) + '.', '#ef4444');
+      return;
+    }
+    showToast(r.error ? String(r.error) : 'No se pudo fusionar', '#ef4444');
+  });
+}
+/* El stock tras una entrega NO se resta a mano: manda el servidor con
+   r.inventario.queda, tambien en el camino duplicado:true (donde el servidor
+   no volvio a descontar, asi que su queda es el stock real). Si el payload
+   no trae el dato se relee la billetera por la rama de lectura. */
+function mmAplicarEntrega(clave, r) {
+  var resp = r || {};
+  var queda = -1;
+  if (resp.inventario && resp.inventario.queda !== undefined
+    && resp.inventario.queda !== null) {
+    queda = mmInt(resp.inventario.queda, -1);
+  }
+  if (queda < 0) return false;
+  MM_ESTADO.inv[clave] = queda;
+  mmPintarBilletera();
+  return true;
+}
+function mmRecargarBilletera() {
+  var u = sesion() || {};
+  if (!u.id) return;
+  var url = '/api/interacciones?tipo=inventario&usuario_id='
+    + encodeURIComponent(String(u.id));
+  mmGet(url).then(function (res) {
+    var inv = res || {};
+    if (inv.ok !== true) return;
+    var cons = (inv.data && inv.data.consumibles) ? inv.data.consumibles : {};
+    var nuevo = {};
+    for (var k in cons) {
+      if (!Object.prototype.hasOwnProperty.call(cons, k)) continue;
+      var c = cons[k];
+      nuevo[k] = mmInt((c && c.cantidad !== undefined) ? c.cantidad : c, 0);
+    }
+    MM_ESTADO.inv = nuevo;
+    mmPintarBilletera();
+  });
+}
+function mmMensajeEntrega(r) {
+  var e = String((r && r.error) || '');
+  if (e === 'STOCK_INSUFICIENTE') {
+    return 'Stock insuficiente: el cliente tiene ' + mmNum(mmInt(r.disponible, 0))
+      + ' y pides ' + mmNum(mmInt(r.requerido, 0)) + '.';
+  }
+  if (e === 'CODIGO_NO_ENCONTRADO') return 'Ese codigo publico no existe.';
+  if (e === 'CONSUMIBLE_NO_DISPONIBLE') return 'Ese producto no pertenece a tu marca.';
+  if (e === 'MARCA_NO_ENCONTRADA') return 'Marca no encontrada en tu cuenta.';
+  if (e === 'CANTIDAD_INVALIDA') return 'Cantidad invalida (1 a 50).';
+  if (e === 'CODIGO_INVALIDO' || e === 'CODIGO_REQUERIDO') return 'Escribe el codigo publico del cliente.';
+  return e ? ('No se pudo entregar: ' + e) : 'No se pudo entregar.';
+}
+function mmEntregar() {
+  var u = sesion();
+  if (!u || !u.id) { mmResultado('Inicia sesion para registrar entregas.', 'error'); return; }
+  var codigo = mmValor('data-mm-codigo-publico').trim();
+  var producto = mmValor('data-mm-producto-entrega').trim();
+  var cant = mmInt(mmValor('data-mm-cantidad-entrega'), 1);
+  if (cant < 1) cant = 1;
+  if (cant > 50) cant = 50;
+  if (!codigo) { mmResultado('Escribe el codigo publico del cliente.', 'error'); return; }
+  if (!producto) { mmResultado('Elige el producto a entregar.', 'error'); return; }
+  if (!MM_ESTADO.activa) { mmResultado('Necesitas una marca activa para entregar.', 'error'); return; }
+  /* clave_idempotencia: OBLIGATORIA, una NUEVA por intento, escrita en el
+     hidden ANTES del POST. Un reintento del MISMO intento reusa la misma
+     clave; tras exito se limpia; si el servidor la rechaza NO se reintenta. */
+  var inp = mmEl('data-mm-clave-idempotencia');
+  var clave = inp ? String(inp.value || '').trim() : '';
+  if (!clave || clave.length < 4) {
+    clave = mmClaveNueva();
+    if (inp) inp.value = clave;
+  }
+  var btn = mmEl('data-mm-btn-entregar');
+  if (btn) btn.disabled = true;
+  mmResultado('Entregando...', 'idle');
+  mmPost('/api/interacciones?tipo=consumible_entregar', {
+    codigo_publico: codigo,
+    consumible_clave: producto,
+    cantidad: cant,
+    marca_id: String(MM_ESTADO.activa),
+    clave_idempotencia: clave
+  }).then(function (res) {
+    if (btn) btn.disabled = false;
+    var r = res || {};
+    if (r.ok === true) {
+      if (inp) inp.value = '';
+      if (!mmAplicarEntrega(producto, r)) mmRecargarBilletera();
+      if (r.duplicado === true) {
+        mmResultado('Entrega ya registrada (idempotencia): no se desconto dos veces.', 'ok');
+      } else {
+        mmResultado('Entrega registrada: ' + mmNum(cant) + ' x ' + producto
+          + ' a ' + codigo + '.', 'ok');
+      }
+      return;
+    }
+    if (r.code === 'CLAVE_IDEMPOTENCIA_REQUERIDA') {
+      if (inp) inp.value = '';
+      mmResultado('Falta la clave de idempotencia: repite la entrega desde el panel.', 'error');
+      return;
+    }
+    if (r.code === 'SCHEMA_NOT_MIGRATED') {
+      mmResultado('Mi Marca: modulo no disponible (esquema pendiente).', 'error');
+      return;
+    }
+    mmResultado(mmMensajeEntrega(r), 'error');
+  });
+}
+/* ---- enganche ------------------------------------------------------- */
+function mmInit() {
+  var raiz = mmRaiz();
+  if (!raiz || MM_ESTADO.enganchado) return;
+  MM_ESTADO.enganchado = true;
+  raiz.addEventListener('change', function (ev) {
+    var t = ev.target;
+    if (!t || !t.getAttribute) return;
+    if (t.hasAttribute('data-mm-marca-activa')) { mmCambiarMarca(t.value); return; }
+    if (t.hasAttribute('data-mm-premio-item')) { mmGuardarOrden(); return; }
+    if (t.hasAttribute('data-mm-tope-unidades')) { mmGuardarTope(); return; }
+    if (t.hasAttribute('data-mm-codigo-publico') || t.hasAttribute('data-mm-producto-entrega')
+      || t.hasAttribute('data-mm-cantidad-entrega')) {
+      /* cambio de datos = VENTA NUEVA: la clave del intento anterior no sirve */
+      var inp = mmEl('data-mm-clave-idempotencia');
+      if (inp) inp.value = '';
+    }
+  });
+  raiz.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.getAttribute) return;
+    var sube = t.closest ? t.closest('[data-mm-promo-toggle],[data-mm-fusion],[data-mm-btn-entregar],[data-mm-btn-crear]') : null;
+    var nodo = sube || t;
+    if (!nodo || !nodo.getAttribute) return;
+    if (nodo.hasAttribute('data-mm-promo-toggle')) { mmTogglePromo(); return; }
+    if (nodo.hasAttribute('data-mm-fusion')) { mmFusionar(nodo.getAttribute('data-mm-fusion')); return; }
+    if (nodo.hasAttribute('data-mm-btn-entregar')) { mmEntregar(); return; }
+    if (nodo.hasAttribute('data-mm-btn-crear')) { mmCrearMarca(); return; }
+  });
+}
 /* ---- INIT ---- */
+if (mmRaiz()) mmInit();
 window.onExploraCOUpdate = function() { checkGate(); pfGatePintar(); pfAplicarTab(); };
 PF_TAB_ACTIVO = pfTabDesdeHash();
 checkGate();
@@ -8152,6 +9189,11 @@ if (pfTabBloqueada(PF_TAB_ACTIVO)) pfTabRedirigir(PF_TAB_ACTIVO);
 else if (PF_TAB_ACTIVO === 'tabla_destino') {
   var _tdSesion = sesion();
   if (_tdSesion && _tdSesion.id) { cargarTablaDestino(); tdTutorialDesbloqueo(); }
+}
+else if (PF_TAB_ACTIVO === 'marca') {
+  /* Deep-link a #marca: pfTab no pasa en la carga inicial, se pide aqui. */
+  var _mmSesion = sesion();
+  if (_mmSesion && _mmSesion.id) { mmInit(); cargarMarcaPanel(_mmSesion.id); }
 }
 window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>

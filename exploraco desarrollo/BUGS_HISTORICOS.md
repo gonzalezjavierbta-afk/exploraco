@@ -2504,4 +2504,23 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **Cobertura permanente (2026-10-25, segundo y ULTIMO pase documental R2):** la regresion de este BUG ya no depende de un smoke ad-hoc. `scripts/smoke_media_caratula.js` (**191** lineas, CommonJS, `vm` + stub de `window`, **sin red**) prueba el caso "miniatura `/embed/` -> derivada" junto con las 4 formas del link y "medio no-YouTube -> placeholder", y esta enganchado al final de la cadena de `npm test` (`package.json:5`). Medido: **104 PASS / 0 FAIL**; prueba negativa: rompiendo `youtubeThumb` el mismo script da **87 PASS / 17 FAIL**. El BUG **sigue CERRADO**: esto no lo reabre, solo congela la red que lo detecta.
 
+## BUG-141: la migracion **058** cayo el `UNIQUE (usuario_id)` de `marcas` **antes** del deploy del codigo que lo consume, y `marca_activar` en produccion responde **42P10** -- **ABIERTO (ventana de deploy, 2026-10-27)** -- bug de **PROCESO**, no de codigo
+
+**Severidad: MEDIA (hoy sin victima medible: **16 usuarios, 0 marcas**, luego ninguna llamada real ha fallado). Estado: ABIERTO -- se cierra solo con el deploy del operador. No se "arregla" con codigo.**
+
+**Sintoma:** en produccion, cualquier `POST ?tipo=marca_activar` sobre el codigo **desplegado** falla con error Postgres **`42P10`** (*"there is no unique or exclusion constraint matching the ON CONFLICT specification"*). La rama entera muere: no activa, no actualiza y no registra el gasto de XP.
+
+**Causa (orden de dos operaciones, no una linea de logica):** el codigo **desplegado** en Vercel es el de la etapa previa a ADR-107 y usa `INSERT ... ON CONFLICT (usuario_id) DO UPDATE` (`api/usuarios.js:2347-2360` segun la tabla de D2 del ADR-107). La **058**, aplicada el **2026-10-27** (`23/23` sentencias OK), ejecuta `ALTER TABLE marcas DROP CONSTRAINT IF EXISTS marcas_usuario_id_key` (`058:245`). Postgres deja de inferir el constraint del `ON CONFLICT` y **rechaza la sentencia en cada llamada**. El codigo nuevo (`UPDATE marcas SET ... WHERE id=COALESCE($marca_id, marca_activa_id)`) existe y esta **commiteado** (`fb38b5a`), pero **no desplegado**.
+
+**Por que se registra como BUG y no solo como nota de relevo:** es una **caida en produccion** (no un riesgo teorico), es **invisible en los tests** (el smoke corre sin `DATABASE_URL` y el codigo nuevo nunca usa `ON CONFLICT`), y el **patron de falla es repetible en cualquier modulo**: *aplicar un DDL destructivo antes de desplegar el codigo que lo acompaña invierte la ventana de seguridad*. Un `DEPLOY` primero habria dejado convivir codigo nuevo + constraint viejo sin fallo; `DDL` primero deja a los usuarios **con el codigo viejo contra el esquema nuevo**. Regla que sale de aqui: **en cambios que quitan un constraint, se despliega el codigo que deja de usarlo y despues se aplica el DDL**, no al reves.
+
+**Mitigante medido (y unico motivo por el que no es un incidente):** la tabla `marcas` tiene **0 filas** y el padron **16 usuarios**, luego ningun usuario bloqueado, ningun XP cobrado mal y ninguna marca huerfana. El fallo se cierra **sin accion de datos** en cuanto se despliegue.
+
+**Verificacion:** no hay test que reproduzca el `42P10` (falla solo contra el esquema **con** la 058 y el codigo **sin** ella: `scripts/verify_058_precheck.js` valida el **precheck**, no este orden). Verificado por el contrario: en el repo, `Select-String "ON CONFLICT (usuario_id)"` sobre `api/usuarios.js` -> **0** coincidencias, es decir **el fallo no esta en el codigo actual**, solo en el desplegado.
+
+**Relacion con otros BUG (sin duplicar):** no es **BUG-137/138/139/140** (render, fotos, atribucion). Tampoco es el `42703`/`42P01` que el codigo nuevo degrada a proposito: aqui el error es **`42P10`**, que ninguna rama captura porque en el codigo nuevo **no puede ocurrir**.
+
+**Registro:** detectado al cerrar **TSK-242 / ADR-107 rev.4**, donde se documento que el modulo tiene **"DESPLIEGUE PENDIENTE"** (y se corrigio en el mismo pase la linea de estado del ADR, que decia "IMPLEMENTADO Y DESPLEGADO").
+
+
 

@@ -16169,8 +16169,21 @@ module.exports = async function handler(req, res) {
             + ' FROM usuarios u JOIN billeteras b ON b.usuario_id = u.id'
             + ' WHERE b.codigo_publico=$2 LIMIT 1) AS tengo,'
             + ' (SELECT ct.id::text FROM canjes_tienda ct'
-            + ' WHERE ct.clave_idempotencia=$5 LIMIT 1) AS existente',
-            [ceUid, ceCodigo, ceMarcaId, ceClave, ceIdem]
+            + ' WHERE ct.clave_idempotencia=$5::text'
+            + ' OR ct.contexto->>\'clave_entrega\' = $5::text'
+            + ' LIMIT 1) AS existente,'
+            // Premio semanal PENDIENTE de ESTE cliente, marca, producto y
+            // MISMA cantidad: si existe, la entrega lo CIERRA sobre su propia
+            // fila (ADR-107 D3) en vez de insertar un canje de mostrador.
+            + ' (SELECT COUNT(*)::int FROM canjes_tienda ct'
+            + ' JOIN billeteras b2 ON b2.usuario_id = ct.usuario_id'
+            + ' WHERE b2.codigo_publico=$2'
+            + ' AND ct.marca_id=$3::uuid'
+            + ' AND ct.origen=\'premio_semanal\''
+            + ' AND ct.estado=\'pendiente\''
+            + ' AND ct.consumible_clave=$4'
+            + ' AND ct.cantidad=$6::int) AS premio_pendiente',
+            [ceUid, ceCodigo, ceMarcaId, ceClave, ceIdem, ceCant]
           );
         } catch (eCeCtx) {
           if (!esEsquemaFaltante(eCeCtx)) throw eCeCtx;
@@ -16201,7 +16214,13 @@ module.exports = async function handler(req, res) {
         }
         var ceTengo = parseInt(ceC0.tengo, 10);
         if (!isFinite(ceTengo) || ceTengo < 0) ceTengo = 0;
-        if (ceTengo < ceCant) {
+        // El premio semanal NO vive en usuarios.capacidades: al otorgarse solo
+        // consumio stock del catalogo (consumibles.stock_usado). Por eso una
+        // entrega que cierra un premio pendiente no exige stock en capacidades;
+        // el descuento de capacidades sigue colgando del INSERT de mostrador.
+        var cePremioPend = parseInt(ceC0.premio_pendiente, 10);
+        if (!isFinite(cePremioPend) || cePremioPend < 0) cePremioPend = 0;
+        if (cePremioPend < 1 && ceTengo < ceCant) {
           return res.status(409).json({
             ok: false, error: 'STOCK_INSUFICIENTE',
             consumible_clave: ceClave, requerido: ceCant, disponible: ceTengo
@@ -16220,6 +16239,24 @@ module.exports = async function handler(req, res) {
             + '), w AS ('
             + ' SELECT b.id AS billetera_id, b.usuario_id AS uid, b.codigo_publico'
             + ' FROM billeteras b WHERE b.codigo_publico = $2 LIMIT 1'
+            + '), pick AS ('
+            + ' SELECT ct.id FROM canjes_tienda ct, w'
+            + ' WHERE ct.usuario_id = w.uid'
+            + ' AND ct.marca_id = $4::uuid'
+            + ' AND ct.origen = \'premio_semanal\''
+            + ' AND ct.estado = \'pendiente\''
+            + ' AND ct.consumible_clave = $3'
+            + ' AND ct.cantidad = $5::int'
+            + ' ORDER BY ct.creado_en ASC LIMIT 1'
+            + '), upd AS ('
+            + ' UPDATE canjes_tienda ct SET estado = \'entregado\','
+            + ' atendido_por = $1::uuid, entregado_en = NOW(),'
+            + ' contexto = COALESCE(ct.contexto, \'{}\'::jsonb)'
+            + ' || jsonb_build_object(\'clave_entrega\', $6::text,'
+            + ' \'codigo_publico\', (SELECT w.codigo_publico FROM w))'
+            + ' FROM pick'
+            + ' WHERE ct.id = pick.id AND ct.estado = \'pendiente\''
+            + ' RETURNING ct.id::text AS canje_id'
             + '), ins AS ('
             + ' INSERT INTO canjes_tienda (usuario_id, marca_id, billetera_id,'
             + ' codigo_publico_snapshot, consumible_id, consumible_clave, cantidad,'
@@ -16231,7 +16268,8 @@ module.exports = async function handler(req, res) {
             + ' jsonb_build_object(\'codigo_publico\', w.codigo_publico),'
             + ' $6::text, NOW()'
             + ' FROM w, c'
-            + ' WHERE EXISTS (SELECT 1 FROM usuarios u WHERE u.id = w.uid'
+            + ' WHERE NOT EXISTS (SELECT 1 FROM upd)'
+            + ' AND EXISTS (SELECT 1 FROM usuarios u WHERE u.id = w.uid'
             + ' AND COALESCE((u.capacidades->\'consumibles\'->>$3::text)::int, 0)'
             + ' >= $5::int)'
             + ' ON CONFLICT (clave_idempotencia) DO NOTHING'
@@ -16245,10 +16283,14 @@ module.exports = async function handler(req, res) {
             + ' FROM ins WHERE u.id = ins.uid::uuid'
             + ' RETURNING u.id'
             + ')'
-            + ' SELECT (SELECT COUNT(*)::int FROM ins) AS creado,'
+            + ' SELECT (SELECT COUNT(*)::int FROM upd) AS premio_cerrado,'
+            + ' (SELECT canje_id FROM upd LIMIT 1) AS premio_id,'
+            + ' (SELECT COUNT(*)::int FROM ins) AS creado,'
             + ' (SELECT COUNT(*)::int FROM d) AS descontado,'
             + ' (SELECT id::text FROM canjes_tienda'
-            + ' WHERE clave_idempotencia=$6 LIMIT 1) AS canje_id',
+            + ' WHERE clave_idempotencia=$6::text'
+            + ' OR contexto->>\'clave_entrega\' = $6::text'
+            + ' LIMIT 1) AS canje_id',
             [ceUid, ceCodigo, ceClave, ceMarcaId, ceCant, ceIdem]
           );
         } catch (eCe) {
@@ -16263,6 +16305,28 @@ module.exports = async function handler(req, res) {
         }
 
         var ceR0 = ceRes[0] || {};
+        // Cierre del premio semanal sobre SU MISMA fila: no se crea canje de
+        // mostrador ni se descuenta usuarios.capacidades (el premio nunca se
+        // acredito ahi; su stock se consumio en marca_premio_otorgar).
+        var cePremioId = (Number(ceR0.premio_cerrado) === 1 && ceR0.premio_id)
+          ? String(ceR0.premio_id) : null;
+        if (cePremioId) {
+          return res.status(200).json({
+            ok: true,
+            duplicado: false,
+            canje: {
+              id: cePremioId,
+              estado: 'entregado',
+              origen: 'premio_semanal',
+              marca_id: ceMarcaId,
+              codigo_publico: ceCodigo,
+              consumible_clave: ceClave,
+              cantidad: ceCant,
+              atendido_por: ceUid
+            },
+            inventario: { tenia: ceTengo, queda: ceTengo }
+          });
+        }
         if (Number(ceR0.creado) !== 1 || Number(ceR0.descontado) !== 1) {
           // Carrera perdida contra otra peticion identica: la fila ya existe
           // y NO se desconto nada. Se devuelve como duplicado, no como error.
