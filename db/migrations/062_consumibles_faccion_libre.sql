@@ -1,0 +1,253 @@
+-- ============================================================================
+-- Migration 062: consumibles de faccion - LIBERAR LOS 4 CONSUMIBLES DE FASE 1
+--   PARA CUALQUIER FACCION, retirando el freno SOLO EN DATO.
+-- Fecha: 2026-10-28
+-- Referencias: ADR-110 (revision 1, decision D4), ADR-002 (ASCII-safe: cero
+--   bytes > 127, cero backticks, sin tildes), ADR-003 (cero borrado logico),
+--   ADR-006 (baseline = archivo real verificado antes de escribir),
+--   ADR-008 (idempotencia / SQL versionado).
+-- Requiere: 057 (columnas faccion_requerida / nivel_requerido y las 4 filas),
+--   017/018 (consumibles.categoria), 045 (schema_migrations).
+--
+-- QUE HACE (una sola sentencia)
+--   Pone faccion_requerida = NULL en las 4 filas de fase 1, identificadas por
+--   clave. Nada mas:
+--     consumible_catalejo_explorador
+--     consumible_lupa_curador
+--     consumible_lente_artista
+--     consumible_pluma_creador
+--   No cambia nivel_requerido (sigue 4), ni era_exclusiva, ni limite_diario,
+--   ni cargas, ni duracion_horas, ni bono_accion, ni bono_xp_fijo, ni precio,
+--   ni activo, ni categoria. Un solo UPDATE, ni un DELETE, ni un DROP, ni un
+--   ALTER, ni un cambio de tipo.
+--
+-- POR QUE (ADR-110 D4)
+--   En fase 1 los 4 consumibles estan escritos, sembrados y con efecto medido,
+--   pero el gate de faccion los hace incomprables para quien no sea de la
+--   faccion exacta. D4 decide que en fase 1 se compran y se usan por CUALQUIER
+--   faccion: el freno se retira SOLO EN DATO y el MOTOR CONSERVA el predicado.
+--   Consecuencia exacta: el predicado de faccion queda INERTE POR DATO (nunca
+--   encuentra una fila con faccion_requerida no nula que lo dispare), no
+--   borrado. Reactivar el freno manana es un UPDATE de vuelta (ver ROLLBACK),
+--   no un redespliegue. Cero cambios de codigo en api/*.js.
+--
+-- POR QUE ES SEGURO
+--   S-1. El CHECK chk_consumibles_faccion_requerida (migracion 057) es
+--        "faccion_requerida IS NULL OR faccion_requerida IN (...)". NULL ya
+--        estaba admitido por diseno: las 32+ filas clasicas viven con NULL y
+--        el CHECK nunca las rechazo. Este UPDATE cae dentro de la rama NULL,
+--        asi que no puede violar el constraint.
+--   S-2. La columna es NULLABLE (varchar(20) NULL, 057). No hay NOT NULL que
+--        romper.
+--   S-3. Ningun indice ni vista depende de faccion_requerida que se
+--        invalide por ponerla a NULL. Las vistas de precio leen precio_xp y
+--        precio_xp_base, que no se tocan.
+--   S-4. nivel_requerido = 4 se mantiene: quien compre seguira necesitando el
+--        nivel. D4 solo retira el eje de faccion. Si el freno de nivel tambien
+--        debe caer, es otra decision y otra migracion.
+--   S-5. No hay DELETE: las 4 filas y su historial de compras
+--        (compra_consumibles) quedan intactos (ADR-003).
+--   S-6. Quedan como estan las descripciones, que aun dicen "Faccion X". Es
+--        texto comercial, no gate: residual conocido y aceptado de D4, no un
+--        fallo de esta migracion. Corregirlo es un cambio de copy aparte.
+--
+-- IDEMPOTENCIA (ADR-008)
+--   El WHERE de corte incluye "faccion_requerida IS NOT NULL". En la primera
+--   corrida actualiza 4 filas; en la segunda el filtro no encuentra ninguna y
+--   escribe 0 filas (no-op funcional, no un UPDATE que reescriba lo mismo).
+--   Ademas "clave IN (...)" acota a las 4 filas: si una no existiera, las
+--   demas se actualizan igual y el conteo de verificacion lo delata.
+--
+-- ATOMICIDAD Y TRANSACCION (leer antes de aplicar)
+--   El runner scripts/apply_sql_file.js ejecuta SENTENCIA A SENTENCIA SIN
+--   transaccion envolvente: por eso este fichero es UNA SOLA sentencia, que es
+--   atomica por definicion (o se aplica entera o no se aplica). NO se escriben
+--   aqui BEGIN ni COMMIT ejecutables: se enviarian como sentencias sueltas y
+--   el COMMIT cerraria una transaccion que el propio runner no abrio.
+--   ENSAYO OBLIGATORIO (en el editor SQL de Neon, NO en este fichero):
+--     BEGIN;
+--     <pegar el UPDATE de la seccion 1>
+--     <correr aqui las consultas de verificacion (a) y (b)>
+--     ROLLBACK;   -- el ensayo NO deja rastro
+--   CORRIDA REAL: solo cuando el ensayo cuadre, con COMMIT:
+--     BEGIN;
+--     <pegar el UPDATE de la seccion 1>
+--     <verificacion (a) y (b)>
+--     COMMIT;
+--   COMMIT SOLO en la corrida real. Un ensayo sin ROLLBACK ya es produccion.
+--
+-- ORDEN DE DESPLIEGUE
+--   Aplicar DESPUES de la 061. Y ojo con la 057: su INSERT ... ON CONFLICT
+--   DO UPDATE re-afirma faccion_requerida = EXCLUDED.faccion_requerida, es
+--   decir, VOLVERIA A PONER EL GATE. Si alguna vez se re-ejecuta la 057 con
+--   este fichero ya aplicado, hay que re-aplicar la 062 despues. La 062 es
+--   re-ejecutable sin coste, asi que el remedio es barato; el olvido, no.
+-- ============================================================================
+
+-- ============================================================================
+-- 0. PREFLIGHT (SOLO LECTURA; NO forma parte del DDL; NO se ejecuta solo).
+--    Copiar y correr ANTES de aplicar la 062.
+-- ============================================================================
+-- (0.a) Estado actual de las 4 filas. ESPERADO antes: 4 filas con
+--       faccion_requerida NO nula y nivel_requerido = 4. Si devuelve menos de
+--       4 filas, la 057 esta incompleta y la 062 no debe aplicarse a ciegas.
+-- SELECT clave, faccion_requerida, nivel_requerido, categoria, activo
+--   FROM consumibles
+--   WHERE clave IN ('consumible_catalejo_explorador','consumible_lupa_curador',
+--                   'consumible_lente_artista','consumible_pluma_creador')
+--   ORDER BY clave;
+--
+-- (0.b) Que el CHECK de faccion existe y admite NULL (evidencia de S-1).
+--       ESPERADO: 1 fila con un def que contenga "IS NULL OR".
+-- SELECT conname, pg_get_constraintdef(oid) AS def
+--   FROM pg_constraint
+--   WHERE conrelid = 'public.consumibles'::regclass
+--     AND conname  = 'chk_consumibles_faccion_requerida';
+
+-- ============================================================================
+-- 1. LIBERAR EL GATE DE FACCION EN LAS 4 FILAS DE FASE 1 (D4 del ADR-110)
+-- ============================================================================
+-- Unico cambio: faccion_requerida = NULL. El resto de columnas queda intacto.
+-- "faccion_requerida IS NOT NULL" es el corte de idempotencia: la segunda
+-- corrida escribe 0 filas.
+
+UPDATE consumibles
+   SET faccion_requerida = NULL
+ WHERE clave IN ('consumible_catalejo_explorador','consumible_lupa_curador',
+                 'consumible_lente_artista','consumible_pluma_creador')
+   AND faccion_requerida IS NOT NULL;
+
+-- ============================================================================
+-- 2. VERIFICACION POST-APLICACION (solo lectura; NO se ejecuta dentro de la
+--    migracion; NO modifica nada). Copiar y correr sentencia por sentencia.
+-- ============================================================================
+-- (a) CONTROL PRINCIPAL. Las 4 filas con faccion_requerida NULL y
+--     nivel_requerido = 4. ESPERADO: 4 filas, exactamente las 4 claves, todas
+--     con faccion_requerida en NULL y nivel_requerido = 4. Si devuelve < 4,
+--     falta fila o falta la 057.
+-- SELECT clave, faccion_requerida, nivel_requerido, era_exclusiva,
+--        limite_diario, categoria, activo
+--   FROM consumibles
+--   WHERE clave IN ('consumible_catalejo_explorador','consumible_lupa_curador',
+--                   'consumible_lente_artista','consumible_pluma_creador')
+--     AND faccion_requerida IS NULL
+--     AND nivel_requerido = 4
+--   ORDER BY clave;
+--
+-- (a.2) Control del conteo: ESPERADO 4. Es la forma corta de (a).
+-- SELECT COUNT(*) AS liberadas
+--   FROM consumibles
+--   WHERE clave IN ('consumible_catalejo_explorador','consumible_lupa_curador',
+--                   'consumible_lente_artista','consumible_pluma_creador')
+--     AND faccion_requerida IS NULL
+--     AND nivel_requerido = 4;
+--
+-- (b) FUGAS: filas que siguen con categoria = 'faccion' y faccion_requerida
+--     NO nula. ESPERADO tras aplicar: 0. NO se asume: se mide y se reporta el
+--     numero real. Si sale > 0, hay filas de faccion fuera de las 4 claves de
+--     fase 1 (por ejemplo una faccion futura) y D4 NO las cubre: decision del
+--     operador, no de esta migracion.
+-- SELECT COUNT(*) AS siguen_con_gate
+--   FROM consumibles
+--   WHERE categoria = 'faccion'
+--     AND faccion_requerida IS NOT NULL;
+--
+-- (b.2) El detalle de esas fugas, si (b) no da 0.
+-- SELECT clave, faccion_requerida, nivel_requerido
+--   FROM consumibles
+--   WHERE categoria = 'faccion'
+--     AND faccion_requerida IS NOT NULL
+--   ORDER BY clave;
+--
+-- (c) NO REGRESION: nada fuera de las 4 claves se movio. ESPERADO: 0 FILAS.
+--     Si devuelve filas, el UPDATE toco de mas y hay que revertir.
+-- SELECT clave, faccion_requerida
+--   FROM consumibles
+--   WHERE faccion_requerida IS NOT NULL
+--     AND clave NOT IN ('consumible_catalejo_explorador','consumible_lupa_curador',
+--                       'consumible_lente_artista','consumible_pluma_creador');
+--
+-- (d) NO REGRESION del resto de columnas de las 4 filas. ESPERADO: 0 FILAS
+--     (las 4 siguen con nivel 4, limite_diario 1, era_exclusiva NULL, activo
+--     true, precio_xp_base = precio_xp y su bono intacto).
+-- SELECT clave, nivel_requerido, limite_diario, era_exclusiva, activo,
+--        precio_xp, precio_xp_base, cargas, duracion_horas, bono_accion,
+--        bono_xp_fijo, categoria
+--   FROM consumibles
+--   WHERE clave IN ('consumible_catalejo_explorador','consumible_lupa_curador',
+--                   'consumible_lente_artista','consumible_pluma_creador')
+--     AND (nivel_requerido IS DISTINCT FROM 4
+--          OR limite_diario IS DISTINCT FROM 1
+--          OR era_exclusiva IS NOT NULL
+--          OR activo IS DISTINCT FROM true
+--          OR precio_xp_base IS DISTINCT FROM precio_xp
+--          OR categoria IS DISTINCT FROM 'faccion'
+--          OR bono_xp_fijo <= 0);
+--
+-- (e) FIXTURE DE CONTROL POSITIVO PARA T8 (NO se ejecuta en esta migracion).
+--     Objetivo de T8: probar que el MOTOR SIGUE BLOQUEANDO cuando el dato
+--     tiene faccion. Como las 4 filas reales ya estan en NULL, sin este
+--     fixture T8 no puede distinguir "el gate se conservo y esta inerte" de
+--     "el gate se borro". El fixture pone el predicado a la vista.
+--     METODO: todo dentro de BEGIN ... ROLLBACK, para no dejar residuo. Si por
+--     error se hiciera COMMIT, la retirada NO se hace con un DELETE ad hoc:
+--     va por un script versionado en db/cleanups/ (ADR-003).
+--     Replicable tal cual (descomentar en el editor SQL, nunca en este fichero):
+--
+--     BEGIN;
+--     INSERT INTO consumibles
+--       (clave, nombre, descripcion, precio_xp, precio_xp_base, activo,
+--        categoria, era_exclusiva, faccion_requerida, nivel_requerido,
+--        cargas, duracion_horas, bono_accion, bono_xp_fijo, limite_diario,
+--        icono)
+--     VALUES
+--       ('fixture_t8_gate_faccion', 'Fixture T8 gate faccion',
+--        'Solo T8. Gate de faccion NO nulo para probar que el motor bloquea. No debe llegar a produccion.',
+--        0, 0, true, 'faccion', NULL, 'exploradores', 4,
+--        1, 24, 'guardado', 0, 1, NULL)
+--     ON CONFLICT (clave) DO NOTHING;
+--
+--     -- T8.1 CONTROL POSITIVO: un usuario cuya faccion NO es 'exploradores'
+--     --   intenta comprar 'fixture_t8_gate_faccion'. ESPERADO: rechazo por
+--     --   gate de faccion (el predicado del motor sigue vivo).
+--     -- T8.2 CONTROL POSITIVO del uso: intenta usarlo. ESPERADO: mismo
+--     --   rechazo.
+--     -- T8.3 CONTROL NEGATIVO: el mismo usuario compra y usa
+--     --   'consumible_catalejo_explorador'. ESPERADO: permitido, porque su
+--     --   faccion_requerida es NULL. Este par (T8.1 rechaza / T8.3 permite) es
+--     --   lo que demuestra "inerte POR DATO", no "predicado eliminado".
+--
+--     ROLLBACK;   -- obligatorio: el fixture no se queda
+--
+--     Nota: precio_xp y precio_xp_base en 0 y activo true para que el fixture
+--     no altere la economia si alguien olvidara el ROLLBACK. La clave lleva el
+--     prefijo 'fixture_' a proposito, para que un SELECT la delate.
+--
+-- (f) Prueba de idempotencia (evidencia para el reporte): re-ejecutar la
+--     seccion 1 debe devolver "UPDATE 0". Se comprueba en el mismo ensayo
+--     BEGIN ... ROLLBACK corriendo el UPDATE DOS veces:
+--       primera  -> UPDATE 4
+--       segunda  -> UPDATE 0
+
+-- ============================================================================
+-- ROLLBACK (reversion EXACTA y no destructiva; este bloque NO se ejecuta,
+--   esta comentado entero).
+--   Restaura los valores que la 057 sembro, solo en las filas que la 062 dejo
+--   en NULL. Es un UPDATE, no un DELETE ni un DROP: las 4 filas nunca se
+--   borran (ADR-003). Idempotente por el mismo patron: "faccion_requerida IS
+--   NULL" hace que la segunda corrida escriba 0 filas.
+--
+--   UPDATE consumibles
+--      SET faccion_requerida = CASE clave
+--            WHEN 'consumible_catalejo_explorador' THEN 'exploradores'
+--            WHEN 'consumible_lupa_curador'        THEN 'curadores'
+--            WHEN 'consumible_pluma_creador'       THEN 'creadores'
+--            WHEN 'consumible_lente_artista'       THEN 'artistas'
+--          END
+--    WHERE clave IN ('consumible_catalejo_explorador','consumible_lupa_curador',
+--                    'consumible_pluma_creador','consumible_lente_artista')
+--      AND faccion_requerida IS NULL;
+--
+--   Comprobacion del ROLLBACK: la consulta (0.a) vuelve a devolver 4 filas con
+--   faccion_requerida no nula; la (b) vuelve a dar 4.
+-- ============================================================================

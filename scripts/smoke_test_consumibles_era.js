@@ -20,8 +20,20 @@
 var fs = require('fs');
 var path = require('path');
 var vm = require('vm');
+// ADR-110 D5: la identidad del comprador sale del Bearer (verificarSesion) y el
+// usuario_id del query/body se IGNORA. La firma se delega en lib/sesion.js, la
+// MISMA primitiva HMAC-SHA256 del motor: cero criptografia duplicada.
+var SESION = require('../lib/sesion.js');
 
 var ROOT = path.join(__dirname, '..');
+
+// El 'sub' del token es la unica autoridad. UID_AJENO es el id que se inyecta
+// en body/query para probar que el motor lo ignora.
+var UID_SESION = '11111111-1111-4111-8111-111111111111';
+var UID_AJENO = '22222222-2222-4222-8222-222222222222';
+var TOKEN_SESION = SESION.firmarSesion(UID_SESION);
+function auth() { return { authorization: 'Bearer ' + TOKEN_SESION }; }
+function sinAuth() { return {}; }
 
 var total = 0;
 var fails = 0;
@@ -134,8 +146,9 @@ async function run() {
     calcularEraVisibleLocal(100000, 1) === 'Mito');
 
   // ================= 2a. GET consumibles (bloqueado) ================
-  // Rama: tipo === 'consumibles' (interacciones.js:5865). Con usuario_id se
-  // lee xp_total, nivel_max (9000 -> nivel 11 = Explorador) y cada item
+  // Rama: tipo === 'consumibles'. ADR-110 D5: la identidad sale del Bearer
+  // (verificarSesion) y el usuario_id del query se IGNORA. Con el token se lee
+  // xp_total/nivel_max del sub (9000 -> nivel 11 = Explorador) y cada item
   // calcula bloqueado = era_exclusiva && era_exclusiva !== era_usuario.
   instalarMock([
     { match: 'FROM consumibles', rows: [
@@ -146,7 +159,7 @@ async function run() {
   ]);
   var resA = null;
   var errA = null;
-  try { resA = await invocar({ method: 'GET', query: { tipo: 'consumibles', usuario_id: 'U1' }, headers: {} }); }
+  try { resA = await invocar({ method: 'GET', query: { tipo: 'consumibles', usuario_id: UID_SESION }, headers: auth() }); }
   catch (e) { errA = e; }
   var dataA = (resA && resA._json && resA._json.data) || [];
   var itemVip = null, itemCafe = null;
@@ -162,10 +175,26 @@ async function run() {
     !!itemVip && itemVip.bloqueado === true, itemVip);
   check('2a-4: prod_cafe (era null) bloqueado === false',
     !!itemCafe && itemCafe.bloqueado === false, itemCafe);
+  // Contrato nuevo: un usuario_id AJENO en el query produce EXACTAMENTE la
+  // misma respuesta que el propio (el query param se tolera y se ignora).
+  var resAAjeno = null;
+  try { resAAjeno = await invocar({ method: 'GET', query: { tipo: 'consumibles', usuario_id: UID_AJENO }, headers: auth() }); }
+  catch (e) { resAAjeno = null; }
+  check('2a-5: GET con usuario_id ajeno -> respuesta identica a la del propio',
+    !!resAAjeno && JSON.stringify(resAAjeno._json) === JSON.stringify(resA && resA._json),
+    resAAjeno && resAAjeno._json && resAAjeno._json.era_usuario);
+  // Y sin sesion el catalogo es publico y SIN gates (era_usuario null).
+  var resASin = null;
+  try { resASin = await invocar({ method: 'GET', query: { tipo: 'consumibles', usuario_id: UID_AJENO }, headers: sinAuth() }); }
+  catch (e) { resASin = null; }
+  check('2a-6: GET sin sesion -> publico y sin gates (era_usuario null)',
+    !!resASin && resASin._status === 200 && !!resASin._json
+    && resASin._json.era_usuario === null, resASin && resASin._json);
 
   // ================= 2b. comprar_consumible BLOQUEADO ===============
-  // Rama: tipo2 === 'comprar_consumible' (interacciones.js:8772). Gate en
-  // 8818-8823: era Mito != Explorador -> 403 ERA_INSUFICIENTE.
+  // Rama: tipo2 === 'comprar_consumible'. ADR-110 D5: exige sesion firmada y
+  // el autor es el 'sub' del token; el usuario_id del body se ignora. Gate de
+  // era: Mito != Explorador -> 403 ERA_INSUFICIENTE.
   instalarMock([
     { match: 'FROM consumibles WHERE clave', rows: [
       { id: '1', clave: 'pase_vip', precio_xp: '2400', categoria: null, era_exclusiva: 'Mito' }
@@ -175,7 +204,7 @@ async function run() {
     ] }
   ]);
   var resB = null;
-  try { resB = await invocar({ method: 'POST', query: {}, body: { tipo: 'comprar_consumible', usuario_id: 'U1', clave: 'pase_vip' }, headers: {} }); }
+  try { resB = await invocar({ method: 'POST', query: {}, body: { tipo: 'comprar_consumible', usuario_id: UID_SESION, clave: 'pase_vip' }, headers: auth() }); }
   catch (e) { resB = null; }
   check('2b-1: compra era futura status 403', !!resB && resB._status === 403, resB && resB._status);
   check('2b-2: error === ERA_INSUFICIENTE',
@@ -184,9 +213,25 @@ async function run() {
   check('2b-3: era_requerida === Mito',
     !!resB && resB._json && resB._json.era_requerida === 'Mito',
     resB && resB._json);
+  // Sin sesion no se escribe nada: 401 SESION_REQUERIDA (antes del catalogo).
+  var resBSin = null;
+  try { resBSin = await invocar({ method: 'POST', query: {}, body: { tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'pase_vip' }, headers: sinAuth() }); }
+  catch (e) { resBSin = null; }
+  check('2b-4: compra sin sesion -> 401 SESION_REQUERIDA',
+    !!resBSin && resBSin._status === 401 && !!resBSin._json
+    && resBSin._json.error === 'SESION_REQUERIDA', resBSin && resBSin._json);
+  // Con sesion y usuario_id AJENO en el body la operacion se aplica al sub: el
+  // resultado es identico al de la compra del propio usuario.
+  var resBAjeno = null;
+  try { resBAjeno = await invocar({ method: 'POST', query: {}, body: { tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'pase_vip' }, headers: auth() }); }
+  catch (e) { resBAjeno = null; }
+  check('2b-5: usuario_id ajeno en el body -> mismo resultado que el propio (se ignora)',
+    !!resBAjeno && JSON.stringify(resBAjeno._json) === JSON.stringify(resB && resB._json),
+    resBAjeno && resBAjeno._json);
 
   // ================= 2c. comprar_consumible SIN GATE ================
   // era_exclusiva null -> sin gate; xp 0 < 60 -> 409 'XP insuficiente'.
+  // Sesion firmada obligatoria (ADR-110 D5); el usuario_id del body se ignora.
   instalarMock([
     { match: 'FROM consumibles WHERE clave', rows: [
       { id: '2', clave: 'prod_cafe', precio_xp: '60', categoria: null, era_exclusiva: null }
@@ -196,7 +241,7 @@ async function run() {
     ] }
   ]);
   var resC = null;
-  try { resC = await invocar({ method: 'POST', query: {}, body: { tipo: 'comprar_consumible', usuario_id: 'U1', clave: 'prod_cafe' }, headers: {} }); }
+  try { resC = await invocar({ method: 'POST', query: {}, body: { tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'prod_cafe' }, headers: auth() }); }
   catch (e) { resC = null; }
   check('2c-1: compra sin gate NO es 403', !!resC && resC._status !== 403, resC && resC._status);
   check('2c-2: compra sin gate -> 409 XP insuficiente (xp 0 < 60)',
@@ -215,7 +260,7 @@ async function run() {
     ] }
   ]);
   var resD = null;
-  try { resD = await invocar({ method: 'POST', query: {}, body: { tipo: 'usar_consumible', usuario_id: 'U1', clave: 'brujula_aprendiz' }, headers: {} }); }
+  try { resD = await invocar({ method: 'POST', query: {}, body: { tipo: 'usar_consumible', usuario_id: UID_SESION, clave: 'brujula_aprendiz' }, headers: auth() }); }
   catch (e) { resD = null; }
   check('2d-1: uso de item de era superada status 200', !!resD && resD._status === 200, resD && resD._status);
   check('2d-2: efecto.multiplicador_x2_usos === 3',
@@ -314,15 +359,25 @@ async function run() {
   // filtro de categoria siga en pie, y conserva la prohibicion de la tienda
   // general duplicada. Si alguien reintroduce una tienda general aqui, 4g-2
   // (2 llamadas) o 4g-2c (cargarTienda/PF_TIENDA_CATS) fallan.
-  var consOcur = perfilSrc.split('tipo=consumibles').length - 1;
-  check('4g-2: mi-perfil.html con exactamente 1 tipo=consumibles (tienda de faccion)',
-    consOcur === 1, consOcur);
+  // 4g-2: ADR-110 retiro la peticion del catalogo desde mi-perfil.html: el
+  // bloque de faccion ya no pide ?tipo=consumibles (solo necesitaba el estado
+  // del usuario) y lee ?tipo=inventario. Se afirma que NO queda ninguna llamada
+  // al catalogo desde el perfil: la unica mencion del literal es un comentario.
+  var consOcur = perfilSrc.split('api/interacciones?tipo=consumibles').length - 1;
+  check('4g-2: mi-perfil.html con 0 llamadas a ?tipo=consumibles (el bloque lee el inventario)',
+    consOcur === 0, consOcur);
   var facIni = perfilSrc.indexOf('function pfFacCargar');
   var facFin = perfilSrc.indexOf('function pfFacRefrescar');
-  var consIdx = perfilSrc.indexOf('tipo=consumibles');
-  check('4g-2a: la llamada tipo=consumibles vive dentro de pfFacCargar',
+  var cuerpoFac = (facIni !== -1 && facFin > facIni) ? perfilSrc.slice(facIni, facFin) : '';
+  var llamadasFac = cuerpoFac.split('fetchConJwt(').length - 1;
+  // 4g-2a: la lectura del bloque de faccion vive DENTRO de pfFacCargar, es UNA
+  // sola y va por fetchConJwt, que es lo que manda el Bearer: sin el, el motor
+  // no puede derivar la identidad y los gates llegarian nulos (ADR-110 D5).
+  check('4g-2a: la lectura de faccion vive dentro de pfFacCargar y va por fetchConJwt (Bearer)',
     facIni !== -1 && facFin !== -1 && facIni < facFin
-    && consIdx > facIni && consIdx < facFin);
+    && llamadasFac === 1
+    && cuerpoFac.indexOf('tipo=inventario&usuario_id=') !== -1,
+    [facIni, facFin, llamadasFac]);
   check('4g-2b: la tienda de faccion solo pinta la categoria faccion',
     perfilSrc.indexOf("String(it.categoria || '').toLowerCase() === 'faccion'") !== -1);
   check('4g-2c: la tienda general de consumibles sigue sin duplicarse en mi-perfil.html',

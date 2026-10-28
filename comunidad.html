@@ -442,6 +442,14 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 #cpanel-mercado .mk-gate{padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;background:rgba(255,74,0,.05)}
 #cpanel-mercado .mk-gate-t{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px}
 #cpanel-mercado .mk-gate-d{font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px}
+/* Catalogo v1.3.0: fila de faccion, accion de compra y etiquetas de gate */
+#cpanel-mercado .mk-vista-fac{margin:0 0 12px;row-gap:6px}
+#cpanel-mercado .mk-vista-fac .mk-cat-t{margin-top:0}
+#cpanel-mercado .mk-cat-t.gate{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.55);font-weight:700;margin-left:5px}
+#cpanel-mercado .mk-cat-act{display:flex;justify-content:flex-end;margin-top:8px}
+#cpanel-mercado .mk-cat-buy{padding:5px 13px;font-size:10px;letter-spacing:.6px;line-height:1.2}
+#cpanel-mercado .mk-cat-buy[disabled]{opacity:.45;cursor:not-allowed}
+#cpanel-mercado .mk-cat-act:hover .mk-cat-buy[disabled]{opacity:.6}
 @media(max-width:540px){
   #cpanel-mercado .mk-oferta{flex-wrap:wrap}
   #cpanel-mercado .mk-of-buy{width:100%}
@@ -1175,7 +1183,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 <script src="dictado-voz.js?v=1"></script>
 <script src="mymapa.js?v=8"></script>
 <script src="cartas-ui.js"></script>
-<script src="mercado.js?v=2"></script>
+<script src="mercado.js?v=3"></script>
 <script>
 /* =============================================================
    COMUNIDAD LATAWEL — hub de interaccion social

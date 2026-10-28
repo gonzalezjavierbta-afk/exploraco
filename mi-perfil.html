@@ -205,6 +205,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .inv-use{padding:5px 12px;background:rgba(255,74,0,.15);border:1px solid rgba(255,74,0,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.6px;transition:all .15s;font-family:'Outfit',sans-serif}
 .inv-use:hover{background:var(--gold);color:var(--black)}
 .inv-era{display:inline-block;margin-left:8px;font-family:'Outfit',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gold);background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.3);border-radius:999px;padding:1px 7px}
+/* ADR-110: etiqueta de FACCION REQUERIDA del consumible poseido. Informa, no
+   filtra ni bloquea. Silo con selector padre unico #pf-inventario (ADR-004). */
+#pf-inventario .inv-fac{display:inline-block;margin-left:8px;font-family:'Outfit',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.62);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:1px 7px}
 /* ---- TIENDA DE FACCION: consumibles categoria 'faccion' (migracion 057) ----
    Silo atomico (ADR-004): TODO lo nuevo cuelga de .pf-fac, con Reset de silo
    explicito (* y box-sizing); nada suelto en :root. El gate lo decide el MOTOR
@@ -244,6 +247,23 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-fac .fac-btn.ghost{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);color:#fff}
 .pf-fac .fac-btn:disabled{opacity:.38;cursor:not-allowed}
 @media (max-width:600px){.pf-fac .fac-grid{grid-template-columns:1fr}}
+/* ADR-110: el contenedor ya no pinta catalogo; solo el efecto vigente y este
+   aviso con enlace al Mercado de Comunidad. Cero precios, cero boton aqui. */
+.pf-fac .fac-aviso{font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.45);border-left:2px solid rgba(255,74,0,.45);padding-left:10px}
+.pf-fac .fac-aviso-lnk{color:var(--gold);font-weight:900;text-decoration:none;border-bottom:1px solid rgba(255,74,0,.45);white-space:nowrap}
+.pf-fac .fac-aviso-lnk:hover{border-bottom-color:var(--gold)}
+/* ---- COLECCION (ADR-110): silo atomico bajo #pf-coleccion (ADR-004).
+   Selector padre unico, sin :root y sin clases sueltas: todo lo nuevo del tab
+   Inventario cuelga de aqui. Los filtros solo conmutan display (ADR-003). ---- */
+#pf-coleccion{box-sizing:border-box;width:100%}
+#pf-coleccion *,#pf-coleccion *::before,#pf-coleccion *::after{box-sizing:border-box}
+#pf-coleccion .pf-col-filtros{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}
+#pf-coleccion .pf-col-f{padding:6px 14px;min-height:34px;border-radius:999px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;background:transparent;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.55);transition:background .15s,color .15s,border-color .15s}
+#pf-coleccion .pf-col-f:hover{border-color:rgba(255,74,0,.5);color:var(--gold)}
+#pf-coleccion .pf-col-f[aria-pressed="true"]{background:var(--gold);border-color:var(--gold);color:var(--black)}
+#pf-coleccion .pf-col-bloque{margin-bottom:20px}
+#pf-coleccion .pf-col-bloque:last-child{margin-bottom:0}
+@media (max-width:600px){#pf-coleccion .pf-col-f{flex:1 1 44%}#pf-coleccion .pf-col-bloque{margin-bottom:16px}}
 /* BONO DE BIENVENIDA POR REFERIDO (referidos) */
 .pf-bono{display:none;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(255,74,0,.14),rgba(255,74,0,.04));border:1px solid rgba(255,74,0,.35);border-radius:10px;padding:14px;margin-bottom:14px}
 .pf-bono-ico{font-size:24px;line-height:1}
@@ -1153,7 +1173,7 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
     <button type="button" class="pf-tab" role="tab" data-tab="clase" aria-selected="false" onclick="pfTab('clase')">&#x2694;&#xFE0F; Progreso</button>
     <button type="button" class="pf-tab" role="tab" data-tab="red" aria-selected="false" onclick="pfTab('red')">&#x1F517; Mi Red</button>
     <button type="button" class="pf-tab" role="tab" data-tab="museo" aria-selected="false" onclick="pfTab('museo')">&#x1F3DB;&#xFE0F; Museo</button>
-    <button type="button" class="pf-tab" role="tab" data-tab="inventario" aria-selected="false" onclick="pfTab('inventario')">&#x1F392; Inventario</button>
+    <button type="button" class="pf-tab" role="tab" data-tab="inventario" aria-selected="false" onclick="pfTab('inventario')">&#x1F392; Coleccion</button>
     <button type="button" class="pf-tab" role="tab" data-tab="mensajes" aria-selected="false" onclick="pfTab('mensajes')">&#x1F4E8; Mensajes</button>
     <button type="button" class="pf-tab" role="tab" data-tab="contratos" aria-selected="false" onclick="pfTab('contratos')">&#x1F4DC; Contratos</button>
     <button type="button" class="pf-tab" role="tab" data-tab="cuenta" aria-selected="false" onclick="pfTab('cuenta')">&#x2699;&#xFE0F; Cuenta</button>
@@ -1250,18 +1270,66 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
   <!-- Bono de bienvenida por referido (tarjeta destacada, oculta por defecto) -->
   <div class="pf-bono" id="pf-bono" data-tab="inventario" style="display:none"></div>
 
-  <!-- MI INVENTARIO (Gamificacion v4) -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F392; Mi Inventario</div>
-  <div id="pf-inventario" data-tab="inventario"></div>
+  <!-- COLECCION (ADR-110): este tab lista SOLO lo que el usuario POSEE, en
+       orden fijo: cartas (album del museo + mis cartas por variante),
+       consumibles y cromos. Los filtros de tipo solo conmutan display: ningun
+       ID sale del DOM ni se borra (ADR-003). La faccion NO filtra aqui:
+       territorio y emisor son etiqueta informativa, no gate. Todo el CSS
+       nuevo cuelga del silo #pf-coleccion (ADR-004). -->
+  <div id="pf-coleccion" data-tab="inventario">
+    <div class="pf-section-title" style="margin-top:20px">&#x1F392; Coleccion</div>
+    <div class="pf-col-filtros" role="group" aria-label="Filtrar la coleccion por tipo">
+      <button type="button" class="pf-col-f" data-col-f="todas" aria-pressed="true" onclick="pfColFiltrar('todas')">Todas</button>
+      <button type="button" class="pf-col-f" data-col-f="cartas" aria-pressed="false" onclick="pfColFiltrar('cartas')">Cartas</button>
+      <button type="button" class="pf-col-f" data-col-f="consumibles" aria-pressed="false" onclick="pfColFiltrar('consumibles')">Consumibles</button>
+      <button type="button" class="pf-col-f" data-col-f="cromos" aria-pressed="false" onclick="pfColFiltrar('cromos')">Cromos</button>
+    </div>
 
-  <!-- TIENDA DE FACCION (consumibles categoria 'faccion', migracion 057).
-       Se anyade a la tienda de consumibles que ya existe, en el mismo sitio
-       donde el usuario ve su XP y su inventario. El CSS nuevo cuelga del silo
-       .pf-fac (ADR-004) y el estado de bloqueo lo manda el motor
-       (bloqueado + motivo_bloqueo): aqui no se recalcula ningun gate. -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F6E1;&#xFE0F; Tienda de faccion</div>
+    <!-- CARTAS: album del museo (vitrina + album por variante) y mis cartas.
+         ADR-003: retirar del museo desequipa la carta y la deja en el album. -->
+    <div class="pf-col-bloque" data-col="cartas">
+      <div class="pf-section-title">&#x1F3DB;&#xFE0F; Album del Museo</div>
+      <div class="cartas-silo pf-v61" id="pf-museo-cartas" data-tab="inventario">
+        <div class="c-museo-head">
+          <div class="v61-card-n">Vitrina de cartas</div>
+          <div class="c-museo-cont" id="pf-museo-count">&#8212;</div>
+        </div>
+        <div class="c-museo-vitrina" id="pf-museo-vitrina">
+          <div class="v61-empty">Cargando museo&#8230;</div>
+        </div>
+        <div class="c-museo-filtros" id="pf-museo-filtros"></div>
+        <div class="v61-grid" id="pf-museo-album"></div>
+      </div>
+
+      <div class="pf-section-title" style="margin-top:20px">&#x1F0CF; Mis Cartas</div>
+      <div class="pf-v61" id="pf-cartas" data-tab="inventario">
+        <div class="v61-empty">Cargando cartas&#8230;</div>
+      </div>
+    </div>
+
+    <!-- CONSUMIBLES: solo los poseidos (cantidad > 0). El boton Usar es el
+         flujo existente; en este bloque no se compra nada. -->
+    <div class="pf-col-bloque" data-col="consumibles">
+      <div class="pf-section-title">&#x1F392; Consumibles</div>
+      <div id="pf-inventario" data-tab="inventario"></div>
+    </div>
+
+    <!-- CROMOS -->
+    <div class="pf-col-bloque" data-col="cromos">
+      <div class="pf-section-title">&#x1F3AB; Cromos</div>
+      <div class="pf-counter" id="pf-cromos-count" data-tab="inventario">0 cromos</div>
+      <div class="cromo-grid" id="pf-cromos" data-tab="inventario"></div>
+    </div>
+  </div>
+
+  <!-- EFECTO DE FACCION (ADR-110). El ID #pf-fac-tienda se REUTILIZA: el tab
+       Inventario ya no vende faccion. El contenedor muestra solo el efecto
+       vigente con sus cargas y un aviso con enlace al Mercado de Comunidad.
+       Sin precios ni boton de compra aqui. El CSS cuelga del silo .pf-fac
+       (ADR-004); el gate y la duracion los manda el motor, no esta pagina. -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F6E1;&#xFE0F; Efecto de faccion</div>
   <div class="pf-fac" id="pf-fac-tienda" data-tab="inventario" aria-live="polite">
-    <div class="fac-vacio">Cargando tienda de faccion&#8230;</div>
+    <div class="fac-vacio">Cargando tu efecto de faccion&#8230;</div>
   </div>
 
   <!-- MIS REGALIAS (regalias pasivas del autor) -->
@@ -1271,36 +1339,16 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
     <div id="pf-regalias-lista"></div>
   </section>
 
-  <!-- MIS CROMOS (Gamificacion v4) -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F3AB; Mis Cromos</div>
-  <div class="pf-counter" id="pf-cromos-count" data-tab="inventario">0 cromos</div>
-  <div class="cromo-grid" id="pf-cromos" data-tab="inventario"></div>
+  <!-- MIS CROMOS: el bloque vive en la Coleccion (ADR-110); aqui no queda
+       copia para no duplicar IDs (ADR-003: los IDs se mueven, no se borran). -->
 
   <!-- EMPRENDEDOR (Mercado, asset compartido mercado.js) -->
   <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F6D2; Emprendedor</div>
   <div class="pf-mercado" id="pf-mercado" data-tab="inventario"></div>
 
   <!-- GAMING v6.1 (Fase 4 / T7): cartas coleccionables y su mercado -->
-  <!-- GAMING v6.1 (Fase 5): Album del Museo de cartas. ADR-003: no borra nada;
-       retirar del museo desequipa la carta y la deja en el album. -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F3DB;&#xFE0F; Album del Museo</div>
-  <div class="cartas-silo pf-v61" id="pf-museo-cartas" data-tab="inventario">
-    <div class="c-museo-head">
-      <div class="v61-card-n">Vitrina de cartas</div>
-      <div class="c-museo-cont" id="pf-museo-count">&#8212;</div>
-    </div>
-    <div class="c-museo-vitrina" id="pf-museo-vitrina">
-      <div class="v61-empty">Cargando museo&#8230;</div>
-    </div>
-    <div class="c-museo-filtros" id="pf-museo-filtros"></div>
-    <div class="v61-grid" id="pf-museo-album"></div>
-  </div>
-
-  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F0CF; Mis Cartas</div>
-  <div class="pf-v61" id="pf-cartas" data-tab="inventario">
-    <div class="v61-empty">Cargando cartas&#8230;</div>
-  </div>
-
+  <!-- Album del Museo y Mis Cartas viven en la Coleccion (ADR-110); no se
+       duplican aqui. El mercado de cartas es venta, no coleccion. -->
   <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F6D2; Mercado de Cartas</div>
   <div class="pf-v61" id="pf-cartas-mercado" data-tab="inventario">
     <div class="v61-empty">Cargando ofertas&#8230;</div>
@@ -1950,7 +1998,7 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
 <script src="dictado-voz.js?v=1"></script>
 <script src="media-embed.js?v=3"></script>
 <script src="media-upload.js"></script>
-<script src="mercado.js?v=2"></script>
+<script src="mercado.js?v=3"></script>
 <script>
 /* mi-perfil.html -- Rev 2026-09-18c: acordeon de niveles (ADR-040 T1) */
 /* =============================================================
@@ -2138,8 +2186,8 @@ function renderPerfil() {
   /* inventario/cromos (Gamificacion v4): la pestana Inventario lista SOLO
      lo que el usuario posee; el catalogo de la tienda se retiro (T5). */
   cargarInventario(u.id);
-  /* Tienda de faccion (057): consume el mismo endpoint de consumibles que ya
-     usa la pagina, filtrado por categoria. */
+  /* ADR-110: #pf-fac-tienda ya no vende faccion; solo informa del efecto
+     vigente y enlaza al Mercado de Comunidad. */
   pfFacCargar(u.id);
   cargarCromos(u.id);
   cargarBonoReferido(u.id);
@@ -3433,6 +3481,23 @@ function pfSlotsComprar(clave) {
 }
 
 /* ---- MI INVENTARIO (Gamificacion v4) ---- */
+/* ADR-110: filtros de la COLECCION. Solo conmutan display de los bloques
+   .pf-col-bloque; ningun ID sale del DOM (ADR-003). 'todas' los muestra todos. */
+function pfColFiltrar(tipo) {
+  var t = String(tipo || 'todas');
+  var box = document.getElementById('pf-coleccion');
+  if (!box) return;
+  var bloques = box.querySelectorAll('.pf-col-bloque');
+  var i;
+  for (i = 0; i < bloques.length; i++) {
+    var on = (t === 'todas' || t === String(bloques[i].getAttribute('data-col') || ''));
+    bloques[i].style.display = on ? '' : 'none';
+  }
+  var bts = box.querySelectorAll('.pf-col-f');
+  for (i = 0; i < bts.length; i++) {
+    bts[i].setAttribute('aria-pressed', String(bts[i].getAttribute('data-col-f') || '') === t ? 'true' : 'false');
+  }
+}
 function cargarInventario(uid) {
   var el = document.getElementById('pf-inventario');
   var balance = document.getElementById('pf-xp-balance');
@@ -3449,7 +3514,7 @@ function cargarInventario(uid) {
         return (parseInt(item.cantidad, 10) || 0) > 0;
       });
       if(!claves.length) {
-        el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Tu inventario esta vacio. A\u00fan no tienes consumibles.</div>';
+        el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No tienes consumibles.</div>';
         return;
       }
       el.innerHTML = claves.map(function(k){
@@ -3459,9 +3524,12 @@ function cargarInventario(uid) {
         var eraTag = item.era_exclusiva
           ? '<span class="inv-era" title="Era exclusiva">Era ' + esc(item.era_exclusiva) + '</span>'
           : '';
+        /* ADR-110: la faccion requerida es ETIQUETA informativa. Sin el dato
+           (o con null) se declara explicitamente 'Cualquier faccion'. */
+        var facTag = '<span class="inv-fac">' + esc(pfFacFaccionTxt(item)) + '</span>';
         return '<div class="inv-item">'
           + '<div class="inv-qty">x' + qty + '</div>'
-          + '<div class="inv-name">' + esc(nombre) + eraTag + '</div>'
+          + '<div class="inv-name">' + esc(nombre) + eraTag + facTag + '</div>'
           + '<button class="inv-use" onclick="usarConsumible(\'' + esc(k) + '\',this)">Usar</button>'
           + '</div>';
       }).join('');
@@ -3553,6 +3621,15 @@ function pfFacNombre(clave) {
   var it = pfFacItem(clave);
   if (it && it.nombre) return String(it.nombre);
   return nombreConsumible(clave);
+}
+/* ADR-110: texto de la faccion requerida de un consumible poseido. Sin dato
+   (o null) NO se deja el hueco en blanco: se declara 'Cualquier faccion'. Con
+   dato se traduce el codigo al nombre publico de FACCION_META. */
+function pfFacFaccionTxt(item) {
+  var f = (item && item.faccion_requerida != null) ? String(item.faccion_requerida).trim() : '';
+  if (!f) return 'Cualquier faccion';
+  var meta = pfFacFaccion(f);
+  return (meta && meta.nombre) ? String(meta.nombre) : f;
 }
 /* Stock por clave. El contrato manda data.stock; si esa clave no llega (motor
    anterior a la 057) cae a data.consumibles.cantidad, que es la MISMA fuente
@@ -3682,18 +3759,16 @@ function pfFacEfectoHtml() {
     + '<span class="fac-reloj" id="pf-fac-reloj">-- h -- m</span>'
     + '</div>';
 }
+/* ADR-110: este contenedor ya NO pinta catalogo. Muestra el efecto vigente
+   (cargas + cuenta atras) y un aviso con enlace al Mercado de Comunidad, que
+   es donde se compran los articulos. pfFacLista / pfFacCardHtml se conservan
+   como helpers (no se borra nada, ADR-003), pero no pintan grid aqui. */
 function pfFacPintar() {
   var el = document.getElementById('pf-fac-tienda');
   if (!el) return;
-  var lista = pfFacLista();
-  var html = pfFacEfectoHtml();
-  if (!lista.length) {
-    el.innerHTML = html + '<div class="fac-vacio">No hay consumibles de faccion activos.</div>';
-  } else {
-    el.innerHTML = html + '<div class="fac-grid">'
-      + lista.map(pfFacCardHtml).join('')
-      + '</div>';
-  }
+  el.innerHTML = pfFacEfectoHtml()
+    + '<div class="fac-aviso">Los articulos se compran en el Mercado de Comunidad.'
+    + ' <a class="fac-aviso-lnk" href="comunidad.html#mercado">Ir al Mercado</a></div>';
   pfFacReloj();
 }
 /* Cuenta atras propia del efecto ('12 h 04 m') sin recargar: un solo
@@ -3726,32 +3801,31 @@ function pfFacReloj() {
   tic();
   PF_FAC_ESTADO.reloj = setInterval(tic, 30000);
 }
+/* ADR-110: el GET pasa por fetchConJwt porque el motor deriva la identidad
+   del Bearer; sin el, los gates llegan nulos. Tampoco se pide ya el catalogo
+   (?tipo=consumibles): el bloque solo necesita el estado del usuario, y tanto
+   el efecto vigente como el stock salen de ?tipo=inventario. */
 function pfFacCargar(uid) {
   var el = document.getElementById('pf-fac-tienda');
   if (!el) return;
   var u = sesion();
   var id = uid || (u && u.id);
   if (!id) return;
-  el.innerHTML = '<div class="fac-vacio">Cargando tienda de faccion\u2026</div>';
-  Promise.all([
-    fetch('/api/interacciones?tipo=consumibles&usuario_id=' + encodeURIComponent(id))
-      .then(function(r){ return r.json(); }).catch(function(){ return null; }),
-    fetch('/api/interacciones?tipo=inventario&usuario_id=' + encodeURIComponent(id))
-      .then(function(r){ return r.json(); }).catch(function(){ return null; })
-  ]).then(function(re) {
-    var cat = (re[0] && re[0].ok) ? re[0] : null;
-    var inv = (re[1] && re[1].ok && re[1].data) ? re[1].data : null;
-    if (!cat) {
-      el.innerHTML = '<div class="fac-err">No se pudo cargar la tienda de faccion.</div>';
-      return;
-    }
-    PF_FAC_ESTADO.cat = cat;
-    PF_FAC_ESTADO.stock = pfFacStockMap(inv);
-    PF_FAC_ESTADO.efecto = (inv && inv.efecto) ? inv.efecto : null;
-    pfFacPintar();
-  }).catch(function() {
-    el.innerHTML = '<div class="fac-err">No se pudo cargar la tienda de faccion.</div>';
-  });
+  el.innerHTML = '<div class="fac-vacio">Cargando tu efecto de faccion\u2026</div>';
+  fetchConJwt('/api/interacciones?tipo=inventario&usuario_id=' + encodeURIComponent(id))
+    .then(function(res) {
+      var inv = (res && res.ok && res.data) ? res.data : null;
+      if (!inv) {
+        el.innerHTML = '<div class="fac-err">No se pudo cargar tu efecto de faccion.</div>';
+        return;
+      }
+      PF_FAC_ESTADO.stock = pfFacStockMap(inv);
+      PF_FAC_ESTADO.efecto = inv.efecto ? inv.efecto : null;
+      pfFacPintar();
+    })
+    .catch(function() {
+      el.innerHTML = '<div class="fac-err">No se pudo cargar tu efecto de faccion.</div>';
+    });
 }
 /* Relee TODO tras una accion: el motor es la fuente de verdad del stock y del
    efecto, y el inventario clasico comparte la misma fuente. */
@@ -8054,7 +8128,7 @@ function cargarCartas(uid) {
     }
     var propias = cartas.filter(function (c) { return (parseInt(c.cantidad, 10) || 0) > 0; });
     if (!propias.length) {
-      html += '<div class="v61-empty">Aun no tienes cartas. Consiguelas en el mercado o por drop.</div>';
+      html += '<div class="v61-empty">Aun no tienes cartas. Se obtienen abriendo sobres y en el Mercado de Cartas.</div>';
       box.innerHTML = html; return;
     }
     html += '<div class="v61-grid">';
@@ -8203,7 +8277,7 @@ function v61RenderAlbum(d, ui) {
   if (fil) fil.innerHTML = v61FiltrosHtml(ui);
   var pos = ((d && d.cartas) || []).filter(function (c) { return c && v61VariantesPosesion(c).length > 0; });
   if (!pos.length) {
-    box.innerHTML = '<div class="v61-empty">Aun no tienes cartas. Consiguelas en el mercado o por drop.</div>';
+    box.innerHTML = '<div class="v61-empty">Aun no tienes cartas. Se obtienen abriendo sobres y en el Mercado de Cartas.</div>';
     return;
   }
   var vis = pos.filter(function (c) {

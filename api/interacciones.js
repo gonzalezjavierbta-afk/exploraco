@@ -9777,18 +9777,24 @@ module.exports = async function handler(req, res) {
             ).catch(function(){ return []; });
           }
         }
-        // Era ganada del usuario (ADR-053/ADR-056): solo se calcula si viene
-        // usuario_id. Sin fila o sin columnas -> era_usuario null y sin gate.
+        // Era ganada del usuario (ADR-053/ADR-056). ADR-110 R1: la autoridad de
+        // identidad es el 'sub' del token firmado; el usuario_id del query se
+        // TOLERA y se IGNORA (mi-perfil.html lo sigue enviando) y un uuid ajeno
+        // produce EXACTAMENTE la misma respuesta que el propio. Sin sesion el
+        // catalogo es publico y sin gates, igual que antes sin usuario_id.
+        // Sin fila o sin columnas -> era_usuario null y sin gate.
         // Junto a la era se calculan el nivel canonico (GREATEST con nivel_max)
         // y la faccion normalizada, que alimentan el bloqueo de los consumibles
         // de faccion de la 057 (prioridad faccion > nivel > era).
         var catEraUsuario = null;
         var catNivelUsuario = null;
         var catFaccionUsuario = null;
-        if (usuarioId) {
+        var catSes = verificarSesion(req);
+        var catUid = (catSes && catSes.ok && catSes.sub) ? String(catSes.sub) : null;
+        if (catUid) {
           var catUsrRows = await sql(
             'SELECT xp_total, nivel_max FROM usuarios WHERE id=$1',
-            [usuarioId]
+            [catUid]
           ).catch(function(){ return []; });
           if (catUsrRows.length) {
             catEraUsuario = calcularEraVisibleLocal(catUsrRows[0].xp_total, catUsrRows[0].nivel_max);
@@ -9798,7 +9804,7 @@ module.exports = async function handler(req, res) {
           // previo) degrada a null sin tumbar el catalogo ni la era.
           var catFacRows = await sql(
             'SELECT faccion FROM usuarios WHERE id=$1',
-            [usuarioId]
+            [catUid]
           ).catch(function(eCatFac) {
             console.warn('TRACE: GET consumibles sin faccion de usuario: ' + (eCatFac && eCatFac.message));
             return [];
@@ -9832,15 +9838,18 @@ module.exports = async function handler(req, res) {
           c.limite_diario = parseInt(c.limite_diario, 10) || 0;
           c.icono = c.icono || null;
           // Bloqueo con prioridad faccion > nivel > era. Mismo contrato que el
-          // gate de era previo: sin usuario_id no se bloquea nada (tienda
-          // publica). Un usuario sin faccion cuenta como bloqueado por faccion.
+          // gate de era previo: sin sesion (catUid null) no se bloquea nada
+          // (tienda publica). Un usuario sin faccion cuenta como bloqueado por
+          // faccion. Los dos predicados de faccion y nivel son CONDICIONALES AL
+          // DATO: con faccion_requerida NULL o nivel_requerido NULL quedan
+          // inertes (migracion 062 deja los clasicos en NULL).
           c.bloqueado = !!(c.era_exclusiva && catEraUsuario && c.era_exclusiva !== catEraUsuario);
           c.motivo_bloqueo = c.bloqueado ? 'ERA_INSUFICIENTE' : null;
-          if (usuarioId && c.faccion_requerida
+          if (catUid && c.faccion_requerida
               && (!catFaccionUsuario || catFaccionUsuario !== c.faccion_requerida)) {
             c.bloqueado = true;
             c.motivo_bloqueo = 'FACCION_INSUFICIENTE';
-          } else if (usuarioId && c.nivel_requerido
+          } else if (catUid && c.nivel_requerido
               && catNivelUsuario !== null && catNivelUsuario < c.nivel_requerido) {
             c.bloqueado = true;
             c.motivo_bloqueo = 'NIVEL_INSUFICIENTE';
@@ -13904,8 +13913,15 @@ module.exports = async function handler(req, res) {
 
       // Comprar consumible pagando xp_total (anti-farming max 5/dia).
       if (tipo2 === 'comprar_consumible') {
-        if (!usuarioId2)
-          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        // ADR-110 R2: el autor es SIEMPRE el 'sub' del token firmado. El
+        // usuario_id del body se acepta por compatibilidad y se IGNORA (no se
+        // responde 400 por discrepancia: los clientes legacy siguen igual).
+        // Sin sesion valida no se escribe nada.
+        var ccSes = verificarSesion(req);
+        if (!ccSes.ok) return responderSesion(res, ccSes.razon || 'SESION_REQUERIDA');
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(ccSes.sub)))
+          return res.status(400).json({ ok: false, error: 'USUARIO_ID_INVALIDO' });
+        usuarioId2 = String(ccSes.sub);
         var ccClave = String(body.clave || '').trim();
         if (!ccClave)
           return res.status(400).json({ ok: false, error: 'clave requerida' });

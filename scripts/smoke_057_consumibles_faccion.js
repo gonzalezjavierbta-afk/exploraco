@@ -28,10 +28,33 @@ var fs = require('fs');
 var path = require('path');
 var vm = require('vm');
 var childProcess = require('child_process');
+// ADR-110 D5: el motor deriva la identidad del Bearer (verificarSesion) e
+// IGNORA el usuario_id del query y del body. La firma del arnes se delega en
+// lib/sesion.js, que es la MISMA primitiva HMAC-SHA256 de api/usuarios.js y de
+// api/interacciones.js: cero criptografia duplicada (ADR-109 D1).
+var SESION = require('../lib/sesion.js');
 
 var ROOT = path.join(__dirname, '..');
 var API_REL = 'api/interacciones.js';
 var MIG_REL = 'db/migrations/057_consumibles_faccion_nivel4.sql';
+
+// ---- Identidades del arnes ----
+// El 'sub' del token firmado es la UNICA autoridad. UID_AJENO es el id que se
+// mete en el body y en el query a proposito: el motor debe ignorarlo y operar
+// sobre UID_SESION.
+var UID_SESION = '11111111-1111-4111-8111-111111111111';
+var UID_AJENO = '22222222-2222-4222-8222-222222222222';
+var TOKEN_SESION = SESION.firmarSesion(UID_SESION);
+// Firmas defectuosas, sin reimplementar criptografia: se corrompe el ultimo
+// caracter del token valido (longitud intacta -> SESION_INVALIDA) y se firma
+// un payload ya vencido con la primitiva real (-> SESION_EXPIRADA).
+var TOKEN_FALSO = String(TOKEN_SESION).slice(0, String(TOKEN_SESION).length - 1)
+  + (String(TOKEN_SESION).slice(-1) === 'A' ? 'B' : 'A');
+var TOKEN_VENCIDO = SESION.firmar({
+  sub: UID_SESION,
+  iat: Math.floor(Date.now() / 1000) - 8 * 24 * 3600,
+  exp: Math.floor(Date.now() / 1000) - 3600
+});
 
 var total = 0;
 var fails = 0;
@@ -121,11 +144,31 @@ function invocar(req) {
     .then(function() { return res; });
 }
 
-function post(body) {
-  return invocar({ method: 'POST', query: {}, body: body, headers: {} });
+function post(body, token) {
+  return invocar({ method: 'POST', query: {}, body: body, headers: cabeceras(token) });
 }
-function get(query) {
-  return invocar({ method: 'GET', query: query, headers: {} });
+function get(query, token) {
+  return invocar({ method: 'GET', query: query, headers: cabeceras(token) });
+}
+
+// Cabeceras de la peticion. Por defecto el arnes manda la sesion FIRMADA (el
+// cliente real la manda siempre); token=false deja la peticion ANONIMA, que es
+// la unica forma de verificar el 401 SESION_REQUERIDA.
+function cabeceras(token) {
+  if (token === false || token === null) return {};
+  return { authorization: 'Bearer ' + String(token || TOKEN_SESION) };
+}
+
+// Busca un valor entre los parametros de TODAS las sentencias ejecutadas.
+// Sirve para afirmar que el id ajeno no llega a la base de datos.
+function algunParametroSql(valor) {
+  for (var i = 0; i < sqlCalls.length; i++) {
+    var p = sqlCalls[i].p || [];
+    for (var j = 0; j < p.length; j++) {
+      if (p[j] !== null && p[j] !== undefined && String(p[j]) === String(valor)) return true;
+    }
+  }
+  return false;
 }
 
 function cuentaSql(fragmento) {
@@ -170,6 +213,39 @@ var COLUMNAS_057 = ['faccion_requerida', 'nivel_requerido', 'cargas', 'duracion_
   'bono_accion', 'bono_xp_fijo', 'limite_diario', 'icono'];
 
 // ============================================================
+// Fixture del CONTROL POSITIVO del gate de faccion
+// ============================================================
+// La migracion 062_consumibles_faccion_libre.sql deja faccion_requerida = NULL
+// en las 4 claves de fase 1, asi que el gate de faccion pasa a ser INERTE
+// sobre ellas (compra y uso permitidos por cualquier faccion). Para probar que
+// el gate SIGUE bloqueando cuando el dato existe se usa esta clave de fixture,
+// que NO existe en Neon: se CREA y se DESTRUYE dentro de este smoke sobre la
+// tabla en memoria del fake SQL del sandbox (global.__MOCKSQL__). No depende
+// del run real de la 062.
+var FIXTURE_CLAVE = 'fixture_gate_faccion';
+var FIXTURE_FACCION = {
+  clave: FIXTURE_CLAVE,
+  nombre: 'Fixture gate faccion (solo smoke)',
+  descripcion: 'clave de fixture: no existe en el catalogo de Neon',
+  precio_xp: '20', categoria: 'faccion', era_exclusiva: null,
+  faccion_requerida: 'exploradores', nivel_requerido: 4,
+  cargas: 1, duracion_horas: 24, bono_accion: 'guardado', bono_xp_fijo: '10',
+  limite_diario: 1, icono: null
+};
+var fixturesActivas = [];
+function crearFixtureFaccion() {
+  if (!fixturesActivas.length) fixturesActivas.push(FIXTURE_FACCION);
+  info('FIXTURE alta: ' + FIXTURE_CLAVE + ' con faccion_requerida='
+    + FIXTURE_FACCION.faccion_requerida + ' (control positivo del gate)');
+  return FIXTURE_FACCION;
+}
+function destruirFixtureFaccion() {
+  fixturesActivas.length = 0;
+  info('FIXTURE baja: ' + FIXTURE_CLAVE + ' fuera del catalogo (el gate no puede dispararse)');
+}
+function filasFixtures() { return fixturesActivas.slice(); }
+
+// ============================================================
 // Datos de catalogo (valores REALES de la 057)
 // ============================================================
 var ITEM_CATALEJO = {
@@ -188,7 +264,7 @@ var ITEM_CLASICO = {
 function mockCatalogo(extra) {
   return [
     { match: 'faccion_requerida, nivel_requerido, cargas, duracion_horas',
-      rows: [ITEM_CATALEJO, ITEM_CLASICO] },
+      rows: [ITEM_CATALEJO, ITEM_CLASICO].concat(filasFixtures()) },
     { match: 'SELECT xp_total, nivel_max FROM usuarios',
       rows: [(extra && extra.usr) || { xp_total: 500, nivel_max: 1 }] },
     { match: 'SELECT faccion FROM usuarios',
@@ -200,7 +276,7 @@ async function run() {
 
   console.log('== T1 GET ?tipo=consumibles: 8 columnas y degradacion escalonada');
   instalarMock(mockCatalogo({ fac: 'exploradores' }));
-  var t1 = await get({ tipo: 'consumibles', usuario_id: 'U1' });
+  var t1 = await get({ tipo: 'consumibles', usuario_id: UID_AJENO });
   var t1Data = (t1._json && t1._json.data) || [];
   var t1Cat = porClave(t1Data, 'consumible_catalejo_explorador');
   var t1Cla = porClave(t1Data, 'prod_cafe');
@@ -229,7 +305,7 @@ async function run() {
     { match: 'SELECT xp_total, nivel_max FROM usuarios', rows: [{ xp_total: 500, nivel_max: 1 }] },
     { match: 'SELECT faccion FROM usuarios', rows: [{ faccion: 'exploradores' }] }
   ]);
-  var t1b = await get({ tipo: 'consumibles', usuario_id: 'U1' });
+  var t1b = await get({ tipo: 'consumibles', usuario_id: UID_AJENO });
   check('T1-8: escalon 1 (sin columnas 057) degrada a 200 con el catalogo 018/035',
     t1b._status === 200 && ((t1b._json && t1b._json.data) || []).length === 1, t1b._status);
   check('T1-9: escalon 1 consulta el SELECT previo',
@@ -244,16 +320,18 @@ async function run() {
     { match: 'SELECT xp_total, nivel_max FROM usuarios', rows: [{ xp_total: 500, nivel_max: 1 }] },
     { match: 'SELECT faccion FROM usuarios', rows: [{ faccion: null }] }
   ]);
-  var t1c = await get({ tipo: 'consumibles', usuario_id: 'U1' });
+  var t1c = await get({ tipo: 'consumibles', usuario_id: UID_AJENO });
   check('T1-10: escalon 2 (sin 018/035) degrada a 200 con el catalogo minimo',
     t1c._status === 200 && ((t1c._json && t1c._json.data) || []).length === 1, t1c._status);
 
   console.log('');
   console.log('== T2 bloqueado / motivo_bloqueo: prioridad faccion > nivel > era');
+  // CONTROL POSITIVO del gate de faccion: la fixture se CREA aqui. Su fila
+  // conserva faccion_requerida no nula, que es el dato que la 062 deja NULL en
+  // las 4 claves de fase 1. Sin este dato el gate es inerte (T2-7..T2-13).
+  crearFixtureFaccion();
   var mockPrio = [
     { match: 'faccion_requerida, nivel_requerido, cargas, duracion_horas', rows: [
-      { clave: 'fac_ok', categoria: 'faccion', precio_xp: '20', era_exclusiva: null,
-        faccion_requerida: 'exploradores', nivel_requerido: 4, limite_diario: 1 },
       { clave: 'nivel_30', categoria: 'general', precio_xp: '20', era_exclusiva: null,
         faccion_requerida: null, nivel_requerido: 30, limite_diario: 0 },
       { clave: 'era_mito', categoria: 'general', precio_xp: '20', era_exclusiva: 'Mito',
@@ -264,16 +342,16 @@ async function run() {
         faccion_requerida: 'artistas', nivel_requerido: 30, limite_diario: 1 },
       { clave: 'nivel_y_era', categoria: 'faccion', precio_xp: '20', era_exclusiva: 'Mito',
         faccion_requerida: 'exploradores', nivel_requerido: 30, limite_diario: 1 }
-    ] },
+    ].concat(filasFixtures()) },
     { match: 'SELECT xp_total, nivel_max FROM usuarios', rows: [{ xp_total: 500, nivel_max: 1 }] },
     { match: 'SELECT faccion FROM usuarios', rows: [{ faccion: null }] }
   ];
   instalarMock(mockPrio);
-  var t2 = await get({ tipo: 'consumibles', usuario_id: 'U1' });
+  var t2 = await get({ tipo: 'consumibles', usuario_id: UID_AJENO });
   var t2Data = (t2._json && t2._json.data) || [];
-  check('T2-1: faccion_requerida con usuario SIN faccion -> FACCION_INSUFICIENTE',
-    (porClave(t2Data, 'fac_ok') || {}).motivo_bloqueo === 'FACCION_INSUFICIENTE',
-    porClave(t2Data, 'fac_ok'));
+  check('T2-1 (control positivo): fixture con faccion_requerida y usuario SIN faccion -> FACCION_INSUFICIENTE',
+    (porClave(t2Data, FIXTURE_CLAVE) || {}).motivo_bloqueo === 'FACCION_INSUFICIENTE',
+    porClave(t2Data, FIXTURE_CLAVE));
   check('T2-2: nivel_requerido 30 con nivel 1 -> NIVEL_INSUFICIENTE',
     (porClave(t2Data, 'nivel_30') || {}).motivo_bloqueo === 'NIVEL_INSUFICIENTE',
     porClave(t2Data, 'nivel_30'));
@@ -295,11 +373,66 @@ async function run() {
     { match: 'SELECT xp_total, nivel_max FROM usuarios', rows: [{ xp_total: 500, nivel_max: 1 }] },
     { match: 'SELECT faccion FROM usuarios', rows: [{ faccion: 'exploradores' }] }
   ]);
-  var t2b = await get({ tipo: 'consumibles', usuario_id: 'U1' });
+  var t2b = await get({ tipo: 'consumibles', usuario_id: UID_AJENO });
   var t2bData = (t2b._json && t2b._json.data) || [];
   check('T2-6: nivel manda sobre era (faccion correcta, nivel 1 < 30, era Mito)',
     (porClave(t2bData, 'nivel_y_era') || {}).motivo_bloqueo === 'NIVEL_INSUFICIENTE',
     porClave(t2bData, 'nivel_y_era'));
+
+  // ---- Gate INERTE sobre las 4 claves de fase 1 (ADR-110 D5 + 062) ----
+  // La 062 deja faccion_requerida = NULL en esas 4 claves: el predicado de
+  // faccion es condicional al dato, asi que cualquier faccion (y tambien un
+  // usuario SIN faccion) ve el catalogo sin bloqueo. nivel_requerido 4 se
+  // mantiene y el usuario de la prueba es nivel 10 para aislar el gate de
+  // faccion; era_exclusiva es NULL en las 4.
+  var CLAVES_FASE1 = ['consumible_catalejo_explorador', 'consumible_lupa_curador',
+    'consumible_pluma_creador', 'consumible_lente_artista'];
+  function filasFase1(categoria) {
+    return CLAVES_FASE1.map(function(k) {
+      return { clave: k, categoria: categoria || 'faccion', precio_xp: '20', era_exclusiva: null,
+        faccion_requerida: null, nivel_requerido: 4, limite_diario: 1 };
+    });
+  }
+  function mockFase1(fac) {
+    return [
+      { match: 'faccion_requerida, nivel_requerido, cargas, duracion_horas', rows: filasFase1() },
+      { match: 'SELECT xp_total, nivel_max FROM usuarios', rows: [{ xp_total: 0, nivel_max: 10 }] },
+      { match: 'SELECT faccion FROM usuarios', rows: [{ faccion: fac }] }
+    ];
+  }
+
+  instalarMock(mockFase1('artistas'));
+  var t2c = await get({ tipo: 'consumibles', usuario_id: UID_AJENO });
+  var t2cData = (t2c._json && t2c._json.data) || [];
+  CLAVES_FASE1.forEach(function(k, ix) {
+    var fila = porClave(t2cData, k);
+    check('T2-' + (7 + ix) + ': gate de faccion INERTE en ' + k
+      + ' (faccion artistas, faccion_requerida NULL) -> sin bloqueo',
+      !!fila && fila.bloqueado === false && fila.motivo_bloqueo === null, fila);
+  });
+  check('T2-11: las 4 claves de fase 1 siguen con nivel_requerido 4 y limite_diario 1',
+    CLAVES_FASE1.every(function(k) {
+      var fila = porClave(t2cData, k);
+      return !!fila && fila.nivel_requerido === 4 && fila.limite_diario === 1
+        && fila.faccion_requerida === null;
+    }), t2cData);
+
+  instalarMock(mockFase1(null));
+  var t2d = await get({ tipo: 'consumibles', usuario_id: UID_AJENO });
+  var t2dData = (t2d._json && t2d._json.data) || [];
+  check('T2-12: gate de faccion INERTE tambien para un usuario SIN faccion',
+    CLAVES_FASE1.every(function(k) {
+      var fila = porClave(t2dData, k);
+      return !!fila && fila.bloqueado === false && fila.motivo_bloqueo === null;
+    }), t2dData);
+
+  // ---- Ciclo de vida de la fixture: se destruye AQUI ----
+  destruirFixtureFaccion();
+  instalarMock(mockCatalogo({ fac: null }));
+  var t2e = await get({ tipo: 'consumibles', usuario_id: UID_AJENO });
+  var t2eData = (t2e._json && t2e._json.data) || [];
+  check('T2-13: tras destruir la fixture su clave ya no esta en el catalogo (0 filas)',
+    porClave(t2eData, FIXTURE_CLAVE) === null && t2eData.length === 2, t2eData.length);
 
   console.log('');
   console.log('== T3 comprar_consumible: orden faccion > nivel > era y cero cobro');
@@ -324,9 +457,13 @@ async function run() {
   }
 
   var itemTriple = { faccion_requerida: 'exploradores', nivel_requerido: 30, era_exclusiva: 'Mito' };
+  // CONTROL POSITIVO del gate de faccion en la COMPRA: se vuelve a crear la
+  // fixture (T2-13 la destruyo) para probar que el gate sigue bloqueando
+  // cuando faccion_requerida existe. Al final del bloque se destruye otra vez.
+  crearFixtureFaccion();
   instalarMock(mockCompra({ item: itemTriple, fac: 'artistas' }));
-  var t3a = await post({ tipo: 'comprar_consumible', usuario_id: 'U1', clave: 'consumible_catalejo_explorador' });
-  check('T3-1: faccion incorrecta -> 403 FACCION_INSUFICIENTE',
+  var t3a = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: FIXTURE_CLAVE });
+  check('T3-1 (control positivo): faccion incorrecta -> 403 FACCION_INSUFICIENTE',
     t3a._status === 403 && t3a._json && t3a._json.error === 'FACCION_INSUFICIENTE',
     t3a._json);
   check('T3-2: el 403 de faccion llega ANTES del gate de era (era Mito no se evalua)',
@@ -337,7 +474,7 @@ async function run() {
     && cuentaSql('INSERT INTO compra_consumibles') === 0);
 
   instalarMock(mockCompra({ item: itemTriple, fac: 'exploradores' }));
-  var t3b = await post({ tipo: 'comprar_consumible', usuario_id: 'U1', clave: 'consumible_catalejo_explorador' });
+  var t3b = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: FIXTURE_CLAVE });
   check('T3-4: nivel insuficiente (con era Mito) -> 403 NIVEL_INSUFICIENTE',
     t3b._status === 403 && t3b._json && t3b._json.error === 'NIVEL_INSUFICIENTE', t3b._json);
   check('T3-5: el 403 de nivel llega ANTES del gate de era',
@@ -352,17 +489,51 @@ async function run() {
       && t3b._json.nivel_actual < 30), t3b._json);
 
   instalarMock(mockCompra({ item: { era_exclusiva: 'Mito', faccion_requerida: null, nivel_requerido: null }, fac: null }));
-  var t3c = await post({ tipo: 'comprar_consumible', usuario_id: 'U1', clave: 'pase_vip' });
+  var t3c = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'pase_vip' });
   check('T3-8: sin gates de faccion ni nivel, el de era sigue vivo -> 403 ERA_INSUFICIENTE',
     t3c._status === 403 && t3c._json && t3c._json.error === 'ERA_INSUFICIENTE', t3c._json);
+  destruirFixtureFaccion();
+
+  // ---- Gate INERTE sobre las 4 claves de fase 1: COMPRA permitida ----
+  // Con faccion_requerida NULL (estado que deja la 062) la compra se aplica a
+  // CUALQUIER faccion: se compra con un usuario 'artistas' y con un usuario sin
+  // faccion. nivel_requerido se deja en NULL para aislar el gate de faccion; la
+  // conservacion de nivel_requerido = 4 se afirma en T2-11 y en T4-8.
+  var comprasFase1 = [];
+  for (var cf = 0; cf < CLAVES_FASE1.length; cf++) {
+    instalarMock(mockCompra({
+      item: { clave: CLAVES_FASE1[cf], categoria: 'faccion', faccion_requerida: null,
+        nivel_requerido: null, era_exclusiva: null, limite_diario: 0 },
+      fac: 'artistas', limN: 0, globN: 0
+    }));
+    /* eslint-disable no-await-in-loop */
+    var compraF1 = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: CLAVES_FASE1[cf] });
+    comprasFase1.push(compraF1);
+  }
+  CLAVES_FASE1.forEach(function(k, ix) {
+    check('T3-' + (9 + ix) + ': gate de faccion INERTE -> compra 200 de ' + k
+      + ' con faccion artistas', !!comprasFase1[ix] && comprasFase1[ix]._status === 200,
+      comprasFase1[ix] && (comprasFase1[ix]._json || comprasFase1[ix]._status));
+  });
+  instalarMock(mockCompra({
+    item: { clave: CLAVES_FASE1[0], categoria: 'faccion', faccion_requerida: null,
+      nivel_requerido: null, era_exclusiva: null, limite_diario: 0 },
+    fac: null, limN: 0, globN: 0
+  }));
+  var t3f = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: CLAVES_FASE1[0] });
+  check('T3-13: gate de faccion INERTE -> un usuario SIN faccion tambien compra (200)',
+    t3f._status === 200, t3f._json || t3f._status);
 
   console.log('');
   console.log('== T4 limite_diario por clave (solo faccion) + tope global de 5');
+  // El LIMITE_DIARIO depende de categoria = 'faccion' y limite_diario > 0, NO
+  // del gate de faccion: con faccion_requerida NULL (estado de la 062 en las 4
+  // claves de fase 1) el tope por clave sigue vivo.
   instalarMock(mockCompra({
-    item: { categoria: 'faccion', limite_diario: 1, faccion_requerida: 'exploradores' },
-    fac: 'exploradores', limN: 1, globN: 1
+    item: { categoria: 'faccion', limite_diario: 1, faccion_requerida: null },
+    fac: 'artistas', limN: 1, globN: 1
   }));
-  var t4a = await post({ tipo: 'comprar_consumible', usuario_id: 'U1', clave: 'consumible_catalejo_explorador' });
+  var t4a = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'consumible_catalejo_explorador' });
   check('T4-1: faccion con limite_diario 1 y 1 compra en 24 h -> 409 LIMITE_DIARIO',
     t4a._status === 409 && t4a._json && t4a._json.error === 'LIMITE_DIARIO', t4a._json);
   check('T4-2: el 409 informa limite_diario y compras_24h',
@@ -374,7 +545,7 @@ async function run() {
     item: { categoria: 'social', limite_diario: 1, faccion_requerida: null },
     fac: null, limN: 9, globN: 0
   }));
-  var t4b = await post({ tipo: 'comprar_consumible', usuario_id: 'U1', clave: 'prod_cafe' });
+  var t4b = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'prod_cafe' });
   check('T4-4: categoria distinta de faccion NO consulta el limite por clave',
     cuentaSql('consumible_id=$2') === 0);
   check('T4-5: categoria distinta de faccion ignora limite_diario (compra 200)',
@@ -384,21 +555,27 @@ async function run() {
     item: { categoria: 'social', limite_diario: 0, faccion_requerida: null },
     fac: null, globN: 5
   }));
-  var t4c = await post({ tipo: 'comprar_consumible', usuario_id: 'U1', clave: 'prod_cafe' });
+  var t4c = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'prod_cafe' });
   check('T4-6: el tope GLOBAL de 5 compras/dia sigue vivo -> 429',
     t4c._status === 429, t4c._json || t4c._status);
   check('T4-7: el 429 global trae el mensaje historico de 5 compras',
     !!(t4c._json && String(t4c._json.error || '').indexOf('5 compras por dia') !== -1), t4c._json);
+  check('T4-8: el LIMITE_DIARIO no depende del gate de faccion (item con faccion_requerida NULL)',
+    t4a._status === 409 && t4a._json && t4a._json.error === 'LIMITE_DIARIO'
+    && t4a._json.limite_diario === 1, t4a._json);
 
   console.log('');
   console.log('== T5 stock: 409 STOCK_LLENO con tope 30');
+  // El tope de stock depende de categoria = 'faccion', no del gate de faccion:
+  // se prueba con faccion_requerida NULL (estado de la 062) y un usuario de
+  // faccion distinta para aislar el gate por clave.
   instalarMock(mockCompra({
-    item: { categoria: 'faccion', faccion_requerida: 'exploradores', limite_diario: 1 },
-    fac: 'exploradores', limN: 0, globN: 0,
+    item: { categoria: 'faccion', faccion_requerida: null, limite_diario: 1 },
+    fac: 'artistas', limN: 0, globN: 0,
     usr: { xp_total: '1000', xp_gastado_sinks: '0', nivel_max: 1,
       capacidades: { consumibles: { consumible_catalejo_explorador: 30 } } }
   }));
-  var t5a = await post({ tipo: 'comprar_consumible', usuario_id: 'U1', clave: 'consumible_catalejo_explorador' });
+  var t5a = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'consumible_catalejo_explorador' });
   check('T5-1: stock 30 en faccion -> 409 STOCK_LLENO',
     t5a._status === 409 && t5a._json && t5a._json.error === 'STOCK_LLENO', t5a._json);
   check('T5-2: el 409 informa stock_actual 30 y stock_maximo 30',
@@ -406,13 +583,15 @@ async function run() {
   check('T5-3: STOCK_LLENO se evalua antes del cobro', cuentaSql('xp_total = xp_total - $1') === 0);
 
   instalarMock(mockCompra({
-    item: { categoria: 'faccion', faccion_requerida: 'exploradores', limite_diario: 1 },
-    fac: 'exploradores', limN: 0, globN: 0,
+    item: { categoria: 'faccion', faccion_requerida: null, limite_diario: 1 },
+    fac: 'artistas', limN: 0, globN: 0,
     usr: { xp_total: '1000', xp_gastado_sinks: '0', nivel_max: 1,
       capacidades: { consumibles: { consumible_catalejo_explorador: 29 } } }
   }));
-  var t5b = await post({ tipo: 'comprar_consumible', usuario_id: 'U1', clave: 'consumible_catalejo_explorador' });
+  var t5b = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'consumible_catalejo_explorador' });
   check('T5-4: con stock 29 la compra no bloquea (200)', t5b._status === 200, t5b._json || t5b._status);
+  check('T5-7: el tope de stock no depende del gate de faccion (faccion_requerida NULL y stock 30 -> 409)',
+    t5a._json && t5a._json.error === 'STOCK_LLENO' && t5a._json.stock_maximo === 30, t5a._json);
 
   var declStock = apiSrc.split('ccStockTope = 30').length - 1;
   check('T5-5: la constante del tope de stock se declara UNA sola vez', declStock === 1, declStock);
@@ -756,14 +935,22 @@ async function run() {
     var filasFac = consultaNeon(Q_FACCION);
     check('T12-2: 4 filas categoria faccion', !!filasFac && filasFac.length === 4,
       filasFac && filasFac.length);
+    // ADR-110 D5 + 062: nivel_requerido 4 y limite_diario 1 son INVARIANTES;
+    // faccion_requerida puede ser la de la 057 (antes del run de la 062) o NULL
+    // (despues: gate inerte). El check acepta los dos estados porque NO puede
+    // depender de si el run real de 062 ya se ejecuto.
     var facOk = !!filasFac && filasFac.length === 4 && filasFac.every(function(f) {
       return Number(f.nivel_requerido) === 4 && Number(f.limite_diario) === 1
-        && f.categoria === 'faccion' && !!f.faccion_requerida;
+        && f.categoria === 'faccion';
     });
-    check('T12-3: las 4 filas con nivel 4, limite_diario 1 y faccion asignada', facOk);
-    var facUnicas = !!filasFac ? filasFac.map(function(f) { return f.faccion_requerida; }).sort().join(',') : '';
-    check('T12-4: una fila por faccion (artistas, creadores, curadores, exploradores)',
-      facUnicas === 'artistas,creadores,curadores,exploradores', facUnicas);
+    check('T12-3: las 4 filas con nivel 4, limite_diario 1 y categoria faccion', facOk);
+    var facValores = !!filasFac ? filasFac.map(function(f) {
+      return f.faccion_requerida === null ? 'NULL' : String(f.faccion_requerida);
+    }).sort().join(',') : '';
+    var facUnaPorFaccion = facValores === 'artistas,creadores,curadores,exploradores';
+    var facInerte = facValores === 'NULL,NULL,NULL,NULL';
+    check('T12-4: una fila por faccion (pre-062) o las 4 en NULL (062 aplicada)',
+      facUnaPorFaccion || facInerte, facValores);
     var nClasicas = consultaNeon(Q_CLASICAS);
     check('T12-5: filas clasicas con limite_diario 0 y requisitos NULL = 0 incoherencias',
       !!nClasicas && nClasicas[0] && Number(nClasicas[0].n) === 0, nClasicas && nClasicas[0]);
@@ -922,6 +1109,108 @@ async function run() {
   check('T14-9: el cobro es UNA sola sentencia (1 llamada sql), sin doble UPDATE',
     facCobro.llamadas === 1 && genCobro.llamadas === 1,
     [facCobro.llamadas, genCobro.llamadas]);
+
+  // ============================================================
+  // T15 CONTRATO DE SESION (ADR-110 D5)
+  // El Bearer es la UNICA autoridad de identidad: ?tipo=consumibles deriva el
+  // usuario del token e IGNORA el usuario_id del query, y comprar_consumible
+  // exige sesion firmada (401 SESION_REQUERIDA / SESION_INVALIDA /
+  // SESION_EXPIRADA) ignorando el usuario_id del body.
+  // ============================================================
+  console.log('');
+  console.log('== T15 contrato de sesion: manda el Bearer, el usuario_id se ignora');
+  var t15Verif = SESION.verificar(TOKEN_SESION);
+  check('T15-0: la sesion del arnes verifica con la primitiva del producto (sub = UID_SESION)',
+    t15Verif.ok === true && t15Verif.sub === UID_SESION, t15Verif.razon);
+
+  function mockSesionGet() {
+    return [
+      { match: 'faccion_requerida, nivel_requerido, cargas, duracion_horas', rows: [
+        { clave: 'pase_vip', nombre: 'Pase VIP', descripcion: '', precio_xp: '2400',
+          categoria: 'social', era_exclusiva: 'Mito', faccion_requerida: null,
+          nivel_requerido: null, cargas: 1, duracion_horas: 24, limite_diario: 0, icono: null },
+        ITEM_CLASICO
+      ] },
+      { match: 'SELECT xp_total, nivel_max FROM usuarios', rows: [{ xp_total: 9000, nivel_max: 1 }] },
+      { match: 'SELECT faccion FROM usuarios', rows: [{ faccion: 'artistas' }] }
+    ];
+  }
+
+  instalarMock(mockSesionGet());
+  var t15sin = await get({ tipo: 'consumibles', usuario_id: UID_AJENO }, false);
+  var t15sinData = (t15sin._json && t15sin._json.data) || [];
+  check('T15-1: GET sin sesion -> 200, catalogo publico y sin gates',
+    t15sin._status === 200 && !!t15sin._json && t15sin._json.era_usuario === null
+    && (porClave(t15sinData, 'pase_vip') || {}).bloqueado === false, t15sin._json);
+
+  instalarMock(mockSesionGet());
+  var t15propio = await get({ tipo: 'consumibles', usuario_id: UID_SESION });
+  check('T15-2: GET con Bearer -> era_usuario y nivel_usuario derivados del sub',
+    t15propio._status === 200 && !!t15propio._json
+    && t15propio._json.era_usuario === 'Explorador'
+    && typeof t15propio._json.nivel_usuario === 'number', t15propio._json);
+
+  instalarMock(mockSesionGet());
+  var t15ajeno = await get({ tipo: 'consumibles', usuario_id: UID_AJENO });
+  check('T15-3: GET con usuario_id AJENO por query -> respuesta IDENTICA a la del propio',
+    JSON.stringify(t15ajeno._json) === JSON.stringify(t15propio._json), t15ajeno._json);
+  check('T15-4: el id ajeno no llega a la base de datos (el SQL usa el sub del token)',
+    algunParametroSql(UID_AJENO) === false && algunParametroSql(UID_SESION) === true,
+    [algunParametroSql(UID_AJENO), algunParametroSql(UID_SESION)]);
+
+  function mockCompraFase1(fac) {
+    return mockCompra({
+      item: { clave: CLAVES_FASE1[0], categoria: 'faccion', faccion_requerida: null,
+        nivel_requerido: null, era_exclusiva: null, limite_diario: 0 },
+      fac: fac, limN: 0, globN: 0
+    });
+  }
+
+  instalarMock(mockCompraFase1('artistas'));
+  var t15post = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO,
+    clave: CLAVES_FASE1[0] }, false);
+  check('T15-5: POST comprar_consumible SIN sesion -> 401 SESION_REQUERIDA',
+    t15post._status === 401 && !!t15post._json
+    && t15post._json.error === 'SESION_REQUERIDA', t15post._json);
+  check('T15-6: sin sesion no hay cobro ni ledger (0 escrituras)',
+    cuentaSql('xp_total = xp_total - $1') === 0
+    && cuentaSql('INSERT INTO compra_consumibles') === 0);
+
+  instalarMock(mockCompraFase1('artistas'));
+  var t15falso = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO,
+    clave: CLAVES_FASE1[0] }, TOKEN_FALSO);
+  check('T15-7: POST con firma corrupta -> 401 SESION_INVALIDA',
+    t15falso._status === 401 && !!t15falso._json
+    && t15falso._json.error === 'SESION_INVALIDA', t15falso._json);
+
+  instalarMock(mockCompraFase1('artistas'));
+  var t15venc = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO,
+    clave: CLAVES_FASE1[0] }, TOKEN_VENCIDO);
+  check('T15-8: POST con token vencido -> 401 SESION_EXPIRADA',
+    t15venc._status === 401 && !!t15venc._json
+    && t15venc._json.error === 'SESION_EXPIRADA', t15venc._json);
+
+  instalarMock(mockCompraFase1('artistas'));
+  var t15ajenoPost = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO,
+    clave: CLAVES_FASE1[0] });
+  check('T15-9: POST con body usuario_id AJENO -> 200 (el body se ignora)',
+    t15ajenoPost._status === 200, t15ajenoPost._json || t15ajenoPost._status);
+  var cobroAjeno = llamadaSql('UPDATE usuarios SET xp_total = xp_total - $1');
+  check('T15-10: el cobro se aplica al sub del token ($3 = UID_SESION) y nunca al ajeno',
+    !!cobroAjeno && String(cobroAjeno.p[2]) === UID_SESION
+    && String(cobroAjeno.p[2]) !== UID_AJENO, cobroAjeno && cobroAjeno.p);
+
+  instalarMock(mockCompraFase1('artistas'));
+  var t15propioPost = await post({ tipo: 'comprar_consumible', usuario_id: UID_SESION,
+    clave: CLAVES_FASE1[0] });
+  check('T15-11: la respuesta con usuario_id ajeno es IDENTICA a la del propio usuario',
+    JSON.stringify(t15ajenoPost._json) === JSON.stringify(t15propioPost._json),
+    t15ajenoPost._json);
+
+  instalarMock(mockCompraFase1('artistas'));
+  var t15sinId = await post({ tipo: 'comprar_consumible', clave: CLAVES_FASE1[0] });
+  check('T15-12: POST sin usuario_id en el body y con sesion -> 200 (el body no es autoridad)',
+    t15sinId._status === 200, t15sinId._json || t15sinId._status);
 
   console.log('');
   var selfRel = 'scripts/smoke_057_consumibles_faccion.js';

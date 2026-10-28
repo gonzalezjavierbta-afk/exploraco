@@ -23,6 +23,8 @@
  * T6 (vista de comunidad, solo lectura):
  *   Mercado.setFiltroCasa(v)      filtra las ofertas por Casa SIN red (cache)
  *   Mercado.setFiltroCat(v)       filtra el catalogo: todos | mios | otros
+ *   Mercado.setFiltroFac(v)       filtra el catalogo por faccion (ADR-110 D5)
+ *   Mercado.comprarCatalogo(cl)   POST comprar_consumible (compra con XP)
  *   Mercado.buscarCatalogo(q)     busca en el catalogo por nombre o clave
  *   Mercado.onItemChange()        recalcula el maximo publicable del formulario
  *
@@ -44,7 +46,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.0';
   var ENDPOINT = '/api/interacciones';
 
   var CASAS = [
@@ -53,6 +55,16 @@
     { id: 'delfin', nombre: 'Delf\u00edn', icono: '\uD83D\uDC2C' }
   ];
   var TIERS = [0, 100, 250, 450, 700];
+
+  /* Facciones del CHECK de la migracion 016 (ids reales del motor). El chip
+   * 'todas' no es una faccion: es el filtro neutro. */
+  var FACCIONES = ['todas', 'exploradores', 'curadores', 'creadores', 'artistas'];
+  var FACCION_NOMBRE = {
+    exploradores: 'Exploradores',
+    curadores: 'Curadores',
+    creadores: 'Creadores',
+    artistas: 'Artistas'
+  };
 
   /* Mensajes amigables por codigo de error del backend (v28). */
   var ERR = {
@@ -78,7 +90,22 @@
     SCHEMA_NOT_MIGRATED: 'El Mercado se esta habilitando. Vuelve pronto.',
     SESION_REQUERIDA: 'Inicia sesion para operar en el Mercado.',
     SESION_EXPIRADA: 'Tu sesion expiro. Vuelve a entrar.',
-    SESION_INVALIDA: 'Tu sesion no es valida. Vuelve a entrar.'
+    SESION_INVALIDA: 'Tu sesion no es valida. Vuelve a entrar.',
+    /* Gates del catalogo (ADR-110 R1): los codigos son los REALES de
+     * api/interacciones.js, tanto en el GET (motivo_bloqueo) como en el
+     * POST comprar_consumible. No se inventa ninguno. */
+    FACCION_INSUFICIENTE: 'Ese articulo es de otra faccion.',
+    ERA_INSUFICIENTE: 'Ese articulo es de otra era.',
+    STOCK_LLENO: 'Ya tienes el tope de unidades de ese articulo.',
+    LIMITE_DIARIO: 'Alcanzaste el limite diario de ese articulo.',
+    PUNTOS_INSUFICIENTES: 'No te alcanza el XP para esta operacion.',
+    USUARIO_ID_INVALIDO: 'Tu sesion no es valida. Vuelve a entrar.',
+    /* Estos tres NO son codigos del motor: son los textos literales que
+     * devuelve comprar_consumible en sus ramas de XP, tope diario y amuleto. */
+    'XP insuficiente': 'No te alcanza el XP para esta compra.',
+    'XP insuficiente para la compra': 'No te alcanza el XP para esta compra.',
+    'Limite de 5 compras por dia alcanzado': 'Alcanzaste el limite de 5 compras por dia.',
+    'Ya tienes un amuleto x2 activo': 'Ya tienes un amuleto x2 activo.'
   };
 
   /* ---- Estado del modulo (una sola copia; ambas paginas la comparten) ---- */
@@ -89,6 +116,8 @@
   var _ofertasListas = false;// las N consultas por Casa ya resolvieron
   var _filtroCasa = 'todas'; // 'todas' | id de Casa (filtro local, sin red)
   var _filtroCat = 'todos';  // 'todos' | 'mios' | 'otros' (catalogo)
+  var _filtroFac = 'todas';  // 'todas' | id de faccion (catalogo, sin red)
+  var _catMeta = null;       // nivel/faccion/era del usuario segun el GET del catalogo
   var _buscaCat = '';        // texto de busqueda en el catalogo
   var _mi = null;            // respuesta de mercado_mi
   var _inv = {};             // inventario (consumibles -> {cantidad, nombre})
@@ -111,6 +140,17 @@
     var n = Math.round(num(v) * 100) / 100;
     try { return n.toLocaleString('es-CO', { maximumFractionDigits: 2 }); }
     catch (e) { return String(n); }
+  }
+  /* Etiquetas legibles de los gates del catalogo (ADR-110 D5). */
+  function capitalizar(s) {
+    var t = String(s == null ? '' : s).trim();
+    if (!t) return '';
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function nombreFaccion(id) {
+    var k = String(id == null ? '' : id).trim().toLowerCase();
+    if (!k) return '';
+    return FACCION_NOMBRE[k] || capitalizar(k);
   }
   function usuario() { return (window.ExploraCO && window.ExploraCO.usuario) || null; }
   function jwt() {
@@ -170,14 +210,37 @@
     if (code === 'PRECIO_FUERA_DE_RANGO' && body && body.precio_min != null && body.precio_max != null) {
       msg += ' Rango: ' + fmt(body.precio_min) + ' a ' + fmt(body.precio_max) + ' XP.';
     }
+    /* Detalle de los gates de compra (ADR-110 R1): el motor manda el dato
+     * exacto en el body. No se inventa nada: si no viene, no se anade. */
+    if (code === 'NIVEL_INSUFICIENTE' && body && body.nivel_requerido != null) {
+      msg += ' Requiere nivel ' + body.nivel_requerido + '.';
+    }
+    if (code === 'ERA_INSUFICIENTE' && body && body.era_requerida) {
+      msg += ' Era requerida: ' + capitalizar(body.era_requerida) + '.';
+    }
+    if (code === 'FACCION_INSUFICIENTE' && body && body.faccion_requerida) {
+      msg += ' Faccion requerida: ' + nombreFaccion(body.faccion_requerida) + '.';
+    }
     return msg;
   }
   function val(id) { var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; }
 
   /* ---- HTTP ---- */
-  function getJSON(qs) {
-    return fetch(ENDPOINT + '?' + qs)
+  /* Firma retrocompatible: getJSON(qs) sigue siendo una lectura publica.
+   * getJSON(qs, { headers: {...} }) permite mandar Authorization cuando hay
+   * sesion (el motor devuelve entonces los gates por usuario). */
+  function getJSON(qs, opts) {
+    var conf = (opts && opts.headers) ? { headers: opts.headers } : undefined;
+    return fetch(ENDPOINT + '?' + qs, conf)
       .then(function (r) { return r.json().catch(function () { return {}; }); });
+  }
+  /* Cabecera de lectura con sesion. NO sustituye al post(): este devuelve
+   * solo el objeto de cabeceras para los GET que aceptan contexto de usuario. */
+  function authHeaders() {
+    var h = {};
+    var t = jwt();
+    if (t) h['Authorization'] = 'Bearer ' + t;
+    return h;
   }
   function post(body) {
     var h = { 'Content-Type': 'application/json' };
@@ -219,11 +282,26 @@
       .then(function (res) { _mi = (res && res.data) || null; return _mi; })
       .catch(function () { _mi = null; return null; });
   }
-  function cargarCatalogo() {
-    if (_catalogo) return Promise.resolve(_catalogo);
-    return getJSON('tipo=consumibles')
-      .then(function (res) { _catalogo = (res && res.data) || []; return _catalogo; })
-      .catch(function () { _catalogo = []; return _catalogo; });
+  /* ADR-110 R1: el catalogo se pide con Authorization cuando hay sesion, para
+   * que el motor devuelva los gates por usuario (bloqueado, motivo_bloqueo,
+   * faccion_requerida, nivel_requerido, era_exclusiva + nivel_usuario,
+   * faccion_usuario, era_usuario). Sin sesion sigue siendo lectura publica:
+   * authHeaders() devuelve {} y la peticion es la de siempre. */
+  function cargarCatalogo(forzar) {
+    if (_catalogo && !forzar) return Promise.resolve(_catalogo);
+    return getJSON('tipo=consumibles', { headers: authHeaders() })
+      .then(function (res) {
+        _catalogo = (res && res.data) || [];
+        _catMeta = (res && res.ok !== false)
+          ? {
+              nivel_usuario: (res && res.nivel_usuario != null) ? res.nivel_usuario : null,
+              faccion_usuario: (res && res.faccion_usuario) ? String(res.faccion_usuario) : null,
+              era_usuario: (res && res.era_usuario) ? String(res.era_usuario) : null
+            }
+          : null;
+        return _catalogo;
+      })
+      .catch(function () { _catalogo = []; _catMeta = null; return _catalogo; });
   }
   function cargarInventario() {
     var u = usuario();
@@ -711,20 +789,43 @@
     return h + chipCasasHtml() + h2;
   }
 
-  /* ---- Catalogo completo (T6): todo lo que existe, marcando lo que tienes.
-   * Es informacion de solo lectura: no habilita publicar nada. ---- */
+  /* ---- Catalogo completo (T6 + ADR-110 D5): todo lo que existe, marcando lo
+   * que tienes y habilitando la COMPRA con XP de lo que el motor permita.
+   * Los filtros (categoria, faccion, busqueda) se combinan entre si y son
+   * locales: cero red. ---- */
   function catalogoFiltrado() {
     var q = String(_buscaCat || '').toLowerCase().trim();
     return (_catalogo || []).filter(function (c) {
       var cant = invCant(String(c.clave || ''));
       if (_filtroCat === 'mios' && cant <= 0) return false;
       if (_filtroCat === 'otros' && cant > 0) return false;
+      if (_filtroFac !== 'todas') {
+        var fac = String(c.faccion_requerida || '').trim().toLowerCase();
+        /* Un articulo sin faccion se usa desde CUALQUIER faccion, asi que
+         * aparece en todos los chips. Solo se descarta el que exige otra. */
+        if (fac && fac !== _filtroFac) return false;
+      }
       if (!q) return true;
       var nombre = String(c.nombre || '').toLowerCase();
       var clave = String(c.clave || '').toLowerCase();
       var desc = String(c.descripcion || '').toLowerCase();
       return nombre.indexOf(q) !== -1 || clave.indexOf(q) !== -1 || desc.indexOf(q) !== -1;
     });
+  }
+  /* Etiquetas de gate del catalogo: faccion, nivel y era. 'Cualquier
+   * faccion' cuando faccion_requerida es NULL (tienda base). */
+  function gatesCatalogoHtml(c) {
+    var h = '';
+    var fac = String(c.faccion_requerida || '').trim();
+    h += '<span class="mk-cat-t gate fac">'
+      + (fac ? esc(nombreFaccion(fac)) : 'Cualquier faccion') + '</span>';
+    if (c.nivel_requerido != null && c.nivel_requerido !== '') {
+      h += '<span class="mk-cat-t gate niv">Nivel ' + esc(String(c.nivel_requerido)) + '</span>';
+    }
+    if (c.era_exclusiva) {
+      h += '<span class="mk-cat-t gate era">Era ' + esc(capitalizar(c.era_exclusiva)) + '</span>';
+    }
+    return h;
   }
   function catalogoHtml() {
     var todo = _catalogo || [];
@@ -742,6 +843,18 @@
     h += '<input class="chat-inp mk-busca" type="search" placeholder="Buscar producto o clave..."'
       + ' value="' + esc(_buscaCat) + '" oninput="Mercado.buscarCatalogo(this.value)">';
     h += '</div>';
+    /* Chips de faccion (combinables con los de arriba y con el buscador). */
+    h += '<div class="mk-vista mk-vista-fac">';
+    FACCIONES.forEach(function (f) {
+      var label = (f === 'todas') ? 'Todas' : nombreFaccion(f);
+      h += '<button type="button" class="mk-chip' + (_filtroFac === f ? ' on' : '')
+        + '" onclick="Mercado.setFiltroFac(\'' + esc(f) + '\')">' + esc(label) + '</button>';
+    });
+    if (_catMeta && _catMeta.faccion_usuario) {
+      h += '<span class="mk-cat-t">Tu faccion: '
+        + esc(nombreFaccion(_catMeta.faccion_usuario)) + '</span>';
+    }
+    h += '</div>';
     var list = catalogoFiltrado();
     if (!list.length) {
       return h + '<div class="mk-msg">Ningun producto coincide con ese filtro.</div>';
@@ -758,16 +871,37 @@
       var tags = (cant > 0)
         ? '<span class="mk-cat-t tienes">Lo tienes: x' + cant + '</span>'
         : '<span class="mk-cat-t falta">No lo tienes</span>';
-      if (c.bloqueado) tags += '<span class="mk-cat-t bloq">Fuera de tu era</span>';
+      /* motivo_bloqueo es CODIGO del motor (ERA_INSUFICIENTE,
+       * FACCION_INSUFICIENTE, NIVEL_INSUFICIENTE): se pinta traducido y el
+       * codigo crudo queda en el title, junto al del boton. */
+      var motivo = String(c.motivo_bloqueo || '');
+      var motivoTxt = motivo ? (ERR[motivo] || motivo) : '';
+      if (motivo) {
+        tags += '<span class="mk-cat-t bloq" title="' + esc(motivo) + '">'
+          + esc(motivoTxt || 'Bloqueado') + '</span>';
+      }
+      tags += gatesCatalogoHtml(c);
+      var sinPrecio = (c.precio_xp === null || c.precio_xp === undefined);
+      var comprable = !c.bloqueado && !sinPrecio;
+      var titulo = c.bloqueado
+        ? (motivoTxt || motivo || 'Bloqueado para tu cuenta')
+        : (sinPrecio ? 'Sin precio en XP' : ('Comprar por ' + fmt(c.precio_xp) + ' XP'));
+      var btn = '<button type="button" class="pand-btn mk-cat-buy"'
+        + (comprable ? '' : ' disabled')
+        + ' title="' + esc(titulo) + '"'
+        + ' onclick="Mercado.comprarCatalogo(\'' + esc(clave) + '\')">Comprar</button>';
       h += '<div class="mk-cat-c">'
         + '<div class="mk-cat-n">' + esc(c.nombre || clave) + '</div>'
         + '<div class="mk-cat-meta">' + esc(clave) + ' \u00b7 ' + esc(precio) + extra
         + (c.categoria ? (' \u00b7 ' + esc(c.categoria)) : '') + '</div>'
         + (desc ? '<div class="mk-cat-d">' + esc(desc) + '</div>' : '')
-        + tags + '</div>';
+        + tags
+        + '<div class="mk-cat-act">' + btn + '</div>'
+        + '</div>';
     });
     h += '</div>';
-    h += '<div class="mk-nota">Ver el catalogo es solo lectura: solo puedes ofertar lo que tienes en tu inventario.</div>';
+    h += '<div class="mk-nota">El catalogo se compra directo con XP desde cada producto. '
+      + 'Los articulos sin faccion se pueden usar desde cualquier faccion.</div>';
     return h;
   }
   function misOfertasHtml() {
@@ -922,6 +1056,13 @@
     _filtroCat = ['mios', 'otros'].indexOf(String(v || '')) !== -1 ? String(v) : 'todos';
     renderComunidad();
   }
+  /* Chip de faccion del catalogo (ADR-110 D5): mismo patron que setFiltroCat,
+   * estado local (_filtroFac) y repintado sin red. */
+  function setFiltroFac(v) {
+    var f = String(v == null ? '' : v).trim().toLowerCase();
+    _filtroFac = (FACCIONES.indexOf(f) !== -1) ? f : 'todas';
+    renderComunidad();
+  }
   function buscarCatalogo(q) {
     _buscaCat = String(q == null ? '' : q).slice(0, 60);
     renderComunidad();
@@ -1003,6 +1144,50 @@
       })
       .catch(function () { toast('Error de conexion', '#ef4444'); });
   }
+  /* POST comprar_consumible (ADR-110 D1/D5): compra DIRECTA del catalogo
+   * pagando XP. Cero endpoint nuevo.
+   * SEGURIDAD (ADR-110 R2): el autor es SIEMPRE el 'sub' del token firmado;
+   * api/interacciones.js ignora el usuario_id del body. Por eso aqui NO se
+   * manda usuario_id: no se inventa identidad desde el cliente.
+   * Los gates (faccion > nivel > era), el XP disponible y el tope de stock
+   * los valida el servidor; el boton deshabilitado es solo cortesia de UI. */
+  function comprarCatalogo(clave) {
+    clave = String(clave == null ? '' : clave).trim();
+    if (!clave) { toast('Elige un producto del catalogo', '#ef4444'); return; }
+    var u = usuario();
+    if (!u || !u.id || !jwt()) { pedirLogin(); return; }
+    var item = null;
+    (_catalogo || []).forEach(function (c) {
+      if (!item && String(c.clave || '') === clave) item = c;
+    });
+    if (item && item.bloqueado) {
+      var m = String(item.motivo_bloqueo || '');
+      toast((ERR[m] || m || 'Ese articulo esta bloqueado para tu cuenta.'), '#ef4444');
+      return;
+    }
+    if (item && (item.precio_xp === null || item.precio_xp === undefined)) {
+      toast('Ese articulo no tiene precio en XP.', '#ef4444');
+      return;
+    }
+    return post({ tipo: 'comprar_consumible', clave: clave })
+      .then(function (res) {
+        if (res && res.ok) {
+          var desc = (num(res.descuento_pct) > 0)
+            ? (' (-' + fmt(res.descuento_pct) + '%)') : '';
+          var resto = (res.xp_total_nuevo != null)
+            ? (' Te quedan ' + fmt(res.xp_total_nuevo) + ' XP.') : '';
+          toast('\u2705 Compra realizada: ' + fmt(res.precio_final) + ' XP' + desc + '.' + resto, '#16a34a');
+          /* _catalogo = null: el GET vuelve a pedir los gates por usuario
+           * (bloqueado/precio) ademas de mi datos e inventario. recargar()
+           * refresca mi/inventario/catalogo/ofertas y repinta la vista. */
+          _catalogo = null;
+          recargar();
+        } else {
+          toast(errorMsg(res), '#ef4444');
+        }
+      })
+      .catch(function () { toast('Error de conexion', '#ef4444'); });
+  }
   function producir() {
     var clave = val('mk-prod-item');
     var cant = parseInt(val('mk-prod-cant'), 10);
@@ -1027,6 +1212,7 @@
     setCasa: setCasa,
     setFiltroCasa: setFiltroCasa,
     setFiltroCat: setFiltroCat,
+    setFiltroFac: setFiltroFac,
     buscarCatalogo: buscarCatalogo,
     onOrigenChange: onOrigenChange,
     onItemChange: onItemChange,
@@ -1039,6 +1225,7 @@
     cancelarCarta: cancelarCarta,
     cargarCartas: cargarCartas,
     producir: producir,
+    comprarCatalogo: comprarCatalogo,
     recargar: recargar,
     irAlMercado: irAlMercado,
     login: pedirLogin
