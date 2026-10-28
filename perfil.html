@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=Outfit:wght@400;500;600;700&family=Geist:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="cartas-ui.css"/>
 <style>
 /* ============================================================
    perfil.html - Museo publico de viajero (ADR-028, WP-3)
@@ -343,6 +344,7 @@ body{background:#E5E7EB}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="usuario-session.js"></script>
+<script src="cartas-ui.js"></script>
 <script>
 /* ============================================================
    perfil.html - Museo publico de viajero (ADR-028, WP-3)
@@ -490,8 +492,9 @@ body{background:#E5E7EB}
   }
 
   /* ---- Contenedor de sala (la numeracion Roman es la senal del museo) ---- */
-  function pfSala(num, title, count, body) {
-    return '<section class="pf-sala">'
+  function pfSala(num, title, count, body, extraCls, extraId) {
+    return '<section class="pf-sala' + (extraCls ? ' ' + esc(extraCls) : '') + '"'
+      + (extraId ? ' id="' + esc(extraId) + '"' : '') + '>'
       + '<header class="pf-sala-head">'
       +   '<span class="pf-sala-num">Sala ' + esc(num) + '</span>'
       +   '<h2 class="pf-sala-title">' + esc(title) + '</h2>'
@@ -894,6 +897,90 @@ body{background:#E5E7EB}
     host.innerHTML = impresos ? h : vacio;
   }
   window.pfMuseoRenderClases = pfMuseoRenderClases;
+  /* ---- Sala VIII: Vitrina de cartas (museo equipado, solo lectura) ----
+     Consume window.CartasUI.fetchMuseo(uid), que encapsula su propia rama
+     de backend y mapea los errores. NUNCA lanza: resuelve ok:true|false.
+     Degradacion: PERFIL_PRIVADO y SCHEMA_NOT_MIGRATED ocultan la sala
+     (el perfil ya muestra su aviso); CONEXION y museo vacio pintan un
+     estado vacio discreto, sin texto tecnico. */
+  function pfRecorte(s, n) {
+    var t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    return t.length > n ? t.slice(0, n).replace(/[\s,;.:-]+$/, '') + '...' : t;
+  }
+  function pfCartasVacio() {
+    return pfEmpty('Vitrina sin cartas', 'Este viajero aun no exhibe cartas');
+  }
+  /* Contador del header de la sala VIII. Arranca vacio y solo se rellena con
+     carga correcta; nunca pinta "null". Formato: "cartas / tope". */
+  function pfCartasContador(sec, texto) {
+    var head = sec ? sec.querySelector('.pf-sala-head') : null;
+    if (!head) return;
+    var span = head.querySelector('.pf-sala-count');
+    if (!texto) { if (span) span.textContent = ''; return; }
+    if (!span) {
+      span = document.createElement('span');
+      span.className = 'pf-sala-count pf-num';
+      head.appendChild(span);
+    }
+    span.textContent = texto;
+  }
+  function pfCartasSala() {
+    return pfSala('VIII', 'Cartas en vitrina', null,
+      '<div id="pf-cartas-body">'
+      + pfEmpty('Abriendo la vitrina', 'Las cartas equipadas de este viajero cargaran en un momento.')
+      + '</div>', 'cartas-silo', 'pf-museo-publico-cartas');
+  }
+  function pfCarta(c) {
+    var UI = window.CartasUI || {};
+    var e2 = typeof UI.esc === 'function' ? UI.esc : esc;
+    var nombre = (c && c.nombre) ? String(c.nombre) : 'Carta';
+    var imagen = (c && c.imagen_url) ? String(c.imagen_url) : '';
+    var rareza = typeof UI.claseRareza === 'function' ? UI.claseRareza(c && c.rareza, c && c.variante) : '';
+    var badge = typeof UI.badgeEmisor === 'function' ? UI.badgeEmisor(c && c.emisor_tipo, c && c.marca_nombre) : '';
+    /* Etiqueta legible de la rareza: diccionario unico en CartasUI.RAREZAS.
+       Si la clave no existe se muestra la clave cruda, no se inventa texto. */
+    var dic = (UI.RAREZAS && typeof UI.RAREZAS === 'object') ? UI.RAREZAS : {};
+    var rKey = String((c && c.rareza) || '').toLowerCase();
+    var rLabel = (rKey && dic[rKey] && dic[rKey].label) ? String(dic[rKey].label) : rKey;
+    var stats = typeof UI.statsTexto === 'function' ? UI.statsTexto(c && c.stats_json) : '';
+    var desc = pfRecorte(c && c.descripcion, 110);
+    return '<article class="pf-trofeo' + (rareza ? ' ' + e2(rareza) : '') + '">'
+      + '<div class="pf-foto">'
+      +   '<span class="pf-foto-ph">' + pfIcon('card') + '</span>'
+      +   (imagen ? '<img src="' + e2(imagen) + '" alt="' + e2(nombre) + '" loading="lazy" onerror="this.remove()">' : '')
+      + '</div>'
+      + '<h3 class="pf-trofeo-name">' + e2(nombre) + '</h3>'
+      + (rLabel ? '<div class="pf-trofeo-tier">' + e2(rLabel) + '</div>' : '')
+      + '<div class="pf-trofeo-meta">' + badge
+      +   (stats ? '<span>' + pfIcon('chart') + ' ' + e2(stats) + '</span>' : '') + '</div>'
+      + (desc ? '<p class="pf-trofeo-date" style="margin:0;line-height:1.45">' + e2(desc) + '</p>' : '')
+      + '</article>';
+  }
+  function pfCargarCartas(uid) {
+    var sec = document.getElementById('pf-museo-publico-cartas');
+    var host = document.getElementById('pf-cartas-body');
+    if (!sec || !host || !uid) { if (sec) sec.style.display = 'none'; return; }
+    var UI = window.CartasUI;
+    if (!UI || typeof UI.fetchMuseo !== 'function') { sec.style.display = 'none'; return; }
+    UI.fetchMuseo(uid).then(function (res) {
+      var sec2 = document.getElementById('pf-museo-publico-cartas');
+      var host2 = document.getElementById('pf-cartas-body');
+      if (!sec2 || !host2) return;
+      res = res || {};
+      if (res.ok !== true) {
+        var err = String(res.error || '');
+        if (err === 'PERFIL_PRIVADO' || err === 'SCHEMA_NOT_MIGRATED') { sec2.style.display = 'none'; return; }
+        host2.innerHTML = pfCartasVacio();
+        return;
+      }
+      var cartas = Array.isArray(res.cartas) ? res.cartas : [];
+      var tope = Number(res.tope);
+      if (!isFinite(tope) || tope <= 0) tope = 0;
+      pfCartasContador(sec2, (cartas.length && tope) ? (cartas.length + ' / ' + tope) : '');
+      if (!cartas.length) { host2.innerHTML = pfCartasVacio(); return; }
+      host2.innerHTML = '<div class="pf-grid pf-grid--album">' + cartas.map(pfCarta).join('') + '</div>';
+    });
+  }
   /* ---- Pintado y acciones ---- */
   function pfSetTheme(vitrina) {
     var oscuro = vitrina && String(vitrina.tema || '').toLowerCase() === 'oscuro';
@@ -924,6 +1011,7 @@ body{background:#E5E7EB}
       + pfTrofeos(d) + pfCromos(d) + pfMapas(d) + pfAlbumes(d) + pfFotos(d)
       + pfSala('VI', 'Clases', null, '<div id="pf-clases-body"></div>')
       + pfHojaVida()
+      + pfCartasSala()
       + pfActions(d)
       + '<div class="pf-foot">Museo de ' + esc(u.nombre || 'un viajero') + ' \u00B7 LATAWEL</div>'
     );
@@ -931,6 +1019,7 @@ body{background:#E5E7EB}
     pfMuseoRenderClases(d.arbol);
     pfCargarFotos(u.id);
     pfCargarHojaVida(u.id);
+    pfCargarCartas(u.id);
     document.title = (u.nombre || 'Perfil') + ' \u00B7 LATAWEL';
     pfSyncDM(d);
   }

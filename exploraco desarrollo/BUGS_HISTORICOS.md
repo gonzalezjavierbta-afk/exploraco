@@ -2542,5 +2542,41 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **Registro:** detectado por `@architect-review` al revisar **ADR-107 rev.4**; cerrado en la **rev.5** (decision: cerrar sobre la misma fila) y en la **rev.6** (billetera). Se registra aqui en el pase de cierre de **TSK-242** porque es **semantica de producto**, no una revision de papel.
 
+## BUG-143: un CTE llamado **`desc`** (palabra reservada de PostgreSQL) reventaba la rama `carta_fusionar` **solo en ejecucion real** contra Neon -- **RESUELTO (2026-10-27, en el mismo pase de TSK-242)**
+
+**Severidad: ALTA (la rama entera respondia error de sintaxis SQL: no fusionaba, no cobraba XP y no descontaba cartas). Estado: ARREGLADO en el codigo -- el CTE se renombro a `decr`; lo que se registra aqui es el **riesgo** y la regla de prevencion, no una tarea abierta.**
+
+**Sintoma:** toda llamada a `POST ?tipo=carta_fusionar` en `api/interacciones.js` (bloque `:15792-15883`) moria en el servidor con error de sintaxis SQL de Postgres al ejecutarse la sentencia contra Neon. El sintoma no era "fusion incorrecta": era la rama **completa caida**, sin efecto parcial, porque la sentencia no llegaba a parsearse.
+
+**Causa:** la sentencia construia un CTE encadenado (`FOR UPDATE` -> `cobro` -> ...) y **uno de los CTE se llamaba `desc`**. `DESC` es **palabra reservada** de PostgreSQL y no puede usarse como alias de CTE ni como nombre de columna sin comillas dobles, asi que el parser rechaza la sentencia entera. Es un error de **nomenclatura SQL**, no de logica: el cuerpo del CTE era correcto.
+
+**Por que se registra como BUG y no como nota de implementacion:** porque **ninguna verificacion estatica puede verlo**. `node --check` valida sintaxis **JavaScript** y el SQL viaja dentro de un string concatenado: para el parser de Node es texto plano, siempre valido. El **smoke estatico** de `buildHTML()` tampoco lo ve (no ejecuta SQL). Es decir: el fallo **paso las 3 capas de control** (sintaxis, ASCII-safety, balance de divs) y solo aparecio en **ejecucion real contra la base**. Regla que sale de aqui: **no usar palabras reservadas de PostgreSQL como alias de CTE ni como nombre de columna** -- `desc`, `asc`, `user`, `order`, `limit`, `offset`, `group`, `table`, `check`, `collate`, `default`, `end`, `references`, `using`, `variadic`, `window`. Y la conclusion operativa: **la deteccion estatica no cubre SQL embebido; solo una ejecucion real lo caza**, luego toda rama nueva con SQL propio exige una prueba contra Neon antes de darse por buena.
+
+**Fix:** el CTE se renombro de `desc` a **`decr`** (`api/interacciones.js:15837`, `' decr AS ('`) y la rama funciona. Un solo cambio de identificador, cero cambios de logica.
+
+**Verificacion:** `Select-String -Path "api\*.js" -Pattern "\bdesc\b\s+AS"` -> **0 coincidencias** (no queda ningun CTE `desc` en los 8 archivos de `api/`), y `Select-String "decr AS \("` -> **1** coincidencia, la de `interacciones.js:15837`. Lo verificado es **el estado del codigo**; la prueba en produccion es la ejecucion real que origino el registro.
+
+**Relacion con otros BUG (sin duplicar):** no es **BUG-142** (metrica sin escritor) ni **BUG-141** (orden de deploy/DDL). Aqui no hay bug de proceso ni de semantica: es un **fallo de sintaxis SQL invisible al CI**, el primero de esta serie que solo se manifiesta con la base delante.
+
+**Registro:** detectado al cerrar **TSK-242** (modulo `carta_fusionar`), en la verificacion real contra Neon posterior a las comprobaciones estaticas.
+
+## BUG-144: colision de nombre en `?tipo=museo_publico` -- dos endpoints distintos, el mismo discriminador y **shapes incompatibles** -- **RESUELTO (2026-10-27, renombrado a `museo_cartas`)**
+
+**Severidad: ALTA (fallo silencioso en cliente: el arbol de casas/clases del perfil publico habria renderizado con datos de cartas, o al reves). Estado: ARREGLADO en el codigo -- el `?tipo=` nuevo se renombro; `museo_publico` queda **reservado** a `api/interacciones.js`.**
+
+**Sintoma (potencial, interceptado antes de desplegar):** la lectura nueva de **cartas equipadas** se implemento inicialmente en `api/usuarios.js` reutilizando el discriminador `?tipo=museo_publico`. Ese tipo **ya existia** en `api/interacciones.js` (`:105`, `:113`, `:265`, `:3681`, `:5288` y otras) desde **WP-3**: devuelve el **arbol de casas/clases del perfil publico**, un payload **completamente distinto** al de cartas equipadas. Dos endpoints, mismo nombre de tipo, shapes incompatibles.
+
+**Causa:** el espacio de nombres `?tipo=` **no es local a un fichero**: es un discriminador global compartido por los 8 endpoints de `api/`. Se eligio el nombre mirando **solo el fichero que se estaba editando** (`usuarios.js`), donde el literal era nuevo, sin comprobar que `interacciones.js` ya lo tenia tomado y **en produccion**.
+
+**Por que se registra como BUG y no como detalle de implementacion:** porque **ningun test estatico lo detecta**. Cada fichero es **coherente consigo mismo**: `usuarios.js` devuelve cartas y parece correcto; `interacciones.js` devuelve el arbol y sigue correcto. La colision solo existe en la **interseccion**, y no hay contrato de tipos que la declare. El fallo habria sido **silencioso en el cliente** (render del arbol con datos de cartas o viceversa, sin 404 ni 500). Los consumidores reales del `museo_publico` original ya estan en produccion: `perfil.html:351`, `:353`, `:1221` y `mi-perfil.html:7934`, `:7948`. Regla que sale de aqui: **antes de crear una rama `?tipo=` nueva, `grep` del literal en TODO el repo** (los 8 archivos de `api/`, los HTML y el JS de raiz), no solo en el fichero que se esta tocando. **Los discriminadores `?tipo=` son un espacio de nombres global compartido por varios endpoints.**
+
+**Fix:** la lectura de cartas se renombro a **`museo_cartas`** en `api/usuarios.js` (`:1082` comentario de cabecera, `:1092` `if (tipo === 'museo_cartas')`, `:1108` y `:1142` degradaciones), **sin alias de compatibilidad**: `museo_publico` queda **RESERVADO** a `api/interacciones.js`.
+
+**Verificacion:** `Select-String "museo_cartas"` -> **4** coincidencias, todas en `api/usuarios.js`; `Select-String "museo_publico"` -> **0** coincidencias en `api/usuarios.js` y las de siempre en `api/interacciones.js` mas los dos HTML. Es decir: **un solo endpoint por nombre de tipo**. Lo verificado es el **estado del codigo**; no se ha medido el render en navegador porque el conflicto se corto antes de llegar a produccion.
+
+**Relacion con otros BUG (sin duplicar):** no es **BUG-143** (SQL embebido) ni **BUG-137/138/139** (campos y atribucion de render). Es el primer registro de esta serie cuyo defecto es de **nomenclatura de API**, no de datos ni de sintaxis.
+
+**Registro:** detectado al cerrar **TSK-242**, al revisar la lectura de cartas equipadas antes de darla por buena.
+
 
 

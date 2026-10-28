@@ -2460,6 +2460,47 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         </div>
         <button class="btn btn-gold" onclick="crearCarta()" style="white-space:nowrap">&#10133; Crear</button>
       </div>
+      <!-- D-6 del ADR-108 (migracion 060): emisor, descripcion, stats_json, canje QR y fusionable -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)">
+        <div style="flex:0 0 130px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Emisor</div>
+          <select class="form-input" id="carta-emisor" style="width:100%">
+            <option value="sistema" selected>Sistema</option>
+            <option value="ugc">UGC</option>
+            <option value="marca">Marca</option>
+          </select>
+        </div>
+        <div style="flex:0 0 110px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Canje QR</div>
+          <select class="form-input" id="carta-qr" style="width:100%">
+            <option value="0" selected>No</option>
+            <option value="1">Si</option>
+          </select>
+        </div>
+        <div style="flex:0 0 110px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Fusionable</div>
+          <select class="form-input" id="carta-fusion" style="width:100%">
+            <option value="1" selected>Si</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+        <div style="flex:1 1 240px;min-width:200px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Emisor ID (uuid, solo UGC)</div>
+          <input class="form-input" id="carta-emisor-id" placeholder="uuid del autor UGC" style="width:100%">
+        </div>
+        <div style="flex:1 1 240px;min-width:200px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Marca ID (uuid, solo Marca)</div>
+          <input class="form-input" id="carta-marca-id" placeholder="uuid de marcas.id" style="width:100%">
+        </div>
+        <div style="flex:1 1 100%;min-width:220px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Descripcion</div>
+          <input class="form-input" id="carta-desc" placeholder="Texto de la carta (opcional)" style="width:100%">
+        </div>
+        <div style="flex:1 1 100%;min-width:220px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">stats_json (objeto JSON)</div>
+          <textarea class="form-input" id="carta-stats" rows="2" placeholder="{}" style="width:100%;font-family:monospace;font-size:11px"></textarea>
+        </div>
+      </div>
       <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5">El ID es identidad (slug ASCII) y no se puede editar despues de crear. El nivel gate es opcional (vacio = carta sin gate).</div>
     </div>
 
@@ -2517,6 +2558,49 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Imagen URL</div>
         <input class="form-input" id="carta-edit-imagen" placeholder="https://..." style="width:100%">
         <button class="btn btn-ghost btn-sm" type="button" style="margin-top:6px" onclick="adminSubirImagen('carta-edit-imagen')">&#x2B06; Subir imagen</button>
+      </div>
+      <!-- D-6 del ADR-108: emisor, ids, descripcion, stats_json, canje QR y fusionable -->
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Emisor</div>
+        <select class="form-input" id="carta-edit-emisor" style="width:100%">
+          <option value="sistema">Sistema</option>
+          <option value="ugc">UGC</option>
+          <option value="marca">Marca</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1 1 190px;min-width:150px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Emisor ID (uuid)</div>
+          <input class="form-input" id="carta-edit-emisor-id" placeholder="solo UGC" style="width:100%">
+        </div>
+        <div style="flex:1 1 190px;min-width:150px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Marca ID (uuid)</div>
+          <input class="form-input" id="carta-edit-marca-id" placeholder="solo Marca" style="width:100%">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Descripcion</div>
+        <input class="form-input" id="carta-edit-desc" placeholder="Texto de la carta (opcional)" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">stats_json (objeto JSON)</div>
+        <textarea class="form-input" id="carta-edit-stats" rows="2" placeholder="{}" style="width:100%;font-family:monospace;font-size:11px"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1 1 130px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Canje QR</div>
+          <select class="form-input" id="carta-edit-qr" style="width:100%">
+            <option value="0">No</option>
+            <option value="1">Si</option>
+          </select>
+        </div>
+        <div style="flex:1 1 130px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Fusionable</div>
+          <select class="form-input" id="carta-edit-fusion" style="width:100%">
+            <option value="1">Si</option>
+            <option value="0">No</option>
+          </select>
+        </div>
       </div>
       <div style="font-size:11px;color:var(--muted);line-height:1.5">El ID es identidad y no se edita. Cero Borrado Logico: desactivar una carta no la borra del catalogo.</div>
     </div>
@@ -10529,8 +10613,12 @@ function cargarSaludRed() {
    CRUD contra /api/admin?recurso=cartas&tipo=cartas_*.
    GET  cartas_lista  -> { ok, data:[{id,nombre,set_slug,rareza,nivel_gate,
         es_evento,imagen_url,activo,creado_en}] }
-   POST cartas_crear  {id,nombre,set_slug,rareza,nivel_gate,es_evento,imagen_url}
-   POST cartas_editar {id, nombre|set_slug|rareza|nivel_gate|es_evento|imagen_url}
+   POST cartas_crear  {id,nombre,set_slug,rareza,nivel_gate,es_evento,imagen_url,
+        emisor_tipo:sistema|ugc|marca, emisor_id, marca_id, descripcion,
+        stats_json:{}, es_canjeable_qr, fusionable}
+   POST cartas_editar {id, nombre|set_slug|rareza|nivel_gate|es_evento|imagen_url|
+        emisor_tipo|emisor_id|marca_id|descripcion|stats_json|es_canjeable_qr|
+        fusionable}  (D-6 del ADR-108, migracion 060)
    POST cartas_toggle {id, activo?}
    El id es identidad (slug ASCII) y NO se edita. Cero Borrado Logico:
    toggle alterna activo. Degradacion 503 SCHEMA_NOT_MIGRATED si la 040 no
@@ -10539,6 +10627,42 @@ function cargarSaludRed() {
 
 var _cartasCache = [];
 var _cartasEditId = null;
+
+/* D-6 del ADR-108 (migracion 060): emisor_tipo / emisor_id / marca_id /
+   descripcion / stats_json / es_canjeable_qr / fusionable viajan en el MISMO
+   body que los campos clasicos. El SERVIDOR es la autoridad de validacion
+   (400 tipado EMISOR_TIPO_INVALIDO, EMISOR_ID_INVALIDO, MARCA_ID_INVALIDO,
+   EMISOR_INCOHERENTE, STATS_JSON_INVALIDO, FUSION_INCOHERENTE): aqui solo se
+   evita mandar un JSON que no parsea, para no gastar un viaje. Prefijo
+   "carta" para evitar colisiones (BUG-006/018/019). */
+function cartaSetValor(id, valor) {
+  var el = document.getElementById(id);
+  if (el) el.value = valor;
+}
+function cartaLeerStats(id) {
+  var el = document.getElementById(id);
+  var txt = el ? String(el.value || '').trim() : '';
+  if (!txt) return {};
+  var obj = JSON.parse(txt);
+  if (!obj || typeof obj !== 'object' || Object.prototype.toString.call(obj) === '[object Array]')
+    throw new Error('debe ser un objeto JSON');
+  return obj;
+}
+function cartaCamposD6(esModal) {
+  var p = esModal ? 'carta-edit-' : 'carta-';
+  var tipo = (document.getElementById(p + 'emisor') || {}).value || 'sistema';
+  var emisorId = String((document.getElementById(p + 'emisor-id') || {}).value || '').trim();
+  var marcaId = String((document.getElementById(p + 'marca-id') || {}).value || '').trim();
+  var desc = String((document.getElementById(p + 'desc') || {}).value || '').trim();
+  return {
+    emisor_tipo: tipo,
+    emisor_id: emisorId ? emisorId : null,
+    marca_id: marcaId ? marcaId : null,
+    descripcion: desc ? desc : null,
+    es_canjeable_qr: (document.getElementById(p + 'qr') || {}).value === '1',
+    fusionable: ((document.getElementById(p + 'fusion') || {}).value || '1') === '1'
+  };
+}
 
 async function loadCartas() {
   var lista = document.getElementById('cartas-lista');
@@ -10610,19 +10734,34 @@ async function crearCarta() {
     if (!isFinite(n) || n < 1) { showAdminToast('Nivel gate invalido', 'error'); return; }
     nivel_gate = n;
   }
+  var statsCa;
+  try { statsCa = cartaLeerStats('carta-stats'); }
+  catch (eS) { showAdminToast('stats_json invalido: ' + eS.message, 'error'); return; }
+  var d6Ca = cartaCamposD6(false);
   try {
     var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_crear', {
       method: 'POST',
       headers: _adminHeaders(),
-      body: JSON.stringify({ id: id, nombre: nombre, set_slug: set_slug, rareza: rareza, nivel_gate: nivel_gate, es_evento: es_evento, imagen_url: imagen_url })
+      body: JSON.stringify({ id: id, nombre: nombre, set_slug: set_slug, rareza: rareza,
+        nivel_gate: nivel_gate, es_evento: es_evento, imagen_url: imagen_url,
+        emisor_tipo: d6Ca.emisor_tipo, emisor_id: d6Ca.emisor_id, marca_id: d6Ca.marca_id,
+        descripcion: d6Ca.descripcion, stats_json: statsCa,
+        es_canjeable_qr: d6Ca.es_canjeable_qr, fusionable: d6Ca.fusionable })
     });
     var data = await resp.json();
-    if (!data.ok) throw new Error(data.error || 'No se pudo crear');
+    if (!data.ok) throw new Error(data.detalle || data.error || 'No se pudo crear');
     document.getElementById('carta-id').value = '';
     document.getElementById('carta-nombre').value = '';
     document.getElementById('carta-set').value = '';
     document.getElementById('carta-nivel').value = '';
     document.getElementById('carta-imagen').value = '';
+    cartaSetValor('carta-emisor', 'sistema');
+    cartaSetValor('carta-emisor-id', '');
+    cartaSetValor('carta-marca-id', '');
+    cartaSetValor('carta-desc', '');
+    cartaSetValor('carta-stats', '');
+    cartaSetValor('carta-qr', '0');
+    cartaSetValor('carta-fusion', '1');
     showAdminToast(data.mensaje || 'Carta creada', 'success');
     loadCartas();
   } catch (e) {
@@ -10641,6 +10780,13 @@ function abrirEditarCarta(id) {
   document.getElementById('carta-edit-nivel').value = (c.nivel_gate == null) ? '' : c.nivel_gate;
   document.getElementById('carta-edit-evento').value = c.es_evento ? '1' : '0';
   document.getElementById('carta-edit-imagen').value = c.imagen_url || '';
+  cartaSetValor('carta-edit-emisor', c.emisor_tipo || 'sistema');
+  cartaSetValor('carta-edit-emisor-id', c.emisor_id || '');
+  cartaSetValor('carta-edit-marca-id', c.marca_id || '');
+  cartaSetValor('carta-edit-desc', c.descripcion || '');
+  cartaSetValor('carta-edit-stats', (c.stats_json && Object.keys(c.stats_json).length) ? JSON.stringify(c.stats_json) : '');
+  cartaSetValor('carta-edit-qr', c.es_canjeable_qr ? '1' : '0');
+  cartaSetValor('carta-edit-fusion', (c.fusionable === false) ? '0' : '1');
   document.getElementById('carta-modal').style.display = 'flex';
 }
 
@@ -10665,14 +10811,22 @@ async function guardarEdicionCarta() {
     if (!isFinite(n) || n < 1) { showAdminToast('Nivel gate invalido', 'error'); return; }
     nivel_gate = n;
   }
+  var statsECa;
+  try { statsECa = cartaLeerStats('carta-edit-stats'); }
+  catch (eSE) { showAdminToast('stats_json invalido: ' + eSE.message, 'error'); return; }
+  var d6ECa = cartaCamposD6(true);
   try {
     var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_editar', {
       method: 'POST',
       headers: _adminHeaders(),
-      body: JSON.stringify({ id: _cartasEditId, nombre: nombre, set_slug: set_slug, rareza: rareza, nivel_gate: nivel_gate, es_evento: es_evento, imagen_url: imagen_url })
+      body: JSON.stringify({ id: _cartasEditId, nombre: nombre, set_slug: set_slug, rareza: rareza,
+        nivel_gate: nivel_gate, es_evento: es_evento, imagen_url: imagen_url,
+        emisor_tipo: d6ECa.emisor_tipo, emisor_id: d6ECa.emisor_id, marca_id: d6ECa.marca_id,
+        descripcion: d6ECa.descripcion, stats_json: statsECa,
+        es_canjeable_qr: d6ECa.es_canjeable_qr, fusionable: d6ECa.fusionable })
     });
     var data = await resp.json();
-    if (!data.ok) throw new Error(data.error || 'No se pudo actualizar');
+    if (!data.ok) throw new Error(data.detalle || data.error || 'No se pudo actualizar');
     cerrarCartaModal();
     showAdminToast(data.mensaje || 'Carta actualizada', 'success');
     loadCartas();

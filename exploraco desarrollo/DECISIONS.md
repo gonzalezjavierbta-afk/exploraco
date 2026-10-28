@@ -11012,3 +11012,607 @@ No se borra ninguna fila (ADR-003): el estado `'anulado'` sigue siendo el unico 
 **REVISION 4 (2026-10-27) -- VIGENTE. Correccion DOCUMENTAL: el papel se alinea al codigo real ya desplegado.** `@architect-review` ("APRUEBA CON CAMBIOS") detecto que la revision 3 se escribio contra el codigo de la revision 2. Se corrigen **ocho puntos**, todos de papel: (1) **tabla real de ramas** -- **7** en `api/interacciones.js` (~~3 GET + 4 POST~~ **2 GET + 5 POST**: `marca_premios`, `canjes_marca`, `marca_presencia`, `marca_panel`, `consumible_fusionar`, `consumible_entregar`, `marca_premio_otorgar`) y **6** en `api/usuarios.js` (2 GET + 4 POST: `mi_marca`, `marcas_mias`, `marca_crear`, `marca_activa_set`, `marca_activar`, `marca_patrocinar`) -> **R4-E1**; (2) los nombres `canje_tienda_registrar`, `canje_tienda_cerrar` y `fusion_marca_registrar` quedan **DESCARTADOS / NO IMPLEMENTADOS**, marcados sin borrar -> **R4-E2**; (3) **`marca_presencia` sale del alcance** (es ADR-040/ADR-064) y su **403 `MARCA_INACTIVA` se conserva** como **excepcion declarada**: el "404 nunca 403" aplica solo a las ramas nuevas -> **R4-E3**; (4) **`409 PREMIO_YA_OTORGADO` SUPERADO**: el codigo responde **200** con `omitidos[].motivo='YA_OTORGADO'`, idempotente por `(marca_id, semana, usuario_id)` y **sin tocar stock en el replay** -> **R4-E4**; (5) conteo de escritura corregido a **4 + 4 = 8** (la rev 3 decia 4 en total) -> **R4-E5**; (6) **`clave_idempotencia` OBLIGATORIA** en `consumible_entregar` (`400 CLAVE_IDEMPOTENCIA_REQUERIDA`) generada **por intento** en el panel, con la **clave natural eliminada** porque bloqueaba ventas legitimas repetidas -> **R4-E6**; (7) **metricas partidas** (`pocimas_otorgadas` / `pocimas_entregadas` y `productos_entregados` = filas) -> **R4-E7**; (8) **deuda declarada**: formula del podio **duplicada** en GET `marca_premios` y POST `marca_premio_otorgar`, aceptada por el operador, **no bloquea la 058** (ya aplicada) y con fix propuesto (helper unico) -> **R4-E8**. Estado del modulo: **IMPLEMENTADO Y DESPLEGADO** (~~desplegado~~ **corregido en la rev.5: IMPLEMENTADO; DESPLIEGUE PENDIENTE DEL OPERADOR**, porque el unico llamador de `consumible_entregar`, `mi-perfil.html` `:9116`, sigue sin commitear: R5-E6), migracion **058 aplicada** en Neon (registrada en `schema_migrations` con `--notas "ADR-107 D1/D16"`). **No queda ningun pendiente de diseno**; lo unico abierto es el **script de otorgamiento del operador** en `scripts/` (R3-E6) y la deuda de mantenimiento de R4-E8. El cierre documental (`TASKS.md`, `NEXT.md`, `BLUEPRINT.md`) sigue correspondiendo al **pase unico R2** de `@docs-keeper`, no a este ADR.
 **REVISION 5 (2026-10-27) -- VIGENTE. Correccion FACTUAL + aclaracion semantica.** `@architect-review` dio de nuevo **"APRUEBA CON CAMBIOS"** sobre la rev.4 y listo **cuatro hechos erroneos** mas **una enmienda del operador** (O4-b). Se corrigen **cinco puntos** y se corrige **el estado**, todos de papel: (1) `api/interacciones.js` sirve **2 GET + 5 POST** (no 3 + 4: **`marca_presencia` es POST**, bloque POST `:10894`/`:10896`, rama `:15799`) -> **R5-E1**; (2) **T5** pasa a **6 consultas** y pierde el ancla muerta `:2347` -> **R5-E2**; (3) las citas de `api/usuarios.js` (`798/849/2433/2536/2577/2641/2663-2667`) estaban **muertas** por los cambios de gate **O4-b sin commitear** y pasan a **ancla por rama/funcion**, con **una sola** linea numerica declarada **movible** -> **R5-E3**; (4) **`pocimas_entregadas` era INALCANZABLE** (cero `UPDATE canjes_tienda` en el repo: siempre 0 y `pendientes` sin drenar) y el operador decide **cerrar el premio pendiente sobre la MISMA fila**; el fix vive en `consumible_entregar` (**encargo paralelo de backend**, no este ADR) y el comentario de **`058:303-305`** queda **desactualizado como descripcion del codigo y vigente como contrato** -> **R5-E4**; (5) **O4-b entra en este pase**: el gate del **ALTA** lee la clave **GLOBAL** `gamificacion_config.marca_nivel_requerido` (fallback **5**, aun **sin sembrar**, luego comportamiento efectivo identico), `marcas.nivel_requerido` **sigue existiendo** como fuente de **spots**/`marca_patrocinar`, y **D5** y **D15** quedan **ENMENDADAS** en su sitio -> **R5-E5**. **Estado corregido:** **IMPLEMENTADO; DESPLIEGUE PENDIENTE DEL OPERADOR** -- el unico llamador de `consumible_entregar` es `mi-perfil.html` (`:9116`), **sin commitear**; la **058 SI esta aplicada** en Neon (registrada en `schema_migrations` con `--notas "ADR-107 D1/D16"`) -> **R5-E6**. **No se reabre diseno:** D1-D16 y las enmiendas R3/R4 quedan intactas y la numeracion sigue siendo **ADR-107**. El cierre documental sigue siendo del **pase unico R2** de `@docs-keeper`.
 **REVISION 6 (2026-10-27) -- VIGENTE. La rama del premio cierra el circulo: se ACREDITA en la billetera, es fusionable y se descuenta al entregar.** Corrige **dos estados** y **una frase** de la rev.5, todos de papel salvo una rama de codigo ya escrita: (1) **D13 rev.6** -- `marca_premio_otorgar` **acredita** el premio en `usuarios.capacidades->'consumibles'` al otorgarlo (merge JSONB atomico colgado del `INSERT`, `api/interacciones.js:16582-16616`, cita de fecha), luego **es fusionable**; `consumible_entregar` **descuenta** de la billetera al cerrar la fila y es **fail-closed** (sin saldo: **409**, no se cierra ni se descuenta) -> **R6-E1**; con ello **D6(b)** ("el premio no toca el inventario del usuario") queda **ENMENDADA** en su sitio; (2) la **059 esta APLICADA** -- indice `idx_canjes_tienda_marca_semana (marca_id, semana, origen, estado)` cuyo consumidor es **el calculo del premio por semana, no el panel**, mas `gamificacion_config.marca_nivel_requerido = 5.0000` con `ON CONFLICT DO NOTHING`, registrada en `schema_migrations` con `numero=59` -> la deuda "059 propuesta" queda **CERRADA**; (3) **O4-b CERRADO** -- el gate del **ALTA** lee la clave global (fallback **5**, `api/usuarios.js:342/:398`) y `marcas.nivel_requerido` **sigue siendo la fuente** de spots/`marca_patrocinar` -> **R6-E2**. **Deploy medido:** `fb38b5a` **SI esta en produccion** (canario `GET ?tipo=canjes_marca` -> **401**; cierra la ventana de **BUG-141**), **`ee5e19c` NO desplegado** y el codigo de la rev.6 **sin commitear**: el **deploy del commit final es del operador**. **Siguen ABIERTAS:** **T14** (formula del podio duplicada) y la asercion **G3** de `scripts/smoke_gaming_v61.js:63-65` (deuda de test: `npm test` en **19/20**). La numeracion sigue siendo **ADR-107**.
+
+## ADR-108: Las cartas dejan de ser un catalogo cerrado de sistema: se abre el **emisor** (`sistema`/`ugc`/`marca`), la rareza se queda como esta y lo "dorado" pasa a ser una **variante** `base|shiny` por carta, con **Museo publico de 12** y **fusion 4->1 determinista con coste en XP**; la **060 es SOLO EXPANSION** (columna `variante` + `UNIQUE` de 3 columnas, `usuarios_cartas_pkey` **intacta**) y la **061 es la CONTRACCION** (PK de 3 columnas; **APLICADA el 2026-10-27, Deuda D-4 CERRADA**); **3 ramas POST** en `api/interacciones.js` y **1 lectura** en `api/usuarios.js` (`museo_cartas`), cero endpoints nuevos [NO deroga ninguna premisa de ADR previos; **acota** ADR-062 (sistema de cartas) y se apoya en ADR-002, ADR-003, ADR-006 y ADR-008]
+
+**ID:** ADR-108
+**Fecha:** 2026-10-27
+**Autor:** `@architect` (diseno). Gate de riesgo CONFIRMADO explicitamente por el operador (toca `api/interacciones.js`, `api/usuarios.js`, `db/migrations/` y dos superficies de UI).
+**Estado:** **ACEPTADO / IMPLEMENTADO (revision 3, 2026-10-27).** Las migraciones **060 y 061 estan APLICADAS** en Neon (segunda corrida idempotente OK), las 3 ramas POST y las 2 lecturas estan desplegadas en el codigo, y la Deuda **D-4 quedo CERRADA**; **revision 4 (segundo y ultimo pase documental, 2026-10-27):** quedan **CERRADAS D-6 y D-8** y **D-11 con limite declarado** -- hechos medidos en `Revision 4`, al final del ADR, y en `TASKS.md` TSK-243. La revision 2 de este bloque (**ACEPTADO / PENDIENTE DE IMPLEMENTAR**) queda **superada**: se conserva su texto como historia (ADR-003) y se anota lo que cambio al implementar en **`Correcciones de la revision 3`**, al final del ADR. Es un ADR de **diseno**: no escribe codigo ni la migracion. Las **decisiones del operador** se registran como **premisa**: no se re-abren. **Revision 2 (2026-10-27):** aplica los **8 bloqueadores** de `@architect-review` y el checklist de mecanismos de `@sql-security`; el detalle esta en `Correcciones de la revision`. Cambios de fondo de esta pasada: la **060 pasa a ser solo expansion** (D12) y el cambio de PK se difiere a la **061** como deuda con orden de despliegue; `marca_id` pasa a `ON DELETE RESTRICT` (D3); el CRUD admin **no puede** crear `ugc`/`marca` ni fijar `stats_json`/`fusionable` y se declara **Deuda D-6** (D3); `activo` fija semantica unica de "en posesion" (D13); `stats_json` es **display-only** salvo `capacidad_gate` (D14). **Numeracion (ADR-006, verificado contra el archivo real el 2026-10-27):** el brief pedia "ADR-100" y **es FALSO**: `DECISIONS.md:9098` ya es `## ADR-100` (seed masivo curado). El patron de conteo es `^## ADR-` (**no** `^## ADR-0`, que oculta las 3 cifras - el mismo error que documenta ADR-106). Devuelve **106** encabezados y el mayor es **`ADR-107`** (linea 10028). Este ADR se escribe como **108**, siguiente consecutivo libre; **no se renumera ningun ADR existente** (ADR-003). Tamano real medido hoy: **> 1,7 MB / 11.406 lineas** (lectura por rango obligatoria, ADR-084 D5: prohibido leerlo completo).
+
+### Problema
+
+El sistema de cartas (ADR-062) nacio como **catalogo cerrado**: 21 cartas de sistema (18 de 4 sets de gate + 3 de evento), rareza fija en 4 valores y `usuarios_cartas` con **una sola fila por (usuario, carta)**, donde los duplicados son la columna `cantidad`. Ese modelo resuelve el gate de nivel, pero **no puede expresar** las cuatro cosas que el producto ya pide: (1) una carta **comunitaria** derivada del album de un usuario; (2) una carta de **marca** patrocinada; (3) una version **brillante** de una carta existente sin inventar una quinta rareza; (4) una **vitrina publica** y un **sumidero de economia** que haga escasa la version brillante.
+
+Los cuatro huecos no son cosmeticos; el tercero y el cuarto chocan de frente con dos invariantes del esquema real:
+
+1. **La rareza no puede crecer.** `cartas_catalogo.rareza` tiene `CHECK (rareza IN ('comun','raro','epico','dorado'))` (`db/migrations/040_gobernanza_cartas_moneda.sql:101-103`) y `mi-perfil.html` mapea **cuatro** clases CSS (`r-comun/r-raro/r-epico/r-dorado`) por `v61RarezaClase()`. Anadir `'shiny'` como quinta rareza obliga a tocar el CHECK, el mapa de clases y todas las consultas que ordenan por rareza: un cambio de dimension disfrazado de valor.
+2. **La PK no admite dos versiones de la misma carta, y es lo que la 061 resolvio.** `usuarios_cartas` tiene `PRIMARY KEY (usuario_id, carta_id)` (`040:163`). Con la PK intacta, la carta `base` y su version brillante **no pueden coexistir como filas**: la segunda chocaria contra `usuarios_cartas_pkey` con `23505`. La correccion de la revision es **expand/contract** (D12): la **060 solo expande** (anade `variante` + un `UNIQUE (usuario_id, carta_id, variante)`) y la **061 contrae** (depromueve la PK a 3 columnas). Mientras la 061 no estuvo aplicada, la escritura de una fila `shiny` **no podia ocurrir**: `carta_fusionar` respondia `503 FUSION_PENDIENTE` con el resto del contrato ya desplegado (D12, riesgo residual R-1). **La 061 quedo aplicada el 2026-10-27 y ese `503` ya no se dispara (revision 3, D-4 CERRADA).**
+
+### Datos medidos (contra el archivo real, 2026-10-27)
+
+1. **`cartas_catalogo`** (`040:97-108`): `id text PK` (slug ASCII), `nombre`, `set_slug`, `rareza varchar(20)` con CHECK de 4 valores, `nivel_gate smallint NULL` (NULL = no gatea), `es_evento boolean NOT NULL DEFAULT false`, `imagen_url`, `activo boolean NOT NULL DEFAULT true`, `creado_en`. Seed idempotente de **21** cartas con `ON CONFLICT (id) DO NOTHING` (`040:118`).
+2. **`usuarios_cartas`** (`040:155-166`): `PRIMARY KEY (usuario_id, carta_id)`, `cantidad int NOT NULL DEFAULT 1 CHECK (cantidad >= 0)`, `obtenida_en`, `activo boolean NOT NULL DEFAULT true`. **Los duplicados son `cantidad`, no filas.**
+3. **`cartas_gates`** (`040:168-176`): `PRIMARY KEY (usuario_id, nivel_gate)`, `CHECK (nivel_gate IN (10,14,20,25))`, `set_slug text NOT NULL`, `consumido_en timestamptz DEFAULT now()`.
+4. **HALLAZGO que refina D4: `cartas_gates` nace SEMBRADA.** La seccion 8 de la 040 (`040:444-452` y siguientes) inserta una fila por gate ya superado para todos los usuarios existentes (`nivel_visible >= nivel_gate`, `ON CONFLICT DO NOTHING`) como **grandfathering A-1**. Por tanto **"insertar en `cartas_gates` con `ON CONFLICT DO NOTHING` como token de idempotencia" habria dado 0 drops a todos los usuarios de nivel >= 10 para siempre**: la fila ya existe y el `RETURNING` llega vacio. D4 se cumple igual, pero **anclada a una columna nueva `drop_en`**, no a la insercion.
+5. **`marcas.id` es `uuid PRIMARY KEY DEFAULT gen_random_uuid()`** (`db/migrations/027_zonas_marcas.sql:197-198`) y el patron de referencia ya existe: `marca_id uuid REFERENCES marcas(id)` (`027:263`, y las migraciones 058/059). `marcas` es una tabla **curada por el admin**, no de alta libre.
+6. **El sumidero de XP de tienda ya tiene mecanismo y no necesita columnas nuevas:** `usuarios.xp_gastado_sinks` se usa como "XP comprometido" y el disponible es `GREATEST(xp_total - COALESCE(xp_gastado_sinks,0), 0)` (`api/interacciones.js:1349`, `:1358`, `:5002-5006`). El comentario `:4966` lo dice explicito: **comprar no baja `xp_total`** (no se pierde nivel), debita `xp_gastado_sinks`. **MATIZ DE LA IMPLEMENTACION (revision 3):** la **fusion NO usa este mecanismo**. Cobra sobre **`usuarios.xp_total`** con asiento de ledger `carta_fusion` (ver D9). Este hecho se cita para dejar claro que `xp_gastado_sinks` **existe y es de otra economia**: no es el campo de la fusion.
+7. **`GET ?tipo=cartas_mias`** (`api/usuarios.js:928-980`) hace `LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1` **solo por `carta_id`**. Con `variante` en la PK, ese JOIN devolveria **2 filas por carta** (base + shiny) y romperia el grid y el `requisitos[].obtenidas`. La lectura tiene que agregar.
+8. **Presupuesto serverless 8/8** y **ultima migracion aplicada = 059** (`db/migrations/059_marcas_indice_semana_y_gate_nivel.sql`). La nueva es la **060**.
+9. **`niveles-data.js` es la fuente unica de capacidades** (cabecera `:1`, `CAPACIDADES_DETALLE` en `:72`), y cada capacidad es un objeto `{clave, nombre, howto, nivel}` con `clave` en slug ASCII (p.ej. `subir_fotos`). El **nivel** de cada capacidad es dato derivado y ya se ha recalibrado; la **clave** es la identidad estable.
+10. **`cromos_catalogo`** (migracion 010) es un coleccionable **paralelo** y deliberadamente no fusionado (nota M-4 en `040`). **No se toca en este ADR.**
+11. **Tres `ON CONFLICT (usuario_id, carta_id)` vivos en `api/interacciones.js`** (`:15260`, `:15456`, `:15531`). Dependen de la forma de la PK: con la PK de 3 columnas **fallan con `42P10`** ("there is no unique or exclusion constraint matching the ON CONFLICT specification"). Es la razon material de que el cambio de PK no pueda ir en el mismo fichero que el codigo (D12).
+12. **Tres `UPDATE` de decremento sin limpieza de museo:** `:15169`, `:15252` (`SET cantidad = cantidad - 1, ...`) y `:15323-15324` (`SET cantidad = cantidad - $3::int, activo = CASE WHEN cantidad - $3::int <= 0 THEN false ELSE activo END`). **Ninguno** limpia `en_museo`/`orden_museo`: al vender la ultima copia equipada, `chk_usuarios_cartas_museo` (que exige `cantidad >= 1` con `en_museo = true`) **revienta con `23514`** y la venta falla. La limpieza es **cambio obligatorio del backend** en el mismo release que la UI (D18).
+13. **`GET ?tipo=cartas_mias` infla el `COUNT(*)`:** `api/usuarios.js:942` hace `LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1` y `:953-958` agrega por `set_slug` con `COUNT(*)::int AS total` y `COUNT(*) FILTER (WHERE uc.activo = true AND uc.cantidad >= 1)::int AS obtenidas`. Con variantes, cada carta **duplica filas** y `total` cuenta **variantes, no cartas**. Las dos expresiones pasan a contar por `carta_id` distinto (D20).
+14. **El CRUD admin de cartas escribe por lista explicita de columnas:** `api/admin.js:970` (`INSERT INTO cartas_catalogo (id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url)`) y `:1018` (`UPDATE cartas_catalogo SET ' + setsCa.join(', ')`, whitelist). Por tanto **no puede** crear cartas `ugc`/`marca` ni fijar `stats_json`/`fusionable`/`emisor_tipo`. No es "a verificar en implementacion": es una **deuda de alcance** (D-6, `@admin-dev`). *(D-6 **CERRADA** en la revision 4: el CRUD ya escribe esas 7 columnas con validacion de coherencia; ver `Revision 4` al final.)*
+15. **`POST {tipo:'cartas_gate'}` ya existe y ya inserta filas de `cartas_gates`:** `api/usuarios.js:2728`, con `INSERT INTO cartas_gates (usuario_id, nivel_gate, set_slug, consumido_en)` en `:2803`. Tras la 060 esas filas nacen con `drop_en IS NULL`, es decir **drop pendiente**. Es correcto **y** es el riesgo: la rama de drop tiene que ser la **unica** que otorga cartas, y la reclamacion y la activacion del gate son **la misma sentencia** (D4, D19).
+16. **`scripts/apply_sql_file.js` existe y ejecuta sentencia a sentencia sin transaccion envolvente.** Consecuencia medida: un `DROP CONSTRAINT` + `ADD PRIMARY KEY` en el mismo fichero deja la tabla **sin PK** si falla entre las dos sentencias. Es la razon tecnica de expand/contract (D12).
+17. **`scripts/gold_shield.js` solo acepta `--sin-express`** (`scripts/gold_shield.js:69-70`; no existe `--check`). Los criterios de verificacion de esta revision solo citan comandos que **existen** en `scripts/`.
+
+### Opciones evaluadas
+
+**Sobre "dorado" (D1):**
+
+- **(A) Quinta rareza `shiny` en el CHECK.** Descartada: cambia el vocabulario de rareza que ya comparten `cartas_catalogo`, `cromos_catalogo` y el mapeo CSS, para expresar algo que **no es una rareza** (una carta shiny es la misma carta con otra probabilidad de origen).
+- **(B) Columna `variante` en `usuarios_cartas` con PK extendida.** Elegida: la rareza queda intacta, el inventario puede tener `base` y `shiny` del mismo `carta_id`, y el "4->1" se vuelve una resta de `cantidad` contra un `UPSERT` de la fila shiny.
+- **(C) Tabla aparte `usuarios_cartas_shiny`.** Descartada: duplica el inventario, obliga a duplicar cada consulta y rompe el tope del museo (que tiene que contar por usuario, no por tabla).
+
+**Sobre la referencia de marca (D3 del brief, punto 3):**
+
+- **(A) `emisor_id text` polimorfico sin FK.** Coste cero, integridad cero: un `marca_id` borrado deja cartas huerfanas y el `JOIN` devuelve `NULL` sin que nadie se entere. Descartada para marcas.
+- **(B) `emisor_id uuid` + FK condicional.** Postgres **no tiene FK condicional**; se simula con trigger, que es mas superficie que una columna.
+- **(C) `emisor_id uuid` para `sistema`/`ugc` + `marca_id uuid REFERENCES marcas(id)` exclusivo de `emisor_tipo='marca'`, con CHECK de coherencia.** Elegida: **cero duplicacion** (cada fila usa una sola de las dos), FK real donde la integridad importa (marca curada por admin) y ninguna FK donde el autor es un usuario que puede desaparecer (UGC huerfano se degrada en lectura, ADR-008, no borra catalogo, ADR-003).
+
+**Sobre el ancla del drop (D4):**
+
+- **(A) Insertar en `cartas_gates` con `ON CONFLICT DO NOTHING`.** **Rota por el hecho 4**: la fila existe por grandfathering y el drop nunca ocurre.
+- **(B) Tabla nueva `cartas_drops`.** Prohibida por la premisa "sin tabla nueva"; ademas crea una segunda fuente de "que gates cruce".
+- **(C) Columna `drop_en timestamptz NULL` en `cartas_gates`.** Elegida: la PK `(usuario_id, nivel_gate)` **ya es** la clave natural del drop, `drop_en IS NULL` es el token de idempotencia y el `UPDATE ... WHERE drop_en IS NULL RETURNING` es atomico bajo el row-lock. Cero tablas nuevas.
+
+**Sobre el coste de la fusion (D8):**
+
+- **(A) Coste escalado por rareza.** Descartada: la rareza ya se paga **cuatro veces** en las cartas de entrada, y un coste variable obliga al cliente a cotizar (o a pedirla, o a duplicarla). Dos fuentes de precio es exactamente el defecto que ADR-099 cerro en la completitud.
+- **(B) Coste plano, constante unica en servidor, servida en el payload.** Elegida: un numero, un sitio (`api/interacciones.js`, junto a `XP_BASES`), cero numeros en HTML.
+
+**Sobre el cambio de PK de `usuarios_cartas` (bloqueador B3 de la revision 1, cerrado por el operador):**
+
+- **(A) `DROP CONSTRAINT usuarios_cartas_pkey` + `ADD PRIMARY KEY (usuario_id, carta_id, variante)` dentro de la 060.** Descartada por dos hechos medidos: (i) el runner aplica sentencia a sentencia sin transaccion (hecho 16), asi que un fallo intermedio deja `usuarios_cartas` **sin PK**; (ii) el cambio de PK **no es compatible** con las 3 ramas vivas que hacen `ON CONFLICT (usuario_id, carta_id)` (hecho 11): entre la migracion y el deploy del codigo nuevo hay una ventana con `42P10` en produccion.
+- **(B) Expand/contract en dos migraciones.** Elegida (D12): la 060 **solo expande** y es reversible en la practica; la 061 contrae y se planifica con el codigo ya desplegado. Coste: una ventana declarada en la que `shiny` **no se puede escribir** (riesgo residual R-1).
+- **(C) Tabla nueva `usuarios_cartas_variantes`.** Descartada: duplica el inventario y rompe el tope del museo, que cuenta por usuario y no por tabla (mismo argumento que la opcion C de "variante").
+
+### Decision
+
+#### D1 - DDL de la migracion `060_cartas_emisor_variante_museo_fusion.sql` (**SOLO EXPANSION**, aditiva, idempotente)
+
+Cabecera del fichero: replica el bloque de la 040 (transaccion implicita, `ON CONFLICT`, cero `DELETE`, cero `DROP TABLE`, cero `DROP COLUMN`) y registra el numero **60** en `schema_migrations`. **Toda restriccion se crea dentro de un `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '...') THEN ... END IF; END $$;`** para que una segunda corrida no falle: `ADD CONSTRAINT` no admite `IF NOT EXISTS`.
+
+**(1) `cartas_catalogo` - columnas nuevas**
+
+| Columna | Tipo | NULL | Default | CHECK / nota |
+|---|---|---|---|---|
+| `emisor_tipo` | `varchar(10)` | NOT NULL | `'sistema'` | `chk_cartas_catalogo_emisor_tipo`: `IN ('sistema','ugc','marca')` |
+| `emisor_id` | `uuid` | NULL | - | **Sin FK** (ver D3). Obligatorio si y solo si `emisor_tipo='ugc'` |
+| `marca_id` | `uuid` | NULL | - | `CONSTRAINT fk_cartas_catalogo_marca_id REFERENCES marcas(id) ON DELETE RESTRICT` (**nombre de FK explicito y REAL**; no es el `_fkey` por defecto). Obligatorio si y solo si `emisor_tipo='marca'` (D3) |
+| `descripcion` | `text` | NULL | - | Texto libre de ficha (UGC/marca). Las 21 de sistema quedan NULL |
+| `stats_json` | `jsonb` | NOT NULL | `'{}'::jsonb` | `chk_cartas_catalogo_stats` (ver D2) |
+| `es_canjeable_qr` | `boolean` | NOT NULL | `false` | Canje presencial por QR; **excluye de fusion** |
+| `fusionable` | `boolean` | NOT NULL | `true` | `chk_cartas_catalogo_fusionable` (ver abajo) |
+
+Restricciones de coherencia (una sola fila usa una sola via de emisor):
+
+```
+chk_cartas_catalogo_emisor_coherente CHECK (
+     (emisor_tipo = 'sistema' AND emisor_id IS NULL     AND marca_id IS NULL)
+  OR (emisor_tipo = 'ugc'     AND emisor_id IS NOT NULL AND marca_id IS NULL)
+  OR (emisor_tipo = 'marca'   AND marca_id IS NOT NULL  AND emisor_id IS NULL))
+```
+
+Invariante duro de D6 (el flag declara, el CHECK garantiza):
+
+```
+chk_cartas_catalogo_fusionable CHECK (
+     fusionable = false
+  OR (nivel_gate IS NULL AND es_evento = false AND emisor_tipo <> 'marca' AND es_canjeable_qr = false))
+```
+
+Indices: `CREATE INDEX IF NOT EXISTS idx_cartas_catalogo_emisor ON cartas_catalogo (emisor_tipo, emisor_id);`
+
+**(2) `usuarios_cartas` - columnas nuevas y UNIQUE de 3 columnas (PK intacta, D12)**
+
+| Columna | Tipo | NULL | Default | CHECK / nota |
+|---|---|---|---|---|
+| `variante` | `varchar(10)` | NOT NULL | `'base'` | `chk_usuarios_cartas_variante`: `IN ('base','shiny')` |
+| `en_museo` | `boolean` | NOT NULL | `false` | Vitrina publica (tope 12) |
+| `orden_museo` | `smallint` | NULL | - | `1..12`; NULL si y solo si `en_museo = false` |
+
+```
+-- 1) EXPANSION (D12): la PK de 2 columnas NO se toca en la 060 (hecho 16)
+--    Se anade la clave unica de 3 columnas que la 061 promocionara a PK.
+ALTER TABLE usuarios_cartas
+  ADD CONSTRAINT uq_usuarios_cartas_variante UNIQUE (usuario_id, carta_id, variante);
+-- Nombre REAL en Neon tras aplicar la 060: uq_usuarios_cartas_variante (uq_, no ux_).
+-- El prefijo ux_ queda para los INDICES (p.ej. ux_usuarios_cartas_museo_orden), no para la constraint.
+
+-- 2) Tope duro del museo: el CHECK es el techo, el indice unico el desempate
+chk_usuarios_cartas_museo CHECK (
+     (en_museo = false AND orden_museo IS NULL)
+  OR (en_museo = true  AND orden_museo BETWEEN 1 AND 12 AND cantidad >= 1
+      AND activo = true))
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_usuarios_cartas_museo_orden
+  ON usuarios_cartas (usuario_id, orden_museo) WHERE en_museo = true;
+```
+
+**Por que el tope 12 no necesita `COUNT(*)` (correccion de la revision):** la conjuncion de **`chk_usuarios_cartas_museo`** (`orden_museo BETWEEN 1 AND 12` con `en_museo = true`) y **`ux_usuarios_cartas_museo_orden`** (un `orden_museo` unico por usuario, parcial sobre `en_museo = true`) implica, por aritmetica de conjuntos, **como maximo 12 filas equipadas por usuario**: 12 valores distintos posibles en un rango de 12. **El tope se arbitra en la base, jamas con un `COUNT(*)` como autorizacion en la app** (D10). Un `COUNT(*)` en el handler solo puede servir para devolver el error **antes** del `23514`/`23505`; nunca para decidir.
+
+**Semantica de `cantidad = 0` (cero borrado logico, ADR-003):** la fusion **no borra filas**: deja `cantidad = 0` y, en la misma sentencia, `en_museo = false` + `orden_museo = NULL`. Un `cantidad = 0` **no puede** estar en el museo (lo garantizan el `CHECK` y `activo`, D13).
+
+**(3) `cartas_gates` - ancla del drop (D4)**
+
+`ALTER TABLE cartas_gates ADD COLUMN IF NOT EXISTS drop_en timestamptz;` - `NULL` = **drop pendiente**. `consumido_en` **no se toca** (sigue significando "cuando se cruzo el gate"). Semantica: `drop_en IS NULL` -> el usuario tiene derecho a **un** drop de ese set; `NOT NULL` -> ya lo cobro.
+
+**(4) `cartas_ofertas` / `cartas_ventas` - transporte de la variante (una columna, cero codigo)**
+
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS variante varchar(10) NOT NULL DEFAULT 'base'` con el mismo CHECK. Las **4 ramas de mercado ya desplegadas** (`carta_publicar|carta_comprar|carta_cancelar|carta_intercambiar`) siguen operando por omision sobre `'base'`: **comportamiento actual intacto**. Aceptar `variante` como parametro opcional en esas ramas es **Deuda D-2** (ver `Estado`), no bloquea la 060.
+
+**(5) Backfill de las 21 cartas existentes (sin UPDATE redundante)**
+
+**Prohibido el `UPDATE` redundante** (correccion de la revision): `emisor_tipo` y `variante` los pone el `DEFAULT` del `ADD COLUMN`, que **solo se aplica a filas existentes en el momento del ALTER y no vuelve a tocar las filas nuevas**. Un `UPDATE cartas_catalogo SET emisor_tipo='sistema'` o un `UPDATE usuarios_cartas SET variante='base'` **pisarian** en la segunda corrida las cartas `ugc`/`marca` y las variantes `shiny` ya creadas: seria una perdida de datos silenciosa del propio backfill. Unico `UPDATE` permitido (porque `fusionable` **no** es derivable del `DEFAULT` y su valor depende de columnas):
+
+```
+UPDATE cartas_catalogo SET fusionable = false
+ WHERE nivel_gate IS NOT NULL OR es_evento = true
+    OR emisor_tipo = 'marca' OR es_canjeable_qr = true;
+```
+
+**Consecuencia medida:** las 21 cartas actuales son **18 de gate (`nivel_gate` no nulo) + 3 de evento**, luego **las 21 quedan `fusionable = false`** y **la fusion nace sin inventario de sistema fusionable**. **Resuelto por el operador:** se siembra un set de sistema sin gate en la propia 060 (punto 6, D16). Ya **no** es una pregunta abierta.
+
+**(6) Seed del set de sistema fusionable (D16)**
+
+```
+INSERT INTO cartas_catalogo (id, nombre, set_slug, rareza, nivel_gate, es_evento,
+                             imagen_url, emisor_tipo, fusionable)
+VALUES ('ct_territorio_01', '...', 'territorio_comun', 'comun', NULL, false,
+        '/img/cartas/...', 'sistema', true),
+       ('ct_territorio_02', '...', 'territorio_comun', 'raro',  NULL, false,
+        '/img/cartas/...', 'sistema', true)
+ON CONFLICT (id) DO NOTHING;
+```
+
+- `set_slug = 'territorio_comun'`, `nivel_gate IS NULL`, `es_evento = false`, `fusionable = true`, rarezas `comun` y `raro`. **No** lleva `emisor_id` ni `marca_id` (es `sistema`, `chk_cartas_catalogo_emisor_coherente` lo exige).
+- **Las cartas de MARCA NO se siembran.** No hay garantia de que exista una fila en `marcas` con el `id` adecuado en cada entorno, y una FK `ON DELETE RESTRICT` (D3) convertiria el seed en un fallo de migracion por entorno. Quedan como **Deuda D-6** (CRUD admin).
+- Con este set, la rama `carta_fusionar` tiene inventario real de sistema desde el dia 1 **ademas** del UGC.
+
+#### D2 - Semantica de `stats_json` (claves exactas y tipos)
+
+`stats_json` es un **objeto** plano, nunca array ni escalar (`jsonb_typeof(stats_json) = 'object'`). Claves normativas:
+
+| Clave | Tipo JSON | Rango | Consumidor | Ausente significa |
+|---|---|---|---|---|
+| `bonus_xp_pct` | `number` | `0..100` | **Ninguno en esta entrega: display-only.** Se almacena y se muestra en el museo; **no altera ningun calculo de XP** (Deuda D-5) | `0` (sin bonus) |
+| `capacidad_gate` | `string` | slug de `NivelesData.CAPACIDADES_DETALLE[].clave` | Gate de capacidad (`usuario-session.js` / `niveles-data.js`) | Sin capacidad asociada |
+
+Reglas:
+
+- **`bonus_xp_pct` es un porcentaje, no un multiplicador.** `15` significa +15%. Nunca `1.15`. Un `number` en JSON se serializa sin comillas y el `CHECK` lo verifica por tipo.
+- **`bonus_xp_pct` es DISPLAY-ONLY en esta entrega (D14).** No tiene consumidor: se guarda y se pinta. **Prohibido inventar un consumidor** (ni en `XP_BASES`, ni en `calcularEra`, ni en el motor de niveles) para justificar el campo. El dia que exista consumidor, se documenta en un ADR con el punto exacto del calculo y su prueba de paridad. Se declara como **Deuda D-5**.
+- **`capacidad_gate` es la CLAVE (slug), NO el nivel.** Justificacion: `niveles-data.js` declara **una sola vez** cada capacidad y su `nivel` es dato **derivado y recalibrable** (hecho 9; los umbrales de nivel ya se han movido y ADR-040 T2 fijo `niveles-data.js` como fuente unica). Guardar `14` obligaria a decidir "14 de que escala" y quedaria obsoleto en la primera recalibracion; guardar `'subir_fotos'` sobrevive a cualquier recalibracion y es **el mismo vocabulario** que ya usa `usuarios.capacidades`. Un slug que no exista en `CAPACIDADES_DETALLE` es **inerte** (se ignora, con `console.warn`), nunca rompe la lectura.
+- **Prefijo reservado `x_`** para claves experimentales; el servidor **ignora** toda clave desconocida (compatibilidad hacia adelante sin migracion). Prohibido usar `x_` para datos normativos.
+- **Prohibido duplicar campos genericos:** si el dato ya existe como columna (`nivel_gate`, `rareza`, `set_slug`, `imagen_url`), **no** se copia en `stats_json`. Tampoco `precio_desde` ni `capacidad`: los campos genericos del motor de fichas se reusan, nunca se duplican dentro de `stats_json`.
+
+CHECK endurecido (correccion de la revision: el `OR` anterior **dejaba pasar cualquier cosa** que no fuera `number`, incluido un `{ "bonus_xp_pct": "quince" }`; ahora la forma y los tipos son obligatorios):
+
+```
+chk_cartas_catalogo_stats CHECK (
+      jsonb_typeof(stats_json) = 'object'
+  AND (NOT (stats_json ? 'bonus_xp_pct')
+       OR jsonb_typeof(stats_json -> 'bonus_xp_pct') = 'number')
+  AND (NOT (stats_json ? 'bonus_xp_pct')
+       OR ((stats_json ->> 'bonus_xp_pct')::numeric BETWEEN 0 AND 100))
+  AND (NOT (stats_json ? 'capacidad_gate')
+       OR jsonb_typeof(stats_json -> 'capacidad_gate') = 'string'))
+```
+
+Lectura del CHECK, en castellano: (i) `stats_json` es **siempre** un objeto JSON (`'{}'` pasa, `'[]'` y `'"x"'` no); (ii) si existe `bonus_xp_pct`, es **numero** (un `"15"` en comillas **no** pasa, que es el falso positivo que tenia la version anterior); (iii) si existe, esta en `0..100`; (iv) si existe `capacidad_gate`, es string.
+
+#### D3 - Como se referencia una carta de MARCA
+
+**Dos columnas, cero duplicacion, FK solo donde la integridad es barata:**
+
+- `emisor_id uuid` **sin FK** -> identifica al autor UGC (`usuarios.id`) y **nunca** a una marca.
+- `marca_id uuid CONSTRAINT fk_cartas_catalogo_marca_id REFERENCES marcas(id) ON DELETE RESTRICT` -> **exclusivo** de `emisor_tipo = 'marca'`.
+- `chk_cartas_catalogo_emisor_coherente` (D1) impide que una fila use las dos o ninguna.
+
+Justificacion: (i) `marcas` es tabla curada por el admin, con niveles y premios (027/058/059) y su `id` es lo unico que un CRUD escribe a mano; una FK real cuesta cero y evita cartas apuntando a marcas fantasma. (ii) `usuarios` es de alta rotacion y su borrado no debe arrastrar el catalogo (ADR-003): **sin FK** y lectura defensiva con `LEFT JOIN` + `COALESCE(nombre, 'Explorador')`. (iii) Una sola columna polimorfica obligaria a castear `text` a `uuid` en cada `JOIN` y a renunciar a ambos beneficios. (iv) **Cero duplicacion**: `emisor_id` no repite el uuid de la marca, `marca_id` no repite el del usuario.
+
+**`ON DELETE RESTRICT` y no `SET NULL` (correccion de la revision):** `chk_cartas_catalogo_emisor_coherente` exige `marca_id IS NOT NULL` cuando `emisor_tipo='marca'`. Un `ON DELETE SET NULL` **contradice** ese CHECK: borrar una marca pondria `marca_id = NULL` y la fila violaria el CHECK, con lo que el borrado **fallaria igual** pero con `23514` en vez de `23503`, y la coherencia quedaria dependiendo de que constraint se evalua primero. Con `RESTRICT` hay **una sola** causa observable: no se borra una marca con cartas, y si se quiere retirar, se desactiva (`activo = false`), que es el patron del resto del esquema.
+
+**Sobre el alta de cartas de marca: la premisa "entra por el CRUD admin ya existente" es FALSA como esta (hecho 14, bloqueador de la revision).** `api/admin.js:970` inserta por **lista explicita de columnas** (`id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url`) y `:1018` actualiza por **whitelist** (`setsCa`). Resultado medido: el CRUD **no puede** crear una carta `emisor_tipo='ugc'` ni `'marca'` (la fila nace `sistema` y viola el CHECK de coherencia si se intenta forzar por otro lado) y **no puede** fijar `stats_json`, `fusionable`, `emisor_id`, `marca_id`, `descripcion` ni `es_canjeable_qr`. **No se escribe como "sin cambios, a verificar en implementacion": se declara Deuda D-6 con agente asignado `@admin-dev`** y alcance cerrado (anadir las 7 columnas al `INSERT` y a la whitelist del `UPDATE`, con validacion de `emisor_tipo` y del par `emisor_id`/`marca_id`).
+
+#### D4 - El drop se ancla a `cartas_gates.drop_en` (idempotencia sin tabla nueva y sin azar)
+
+- **Que se entrega:** el **set completo** (`set_slug`) del `nivel_gate`, **1 unidad por carta activa**, `variante='base'`. **Sin tirada aleatoria**: determinista, auditable.
+- **Token de idempotencia:** `drop_en`. Un gate, un drop, para siempre.
+- **Requisito de nivel (fail-closed):** el servidor recalcula `nivel_visible` con el **mismo** motor que `GET ?tipo=cartas_mias` (`nivelVisibleDe()`, `api/usuarios.js:975`) y exige `nivel_visible >= nivel_gate`. **El `nivel_gate` del body no se cree**: es un parametro de seleccion, no una autorizacion.
+- **La reclamacion y la activacion del gate son la MISMA sentencia (D19).** `POST {tipo:'cartas_gate'}` (`api/usuarios.js:2728`, `INSERT` en `:2803`) ya inserta filas de `cartas_gates` con `drop_en` **NULL**. Tras la 060 eso significa "drop pendiente", que es lo correcto. El riesgo declarado es el inverso: **la insercion de la fila no puede otorgar cartas por si misma**, y ninguna otra rama puede hacer `UPDATE cartas_gates SET drop_en = ...` fuera del `ON CONFLICT ... DO UPDATE ... WHERE drop_en IS NULL RETURNING` de D5. **Un gate = un drop, y el drop se cobra en una sola ida**: una fila insertada por `cartas_gate` **no** otorga nada hasta que el usuario llama a `carta_obtener_drop`, y esa llamada consume el token. No existe "drop gratis extra" porque el otorgamiento de cartas vive **solo** en el `INSERT ... SELECT ... EXISTS (SELECT 1 FROM stamp)` de D5.
+- **Sin `DEFERRABLE`.** `drop_en` es un token de idempotencia, no una constraint diferible; la operacion de museo es **equipar y retirar**, y no requiere constraints diferidas (D17).
+
+#### D5 - Contrato de `POST ?tipo=carta_obtener_drop` (`api/interacciones.js`)
+
+**Body:** `{ "tipo": "carta_obtener_drop", "nivel_gate": 10 }` (entero; `10|14|20|25`).
+**Auth:** JWT obligatorio; el `usuario_id` sale **siempre** de `verificarSesion(req)`, nunca del body.
+**OK 200:** `{ ok:true, data:{ nivel_gate:10, set_slug:'territorio_mundana', ya_obtenido:false, drop_en:'2026-10-27T...', cartas:[{carta_id,nombre,rareza,imagen_url,cantidad}] } }`
+**Replay 200 (no es error):** `{ ok:true, data:{ nivel_gate:10, set_slug:'...', ya_obtenido:true, drop_en:'...original...', cartas:[] } }`
+**Errores tipados:** `400 NIVEL_GATE_INVALIDO` | `401 SESION_REQUERIDA` | `403 GATE_NO_ALCANZADO` (con `nivel_actual` y `nivel_requerido`) | `503 responderSchemaPendiente('cartas_drop', e)` (se **reutiliza** la funcion existente, sin renombrar el error).
+
+**SQL unico (una sola ida, sin transaccion de cliente, sin doble drop):**
+
+```
+WITH lvl AS (SELECT GREATEST(<nivel derivado de xp_total>, COALESCE(nivel_max,1)) AS nv
+               FROM usuarios WHERE id = $1::uuid),
+     stamp AS (
+       INSERT INTO cartas_gates (usuario_id, nivel_gate, set_slug, drop_en)
+       SELECT $1::uuid, $2::smallint, $3::text, now()
+         FROM lvl WHERE lvl.nv >= $2::smallint
+       ON CONFLICT (usuario_id, nivel_gate)
+       DO UPDATE SET drop_en = now() WHERE cartas_gates.drop_en IS NULL
+       RETURNING nivel_gate),
+     ins AS (
+       INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad)
+       SELECT $1::uuid, c.id, 'base', 1
+         FROM cartas_catalogo c
+        WHERE c.set_slug = $3::text AND c.activo = true AND EXISTS (SELECT 1 FROM stamp)
+       ON CONFLICT (usuario_id, carta_id, variante)
+       DO UPDATE SET cantidad = usuarios_cartas.cantidad + 1, activo = true
+       RETURNING carta_id)
+SELECT (SELECT nv FROM lvl) AS nivel_actual,
+       (SELECT COUNT(*)::int FROM ins) AS cartas_otorgadas;
+```
+
+**Garantia de concurrencia:** el `ON CONFLICT ... DO UPDATE ... WHERE cartas_gates.drop_en IS NULL` se evalua **bajo el row-lock** del conflicto. Dos POST simultaneos: uno gana el lock y estampa `drop_en`; el otro re-evalua el `WHERE` sobre la version actualizada, **no casa**, no devuelve fila, `stamp` queda vacio y `ins` inserta **0** filas. `cartas_otorgadas = 0` + `drop_en` no nulo => **replay**. Nunca 2x set. (Nota: si el usuario **no** tenia fila y `nv < gate`, no hay `INSERT` y la respuesta es `403`, no `200` vacio.)
+
+#### D6 - Contrato de `POST ?tipo=carta_equipar_museo` (`api/interacciones.js`)
+
+**Body:** `{ "tipo":"carta_equipar_museo", "carta_id":"ct_ugc_ab12", "variante":"base", "accion":"equipar", "orden":3 }`
+`accion` en **`equipar|retirar`** (**`reordenar` NO existe como accion**: no es requisito de producto, y reordenar = `retirar` + `equipar`, D17); `variante` por omision `'base'`; `orden` **obligatorio** en `equipar` (1..12) e **ignorado** en `retirar`.
+**OK 200:** `{ ok:true, data:{ total:3, tope:12, museo:[{carta_id,variante,orden,nombre,rareza,imagen_url}] } }` (el museo completo ordenado por `orden_museo ASC`; asi el cliente no recalcula).
+**Errores:** `400 PARAMETROS_INVALIDOS` | `400 ORDEN_INVALIDO` (fuera de 1..12 o `accion` desconocida) | `401 SESION_REQUERIDA` | `404 CARTA_NO_POSEE` (no hay fila con `activo = true AND cantidad >= 1`) | `409 MUSEO_LLENO` | `409 ORDEN_OCUPADO` | `503` esquema.
+
+**SQL:** una sola sentencia `UPDATE usuarios_cartas SET en_museo = true, orden_museo = $orden WHERE usuario_id = $1 AND carta_id = $2 AND variante = $3 AND activo = true AND cantidad >= 1 RETURNING ...`. **El predicado `activo = true AND cantidad >= 1` es el MISMO que usan el museo publico (D8) y la fusion (D7) en esta entrega (D13)**: "activo" = **en posesion**; `cantidad = 0` obliga `activo = false` y prohibe `en_museo = true` desde el `CHECK`. La respuesta devuelve el museo con un segundo `SELECT` (lectura, no escritura) o con un `CTE` de `RETURNING` + `json_agg`.
+**Garantia de concurrencia:** no se usa un `COUNT(*)` como autorizacion (seria TOCTOU). El arbitro es la **base**: `ux_usuarios_cartas_museo_orden` (dos peticiones al mismo `orden`) -> `23505`; `chk_usuarios_cartas_museo` (`orden` 13 imposible, y `orden_museo` unico por usuario en `1..12` implica tope 12) -> `23514`. El handler **mapea** `23505 -> 409 ORDEN_OCUPADO` y `23514 -> 409 MUSEO_LLENO`; el pre-chequeo de `COUNT(*)` solo existe para dar el error **antes** de intentarlo, **nunca como autorizacion** (D10).
+
+#### D7 - Contrato de `POST ?tipo=carta_fusionar` (`api/interacciones.js`)
+
+**Body:** `{ "tipo":"carta_fusionar", "carta_id":"ct_ugc_ab12" }` (siempre consume `variante='base'`; el resultado es `'shiny'`).
+**OK 200:** `{ ok:true, data:{ carta_id:'ct_ugc_ab12', variante_resultado:'shiny', cantidad_base:0, cantidad_shiny:1, xp_gastado:200, xp_disponible:3400 } }`
+**Errores:** `400 PARAMETROS_INVALIDOS` | `400 CARTA_NO_FUSIONABLE` (el catalogo la declara `fusionable=false`; incluye el motivo: `evento|gate|marca|qr`) | `401 SESION_REQUERIDA` | `404 CARTA_NO_ENCONTRADA` | `409 CARTAS_INSUFICIENTES` (con `cantidad_actual` y `requeridas:4`) | `409 XP_INSUFICIENTE` (con `faltante`) | `503` esquema.
+
+**Verificacion de fusibilidad en servidor, no en cliente:** `SELECT fusionable FROM cartas_catalogo WHERE id = $carta AND activo = true` -> si `false`, `400 CARTA_NO_FUSIONABLE`. El cliente **no** decide nada: recibe `fusionable` en la lectura y solo oculta el boton.
+
+**SQL unico (4->1 + cobro de XP, todo o nada):**
+
+```
+WITH src AS (
+  SELECT cantidad FROM usuarios_cartas
+   WHERE usuario_id = $1::uuid AND carta_id = $2 AND variante = 'base'
+     AND activo = true AND cantidad >= 4
+   FOR UPDATE),
+     cobro AS (
+  -- MECANISMO REAL (corregido en la revision 3): el coste se cobra sobre
+  -- usuarios.xp_total, NO sobre xp_gastado_sinks, y el asiento va al ledger
+  -- de XP (xp_ledger) con accion 'carta_fusion' y es_exento = true.
+  -- El guard usa el DISPONIBLE (total - sinks), que es el criterio de la economia.
+  UPDATE usuarios u
+     SET xp_total = u.xp_total - $3::numeric
+   WHERE u.id = $1::uuid
+     AND EXISTS (SELECT 1 FROM src)
+     AND GREATEST(u.xp_total - COALESCE(u.xp_gastado_sinks, 0), 0) >= $3::numeric
+   RETURNING u.xp_total),
+     decr AS (
+  UPDATE usuarios_cartas uc
+     SET cantidad = uc.cantidad - 4,
+         en_museo = CASE WHEN uc.cantidad - 4 <= 0 THEN false ELSE uc.en_museo END,
+         orden_museo = CASE WHEN uc.cantidad - 4 <= 0 THEN NULL ELSE uc.orden_museo END
+   WHERE uc.usuario_id = $1::uuid AND uc.carta_id = $2 AND uc.variante = 'base'
+     AND uc.cantidad >= 4 AND EXISTS (SELECT 1 FROM cobro)
+   RETURNING uc.cantidad),
+     out AS (
+  INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo)
+  SELECT $1::uuid, $2, 'shiny', 1, true WHERE EXISTS (SELECT 1 FROM decr)
+  ON CONFLICT (usuario_id, carta_id, variante)
+  DO UPDATE SET cantidad = usuarios_cartas.cantidad + 1, activo = true
+  RETURNING cantidad)
+SELECT (SELECT cantidad FROM decr) AS cantidad_base,
+       (SELECT cantidad FROM out)  AS cantidad_shiny,
+       (SELECT xp_total FROM cobro) AS xp_total;
+```
+
+**Leccion de PostgreSQL (hallazgo de la implementacion, revision 3):** el CTE de decremento se llamo primero **`desc`**, que es **palabra reservada** (`ORDER BY ... DESC`) y **rompia el `WITH` en tiempo de ejecucion**: el error **no lo detecta `node --check`** (es SQL dentro de una cadena). Se renombro a **`decr`**. Regla para el siguiente que escriba un CTE: **nunca `desc` ni `asc`** (ni `all`/`user` sin comillas) como nombre de CTE.
+
+**Garantia de concurrencia (doble gasto y doble fusion) - corregida en la revision.** La garantia **no** la da la *forma* del SQL (que los CTEs cuelguen de `EXISTS` no es una prueba de atomicidad), la dan **dos** mecanismos concretos:
+
+1. **`FOR UPDATE` en `src`** serializa a los dos peticionarios sobre la fila de inventario. El segundo se **bloquea** hasta que el primero confirma; al desbloquearse, su `SELECT ... FOR UPDATE` se **re-evalua** sobre la version nueva y, con `cantidad = 0`, devuelve **cero filas** -> `src` vacio -> `cobro` no casa (`EXISTS (SELECT 1 FROM src)` es falso) y **no cobra**.
+2. **`UPDATE ... WHERE uc.cantidad >= 4 RETURNING`** es el segundo arbitro, independiente del primero: aunque `src` hubiera leido 4 (por cualquier carrera que el lock no cubriera), el `UPDATE` **re-evalua** el predicado con `EvalPlanQual` en `READ COMMITTED` y **no casa** si ya no quedan 4. Sin `RETURNING`, `decr` queda vacio.
+
+**Hueco contable declarado (Deuda D-9, revision 3):** el **asiento del ledger** (`xp_ledger`, `accion='carta_fusion'`, escrito por `registrarXpLedger`) se escribe **fuera** del CTE atomico, que es la misma forma que usan el resto de ramas de `api/interacciones.js`. Si el proceso muere entre el `UPDATE usuarios` y el `INSERT` del ledger, el XP **si** baja y el asiento **no** existe: el saldo es correcto, la contabilidad no. Se documenta, no se corrige en esta entrega.
+
+Por tanto: **sin decremento no hay cargo y sin cargo no hay shiny**. Los `EXISTS` encadenados son **defensa en profundidad** (evitan el cargo si la re-evaluacion falla), no el argumento. Una fila `cantidad = 0` en el resultado final es la **prueba** de que no se borro nada (ADR-003). Nota adicional: si cualquiera de las tres sentencias violara una constraint, **aborta la sentencia completa** (no hay commit parcial de los CTEs).
+
+#### D8 - Contrato de `GET ?tipo=museo_cartas` (`api/usuarios.js`)
+
+**COLISION DE NOMBRES RESUELTA EN LA IMPLEMENTACION (revision 3, dato medido).** `?tipo=museo_publico` **YA EXISTIA** en `api/interacciones.js` y devuelve el **arbol de casas/clases del perfil publico**; lo consumen `perfil.html` y `mi-perfil.html`. Por tanto **`museo_publico` esta RESERVADO a `api/interacciones.js` y NO se puede reutilizar** para las cartas. La lectura de cartas equipadas se llama **`museo_cartas`** y vive en `api/usuarios.js`. Quien lea este ADR en la revision 2 no debe implementar `museo_publico` en `usuarios.js`: romperia el arbol de casas.
+
+**Publico, SIN sesion (D9 del brief).** Query: `?tipo=museo_cartas&usuario_id=<uuid>`; `usuario_id` **obligatorio** y validado con la misma regex UUID que `cartas_mias` (`api/usuarios.js:930`).
+
+**OK 200:**
+
+```
+{ ok:true, data:{
+    usuario_id, autor:{ nombre, nivel_visible },
+    total: 3, tope: 12,
+    museo: [ { carta_id, nombre, rareza, variante, imagen_url, orden, set_slug,
+                emisor_tipo, emisor_nombre, descripcion, stats_json,
+                bonus_xp_pct, capacidad_gate } ] } }
+```
+
+- `emisor_nombre`: `'Sistema'` si `emisor_tipo='sistema'`; el nombre del autor si `'ugc'`; `marcas.nombre` (o el slug) si `'marca'` (`LEFT JOIN marcas m ON m.id = c.marca_id`).
+- `bonus_xp_pct` / `capacidad_gate` se **aplanan** desde `stats_json` con `COALESCE((c.stats_json->>'bonus_xp_pct')::numeric, 0)` y `c.stats_json->>'capacidad_gate'`, para que el cliente no parsee JSONB.
+- **Usuario sin nada equipado (NO es error):** `200` con `museo: []` y `total: 0`. La UI **no pinta** el bloque (degradacion ADR-008); **no se elimina ningun ID del DOM** (ADR-003), solo se oculta.
+- **`404 USUARIO_NO_ENCONTRADO`** solo si el uuid no existe en `usuarios` (mismo criterio que `cartas_mias`, `api/usuarios.js:935-936`).
+- Orden: `orden_museo ASC`. Filtro: **`uc.en_museo = true AND uc.cantidad >= 1 AND uc.activo = true AND c.activo = true`** (mismo predicado que D6/D7, D13). Los dos `activo` son de tablas distintas y **se exigen los dos**: `uc.activo` = el usuario la posee, `c.activo` = la carta sigue viva en catalogo.
+- **Privacidad:** solo se exponen datos ya publicos en `perfil.html` (nombre y nivel) mas las cartas equipadas. **Nunca** `xp_total`, correo, ni cartas no equipadas.
+
+**Regresion obligatoria de la lectura `cartas_mias`** (hechos 7 y 13). Hoy `api/usuarios.js:942` hace `LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1` y con variantes devolveria **2 filas por carta**. Cambios obligatorios, todos en la misma rama:
+
+1. **El `JOIN` agrega por carta** (`GROUP BY c.id` o subconsulta) y devuelve **una fila por carta** con `SUM(uc.cantidad) FILTER (WHERE uc.variante = 'base') AS cantidad_base` y `SUM(...) FILTER (WHERE uc.variante = 'shiny') AS cantidad_shiny`, conservando las claves `cantidad` y `activa` (contrato que `mi-perfil.html` ya consume) y agregando `activo_col`/`posee` si la UI lo necesita.
+2. **El `COUNT(*)` de `:953-958` pasa a contar `DISTINCT carta_id`**, no filas: `COUNT(DISTINCT c.id)::int AS total` y `COUNT(DISTINCT c.id) FILTER (WHERE uc.activo = true AND uc.cantidad >= 1)::int AS obtenidas`. Con `COUNT(*)` el `total` de cada set se **infla con las variantes** (hecho 13) y el `requisitos[].obtenidas` deja de cuadrar con el numero de cartas del set.
+3. `requisitos[].obtenidas` cuenta **cartas distintas con `cantidad >= 1`**, no variantes.
+4. La rama `cartas_gate` de `api/usuarios.js:~2789` hace el mismo `JOIN` sobre `usuarios_cartas` para decidir el drop: **tambien agrega por `carta_id`**, y su verificacion `cantidad>=1` no cambia con variantes.
+
+#### D9 - Coste de la fusion (valor unico, en servidor, nunca en HTML)
+
+- **Valor: `200` XP por fusion. Plano, no escalado por rareza.**
+- **Fuente unica de verdad:** `var CARTA_FUSION_XP = 200;` en `api/interacciones.js`, **junto a `XP_BASES`** (`:461-488`), con comentario de una linea citando este ADR.
+- **Como se cobra:** **`usuarios.xp_total -= 200`** con asiento en `xp_ledger` (`accion='carta_fusion'`, `es_exento = true`, via `registrarXpLedger`, `api/interacciones.js:1922`) (mecanismo REAL de la implementacion, revision 3). El guard del cobro es el **disponible** `GREATEST(xp_total - COALESCE(xp_gastado_sinks,0),0) >= 200`. La redaccion original de la revision 2 (`xp_gastado_sinks += 200`) **era falsa** y queda **superada**: ese campo es el de los sinks de tienda, no el de la fusion. Consecuencia de producto: **el nivel SI puede bajar** si el XP restante cruza un umbral -- se acepta porque el XP gastado en fusion es XP consumido, no comprometido, y el ledger lo deja auditable.
+- **Como llega al cliente:** `fusion_coste_xp` como **campo de la respuesta** de `cartas_mias` y de `museo_cartas` (no de un endpoint nuevo). **Prohibido** un `200` literal en `mi-perfil.html` o `mercado.js`: verificable por V16.
+- **Justificacion del numero:** 200 XP equivale a **1,67 publicaciones completas** (120, `:461-488`), muy por debajo del rango de consumibles de marca (1.166-6.333). Es un sumidero **que se siente** sin ser un muro, y conserva el ROI de la economia de publicacion. Plano porque la rareza **ya se paga cuatro veces** en las cartas consumidas: escalar el coste por rareza cobraria dos veces por lo mismo y obligaria a cotizar en cliente.
+
+#### D10 - Regla del tope 12 (arbitrado en la BASE, nunca en la app)
+
+- **Donde se valida:** en la **base**, no en el handler. Dos mecanismos que se componen: `chk_usuarios_cartas_museo` hace **imposible** `orden_museo` fuera de `1..12` con `en_museo = true` (y exige `cantidad >= 1` y `activo = true`), y `ux_usuarios_cartas_museo_orden` hace **imposible** repetir `orden_museo` por usuario. **Consecuencia aritmetica:** 12 valores distintos en un rango de 12 => **maximo 12 filas equipadas por usuario**, sin contar filas.
+- **`COUNT(*)` nunca autoriza.** Un `COUNT(*) >= 12` en el handler es TOCTOU y ademas innecesario: solo puede servir para devolver el `409` antes de tocar la base. **Prohibido** usarlo como condicion de escritura, y prohibido `GET_LOCK`/advisory locks para simular el tope.
+- **Intento 13:** `409 MUSEO_LLENO` con `{ total:12, tope:12 }`. Si entra por una carrera (el pre-chequeo paso pero otra peticion equipo entre medias), la violacion `23514`/`23505` se mapea **al mismo** `409 MUSEO_LLENO`/`409 ORDEN_OCUPADO`: **un solo error observable por causa**, sin 500.
+- **No hay `reordenar`.** La operacion de museo es **equipar y retirar**; cambiar el orden de una pieza es `retirar` + `equipar` (D17). Por eso **no** hace falta ninguna constraint `DEFERRABLE`: nunca se necesita una transaccion que intercambie dos `orden_museo` entre si (que es el unico caso que una `UNIQUE` inmediata bloquea).
+
+#### D11 - Matriz de errores ASCII (todas las ramas nuevas)
+
+`MAYUSCULAS_CON_GUION_BAJO`, ASCII puro, `{ ok:false, error:'...', ...detalle }`. **Cero acentos y cero backticks** (ADR-002).
+
+| HTTP | error | Ramas |
+|---|---|---|
+| 400 | `PARAMETROS_INVALIDOS` | las 3 |
+| 400 | `NIVEL_GATE_INVALIDO` | `carta_obtener_drop` |
+| 400 | `ORDEN_INVALIDO` | `carta_equipar_museo` (fuera de `1..12` o `accion` distinta de `equipar|retirar`) |
+| 400 | `CARTA_NO_FUSIONABLE` | `carta_fusionar` |
+| 400 | `SET_SLUG_INVALIDO` | alta de catalogo: `set_slug` presente en el body o no derivable de `nivel_gate` (D15) |
+| 401 | `SESION_REQUERIDA` | las 3 |
+| 403 | `GATE_NO_ALCANZADO` | `carta_obtener_drop` |
+| 404 | `CARTA_NO_POSEE` | `carta_equipar_museo` |
+| 404 | `CARTA_NO_ENCONTRADA` | `carta_fusionar` |
+| 404 | `USUARIO_NO_ENCONTRADO` | `museo_cartas` |
+| 409 | `MUSEO_LLENO` | `carta_equipar_museo` |
+| 409 | `ORDEN_OCUPADO` | `carta_equipar_museo` |
+| 409 | `CARTAS_INSUFICIENTES` | `carta_fusionar` |
+| 409 | `XP_INSUFICIENTE` | `carta_fusionar` |
+| 503 | `responderSchemaPendiente()` | las 4 (060 sin aplicar) |
+| 503 | `FUSION_PENDIENTE` | `carta_fusionar` mientras la **061** no este aplicada (D12, R-1) -- **ya no se dispara: la 061 esta aplicada; se conserva como red por si se restaurase una base sin ella** |
+
+`FUSION_PENDIENTE` es **ASCII puro** y responde antes de escribir: sin PK de 3 columnas el `INSERT` de `shiny` chocaria con `usuarios_cartas_pkey` (`23505`) y devolveria un 500 al usuario. La deteccion es una sola consulta por peticion (o un flag de modulo memoizado): `SELECT COUNT(*) FROM pg_constraint WHERE conname = 'usuarios_cartas_pkey' AND pg_get_constraintdef(oid) LIKE '%variante%'`.
+
+#### D12 - Expand/contract: la 060 SOLO expande, la 061 contrae (sustituye el cambio de PK en la 060) -- **EJECUTADO: 060 y 061 aplicadas**
+
+**Decision del operador, cerrada.** La **060 es solo expansion**:
+
+1. `ADD COLUMN IF NOT EXISTS variante varchar(10) NOT NULL DEFAULT 'base'` + `CHECK (variante IN ('base','shiny'))`.
+2. `ADD CONSTRAINT uq_usuarios_cartas_variante UNIQUE (usuario_id, carta_id, variante)` (**nombre REAL aplicado**; la revision 2 escribia `ux_`).
+3. **`usuarios_cartas_pkey` NO se toca.** Cero `DROP CONSTRAINT` sobre la PK en la 060.
+
+**La 061 (APLICADA el 2026-10-27) hizo la contraccion:** (a) `DROP CONSTRAINT usuarios_cartas_pkey` y `ADD PRIMARY KEY (usuario_id, carta_id, variante)` en **una sola sentencia atomica**; (b) las **5** ocurrencias de upsert de `api/interacciones.js` ya escriben `ON CONFLICT (usuario_id, carta_id, variante)`; (c) `cartas_intercambios` recibio `variante`. **(d) `ON CONFLICT` de 2 columnas: 0 en el repo.**
+
+**Justificacion (dos hechos medidos):** (i) `scripts/apply_sql_file.js` ejecuta **sentencia a sentencia sin transaccion envolvente** (hecho 16): un `DROP`+`ADD` de la PK deja `usuarios_cartas` **sin PK** si el proceso muere entre ambas; (ii) el cambio de PK produce **`42P10`** en **3 ramas vivas** durante toda la ventana entre aplicar la 060 y desplegar el codigo (hecho 11): `ON CONFLICT (usuario_id, carta_id)` no casa con una PK de 3 columnas. Producir un error en el mercado mientras se espera un deploy es peor que esperar.
+
+**Orden de despliegue de la deuda: codigo primero, PK despues (EJECUTADO, y el orden resulto MAS seguro de lo previsto).**
+1. Aplicar **060** (expansion). Ninguna rama cambia de comportamiento. **HECHO** (idempotente, verificada en segunda corrida).
+2. Desplegar el codigo con el upsert de **3 columnas**: **resolvia ya contra `uq_usuarios_cartas_variante`**, no contra la PK, luego funcionaba con PK de 2 **y** con PK de 3. **Consecuencia medida: no hubo ventana `42P10` ni `503` obligatorio**, ni siquiera entre el deploy y la 061.
+3. Escribir y aplicar **061** (contraccion). **HECHO**: depromocion de la PK en **una sola sentencia atomica** (evita el estado "tabla sin PK" del runner sin transaccion, hecho 16) + `cartas_intercambios.variante`. Conserva `uq_usuarios_cartas_variante`.
+4. Activar la escritura de `shiny`: **activa** desde que la 061 esta aplicada; el `503 FUSION_PENDIENTE` queda como red para una base restaurada sin ella.
+
+**Criterio de verificacion de la 061:** `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'usuarios_cartas_pkey'` -> contiene `variante`; `Select-String -Path "api/interacciones.js" -Pattern "ON CONFLICT \(usuario_id, carta_id\)"` -> **0**; `node scripts/smoke_mercado.js` -> **PASS**.
+
+#### D13 - `activo` significa "en posesion" (una sola semantica, tres consumidores)
+
+- `usuarios_cartas.activo` = **el usuario posee la fila**. `cantidad = 0` **obliga** `activo = false` (ya lo hace `:15324`; hay que extenderlo a `:15169` y `:15252`, D18).
+- **Toda** lectura de museo (D8), **toda** escritura de museo (D6) y **toda** fusion (D7) exigen el **mismo** predicado: **`activo = true AND cantidad >= 1`**. No hay tres variantes del predicado; hay uno.
+- El `CHECK` del museo (D1) incorpora `activo = true`, de modo que la contradiccion `en_museo = true` + `activo = false` es **imposible en la base**, no una convencion.
+- Unicidad de la regla: **no existe** en este ADR un `cantidad > 0` sin `activo`, ni un `activo = true` con `cantidad = 0`.
+
+#### D14 - `stats_json` es display-only salvo `capacidad_gate`
+
+- **`capacidad_gate`**: unico stat con consumidor (gate de capacidad). Es slug, no nivel (D2).
+- **`bonus_xp_pct`**: se **almacena y se muestra**; **no altera ningun calculo de XP** en esta entrega. **Deuda D-5.** Prohibido inventar un consumidor falso (ni `XP_BASES`, ni `calcularEra`, ni el motor de niveles) para justificar la columna.
+- Cualquier otra clave de `stats_json` es **inerte**: se transporta y se pinta, no se interpreta.
+
+#### D15 - `set_slug` se deriva en servidor desde `nivel_gate`, jamas se acepta del body
+
+- El `set_slug` de una carta **nueva** se **calcula** en el servidor a partir de `nivel_gate` (mapa `10|14|20|25 -> set_slug`), con el mismo origen que usa el drop. **Nunca** se lee de `body.set_slug`.
+- Motivo (farmeo cruzado): si el cliente puede elegir `set_slug`, puede apuntar una carta barata a un `set_slug` de gate alto y cobrar un set entero con `carta_obtener_drop`, o equiparar una carta a un set del que no es.
+- Si el body **trae** `set_slug` -> `400 SET_SLUG_INVALIDO` (no se ignora en silencio: se rechaza, para que el error sea observable). Si `nivel_gate` no es uno de los 4 valores, idem.
+- `set_slug` de las cartas `ugc`/`marca` (sin gate) es una constante por emisor (`ugc`/`marca` + slug del emisor), tambien derivada en servidor.
+
+#### D16 - Set de sistema fusionable sembrado en la 060; las cartas de marca NO se siembran
+
+- La 060 inserta el set `territorio_comun` con `nivel_gate IS NULL`, `es_evento = false`, `fusionable = true`, rarezas `comun`/`raro`, `ON CONFLICT (id) DO NOTHING` (D1 punto 6). **Sin el, la fusion nace sin inventario de sistema** y la funcion solo opera sobre UGC.
+- **Las cartas de marca no se siembran:** no hay garantia de fila en `marcas` por entorno y la FK `ON DELETE RESTRICT` (D3) convertiria el seed en un fallo de migracion dependiente de datos. Se crean por el CRUD admin, que **hoy no puede** (Deuda D-6).
+
+#### D17 - Reordenar NO es requisito de producto; no se usa `DEFERRABLE`
+
+- Operacion de museo = **equipar** y **retirar**. Reordenar = `retirar` + `equipar` (dos peticiones, ambas ya contratadas).
+- Por eso **no** hay `accion:'reordenar'` (D6) ni constraint `DEFERRABLE`: el unico caso que una `UNIQUE` inmediata bloquea es el **intercambio** de dos `orden_museo` en una transaccion, y ese caso **no existe** en el producto. Anadir `DEFERRABLE` seria coste sin uso y ademas `DEFERRABLE` no aplica a indices unicos parciales creados con `CREATE UNIQUE INDEX` (solo a constraints).
+
+#### D18 - Limpieza de museo obligatoria en los TRES `UPDATE` de decremento (cambio obligatorio del backend)
+
+Los tres decrementos de `api/interacciones.js` deben limpiar el museo cuando `cantidad` llega a 0, o `chk_usuarios_cartas_museo` **revienta (`23514`)** al vender/intercambiar la ultima copia equipada y la operacion falla:
+
+| Linea | Rama | Cambio obligatorio |
+|---|---|---|
+| `:15169` | venta/compra de carta | anadir `en_museo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE en_museo END, orden_museo = CASE WHEN cantidad - 1 <= 0 THEN NULL ELSE orden_museo END` y `activo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE activo END` |
+| `:15252` | intercambio de carta | idem anterior (mismo delta `-1`) |
+| `:15323-15324` | decremento por `$3` | anadir `en_museo`/`orden_museo` con el mismo `CASE WHEN cantidad - $3::int <= 0`, junto al `activo` que ya existe |
+
+**Es cambio obligatorio del mismo release que la UI**, no una mejora. Sin el, la primera venta de una carta equipada devuelve 500. **Agente:** `@backend-dev` (gate).
+
+#### D19 - Drop: ancla `cartas_gates.drop_en`, cobro en una sola sentencia, y `cartas_gate` no otorga cartas
+
+- **Ancla:** `cartas_gates.drop_en`. `NULL` = derecho a **un** drop; `NOT NULL` = ya cobrado.
+- **Cobro atomico:** `INSERT ... ON CONFLICT (usuario_id, nivel_gate) DO UPDATE SET drop_en = now() WHERE cartas_gates.drop_en IS NULL RETURNING nivel_gate`. El `WHERE` sobre la fila en conflicto es el **token de idempotencia**, evaluado bajo row-lock.
+- **`POST {tipo:'cartas_gate'}` (`api/usuarios.js:2728`, `INSERT` en `:2803`) no puede convertirse en un drop gratis extra:** esa rama inserta la fila con `drop_en` NULL y **no entrega cartas**; el otorgamiento vive **solo** en el `INSERT ... SELECT ... EXISTS (SELECT 1 FROM stamp)` de D5. **Reclamacion y activacion del gate son la misma sentencia**; no existe una segunda ruta que haga `UPDATE cartas_gates SET drop_en = ...`.
+
+#### D20 - Regresion de lectura: se cuenta por `carta_id` distinto, no por fila
+
+- `api/usuarios.js:942` (`LEFT JOIN usuarios_cartas`) y `:956` (`LEFT JOIN` de la rama de `requisitos`) **agregan por carta**.
+- El `COUNT(*)` de `:953-958` (`total` y `obtenidas`) pasa a `COUNT(DISTINCT c.id)`: con variantes, `COUNT(*)` **infla** el total de un set con las filas `shiny` (hecho 13).
+- `carta_id IN (...)` de `:2789` no cuenta filas: verifica existencia. Se mantiene, con `activo = true AND cantidad >= 1`.
+
+### Justificacion
+
+El ADR cierra **cuatro huecos con una sola migracion aditiva** y **cuatro puntos de extension** (3 POST + 1 GET), sin endpoint nuevo (8/8) y sin tocar el sistema paralelo `cromos_catalogo`.
+
+1. **La dimension correcta es `variante`, no una rareza.** La rareza responde "cuanto cuesta que te salga"; la variante responde "que version tienes". Meter `shiny` en el CHECK habria roto el mapa CSS (`v61RarezaClase`), el vocabulario compartido con `cromos_catalogo` y todas las ordenaciones por rareza, a cambio de expresar como rareza algo que **no lo es**. El coste de `variante` es **una PK extendida**, que es exactamente el precio de que dos versiones de la misma carta puedan coexistir (hecho 2). Sin ese cambio, el "4->1" habria sido una resta invisible sobre una fila compartida.
+2. **El drop no puede anclarse a la insercion en `cartas_gates` porque la 040 ya la sembro.** Es el unico punto del brief que **no se podia ejecutar como estaba escrito**: el grandfathering A-1 (`040:444+`) deja la fila creada y el `ON CONFLICT DO NOTHING` devuelve vacio, luego **cero drops para todos los usuarios de nivel >= 10**. La columna `drop_en` conserva la premisa ("ancla en `cartas_gates`, sin tabla nueva, sin azar") y la vuelve operable, ademas de **repartir el drop pendiente** a quien ya cruzo el gate (que es lo que el operador quiere: los veteranos tambien lo cobran, una vez).
+3. **`capacidad_gate` como slug y no como nivel** evita el unico fallo silencioso posible aqui: un numero de nivel guardado en una carta se queda obsoleto en la primera recalibracion de umbrales, mientras que el slug es la identidad que `niveles-data.js` declara estable y que `usuarios.capacidades` ya usa.
+4. **La fusion determinista con coste plano** convierte una loteria en un **sumidero medible**: mismo `carta_id`, `variante='shiny'`, sin `random()`. Determinismo = auditable (dos usuarios con las mismas 4 cartas obtienen lo mismo), y el coste plano mantiene **una** fuente de precio, servida, jamas replicada en HTML (el defecto que ADR-099 cerro en la completitud).
+5. **El tope 12 vive en la base**, no en el `if` del handler: con un `CHECK` y un indice unico, la carrera del "intento 13" no puede materializarse ni con dos pestanas ni con dos servidores. La aplicacion solo traduce el codigo SQL a un error tipado.
+6. **Expand/contract es lo que hace que el cambio de esquema sea operativo.** Un `DROP`+`ADD` de PK en un runner sin transaccion es un punto de no retorno silencioso (hecho 16) y rompe 3 ramas vivas con `42P10` (hecho 11). Partirlo en dos migraciones cuesta una ventana declarada (`shiny` no escribible) y compra que **ninguna** operacion del mercado falle por el orden de despliegue. La ventana es **observable** (`503 FUSION_PENDIENTE`), no un 500, y tiene fecha: la 061.
+7. **La limpieza de museo en los 3 decrementos no es cosmetica**: el `CHECK` del museo exige `cantidad >= 1`, asi que sin la limpieza la primera venta de una carta equipada **falla** (D18). El `CHECK` no es solo un techo del museo: es un contrato que obliga a mantener la coherencia en las ramas que **no** son de museo. Ese es el coste real de arbitrar en la base, y se asume a cambio de que el tope sea inviolable.
+8. **El alcance del CRUD admin se declara, no se supone.** El ADR anterior afirmaba "sin cambios, a verificar en implementacion" sobre un CRUD que inserta por lista explicita de columnas (hecho 14). Un ADR que dice "sin cambios" sobre algo que no puede hacer lo que el ADR necesita es un ADR que miente al Lead Developer. Deuda **D-6** con agente y alcance.
+
+### Impacto
+
+- **Datos:** migracion **060** (**solo expansion**: `ADD COLUMN`, `ADD CONSTRAINT UNIQUE`, indices; idempotente, sin `DELETE`, sin `DROP TABLE`, **sin tocar la PK**); `schema_migrations` registra `60` y **`61`**. Backfill **minimo**: un unico `UPDATE ... SET fusionable = false` (D1 punto 5); **prohibido** el `UPDATE` redundante de `emisor_tipo`/`variante` (pisaria `ugc`/`marca`/`shiny` en la segunda corrida). Seed del set de sistema `territorio_comun` (D16, 6 cartas `ct_comun_01`..`ct_comun_06`, 4 `comun` + 2 `raro`; catalogo total **27**) y `fusionable=false` en las **21** cartas previas. **Ninguna fila se borra**: el cero borrado logico (ADR-003) se respeta tambien en el `cantidad = 0`. **La 061 (PK de 3 columnas) YA se aplico (D-4 CERRADA)**: `usuarios_cartas_pkey` es ahora `(usuario_id, carta_id, variante)`.
+- **Backend:** `api/interacciones.js` (+3 ramas POST, +1 constante, +mapa de errores SQL->HTTP, **+limpieza de museo en los 3 `UPDATE` de decremento `:15169`, `:15252`, `:15323` -> cambio OBLIGATORIO, D18**), `api/usuarios.js` (`cartas_mias` agregada por `carta_id` + `COUNT(DISTINCT c.id)` + **`museo_cartas`**, que es el nombre REAL: `museo_publico` esta reservado a `interacciones.js`). **`ls api/*.js` sigue 8**. `api/admin.js`: **NO se extiende en esta entrega y eso es una limitacion medida, no un "sin cambios"** (`:970` inserta por lista explicita de columnas, `:1018` actualiza por whitelist: no puede crear `ugc`/`marca` ni fijar `stats_json`/`fusionable`) -> **Deuda D-6, agente `@admin-dev`**.
+- **UI:** `mi-perfil.html` (bloque **Album del Museo** ADICIONAL, D5 del brief: **"Mis Cartas" no se elimina**), `mercado.js` (seccion de cartas montada en `#mercado-cuerpo`, D7 del brief, reutilizando las 4 ramas existentes), `perfil.html` (bloque publico que consume **`museo_cartas`** y **no se pinta** si `total = 0`). `index.html` **no se toca**.
+- **Render:** `api/pagina-destino.js` **no se toca** (las cartas no entran en la ficha del destino). `buildHTML()` intacto.
+- **Motor generico de tags:** **no aplica**. Este ADR no anade campos a `CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS`: no hay categoria nueva ni campo de `tags` JSONB. El modelo nuevo son **columnas** de dos tablas ya existentes, no claves de `tags`. Registrar esto importa: quien lea el ADR no debe buscar el registro en el motor de categorias.
+- **Economia:** nuevo sumidero de **200 XP** por fusion. **No hay bono de XP nuevo:** `bonus_xp_pct` es **display-only** en esta entrega (D14, Deuda D-5) y **no** crea accion ni consumidor en `XP_BASES`, `calcularEra` ni el motor de niveles. Cualquier afirmacion contraria en un brief es falsa.
+- **Riesgo residual:** (i) **R-1, ventana expand/contract: CERRADA** -- la 061 esta aplicada y la variante `shiny` **ya se escribe**; el `503 FUSION_PENDIENTE` (D11) queda como red para una base restaurada sin la 061. (ii) `variante` en `cartas_ofertas`/`cartas_ventas`: la columna existe y viaja en `GET cartas_ofertas` (`variante`, `emisor_tipo`, `marca_nombre`); la publicacion/compra ya la elige en la UI (Deuda D-2 parcialmente cubierta). (iii) `emisor_id` sin FK permite un catalogo UGC con autor borrado: se degrada con `COALESCE`, no rompe (ADR-008). (iv) **el CRUD admin no puede crear `ugc`/`marca`** (Deuda D-6): hasta que se extienda, el unico inventario `ugc`/`marca` se crea por SQL, y las cartas de marca **no existen** por seed.
+
+### Criterio de verificacion
+
+Cada frase es comprobable por **un comando que existe** o por **una consulta SQL**. **Ninguna dice "funciona bien".** Toda consulta ad-hoc se ejecuta con `node scripts/neon_select.js -f <fichero.sql>` (runner real del repo, `scripts/neon_select.js:37-38`); toda migracion se aplica con `node scripts/apply_sql_file.js db/migrations/<fichero>.sql` (runner real, **sin transaccion envolvente**, hecho 16).
+
+1. **V1 (D1, expansion)** `Select-String -Path "db/migrations/060_*.sql" -Pattern "ADD COLUMN IF NOT EXISTS variante"` -> **1** coincidencia; `Select-String -Path "db/migrations/060_*.sql" -Pattern "DROP TABLE|DROP COLUMN"` -> **0**.
+2. **V2 (D12, PK INTACTA)** `Select-String -Path "db/migrations/060_*.sql" -Pattern "usuarios_cartas_pkey"` -> **0** (la 060 no menciona la PK). En base ya migrada: `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='usuarios_cartas_pkey'` -> **NO** contiene `variante`; `SELECT COUNT(*) FROM pg_constraint WHERE conname='uq_usuarios_cartas_variante'` -> **1**.
+3. **V3 (D1, backfill sin UPDATE redundante)** `Select-String -Path "db/migrations/060_*.sql" -Pattern "SET emisor_tipo|usuarios_cartas SET variante"` -> **0**; `-Pattern "SET fusionable = false"` -> **1**. En base: `SELECT COUNT(*) FROM cartas_catalogo WHERE emisor_tipo <> 'sistema' AND emisor_tipo IS NOT NULL` -> **0**; `SELECT COUNT(*) FROM cartas_catalogo WHERE fusionable = true` -> **= filas del set `territorio_comun` sembradas (>= 1)**, ni 0 ni 21.
+4. **V4 (D1, invariantes)** dentro de `BEGIN ... ROLLBACK`: `INSERT` con `fusionable=true` + `nivel_gate=10` -> **`23514`** (`chk_cartas_catalogo_fusionable`); `INSERT` con `emisor_tipo='marca'` y `marca_id NULL` -> **`23514`** (`chk_cartas_catalogo_emisor_coherente`); `INSERT` con `set_slug` desconocido **no** se prueba aqui (es validacion de servidor, V23).
+5. **V5 (D1, idempotencia)** `node scripts/apply_sql_file.js db/migrations/060_*.sql` ejecutado **dos veces** -> **0 errores** y `SELECT COUNT(*) FROM cartas_catalogo` **igual** antes y despues de la segunda corrida (prueba de que el backfill no pisa `ugc`/`marca`).
+6. **V6 (D2, stats endurecido)** dentro de `BEGIN ... ROLLBACK`: `stats_json='{"bonus_xp_pct":150}'` -> **`23514`**; `stats_json='{"bonus_xp_pct":"quince"}'` -> **`23514`** (el falso positivo de la revision 1); `stats_json='[]'::jsonb` -> **`23514`** (`jsonb_typeof` != object); `stats_json='{"bonus_xp_pct":15,"capacidad_gate":"subir_fotos"}'` -> **acepta**. Y `Select-String -Path "niveles-data.js" -Pattern "clave: 'subir_fotos'"` -> **1**.
+7. **V7 (D3, RESTRICT)** `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='fk_cartas_catalogo_marca_id'` -> contiene **`ON DELETE RESTRICT`** (y **no** `SET NULL`). **El nombre es EXPLICITO, no el `cartas_catalogo_marca_id_fkey` por defecto de PostgreSQL que esperaba la revision 2:** la 060 declara la constraint con nombre propio para poder citarla. `DELETE FROM marcas WHERE id = <marca con carta>` en `BEGIN ... ROLLBACK` -> **`23503`**.
+8. **V8 (D5, drop)** dos `POST ?tipo=carta_obtener_drop` con el mismo `nivel_gate` en `Promise.all` -> una respuesta con `cartas_otorgadas > 0` y otra con `0` y `ya_obtenido:true`; `SELECT SUM(cantidad) FROM usuarios_cartas WHERE usuario_id=$1 AND carta_id IN (SELECT id FROM cartas_catalogo WHERE set_slug=$2)` == **numero de cartas del set**, **no** el doble.
+9. **V9 (D5, gate)** usuario con `nivel_visible = 3` y `POST nivel_gate:25` -> **403 `GATE_NO_ALCANZADO`** y `SELECT COUNT(*) FROM cartas_gates WHERE usuario_id=$1 AND nivel_gate=25` == **0**.
+10. **V10 (D6/D10, tope 12 en la BASE)** equipar 12 -> **200**; la 13 -> **409 `MUSEO_LLENO`**; `SELECT COUNT(*) FROM usuarios_cartas WHERE usuario_id=$1 AND en_museo = true` == **12**. **Arbitraje en base, sin app:** `UPDATE usuarios_cartas SET en_museo=true, orden_museo=13 WHERE ...` -> **`23514`**; y `Select-String -Path "api/interacciones.js" -Pattern "COUNT\(\*\) >= 12|total >= 12"` -> **0** (el handler no usa `COUNT(*)` como autorizacion).
+11. **V11 (D6, orden)** dos peticiones simultaneas al **mismo** `orden` -> una **200** y otra **409 `ORDEN_OCUPADO`** (o `MUSEO_LLENO` si el tope actua primero); `UPDATE ... SET orden_museo=3` sobre una segunda fila equipada -> **`23505`** (`ux_usuarios_cartas_museo_orden`).
+12. **V12 (D7, fusion OK - la 061 YA esta aplicada)** con la PK de 3 columnas aplicada: 4 base + disponible >= 200 -> `cantidad_base = 0`, `cantidad_shiny = 1`, **`xp_total` -200** y **un asiento en `xp_ledger` con `accion='carta_fusion'`**; `xp_gastado_sinks` **no cambia** (no es el mecanismo de la fusion).
+12b. **V12b (D12, R-1 fail-closed) -- ESCENARIO HISTORICO** con **solo la 060** aplicada: `POST ?tipo=carta_fusionar` -> **503 `FUSION_PENDIENTE`** y `SELECT COUNT(*) FROM usuarios_cartas WHERE variante='shiny' AND usuario_id=$1` == **0**; `Select-String -Path "api/interacciones.js" -Pattern "FUSION_PENDIENTE"` -> **>= 1**. **Con la 061 aplicada (estado actual) la fusion responde 200 y escribe la fila `shiny`; el `503` ya no debe reproducirse.**
+13. **V13 (D7, insuficientes / XP)** 3 base -> **409 `CARTAS_INSUFICIENTES`**; 4 base y disponible 199 -> **409 `XP_INSUFICIENTE`**; en ambos casos `SELECT cantidad ... variante='base'` sigue **3** / **4** y **no** existe fila `shiny`.
+14. **V14 (D7, concurrencia)** dos `carta_fusionar` simultaneos con **solo 4** base -> una **200** y otra **409**; `cantidad_shiny` == **1** y `xp_total` baja **200**, no 400 (garantia `FOR UPDATE` + `WHERE cantidad >= 4 RETURNING`, D7).
+15. **V15 (D7, fusibilidad)** `POST carta_fusionar` sobre una carta de gate (`nivel_gate IS NOT NULL`) -> **400 `CARTA_NO_FUSIONABLE`**; sobre una de `territorio_comun` o una UGC con `fusionable=true` -> **200**.
+16. **V16 (D9, coste)** `Select-String -Path "mi-perfil.html","mercado.js" -Pattern "CARTA_FUSION_XP|fusion_coste_xp\s*=\s*200"` -> **0** (el cliente consume el campo, no lo define); `Select-String -Path "api/interacciones.js" -Pattern "CARTA_FUSION_XP = 200"` -> **1**.
+17. **V17 (D8, publico)** `GET ?tipo=museo_cartas&usuario_id=<uuid con 3 equipadas>` **sin cabecera `Authorization`** -> **200** con `museo.length == 3` y `orden` ascendente; usuario sin equipadas -> **200** con `cartas: []`, `total: 0`; uuid inexistente -> **404 `USUARIO_NO_ENCONTRADO`** (o `403 PERFIL_PRIVADO` si el perfil es privado, contrato de la implementacion).
+17b. **V17b (D8, NO colision)** `Select-String -Path "api/interacciones.js" -Pattern "museo_publico"` -> **>= 1** (el arbol de casas sigue ahi) y `Select-String -Path "api/usuarios.js" -Pattern "museo_publico"` -> **0** (la lectura de cartas **no** roba el nombre reservado).
+18. **V18 (D8/D20, sin regresion)** `GET ?tipo=cartas_mias` de un usuario con base y shiny de la **misma** carta -> **una** fila por carta con `cantidad_base`/`cantidad_shiny`; `Select-String -Path "api/usuarios.js" -Pattern "COUNT\(\*\)::int AS total"` -> **0** y `-Pattern "COUNT\(DISTINCT c\.id\)"` -> **>= 1** (si `COUNT(*)` sigue, el `total` se infla con las variantes, hecho 13).
+19. **V19 (D18, limpieza de museo)** `Select-String -Path "api/interacciones.js" -Pattern "en_museo = CASE WHEN cantidad"` -> **3** (una por decremento: `:15169`, `:15252`, `:15323`). Prueba funcional: equipar 1 copia y venderla -> **200** y `SELECT COUNT(*) FROM usuarios_cartas WHERE usuario_id=$1 AND en_museo = true` == **0** (sin la limpieza, la venta devuelve **`23514`**).
+20. **V20 (GOLD + ASCII, comandos REALES)** `node --check api/interacciones.js` -> exit **0**; `node --check api/usuarios.js` -> exit **0**; `node scripts/gold_shield.js --sin-express` -> **PASS** (unico flag que acepta el script, `scripts/gold_shield.js:69-70`; **`--check` NO existe**). ASCII medido: `$b=[IO.File]::ReadAllBytes('api/interacciones.js'); ($b | Where-Object {$_ -gt 127}).Count` -> **igual** al valor de `HEAD`.
+21. **V21 (presupuesto serverless)** `Get-ChildItem api -Filter *.js | Measure-Object` -> **Count = 8**; `Select-String -Pattern "carta_equipar_museo|carta_fusionar|carta_obtener_drop" api/usuarios.js` -> **0** (las escrituras van a `interacciones.js`).
+22. **V22 (D15, set_slug de servidor)** `Select-String -Path "api/admin.js" -Pattern "body\.set_slug"` -> **0**; `POST` de alta con `set_slug` en el body -> **400 `SET_SLUG_INVALIDO`** y `SELECT COUNT(*) FROM cartas_catalogo WHERE id = <nuevo id>` == **0** (no se creo nada).
+23. **V23 (smoke) -- CORREGIDO en la revision 3.** El smoke **no** se creo como fichero nuevo: se **extendio el que ya existia**, `scripts/smoke_gaming_v61.js` (ramas de carta **5 -> 8** y seccion nueva **X1-X23**), y pasa **43/43**. *El nombre `scripts/smoke_060_cartas_museo_fusion.js` que cita la revision 2 **no existe** y no hay que crearlo: se conserva la cita para que nadie lo cuente como entregable.* **`npm run test` no aplica a esta entrega.**
+24. **V24 (migraciones registradas)** `node scripts/verificar_migraciones_prod.js 060` y `... 061` -> reportan ambas aplicadas (`scripts/verificar_migraciones_prod.js:699`, `argv[2]` = numero de migracion). **Segunda corrida de las dos migraciones: 0 errores (idempotencia probada).**
+
+### Estado
+
+**ACEPTADO / PENDIENTE DE IMPLEMENTAR (revision 2).** Es un ADR de **diseno**: no escribe codigo, no aplica la migracion y no toca ningun archivo de implementacion. Las **decisiones del operador** quedan **cerradas** y no se re-abren: las 9 originales (variante como dimension, lecturas en `usuarios.js`, UGC desde `album_fotos`, drop anclado a `cartas_gates`, museo de 12 adicional, fusionabilidad por carta con resultado determinista, mercado en `mercado.js`, coste en XP y museo publico sin sesion) **mas** las de la segunda pasada (**D12** expand/contract, **D13** `activo` = en posesion, **D14** `stats_json` display-only, **D15** `set_slug` de servidor, **D16** set de sistema sembrado, **D17** sin reordenar ni `DEFERRABLE`, **D18** limpieza de museo en los 3 decrementos, **D19** drop en una sola sentencia, **D20** lectura por `carta_id` distinto).
+
+**Correccion de un hecho del brief (D4):** "el drop se ancla a `cartas_gates`" **se cumple**, pero **no** por `INSERT ... ON CONFLICT DO NOTHING` sino por la columna nueva `drop_en`: la 040 ya sembro `cartas_gates` para todo usuario que cruzo el gate (`040:444+`), asi que la insercion como token habria dado **0 drops permanentes** a los veteranos. La premisa se conserva; el ancla se concreta.
+
+**Bloqueadores de implementacion: NINGUNO ABIERTO.** Los tres de la revision 1 estan **cerrados por el operador** y convertidos en decision:
+
+- **B1 (cerrado -> D4/D19)** - `drop_en` es el ancla. Los veteranos **cobran su drop pendiente una vez** (`drop_en IS NULL`), y `POST {tipo:'cartas_gate'}` no otorga cartas.
+- **B2 (cerrado -> D16)** - se **siembra** el set de sistema `territorio_comun` (`nivel_gate IS NULL`, `es_evento=false`, `fusionable=true`, rarezas `comun`/`raro`) en la propia 060. Las cartas de marca **no** se siembran.
+- **B3 (cerrado -> D12)** - **expand/contract**: la 060 **no toca la PK**; el cambio de PK iba a la **061** con orden *codigo primero, PK despues*. **La 061 YA esta aplicada (D-4 CERRADA, revision 3) y la ventana R-1 quedo cerrada sin fallos.**
+
+**Deudas declaradas (no bloquean la 060):**
+
+- **D-1** - el alta de cartas UGC (derivada de `album_fotos` del autor) **no crea rama nueva**: se sirve por el CRUD admin existente (`?recurso=cartas`) o por un job de `scripts/`. El **endpoint de generacion masiva** queda fuera de este ADR.
+- **D-2** - `cartas_ofertas`/`cartas_ventas` reciben la columna `variante` (default `'base'`) pero las **4 ramas de mercado siguen sin aceptar el parametro**: shiny no se comercializa en esta entrega. Cero cambios de comportamiento actual.
+- **D-3** - `emisor_id` **sin FK** por diseno (ADR-003): un catalogo UGC con autor borrado se degrada con `COALESCE` en lectura. No hay guard automatico.
+- **D-4 (CERRADA el 2026-10-27) - la 061 (contraccion) YA ESTA APLICADA.** `db/migrations/061_cartas_pk_variante.sql` depromueve `usuarios_cartas_pkey` a `(usuario_id, carta_id, variante)` en **UNA sola sentencia atomica**, conserva `uq_usuarios_cartas_variante` y anade `cartas_intercambios.variante`. Idempotente y verificada en **segunda corrida**. **Orden seguro ejecutado: codigo primero y PK despues** -- el `ON CONFLICT (usuario_id, carta_id, variante)` de 3 columnas **ya resolvia contra `uq_usuarios_cartas_variante`** (no contra la PK), de modo que **no hubo ventana rota**: entre desplegar el codigo y aplicar la 061 las 5 ocurrencias de upsert funcionaban igual. La contraccion solo retiro la PK de 2 columnas que ya era redundante.
+- **D-5 (nueva) - `bonus_xp_pct` sin consumidor.** Se almacena y se muestra; **no** altera ningun calculo de XP (D14). Prohibido inventar consumidor. **Agente:** pendiente de decision de producto.
+- **D-6 (nueva) - CRUD admin de cartas incompleto.** `api/admin.js:970` inserta por lista explicita de columnas y `:1018` actualiza por whitelist: **no puede** crear `ugc`/`marca` ni fijar `stats_json`, `fusionable`, `emisor_id`, `marca_id`, `descripcion`, `es_canjeable_qr`. Alcance: anadir esas columnas al `INSERT` y a la whitelist del `UPDATE`, con validacion de `emisor_tipo` y de la coherencia `emisor_id`/`marca_id`, y `set_slug` derivado (D15). **Agente asignado: `@admin-dev`** (gate).
+- **D-7 (nueva) - UI del museo**: el bloque de museo en `mi-perfil.html` y `perfil.html` (equipar/retirar, sin reordenar) queda para `@frontend-tpl`; **no** forma parte del contrato de datos.
+
+**Riesgos residuales:** **R-1 CERRADO** (ventana expand/contract: la 061 esta aplicada y `shiny` es escribible; queda el `503 FUSION_PENDIENTE` como red teorica) y **R-2** inventario `ugc`/`marca` dependiente de SQL hasta D-6.
+
+**Orden de despliegue (EJECUTADO el 2026-10-27):** (1) aplicar **060** en Neon con `node scripts/apply_sql_file.js` y registrar `60` en `schema_migrations` (**HECHO**); (2) desplegar `api/interacciones.js` + `api/usuarios.js` **incluida la limpieza de museo de los 3 decrementos (D18)**; (3) desplegar UI (`mi-perfil.html`, `perfil.html`, `mercado.js`, mas `cartas-ui.js`/`cartas-ui.css`); (4) **061 aplicada (HECHO, D-4 CERRADA)**. **El orden que se siguio fue codigo primero y PK despues**, y **no hubo ventana rota**: el upsert de 3 columnas resolvia ya contra `uq_usuarios_cartas_variante`. **Invertido, las ramas nuevas responden `503` tipado** (patron `responderSchemaPendiente`, `api/usuarios.js:963`), nunca 500. El cierre documental (`TASKS.md`, `NEXT.md`, `BLUEPRINT.md` si toca el modelo de datos) es del **pase unico R2** de `@docs-keeper` (R2, AGENTS.md seccion 3.9); **el argumento vive solo en este ADR** (ADR-084 D1).
+
+### Correcciones de la revision (segunda pasada, 2026-10-27)
+
+Aplica los hallazgos de `@architect-review` (SOLICITA CAMBIOS, 8 bloqueadores) y el checklist de mecanismos de `@sql-security`. **El ID, el problema y las decisiones D1-D11 no se re-abren; D12-D20 se anaden para cerrar lo que la revision 1 dejaba abierto o afirmaba en falso.**
+
+| # | Bloqueador de la revision 1 | Correccion aplicada | Decision |
+|---|---|---|---|
+| 1 | La 060 reconstruia la PK (`DROP`+`ADD`) con un runner **sin transaccion** y rompia 3 `ON CONFLICT` vivos con `42P10` | **Expand/contract**: la 060 **solo expande** (`variante` + `UNIQUE` de 3 columnas, PK intacta); la **061** contrae. Deuda D-4 con orden *codigo primero, PK despues* | **D12** |
+| 2 | `marca_id ... ON DELETE SET NULL` **contradecia** el CHECK de coherencia (`marca` exige `marca_id NOT NULL`) | `ON DELETE RESTRICT`: una sola causa observable (`23503`), retirada por `activo=false` | **D3** |
+| 3 | "El CRUD admin ya existente crea cartas `ugc`/`marca`; sin cambios, a verificar en implementacion" | **Falso medido** (`admin.js:970` lista explicita, `:1018` whitelist). Deuda **D-6** con agente (`@admin-dev`) y alcance cerrado; las cartas de marca **no** se siembran | **D3, D16, D-6** |
+| 4 | `activo` se exigia en D6 y se omitia en D8; `cantidad = 0` no estaba ligado a `en_museo` | Semantica unica: **`activo` = en posesion**; `activo = true AND cantidad >= 1` en museo (lectura y escritura) y en fusion; el `CHECK` del museo incorpora `activo = true` | **D13** |
+| 5 | `chk_cartas_catalogo_stats` **dejaba pasar cualquier cosa** no numerica (`{"bonus_xp_pct":"quince"}`) y no exigia objeto | CHECK endurecido: `jsonb_typeof(stats_json) = 'object'`, `bonus_xp_pct` **numero** y en `0..100`, `capacidad_gate` string. Ademas `bonus_xp_pct` pasa a **display-only** | **D2, D14** |
+| 6 | `stats_json` se presentaba con un consumidor de XP inexistente; `set_slug` era aceptable desde el body | `bonus_xp_pct` **display-only** (Deuda D-5, prohibido inventar consumidor); `set_slug` **derivado en servidor** desde `nivel_gate`, body con `set_slug` -> `400 SET_SLUG_INVALIDO` | **D14, D15** |
+| 7 | El tope 12 se describia con un `COUNT(*)` en el handler (TOCTOU) y `reordenar` se daba por requisito | Tope arbitrado **solo en la base** (`CHECK 1..12` + `UNIQUE` parcial => maximo 12 filas); `COUNT(*)` **nunca autoriza**; `reordenar` **eliminado** (retirar + equipar), sin `DEFERRABLE` | **D10, D17** |
+| 8 | El criterio de verificacion citaba `gold_shield.js --check` (**no existe**) y el backfill con `UPDATE` redundante que pisaba `ugc`/`marca`/`shiny` | Verificacion reescrita con **comandos que existen** (`--sin-express`, `node --check`, `apply_sql_file.js`, `neon_select.js`, `verificar_migraciones_prod.js`); backfill reducido al **unico** `UPDATE fusionable=false`; V23 declara que el smoke **no existe aun** | **D1 (punto 5), D18, V1-V24** |
+
+**Ademas, del checklist de `@sql-security` (mecanismos, no forma):** limpieza de museo obligatoria en los **3** `UPDATE` de decremento (D18, si no la primera venta de una carta equipada devuelve `23514`); el drop se cobra en **una sola sentencia** y `POST {tipo:'cartas_gate'}` **no otorga cartas** (D19); la garantia contra doble fusion es **`FOR UPDATE` + `UPDATE ... WHERE cantidad >= 4 RETURNING`**, **no** la forma del SQL (D7 reescrito); y la lectura `cartas_mias` cuenta por **`carta_id` distinto**, no por fila (D20).
+
+### Correcciones de la revision 3 (implementacion, 2026-10-27)
+
+Lo que el diseno **esperaba** y el archivo real **desmintio**. Cada linea es un hecho medido al implementar: manda el codigo (ADR-006), no la revision 2.
+
+| # | Lo que decia la revision 2 | Lo que hay en el archivo real | Donde |
+|---|---|---|---|
+| 1 | Constraint `ux_usuarios_cartas_variante` | **`uq_usuarios_cartas_variante`** (`uq_`, no `ux_`); `ux_` queda para los indices (`ux_usuarios_cartas_museo_orden`) | D1 (DDL), V2 |
+| 2 | FK con el nombre por defecto de PostgreSQL (`cartas_catalogo_marca_id_fkey`) | **`fk_cartas_catalogo_marca_id`**, nombre **explicito** declarado en la 060 | D3, V7 |
+| 3 | El coste de la fusion se cobraba como `xp_gastado_sinks += 200` ("el nivel no baja") | Se cobra sobre **`usuarios.xp_total`** con **asiento de ledger `carta_fusion`**; `xp_gastado_sinks` **no cambia**. El nivel **si** puede bajar | D9, V12, V14 |
+| 4 | El CTE de decremento se llamaba `desc` | **`desc` es palabra reservada y rompia el `WITH`** en ejecucion; renombrado a **`decr`**. `node --check` **no** lo detecta (es SQL en una cadena) | D7 (SQL) |
+| 5 | La lectura publica se llamaba `museo_publico` | **`museo_publico` YA EXISTE en `api/interacciones.js`** (arbol de casas/clases, lo consumen `perfil.html` y `mi-perfil.html`): **nombre RESERVADO**. La lectura de cartas es **`museo_cartas`** en `api/usuarios.js` | D8, V17, V17b |
+| 6 | Deuda **D-4** abierta (la 061 no se escribe) | **D-4 CERRADA**: la **061 esta aplicada** y `usuarios_cartas_pkey` es `(usuario_id, carta_id, variante)` | D12, D-4 |
+| 7 | El smoke seria un fichero nuevo `scripts/smoke_060_cartas_museo_fusion.js` | Se **extendio** `scripts/smoke_gaming_v61.js` (5 -> 8 ramas de carta + seccion X1-X23): **43/43** | V23 |
+
+**Sobre el orden seguro de la 061 (lo mas util de este pase):** el upsert de **3 columnas** resuelve contra una `UNIQUE` de 3 columnas, **no contra la PK**. Como la 060 ya habia creado `uq_usuarios_cartas_variante`, el codigo con `ON CONFLICT (usuario_id, carta_id, variante)` funcionaba **con la PK vieja y con la nueva**. Consecuencia: **codigo primero y PK despues no abrio ninguna ventana** -- cero `42P10` y ni siquiera hizo falta que `carta_fusionar` respondiera `503` durante la transicion. La leccion general: **si el `ON CONFLICT` apunta a una `UNIQUE` nombrada y no a la PK, el cambio de PK deja de ser un evento de riesgo y pasa a ser higiene de esquema.** La 061 hace la contraccion en **una sola sentencia atomica** (el runner no envuelve en transaccion, hecho 16).
+
+**Deudas NUEVAS de la implementacion (declaradas, no cerradas):**
+
+- **D-8 (CERRADA) - la constante de coste de fusion ya NO esta duplicada.** Vive en **`lib/cartas-config.js`** (`CARTA_FUSION_XP`, y `MUSEO_TOPE`), y **los dos** `api/` la consumen por `require`: `api/interacciones.js:225-226` (el que cobra) y `api/usuarios.js:252-253` (el que la sirve como `fusion_coste_xp`). **Medido en este pase:** `Test-Path lib/cartas-config.js` -> **True** y las dos referencias existen. Riesgo cerrado: preview y cobro ya no pueden discrepar por editar una sola copia.
+- **D-9 - el asiento del ledger de la fusion se escribe FUERA del CTE atomico.** Consistente con el resto del fichero, pero es un **hueco contable**: si falla la escritura del asiento, el XP baja y no hay rastro. Declarado en D7.
+- **D-10 - `mercado.js` no tiene la clave `PUNTOS_INSUFICIENTES` en su diccionario de errores.** El libro de cartas muestra el **codigo crudo** en vez de un mensaje legible. Cosmetico, pero es una regresion de UX respecto al resto de errores del modulo. **Agente:** `@js-silo-dev`.
+- **D-11 - no hay `DATABASE_URL` en el entorno, luego el smoke de las ramas nuevas es ESTATICO.** Falta una **prueba real contra Neon** de los 6 casos que el smoke estatico no puede cubrir: usuario **con** museo, usuario **sin** museo, **UUID invalido**, **museo lleno**, **fusion sin copias** y **drop repetido**. Sin ella, V8-V17 estan **escritas** pero no **ejecutadas** contra la base. **Agente:** `@qa-auditor` + operador (credenciales).
+
+### Revision 4 (segundo y ultimo pase documental, 2026-10-27)
+
+Este ADR **no cambia de diseno**: cambia el **estado de tres deudas** que la revision 3 declaro abiertas. El texto original de cada una **se conserva** arriba (Cero Borrado Logico, ADR-003); aqui solo el hecho medido que las cierra.
+
+| # | Deuda | Estado nuevo | Hecho medido (archivo real, ADR-006) |
+|---|---|---|---|
+| 1 | **D-6** -- el CRUD admin no podia crear cartas `ugc`/`marca` | **CERRADA** | `api/admin.js`: helpers `:346-423` (normalizacion de emisor, uuid, `stats_json`, `descripcion`, booleano, coherencia), `cartas_crear` `:1040-1096` (INSERT de **14 columnas**, `$12::jsonb`) y `cartas_editar` `:1100-1245` (lee la fila **actual** y valida el merge). Errores tipados `EMISOR_TIPO_INVALIDO`, `EMISOR_ID_INVALIDO`, `MARCA_ID_INVALIDO`, `EMISOR_INCOHERENTE`, `STATS_JSON_INVALIDO`, `FUSION_INCOHERENTE`, `DESCRIPCION_INVALIDA`. `admin.html`: fila `~2463-2502`, modal `~2562-2605`, helpers `~10631-10830`, divs **1281/1281**, cero IDs eliminados. `node --check` pass, `api/` = **8**, smoke de helpers **25/25**. **El hecho 14 de este ADR queda superado como diagnostico**, no como historia: lo que decia era cierto en la revision 2 y dejo de serlo al implementar. |
+| 2 | **D-8** -- constante de coste duplicada | **CERRADA y ampliada** | La fuente unica es **`lib/cartas-config.js`**, que exporta `CARTA_FUSION_XP=200`, `MUSEO_TOPE=12`, `CARTA_VARIANTES=['base','shiny']` y `CARTA_VARIANTE_DEFECTO='base'`; los dos `api/` los consumen por `require` **sin declaraciones locales**. Guard estatico **`scripts/smoke_cartas_constantes.js`** (**28 PASS / 0 FAIL**) en `npm run test` con alias `smoke:cartas-constantes`; sus controles negativos reintroduciendo un literal dan **FAIL**, luego muerde. **Criterio, no deuda:** `CARTA_GATES = [10,14,20,25]` **se queda** en `api/interacciones.js` por tener **un unico punto logico de consumo**. |
+| 3 | **D-11** -- el smoke es estatico | **CERRADA CON LIMITE DECLARADO** | Ensayo en **transaccion revertida** con el `DATABASE_URL` de `.env.local`: conteos PRE y POST **identicos** (`usuarios_cartas` 0->0, `cartas_catalogo` 27->27, `cartas_gates` 0->0, `usuarios` 16->16) = **cero persistencia**; **6/6 PASS**: 13er slot bloqueado por `chk_usuarios_cartas_museo` (**23514**) y duplicado de `orden_museo` por `ux_usuarios_cartas_museo_orden` (**23505**); fusion 3 copias `rowCount 0` y 4 copias `1`; drop 1 fila la primera vez y 0 la segunda y la tercera; `base` y `shiny` coexisten y el `ON CONFLICT` de 3 columnas resuelve por la PK nueva; catalogo 27 / sistema 27 / `fusionable` 21 false y 6 true / las 6 `ct_comun_01..06` sin gate / cero violaciones de coherencia; FK de marca **23503** con `confdeltype='r'`. **LIMITE:** los 3 guardas de aplicacion (403 `GATE_NO_ALCANZADO`, 403 `PERFIL_PRIVADO`, 400 por UUID invalido) viven en JS de los handlers y siguen verificados **solo por lectura de fuente**; probarlos exige un **runtime HTTP** que el entorno no tiene. |
+
+**Consecuencia para la proxima sesion:** ninguna de las tres deudas necesita ya `@admin-dev` ni credenciales de Neon. Lo que queda abierto de este ADR es **D-9** (ledger de la fusion fuera del CTE atomico), **D-10** (`PUNTOS_INSUFICIENTES` en `mercado.js`), **D-5** (`stats_json.bonus_xp_pct` display-only sin consumidor) y el **arnes HTTP** de los 3 guardas.
+
+**Bugs que este dominio ya dejo registrados:** **BUG-143** (CTE `desc`, palabra reservada de PostgreSQL, **invisible a `node --check`**) y **BUG-144** (colision `?tipo=museo_publico`, reservado a `api/interacciones.js`; la lectura de cartas es `museo_cartas`) en `BUGS_HISTORICOS.md:2545-2581`.

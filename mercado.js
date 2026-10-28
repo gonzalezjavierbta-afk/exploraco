@@ -44,7 +44,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
   var ENDPOINT = '/api/interacciones';
 
   var CASAS = [
@@ -96,6 +96,9 @@
   var _catalogo = null;      // catalogo de consumibles
   var _form = false;         // formulario de publicacion abierto
   var _prod = false;         // formulario de produccion abierto
+  var _cartas = null;        // libro de ofertas de cartas (data del GET)
+  var _cartasListas = false; // el GET de cartas ya resolvio (exito o fallo)
+  var _cartasError = '';     // codigo de error del GET de cartas, si lo hubo
 
   /* ---- Helpers ---- */
   function esc(s) {
@@ -272,6 +275,158 @@
       _ofertas = _ofertasPorCasa[_casaSel];
       _ofertasListas = true;
     });
+  }
+
+  /* ---- Mercado de cartas (libro de ofertas) ----------------------------
+   * Vive en ESTE modulo y se pinta en el MISMO contenedor del mercado de
+   * consumibles (#mercado-cuerpo). Consume SOLO ramas que ya existen en
+   * api/interacciones.js: cero endpoints nuevos (presupuesto 8/8).
+   *   GET  /api/interacciones?tipo=cartas_ofertas   -> libro publico
+   *   POST /api/interacciones  {tipo:'carta_comprar'}
+   *   POST /api/interacciones  {tipo:'carta_cancelar'}
+   * Rareza, marca shiny y badge de emisor los pinta window.CartasUI
+   * (cartas-ui.js): CartasUI.claseRareza(...) y CartasUI.badgeEmisor(...).
+   * Si esa pagina no cargo el script, el bloque degrada a texto plano y
+   * NUNCA lanza: todas las llamadas van tras guarda. */
+  function cartasUI() {
+    var c = null;
+    try { c = window.CartasUI || null; } catch (e) { c = null; }
+    return (c && typeof c === 'object') ? c : null;
+  }
+  function cRarezaClase(rareza, variante) {
+    var c = cartasUI();
+    if (c && typeof c.claseRareza === 'function') {
+      try { return String(c.claseRareza(rareza, variante) || ''); } catch (e) {}
+    }
+    return '';
+  }
+  function cRarezaLabel(rareza) {
+    var k = String(rareza === null || rareza === undefined ? '' : rareza).toLowerCase().trim();
+    var c = cartasUI();
+    if (c && c.RAREZAS && c.RAREZAS[k] && c.RAREZAS[k].label) return String(c.RAREZAS[k].label);
+    return k;
+  }
+  function cEmisorBadge(emisorTipo, marcaNombre) {
+    var c = cartasUI();
+    if (c && typeof c.badgeEmisor === 'function') {
+      try { return String(c.badgeEmisor(emisorTipo, marcaNombre) || ''); } catch (e) {}
+    }
+    return '';
+  }
+  function cEsShiny(variante) {
+    return String(variante === null || variante === undefined ? '' : variante)
+      .toLowerCase().trim() === 'shiny';
+  }
+  /* GET del libro publico de cartas. NUNCA rechaza: deja [] + codigo. */
+  function cargarCartas() {
+    _cartasListas = false;
+    return getJSON('tipo=cartas_ofertas')
+      .then(function (res) {
+        if (res && res.ok === true) {
+          _cartas = Object.prototype.toString.call(res.data) === '[object Array]' ? res.data : [];
+          _cartasError = '';
+        } else {
+          _cartas = [];
+          _cartasError = String((res && res.error) || 'SERVIDOR');
+        }
+        _cartasListas = true;
+        return _cartas;
+      })
+      .catch(function () {
+        _cartas = [];
+        _cartasError = 'CONEXION';
+        _cartasListas = true;
+        return _cartas;
+      });
+  }
+  function cartaFilaHtml(o, miId) {
+    o = (o && typeof o === 'object') ? o : {};
+    var id = String(o.id === null || o.id === undefined ? '' : o.id);
+    var resto = parseInt(o.cantidad_restante, 10) || 0;
+    var precio = num(o.precio_xp);
+    var vendedor = (o.vendedor_nombre !== null && o.vendedor_nombre !== undefined)
+      ? String(o.vendedor_nombre)
+      : ((o.vendedor !== null && o.vendedor !== undefined) ? String(o.vendedor) : '');
+    var nombre = o.carta_nombre || o.nombre || 'Carta';
+    var mial = !!(miId && o.vendedor_id !== null && o.vendedor_id !== undefined
+      && String(o.vendedor_id) === String(miId));
+    var clases = cRarezaClase(o.rareza, o.variante);
+    var badge = cEmisorBadge(o.emisor_tipo, o.marca_nombre);
+    var img = o.imagen_url
+      ? '<img src="' + esc(o.imagen_url) + '" alt="" width="40" height="40" loading="lazy"'
+        + ' onerror="this.style.visibility=\'hidden\'"> '
+      : '';
+    var h = '<div class="mk-oferta"><div class="mk-of-main">'
+      + '<div class="mk-of-nombre' + (clases ? ' ' + esc(clases) : '') + '">'
+      + img + esc(nombre)
+      + (mial ? ' <span class="mk-mia">Tuya</span>' : '') + '</div>'
+      + '<div class="mk-of-meta">' + esc(cRarezaLabel(o.rareza))
+      + (cEsShiny(o.variante) ? ' \u00b7 Shiny' : '')
+      + ' \u00b7 ' + fmt(precio) + ' XP c/u'
+      + ' \u00b7 quedan ' + resto + '</div>'
+      + '<div class="mk-of-meta">'
+      + (vendedor ? ('Vendedor: ' + esc(vendedor)) : 'Vendedor: anonimo')
+      + (badge ? ' ' + badge : '') + '</div>'
+      + '</div>';
+    if (mial) {
+      h += '<div class="mk-of-buy">'
+        + '<button type="button" class="pand-btn" onclick="Mercado.cancelarCarta(\''
+        + esc(id) + '\')">Cancelar mi oferta</button></div>';
+    } else if (resto > 0) {
+      var inId = 'mk-cq-' + id;
+      h += '<div class="mk-of-buy">'
+        + '<input class="chat-inp mk-qty" id="' + esc(inId) + '" type="number" min="1" max="'
+        + resto + '" value="1">'
+        + '<button type="button" class="pand-btn" onclick="Mercado.comprarCarta(\''
+        + esc(id) + '\',\'' + esc(inId) + '\')">Comprar</button></div>';
+    }
+    return h + '</div>';
+  }
+  function cartasHtml(miId) {
+    var h = '<div class="cartas-silo"><div class="mk-sec-t">Cartas a la venta</div>';
+    var nota = '<div class="mk-msg">Para poner una carta a la venta, abre tu inventario en '
+      + '<a href="mi-perfil.html#inventario">Mi Perfil</a>.</div>';
+    if (!cartasUI()) {
+      h += '<div class="mk-msg">Los estilos de carta no estan disponibles en esta pagina; '
+        + 'el libro se muestra en texto plano.</div>';
+    }
+    if (!_cartasListas) return h + '<div class="mk-msg">Cargando cartas\u2026</div></div>';
+    if (_cartasError) {
+      return h + '<div class="mk-msg">' + esc(errorMsg({ error: _cartasError })) + '</div>'
+        + nota + '</div>';
+    }
+    var lista = _cartas || [];
+    if (!lista.length) {
+      return h + '<div class="mk-msg">Aun no hay cartas a la venta.</div>' + nota + '</div>';
+    }
+    h += '<div class="mk-ofertas">';
+    lista.forEach(function (o) { h += cartaFilaHtml(o, miId); });
+    return h + '</div>' + nota + '</div>';
+  }
+  function comprarCarta(ofertaId, inputId) {
+    if (!jwt()) { pedirLogin(); return; }
+    var cant = parseInt(val(inputId), 10);
+    if (!isFinite(cant) || cant < 1) cant = 1;
+    post({ tipo: 'carta_comprar', oferta_id: ofertaId, cantidad: cant })
+      .then(function (res) {
+        if (res && res.ok) {
+          toast('\u2705 Carta comprada (' + fmt(cant) + ' ud.)', '#16a34a');
+          recargar();
+        } else { toast(errorMsg(res), '#ef4444'); }
+      })
+      .catch(function () { toast('Error de conexion', '#ef4444'); });
+  }
+  function cancelarCarta(ofertaId) {
+    if (!jwt()) { pedirLogin(); return; }
+    post({ tipo: 'carta_cancelar', oferta_id: ofertaId })
+      .then(function (res) {
+        if (res && res.ok) {
+          var extra = res.devueltas ? (' (' + num(res.devueltas) + ' devueltas)') : '';
+          toast('\u2705 Oferta de carta cancelada' + extra, '#16a34a');
+          recargar();
+        } else { toast(errorMsg(res), '#ef4444'); }
+      })
+      .catch(function () { toast('Error de conexion', '#ef4444'); });
   }
 
   function invCant(clave) {
@@ -654,6 +809,7 @@
     html += ofertasHtml(u.id);
     html += misOfertasHtml();
     html += catalogoHtml();
+    html += cartasHtml(u.id);
     el.innerHTML = html;
   }
   function cargar() {
@@ -667,6 +823,7 @@
     _ofertasListas = false;
     return Promise.all([cargarConfig(), cargarMiData(), cargarCatalogo(), cargarInventario()])
       .then(function () { return cargarOfertasTodas(); })
+      .then(function () { return cargarCartas(); })
       .then(function () { renderComunidad(); })
       .catch(function () {
         el.innerHTML = '<div class="mk-msg">No se pudo cargar el Mercado. Intenta de nuevo.</div>';
@@ -739,6 +896,7 @@
       if (!_config) tareas.push(cargarConfig());
       if (!_catalogo) tareas.push(cargarCatalogo());
       tareas.push(cargarOfertasTodas());
+      tareas.push(cargarCartas());
     }
     return Promise.all(tareas)
       .then(function () {
@@ -877,6 +1035,9 @@
     publicar: publicar,
     comprar: comprar,
     cancelar: cancelar,
+    comprarCarta: comprarCarta,
+    cancelarCarta: cancelarCarta,
+    cargarCartas: cargarCartas,
     producir: producir,
     recargar: recargar,
     irAlMercado: irAlMercado,

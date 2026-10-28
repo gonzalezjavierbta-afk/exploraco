@@ -14,6 +14,7 @@
 <!-- T7 (ADR-039): Leaflet para el map-picker de localizacion del Museo -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="dictado-voz.css?v=1"/>
+<link rel="stylesheet" href="cartas-ui.css"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -1094,6 +1095,27 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
 .mi-marca .mm-op{font-family:'Outfit',sans-serif;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:rgba(255,255,255,.35)}
 .mi-marca .mm-error{font-size:12px;line-height:1.45;margin-top:6px;color:#fca5a5}
 @media (max-width:600px){.mi-marca .mm-grid2{grid-template-columns:1fr}.mi-marca .mm-metricas{grid-template-columns:repeat(2,1fr)}.mi-marca .mm-crear{flex-direction:column;align-items:stretch}.mi-marca .mm-crear .mm-btn{width:100%}.mi-marca .mm-receta .mm-btn{width:100%}}
+/* ---- Album del Museo de cartas (Fase 5): silo atomico bajo #pf-museo-cartas
+   (ADR-004). Reutiliza las clases .v61-* del perfil y las de cartas-ui.css
+   (.c-shiny, .c-badge-emisor); aqui solo vive lo propio de la vitrina. ---- */
+#pf-museo-cartas .c-museo-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+#pf-museo-cartas .c-museo-cont{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:.8px;color:var(--gold)}
+#pf-museo-cartas .c-museo-vitrina{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:18px}
+#pf-museo-cartas .c-museo-slot{min-height:88px}
+#pf-museo-cartas .c-museo-slot.is-libre{border:1px dashed rgba(255,255,255,.14);border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:rgba(255,255,255,.12)}
+#pf-museo-cartas .c-museo-thumb{position:relative;width:100%;height:64px;border-radius:6px;overflow:hidden;background:linear-gradient(135deg,rgba(255,74,0,.18),rgba(255,255,255,.04));display:flex;align-items:center;justify-content:center}
+#pf-museo-cartas .c-museo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+#pf-museo-cartas .c-museo-thumb-fb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:2px;color:rgba(255,255,255,.35);text-transform:uppercase}
+#pf-museo-cartas .c-museo-filtros{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+#pf-museo-cartas .c-museo-f{padding:6px 12px;min-height:34px;border-radius:999px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;background:transparent;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.55);transition:background .15s,color .15s,border-color .15s}
+#pf-museo-cartas .c-museo-f:hover{border-color:rgba(255,74,0,.5);color:var(--gold)}
+#pf-museo-cartas .c-museo-f[aria-pressed="true"]{background:var(--gold);border-color:var(--gold);color:var(--black)}
+#pf-museo-cartas .c-museo-var{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px}
+#pf-museo-cartas .c-museo-var .v61-btn{width:auto;flex:0 0 auto;padding:4px 10px}
+#pf-museo-cartas .c-museo-stats{font-size:10px;color:var(--gold-d);line-height:1.4}
+#pf-museo-cartas .v61-btn[disabled]{opacity:.35;cursor:not-allowed}
+#pf-museo-cartas .v61-btn[disabled]:hover{background:transparent;color:var(--gold)}
+@media (max-width:600px){#pf-museo-cartas .c-museo-vitrina{grid-template-columns:repeat(3,minmax(0,1fr))}#pf-museo-cartas .c-museo-var{flex-direction:column;align-items:stretch}#pf-museo-cartas .c-museo-var .v61-btn{width:100%}}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -1259,6 +1281,21 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
   <div class="pf-mercado" id="pf-mercado" data-tab="inventario"></div>
 
   <!-- GAMING v6.1 (Fase 4 / T7): cartas coleccionables y su mercado -->
+  <!-- GAMING v6.1 (Fase 5): Album del Museo de cartas. ADR-003: no borra nada;
+       retirar del museo desequipa la carta y la deja en el album. -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F3DB;&#xFE0F; Album del Museo</div>
+  <div class="cartas-silo pf-v61" id="pf-museo-cartas" data-tab="inventario">
+    <div class="c-museo-head">
+      <div class="v61-card-n">Vitrina de cartas</div>
+      <div class="c-museo-cont" id="pf-museo-count">&#8212;</div>
+    </div>
+    <div class="c-museo-vitrina" id="pf-museo-vitrina">
+      <div class="v61-empty">Cargando museo&#8230;</div>
+    </div>
+    <div class="c-museo-filtros" id="pf-museo-filtros"></div>
+    <div class="v61-grid" id="pf-museo-album"></div>
+  </div>
+
   <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F0CF; Mis Cartas</div>
   <div class="pf-v61" id="pf-cartas" data-tab="inventario">
     <div class="v61-empty">Cargando cartas&#8230;</div>
@@ -7287,7 +7324,7 @@ function pfTab(tab) {
   if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
   if (tab === 'museo' && u && u.id) { cargarMuseoPreview(u.id); museoRefrescar(); }
-  if (tab === 'inventario' && u && u.id) { cargarInventario(u.id); pfFacCargar(u.id); pfSlotsCargar(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); cargarCartas(u.id); cargarMercadoCartas(); cargarMoneda(u.id); }
+  if (tab === 'inventario' && u && u.id) { cargarInventario(u.id); pfFacCargar(u.id); pfSlotsCargar(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); cargarCartas(u.id); cargarMuseoCartas(); cargarMercadoCartas(); cargarMoneda(u.id); }
   if (tab === 'mensajes' && u && u.id) cargarMensajes(u.id);
   if (tab === 'contratos' && u && u.id) cargarContratos(u.id);
   if (tab === 'cuenta' && u) renderCuentaPanel();
@@ -7988,12 +8025,12 @@ function v61GatesSet(gates) {
 function cargarCartas(uid) {
   var box = document.getElementById('pf-cartas');
   if (!box || !uid) return;
-  var fn = v61Helper('misCartas');
-  if (!fn) { box.innerHTML = '<div class="v61-empty">Cartas no disponibles.</div>'; return; }
+  if (!v61Helper('misCartas')) { box.innerHTML = '<div class="v61-empty">Cartas no disponibles.</div>'; v61MuseoError('Cartas no disponibles'); return; }
   box.innerHTML = '<div class="v61-empty">Cargando cartas\u2026</div>';
-  fn(uid).then(function (res) {
-    if (!res || !res.ok) { box.innerHTML = '<div class="v61-err">' + esc(v61Msg(res)) + '</div>'; return; }
+  v61CartasDatos(uid).then(function (res) {
+    if (!res || !res.ok) { box.innerHTML = '<div class="v61-err">' + esc(v61Msg(res)) + '</div>'; v61MuseoError(v61Msg(res)); return; }
     var d = res.data || {};
+    v61RenderMuseo(d, v61Ui());
     var cartas = d.cartas || [];
     var gates = v61GatesSet(d.gates);
     var requisitos = d.requisitos || [];
@@ -8040,6 +8077,266 @@ function cargarCartas(uid) {
     box.innerHTML = html;
   }).catch(function () { box.innerHTML = '<div class="v61-err">No se pudieron cargar tus cartas.</div>'; });
 }
+/* ---- Album del Museo (Fase 5): vitrina de huecos + album completo ----------
+   Fuente UNICA de datos: GET ?tipo=cartas_mias, el mismo que ya usa
+   cargarCartas(). v61CartasDatos dedupe la peticion en vuelo (v61CartasPend):
+   abrir la pestana inventario NO dispara dos GET.
+   Reutiliza CartasUI (claseRareza / badgeEmisor / statsTexto) y las acciones
+   ya existentes (v61PublicarCarta). ADR-003: retirar desequipa, no borra. */
+var v61CartasCache = null;
+var v61CartasPend = null;
+var v61MuseoFiltro = 'todos';
+function v61CartasDatos(uid) {
+  var fn = v61Helper('misCartas');
+  if (!uid || !fn) return Promise.reject(new Error('CARTAS_NO_DISPONIBLE'));
+  if (v61CartasPend) return v61CartasPend;
+  v61CartasPend = fn(uid).then(function (res) {
+    v61CartasPend = null;
+    if (res && res.ok) v61CartasCache = res.data || {};
+    return res;
+  }, function (e) { v61CartasPend = null; throw e; });
+  return v61CartasPend;
+}
+function v61Ui() {
+  var ui = window.CartasUI;
+  return (ui && typeof ui.claseRareza === 'function' && typeof ui.badgeEmisor === 'function') ? ui : null;
+}
+function v61VarianteLabel(v) {
+  var ui = v61Ui();
+  var k = String(v || 'base').toLowerCase();
+  if (ui && ui.VARIANTES && ui.VARIANTES[k] && ui.VARIANTES[k].label) return ui.VARIANTES[k].label;
+  return k;
+}
+function v61VariantesPosesion(c) {
+  var out = [];
+  ((c && c.variantes) || []).forEach(function (v) {
+    if (!v) return;
+    if (v.activa !== true) return;
+    if ((Number(v.cantidad) || 0) < 1) return;
+    out.push(v);
+  });
+  return out;
+}
+/* Silent Fallback (ADR-008): si la imagen falla, se oculta y queda visible el
+   hueco degradado con las iniciales. Nunca un icono roto. */
+function v61Thumb(url, alt) {
+  var ini = String(alt || '?').replace(/[^A-Za-z0-9]/g, '').substring(0, 2);
+  var html = '<div class="c-museo-thumb"><div class="c-museo-thumb-fb">' + esc(ini || '?') + '</div>';
+  if (url) {
+    html += '<img src="' + esc(url) + '" alt="' + esc(alt || '') + '" loading="lazy"'
+      + ' onerror="this.onerror=null;this.style.display=\'none\';">';
+  }
+  html += '</div>';
+  return html;
+}
+function v61MuseoError(msg) {
+  var vit = document.getElementById('pf-museo-vitrina');
+  var alb = document.getElementById('pf-museo-album');
+  var fil = document.getElementById('pf-museo-filtros');
+  var cnt = document.getElementById('pf-museo-count');
+  if (cnt) cnt.textContent = '\u2014';
+  if (vit) vit.innerHTML = '<div class="v61-err">' + esc(msg || 'Museo no disponible') + '</div>';
+  if (alb) alb.innerHTML = '';
+  if (fil) fil.innerHTML = '';
+}
+function v61MuseoMapa(d) {
+  var mapa = {};
+  ((d && d.cartas) || []).forEach(function (c) { if (c && c.id) mapa[String(c.id)] = c; });
+  return mapa;
+}
+function v61RenderVitrina(d, ui, mapa) {
+  var box = document.getElementById('pf-museo-vitrina');
+  var cnt = document.getElementById('pf-museo-count');
+  if (!box) return;
+  var tope = Number(d.museo_tope) || Number(ui.TOPE_MUSEO) || 0;
+  var piezas = d.museo || [];
+  var slots = [];
+  var i;
+  for (i = 0; i < tope; i++) slots.push(null);
+  piezas.forEach(function (p) {
+    if (!p) return;
+    var o = (p.orden_museo === null || p.orden_museo === undefined) ? Number(p.orden) : Number(p.orden_museo);
+    var slot = -1;
+    for (var k = 0; k < tope; k++) { if (!slots[k]) { slot = k; break; } }
+    if (isFinite(o) && o >= 0 && o < tope && !slots[o]) slots[o] = p;
+    else if (slot >= 0) slots[slot] = p;
+  });
+  var html = '';
+  slots.forEach(function (p) {
+    if (!p) { html += '<div class="c-museo-slot is-libre" aria-hidden="true">&#43;</div>'; return; }
+    var cid = String(p.id || p.carta_id || '');
+    var cat = mapa[cid] || {};
+    var varKey = String(p.variante || 'base').toLowerCase();
+    html += '<div class="v61-card c-museo-slot ' + ui.claseRareza(p.rareza || cat.rareza, varKey) + '">'
+      + v61Thumb(p.imagen_url || cat.imagen_url, p.nombre || cat.nombre || cid)
+      + '<div class="v61-card-n">' + esc(p.nombre || cat.nombre || cid) + '</div>'
+      + '<span class="v61-rareza">' + esc(v61VarianteLabel(varKey)) + '</span>'
+      + ui.badgeEmisor(cat.emisor_tipo, cat.marca_nombre)
+      + '<button type="button" class="v61-btn ghost" onclick="v61RetirarMuseo(\'' + esc(cid) + '\',\'' + esc(varKey) + '\')">Retirar</button>'
+      + '</div>';
+  });
+  box.innerHTML = html;
+  if (cnt) cnt.textContent = piezas.length + '/' + (tope || piezas.length);
+}
+function v61FiltrosHtml(ui) {
+  var em = (ui && ui.EMISORES) || {};
+  var ops = [{ k: 'todos', l: 'Todos' }];
+  ['sistema', 'ugc', 'marca'].forEach(function (k) {
+    if (em[k] && em[k].label) ops.push({ k: k, l: em[k].label });
+  });
+  var html = '';
+  ops.forEach(function (o) {
+    html += '<button type="button" class="c-museo-f" aria-pressed="'
+      + (v61MuseoFiltro === o.k ? 'true' : 'false') + '"'
+      + ' onclick="v61MuseoFiltrar(\'' + o.k + '\')">' + esc(o.l) + '</button>';
+  });
+  return html;
+}
+function v61MuseoFiltrar(filtro) {
+  v61MuseoFiltro = filtro || 'todos';
+  if (v61CartasCache) v61RenderAlbum(v61CartasCache, v61Ui());
+}
+function v61RenderAlbum(d, ui) {
+  var box = document.getElementById('pf-museo-album');
+  var fil = document.getElementById('pf-museo-filtros');
+  if (!box) return;
+  if (fil) fil.innerHTML = v61FiltrosHtml(ui);
+  var pos = ((d && d.cartas) || []).filter(function (c) { return c && v61VariantesPosesion(c).length > 0; });
+  if (!pos.length) {
+    box.innerHTML = '<div class="v61-empty">Aun no tienes cartas. Consiguelas en el mercado o por drop.</div>';
+    return;
+  }
+  var vis = pos.filter(function (c) {
+    if (v61MuseoFiltro === 'todos') return true;
+    return String(c.emisor_tipo || 'sistema').toLowerCase() === v61MuseoFiltro;
+  });
+  if (!vis.length) {
+    box.innerHTML = '<div class="v61-empty">Ninguna carta de ese emisor en tu album.</div>';
+    return;
+  }
+  var html = '';
+  vis.forEach(function (c) {
+    var id = String(c.id || '');
+    var vars = v61VariantesPosesion(c);
+    var varClase = 'base';
+    var baseCant = 0;
+    var total = 0;
+    vars.forEach(function (v) {
+      var k = String(v.variante || 'base').toLowerCase();
+      var n = Number(v.cantidad) || 0;
+      total += n;
+      if (k === 'shiny' && n > 0) varClase = 'shiny';
+      if (k === 'base') baseCant = n;
+    });
+    var stats = ui.statsTexto(c.stats_json);
+    html += '<div class="v61-card ' + ui.claseRareza(c.rareza, varClase) + '">'
+      + v61Thumb(c.imagen_url, c.nombre || id)
+      + '<div class="v61-card-n">' + esc(c.nombre || id) + '</div>'
+      + '<span class="v61-rareza">' + esc(c.rareza || 'comun') + '</span>'
+      + ui.badgeEmisor(c.emisor_tipo, c.marca_nombre)
+      + (stats ? '<div class="c-museo-stats">' + esc(stats) + '</div>' : '')
+      + '<div class="v61-meta">Tienes <b class="v61-qty">' + total + '</b></div>';
+    vars.forEach(function (v) {
+      var k = String(v.variante || 'base').toLowerCase();
+      html += '<div class="c-museo-var"><span class="v61-meta">' + esc(v61VarianteLabel(k))
+        + ' x' + (Number(v.cantidad) || 0) + '</span>';
+      if (v.en_museo === true) {
+        html += '<button type="button" class="v61-btn ghost" onclick="v61RetirarMuseo(\'' + esc(id) + '\',\'' + esc(k) + '\')">Retirar</button>';
+      } else {
+        html += '<button type="button" class="v61-btn" onclick="v61ExhibirCarta(\'' + esc(id) + '\',\'' + esc(k) + '\')">Exhibir</button>';
+      }
+      html += '</div>';
+    });
+    var fus = (c.fusionable === true);
+    var puede = (fus && baseCant >= 4);
+    var tFus = fus
+      ? (puede ? 'Consume 4 copias base y acredita 1 shiny' : 'Te faltan copias base: necesitas 4 para fusionar')
+      : 'Esta carta no es fusionable';
+    html += '<button type="button" class="v61-btn ghost"'
+      + (puede ? ' onclick="v61FusionarCarta(\'' + esc(id) + '\')"' : ' disabled aria-disabled="true"')
+      + ' title="' + esc(tFus) + '">Fusionar duplicados</button>'
+      + '<button type="button" class="v61-btn" onclick="v61VenderCarta(\'' + esc(id) + '\',' + total + ')">Poner a la venta</button>'
+      + '</div>';
+  });
+  box.innerHTML = html;
+}
+function v61RenderMuseo(d, ui) {
+  var box = document.getElementById('pf-museo-cartas');
+  if (!box) return;
+  if (!ui) { v61MuseoError('Cartas UI no disponible'); return; }
+  d = d || {};
+  v61RenderVitrina(d, ui, v61MuseoMapa(d));
+  v61RenderAlbum(d, ui);
+}
+/* Carga del bloque. Sin argumento reutiliza la cache del GET ya hecho por
+   cargarCartas(); si no hay cache ni peticion en vuelo, pide los datos. */
+function cargarMuseoCartas(datos) {
+  var box = document.getElementById('pf-museo-cartas');
+  if (!box) return;
+  var ui = v61Ui();
+  if (datos) { v61RenderMuseo(datos, ui); return; }
+  if (v61CartasCache) { v61RenderMuseo(v61CartasCache, ui); return; }
+  var u = sesion();
+  if (!u || !u.id) { v61MuseoError('Inicia sesion para ver tu album'); return; }
+  v61CartasDatos(u.id).then(function (res) {
+    if (!res || !res.ok) { v61MuseoError(v61Msg(res)); return; }
+    v61RenderMuseo(res.data || {}, ui);
+  }).catch(function () { v61MuseoError('No se pudo cargar el museo'); });
+}
+function v61CartaPorId(cartaId) {
+  var out = null;
+  ((v61CartasCache && v61CartasCache.cartas) || []).forEach(function (c) {
+    if (c && String(c.id) === String(cartaId)) out = c;
+  });
+  return out;
+}
+function v61MuseoRefrescar() {
+  cargarMuseoCartas();
+  var u = sesion();
+  if (u && u.id) cargarCartas(u.id);
+}
+function v61MuseoEquipar(cartaId, variante, accion) {
+  v61Post({ tipo: 'carta_equipar_museo', accion: accion, carta_id: cartaId, variante: variante }).then(function (res) {
+    if (!res || !res.ok) {
+      var m = 'No se pudo actualizar el museo';
+      if (res && res.error === 'MUSEO_LLENO') m = 'Tu museo esta lleno: retira una carta para exhibir otra';
+      else if (res) m = v61Msg(res);
+      showToast(m, '#ef4444');
+      return;
+    }
+    var dd = res.data || {};
+    if (v61CartasCache) {
+      if (dd.museo) v61CartasCache.museo = dd.museo;
+      if (dd.tope) v61CartasCache.museo_tope = dd.tope;
+    }
+    showToast(accion === 'retirar' ? 'Carta retirada del museo' : 'Carta exhibida en el museo');
+    v61MuseoRefrescar();
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+function v61ExhibirCarta(cartaId, variante) { v61MuseoEquipar(cartaId, variante, 'equipar'); }
+function v61RetirarMuseo(cartaId, variante) { v61MuseoEquipar(cartaId, variante, 'retirar'); }
+/* Fusion 4 base -> 1 shiny. El coste SIEMPRE se lee de fusion_coste_xp en la
+   respuesta del servidor; jamas se escribe a mano aqui. */
+function v61FusionarCarta(cartaId) {
+  var c = v61CartaPorId(cartaId);
+  if (!c) { showToast('Carta no disponible', '#ef4444'); return; }
+  var coste = Number(c.fusion_coste_xp);
+  if (!isFinite(coste) || coste <= 0) { showToast('Coste de fusion no disponible', '#ef4444'); return; }
+  if (!window.confirm('Fusionar 4 copias base en 1 shiny?' + '\n' + 'Coste: ' + coste + ' XP.')) return;
+  v61Post({ tipo: 'carta_fusionar', carta_id: cartaId }).then(function (res) {
+    if (!res || !res.ok) {
+      var m = 'No se pudo fusionar';
+      if (res && res.error === 'CARTAS_INSUFICIENTES') m = 'Necesitas 4 copias base para fusionar';
+      else if (res && res.error === 'XP_INSUFICIENTE') m = 'XP insuficiente para pagar la fusion';
+      else if (res && res.error === 'CARTA_NO_FUSIONABLE') m = 'Esta carta no es fusionable';
+      else if (res) m = v61Msg(res);
+      showToast(m, '#ef4444');
+      return;
+    }
+    showToast('Fusion completada: 1 carta shiny');
+    v61MuseoRefrescar();
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
 function v61ConsumirGate(nivel) {
   var u = sesion();
   var fn = v61Helper('cartasGate');
@@ -8054,7 +8351,40 @@ function v61ConsumirGate(nivel) {
     showToast(m, '#ef4444');
   }).catch(function () { showToast('Error de conexion', '#ef4444'); });
 }
-function v61PublicarCarta(cartaId, cantMax) {
+/* Venta con variante. v61PublicarCarta(cartaId, cantMax, variante) sigue
+   aceptando dos argumentos: sin tercer parametro la variante es 'base'.
+   En el album una carta puede tener base y shiny, pero el layout reserva un
+   unico boton de venta por tarjeta, asi que ese boton pregunta cual ofertar
+   con un menu numerado que lista cada variante y su cantidad. */
+function v61VenderCarta(cartaId, cantMax) {
+  var c = null;
+  ((v61CartasCache && v61CartasCache.cartas) || []).forEach(function (x) {
+    if (x && String(x.id) === String(cartaId)) c = x;
+  });
+  var ops = [];
+  v61VariantesPosesion(c || {}).forEach(function (v) {
+    var n = Number(v && v.cantidad) || 0;
+    if (n > 0) ops.push({ k: String((v && v.variante) || 'base').toLowerCase(), n: n });
+  });
+  if (!ops.length) {
+    v61PublicarCarta(cartaId, parseInt(cantMax, 10) || 1, 'base');
+    return;
+  }
+  if (ops.length === 1) {
+    v61PublicarCarta(cartaId, ops[0].n, ops[0].k);
+    return;
+  }
+  var txt = ops.map(function (o, i) {
+    return (i + 1) + ') ' + v61VarianteLabel(o.k) + ' x' + o.n;
+  }).join(' | ');
+  var sel = prompt('Variante a vender: ' + txt, '1');
+  if (sel === null) return;
+  var ix = parseInt(sel, 10) - 1;
+  if (!isFinite(ix) || ix < 0 || ix >= ops.length) { showToast('Variante invalida', '#ef4444'); return; }
+  v61PublicarCarta(cartaId, ops[ix].n, ops[ix].k);
+}
+function v61PublicarCarta(cartaId, cantMax, variante) {
+  var vK = String(variante || 'base').toLowerCase();
   var precio = prompt('Precio por carta en XP:', '');
   if (precio === null) return;
   var p = parseFloat(precio);
@@ -8063,7 +8393,7 @@ function v61PublicarCarta(cartaId, cantMax) {
   if (cant === null) return;
   var c = parseInt(cant, 10);
   if (!isFinite(c) || c < 1) { showToast('Cantidad invalida', '#ef4444'); return; }
-  v61Post({ tipo: 'carta_publicar', carta_id: cartaId, cantidad: c, precio_xp: p }).then(function (res) {
+  v61Post({ tipo: 'carta_publicar', carta_id: cartaId, variante: vK, cantidad: c, precio_xp: p }).then(function (res) {
     if (res && res.ok) {
       showToast('Carta publicada en venta');
       var u = sesion();
@@ -9209,6 +9539,7 @@ else if (PF_TAB_ACTIVO === 'marca') {
 window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>
   <script src="usuario-session.js"></script>
+<script src="cartas-ui.js"></script>
   <script src="album-comments.js?v=2"></script>
   <script>
   /* Dictado por voz en las descripciones de album. Degradacion total:

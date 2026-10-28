@@ -1,0 +1,74 @@
+/* =====================================================================
+   cartas-ui.css  --  Aislamiento atomico (silo `.cartas-silo`)
+   Solo las clases NUEVAS que no existen en el CSS del perfil:
+     .c-shiny        variante brillante de una carta
+     .c-badge-emisor badge de emisor que pinta CartasUI.badgeEmisor
+   NO se redefine aqui .r-comun/.r-raro/.r-epico/.r-dorado: ya viven en
+   mi-perfil.html y son la fuente unica de color por rareza.
+   ADR-004: todo selector cuelga de `.cartas-silo`. Cero fugas a :root,
+   cero estilos globales, cero bytes > 127.
+   ===================================================================== */
+
+/* Reset de silo: solo el box-sizing de los nodos de carta. */
+.cartas-silo .c-shiny,
+.cartas-silo .c-badge-emisor,
+.cartas-silo .c-shiny *,
+.cartas-silo .c-badge-emisor * {
+  box-sizing: border-box;
+}
+
+/* --- Variante shiny -------------------------------------------------
+   Brillo dorado en el borde + halo suave. El color de rareza sigue
+   mandando por el borde superior que ya aplica el CSS del perfil; aqui
+   solo se anade el anillo exterior para no competir con el. */
+.cartas-silo .c-shiny {
+  border-color: #FFB84D;
+  box-shadow: 0 0 0 2px rgba(255, 184, 77, .55), 0 0 14px rgba(255, 184, 77, .35);
+  position: relative;
+}
+
+/* Reflejo diagonal muy tenue, sin capturar clics. */
+.cartas-silo .c-shiny::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, .28) 45%,
+    rgba(255, 255, 255, 0) 70%);
+  border-radius: inherit;
+}
+
+/* --- Badge de emisor ------------------------------------------------ */
+.cartas-silo .c-badge-emisor {
+  display: inline-flex;
+  align-items: center;
+  gap: .3em;
+  max-width: 100%;
+  padding: .18em .55em;
+  border: 1px solid rgba(15, 20, 25, .12);
+  border-radius: 999px;
+  background: rgba(15, 20, 25, .06);
+  color: inherit;
+  font-size: .74rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+/* Sobre fondos oscuros el badge invierte su tinta. */
+.cartas-silo.cartas-silo--oscuro .c-badge-emisor {
+  border-color: rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .1);
+}
+
+/* Accesibilidad: nada de animacion ni halo agresivo si se pide calma. */
+@media (prefers-reduced-motion: reduce) {
+  .cartas-silo .c-shiny {
+    box-shadow: 0 0 0 2px rgba(255, 184, 77, .55);
+  }
+}

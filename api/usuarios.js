@@ -245,6 +245,17 @@ var scoreFamaSql = MOTOR_SCORE.scoreFamaSql;
 var SCORE_ORDEN = MOTOR_SCORE.SCORE_ORDEN;
 var sqlConDegradacion = MOTOR_SCORE.sqlConDegradacion;
 
+// ADR-108 D9/D10: constantes UNICAS del sistema de cartas, compartidas con el
+// handler que las cobra (api/interacciones.js). Viven en lib/cartas-config.js
+// (fuera de api/ por el techo 8/8, mismo patron que lib/score.js) para que el
+// coste de la fusion que se ANUNCIA aqui y el que se COBRA alli no deriven.
+var CartasConfig = require('../lib/cartas-config.js');
+var CARTA_FUSION_XP = CartasConfig.CARTA_FUSION_XP;
+var MUSEO_TOPE = CartasConfig.MUSEO_TOPE;
+// Variante por defecto de una carta ('base'): la misma que valida el handler
+// que equipa/fusiona/dropea (api/interacciones.js) via CARTA_VARIANTES.
+var CARTA_VARIANTE_DEFECTO = CartasConfig.CARTA_VARIANTE_DEFECTO;
+
 
 
 // ADR-058 (Multiplicador de Origen por lejania): el perfil expone un objeto
@@ -458,6 +469,15 @@ function conNivel(row) {
 // CHECK nivel_gate IN (10,14,20,25) de la migracion 040 (Regla de No
 // Duplicidad: un unico catalogo en el backend).
 var CARTAS_GATES_NIVELES = [10, 14, 20, 25];
+
+// Coste de XP de la fusion de cartas (4 -> 1). UNICA FUENTE: lib/cartas-config.js
+// (CARTA_FUSION_XP), el mismo modulo del que lo lee el handler que lo cobra
+// (api/interacciones.js). Aqui solo se ANUNCIA al cliente como fusion_coste_xp;
+// prohibido reescribir el literal (la UI y el cobro dejarian de cuadrar).
+
+// Museo de cartas (migracion 061): tope de piezas equipadas por usuario. Se
+// enlaza arriba desde lib/cartas-config.js (MUSEO_TOPE); el arbitro real del
+// tope sigue siendo la base (CHECK + indice unico parcial, ADR-108 D10).
 
 // ADR-053 / ADR-062 (A-1 CERRADO): nivel_visible = GREATEST(nivel derivado de
 // xp_total, COALESCE(nivel_max,1)). Es el nivel que gobierna el grandfathering
@@ -929,17 +949,33 @@ module.exports = async (req, res) => {
         var cmId = String(req.query.usuario_id || '').trim();
         if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(cmId))
           return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
-        var cmUsr, cmCartas, cmGates, cmReq;
+        var cmUsr, cmCartas, cmGates, cmReq, cmMuseo;
         try {
           cmUsr = await sql('SELECT xp_total, nivel_max FROM usuarios WHERE id=$1 LIMIT 1', [cmId]);
           if (!cmUsr.length)
             return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+          // Retrocompatible: las 9 claves historicas (id, nombre, set_slug,
+          // rareza, nivel_gate, es_evento, imagen_url, cantidad, activa) se
+          // conservan con el mismo tipo. Lo nuevo va ADEMAS.
+          // El LEFT JOIN LATERAL + jsonb_agg garantiza UNA fila por carta: un
+          // JOIN plano por carta_id multiplicaba filas desde la 061 (una fila
+          // por variante base/shiny).
           cmCartas = await sql(
             'SELECT c.id, c.nombre, c.set_slug, c.rareza, c.nivel_gate, c.es_evento,'
-            + ' c.imagen_url, COALESCE(uc.cantidad, 0)::int AS cantidad,'
-            + ' COALESCE(uc.activo, false) AS activa'
+            + ' c.imagen_url, c.emisor_tipo, c.emisor_id, c.marca_id,'
+            + ' m.nombre AS marca_nombre, c.descripcion, c.stats_json,'
+            + ' c.es_canjeable_qr, c.fusionable,'
+            + ' COALESCE(uc.inv, \'[]\'::jsonb) AS variantes'
             + ' FROM cartas_catalogo c'
-            + ' LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1'
+            + ' LEFT JOIN marcas m ON m.id = c.marca_id'
+            + ' LEFT JOIN LATERAL ('
+            + '   SELECT jsonb_agg(jsonb_build_object('
+            + '     \'variante\', u2.variante, \'cantidad\', u2.cantidad,'
+            + '     \'en_museo\', u2.en_museo, \'orden_museo\', u2.orden_museo,'
+            + '     \'activa\', u2.activo) ORDER BY u2.variante) AS inv'
+            + '   FROM usuarios_cartas u2'
+            + '   WHERE u2.usuario_id = $1 AND u2.carta_id = c.id'
+            + ' ) uc ON true'
             + ' WHERE c.activo = true'
             + ' ORDER BY c.set_slug ASC, c.nivel_gate ASC NULLS LAST, c.id ASC',
             [cmId]
@@ -949,19 +985,83 @@ module.exports = async (req, res) => {
             + ' WHERE usuario_id = $1 ORDER BY nivel_gate ASC',
             [cmId]
           );
+          // El requisito por set cuenta CARTAS DISTINTAS (COUNT DISTINCT), no
+          // filas: con variantes, contar filas inflaba el denominador. "Obtenida"
+          // = alguna variante en posesion con cantidad >= 1.
           cmReq = await sql(
-            'SELECT c.set_slug, c.nivel_gate, COUNT(*)::int AS total,'
-            + ' COUNT(*) FILTER (WHERE uc.activo = true AND uc.cantidad >= 1)::int AS obtenidas'
+            'SELECT c.set_slug, c.nivel_gate, COUNT(DISTINCT c.id)::int AS total,'
+            + ' COUNT(DISTINCT c.id) FILTER (WHERE uc.activo = true'
+            + ' AND uc.cantidad >= 1)::int AS obtenidas'
             + ' FROM cartas_catalogo c'
             + ' LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1'
             + ' WHERE c.activo = true AND c.nivel_gate IN (10,14,20,25)'
             + ' GROUP BY c.set_slug, c.nivel_gate ORDER BY c.nivel_gate ASC',
             [cmId]
           );
+          // Museo equipado, solo lectura (ADR-003: nada se borra, se desequipa).
+          cmMuseo = await sql(
+            'SELECT c.id, c.nombre, c.set_slug, c.rareza, c.imagen_url,'
+            + ' uc.variante, uc.orden_museo'
+            + ' FROM usuarios_cartas uc JOIN cartas_catalogo c ON c.id = uc.carta_id'
+            + ' WHERE uc.usuario_id = $1 AND uc.en_museo = true'
+            + ' AND uc.activo = true AND uc.cantidad >= 1 AND c.activo = true'
+            + ' ORDER BY uc.orden_museo ASC NULLS LAST, c.id ASC LIMIT $2',
+            [cmId, MUSEO_TOPE]
+          );
         } catch (eCm) {
           if (!eCm || (eCm.code !== '42P01' && eCm.code !== '42703')) throw eCm;
           return responderSchemaPendiente(res, 'cartas_mias', eCm);
         }
+        // Agregacion defensiva por carta: neon devuelve jsonb ya parseado, pero
+        // si llegara como texto se normaliza aqui (nunca se duplica la carta).
+        cmCartas = (cmCartas || []).map(function (c) {
+          var vArr = c.variantes;
+          if (typeof vArr === 'string') {
+            try { vArr = JSON.parse(vArr); } catch (eVc) { vArr = []; }
+          }
+          if (!Array.isArray(vArr)) vArr = [];
+          var vNorm = vArr.map(function (v) {
+            var vCant = Number(v && v.cantidad) || 0;
+            var vOrden = (v && (v.orden_museo === 0 || v.orden_museo))
+              ? Number(v.orden_museo) : null;
+            return {
+              variante: String((v && v.variante) || CARTA_VARIANTE_DEFECTO),
+              cantidad: vCant,
+              en_museo: (v && v.en_museo) === true,
+              orden_museo: vOrden,
+              activa: (v && v.activa) === true
+            };
+          });
+          var vTotal = 0;
+          var vPosesion = false;
+          vNorm.forEach(function (v) {
+            if (v.activa && v.cantidad >= 1) {
+              vTotal += v.cantidad;
+              vPosesion = true;
+            }
+          });
+          return {
+            id: c.id,
+            nombre: c.nombre,
+            set_slug: c.set_slug,
+            rareza: c.rareza,
+            nivel_gate: c.nivel_gate,
+            es_evento: c.es_evento,
+            imagen_url: c.imagen_url,
+            cantidad: vTotal,
+            activa: vPosesion,
+            emisor_tipo: c.emisor_tipo || null,
+            emisor_id: c.emisor_id || null,
+            marca_id: c.marca_id || null,
+            marca_nombre: c.marca_nombre || null,
+            descripcion: c.descripcion || null,
+            stats_json: c.stats_json || null,
+            es_canjeable_qr: c.es_canjeable_qr === true,
+            fusionable: c.fusionable === true,
+            fusion_coste_xp: CARTA_FUSION_XP,
+            variantes: vNorm
+          };
+        });
         cmReq = cmReq.map(function (r) {
           r.total = Number(r.total) || 0;
           r.obtenidas = Number(r.obtenidas) || 0;
@@ -975,7 +1075,102 @@ module.exports = async (req, res) => {
             nivel_visible: nivelVisibleDe(cmUsr[0]),
             cartas: cmCartas,
             gates: cmGates,
-            requisitos: cmReq
+            requisitos: cmReq,
+            museo: cmMuseo || [],
+            museo_tope: MUSEO_TOPE
+          }
+        });
+      }
+
+      // ---- GET: museo_cartas (migracion 061) -----------------------------
+      // Vitrina de cartas equipadas, de solo lectura, para el perfil publico.
+      // PUBLICA: sin JWT ni sesion (misma politica que perfil_publico).
+      // Expone SOLO lo equipado: nunca la coleccion completa, cantidad, activo
+      // ni el inventario no equipado.
+      // NOMBRE DELIBERADO: el tipo museo publico (con guion bajo en medio) ya
+      // existe en api/interacciones.js y significa OTRA cosa (arbol de
+      // casas/clases del perfil publico, WP-3; lo consumen perfil.html y
+      // mi-perfil.html). Aqui no se reutiliza ni se deja alias: un mismo tipo
+      // con dos shapes seria una trampa de mantenimiento.
+      if (tipo === 'museo_cartas') {
+        var mpId = String(req.query.usuario_id || '').trim();
+        // Misma validacion UUID que cartas_mias (UUID_RE, linea 405).
+        if (!UUID_RE.test(mpId))
+          return res.status(400).json({ ok: false, error: 'USUARIO_ID_INVALIDO' });
+        var mpRows;
+        try {
+          // Mismo patron de degradacion que perfil_publico: sin usuarios.foto_url
+          // (42703) se reintenta sin la columna en vez de escalar a 503.
+          mpRows = await sql(
+            'SELECT id, nombre, avatar_url, foto_url, xp_total, nivel_max,'
+            + ' perfil_publico FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
+            [mpId]
+          );
+        } catch (eMpFoto) {
+          if (!eMpFoto || eMpFoto.code !== '42703') throw eMpFoto;
+          console.error('[usuarios] museo_cartas degradado 42703: ' + eMpFoto.message);
+          mpRows = await sql(
+            'SELECT id, nombre, avatar_url, xp_total, nivel_max, perfil_publico'
+            + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
+            [mpId]
+          );
+        }
+        if (!mpRows.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var mpU = mpRows[0];
+        var mpNivel = Math.max(calcularNivel(mpU.xp_total).nivel,
+          Number(mpU.nivel_max) || 1);
+        if (mpU.perfil_publico === false) {
+          return res.status(403).json({
+            ok: false,
+            error: 'PERFIL_PRIVADO',
+            data: { nombre: mpU.nombre, nivel: mpNivel }
+          });
+        }
+        var mpCartas;
+        try {
+          mpCartas = await sql(
+            'SELECT c.id, c.nombre, c.rareza, c.set_slug, c.imagen_url,'
+            + ' c.descripcion, c.emisor_tipo, m.nombre AS marca_nombre,'
+            + ' c.stats_json, uc.variante'
+            + ' FROM usuarios_cartas uc JOIN cartas_catalogo c ON c.id = uc.carta_id'
+            + ' LEFT JOIN marcas m ON m.id = c.marca_id'
+            + ' WHERE uc.usuario_id = $1 AND uc.en_museo = true'
+            + ' AND uc.activo = true AND uc.cantidad >= 1 AND c.activo = true'
+            + ' ORDER BY uc.orden_museo ASC NULLS LAST, c.id ASC LIMIT $2',
+            [mpId, MUSEO_TOPE]
+          );
+        } catch (eMp) {
+          if (!eMp || (eMp.code !== '42P01' && eMp.code !== '42703')) throw eMp;
+          return responderSchemaPendiente(res, 'museo_cartas', eMp);
+        }
+        // Vitrina vacia = 200 con cartas: []. Nunca 404 ni error: el perfil
+        // publico no debe romperse por un museo sin equipar.
+        var mpLista = (mpCartas || []).map(function (c) {
+          return {
+            id: c.id,
+            nombre: c.nombre,
+            rareza: c.rareza,
+            variante: String(c.variante || CARTA_VARIANTE_DEFECTO),
+            set_slug: c.set_slug,
+            imagen_url: c.imagen_url || null,
+            descripcion: c.descripcion || null,
+            emisor_tipo: c.emisor_tipo || null,
+            marca_nombre: c.marca_nombre || null,
+            stats_json: c.stats_json || null
+          };
+        });
+        return res.json({
+          ok: true,
+          data: {
+            usuario_id: mpU.id,
+            nombre: mpU.nombre,
+            avatar_url: mpU.avatar_url || null,
+            foto_url: mpU.foto_url || null,
+            nivel: mpNivel,
+            perfil_publico: true,
+            cartas: mpLista,
+            museo_tope: MUSEO_TOPE
           }
         });
       }

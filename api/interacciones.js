@@ -218,6 +218,15 @@ var sqlNormGeo = BUSQ.sqlNormGeo;
 // los conteos de fotos se los pasa el SELECT de publicar_lugar_otorgar (D3.1).
 var ECCompletitud = require('../lib/completitud.js');
 
+// ADR-108 D9/D10: el coste de la fusion (200) y el tope del museo (12) viven
+// UNA sola vez, en lib/cartas-config.js, porque los consume TAMBIEN la lectura
+// de api/usuarios.js (fusion_coste_xp / museo_tope). Se enlazan con el mismo
+// nombre local para no tocar los usos. Prohibido reescribir el literal.
+var CartasConfig = require('../lib/cartas-config.js');
+var CARTA_FUSION_XP = CartasConfig.CARTA_FUSION_XP;
+var CARTA_MUSEO_TOPE = CartasConfig.MUSEO_TOPE;
+var CARTA_VARIANTE_DEFECTO = CartasConfig.CARTA_VARIANTE_DEFECTO;
+
 // v9 Gamificacion v4.0: probabilidades de cromos por rareza (ADR-018)
 var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 };
 
@@ -493,6 +502,11 @@ var XP_BASES = {
   publicar_bono_geo: 40,
   publicar_bono_foto: 30
 };
+
+// ADR-108 D9: coste plano de la fusion 4->1 (variante shiny). El valor vive en
+// lib/cartas-config.js junto al tope del museo, para que el cobro (aqui) y la
+// lectura (api/usuarios.js: fusion_coste_xp) no puedan derivar entre si. Se
+// cobra restando xp_total con doble guard: el nivel no baja (ADR-018).
 
 // Regalias pasivas (migracion 037): porcentaje ADICIONAL de XP que se
 // "mintea" al autor de un medio/espacio cada vez que OTRO usuario
@@ -2652,6 +2666,17 @@ var CARTA_OFERTA_ESTADOS_ACTIVOS = ['abierta', 'parcial'];
 var CARTA_OFERTA_HORAS_DEFAULT = 168;
 var CARTA_OFERTA_LIMITE = 200;
 
+// ADR-108 D6/D10: museo publico de 12 piezas (migracion 060). El tope 12 NO se
+// autoriza con COUNT(*): lo arbitran chk_usuarios_cartas_museo (orden 1..12)
+// y ux_usuarios_cartas_museo_orden (un orden unico por usuario). El valor de
+// CARTA_MUSEO_TOPE se enlaza arriba desde lib/cartas-config.js (MUSEO_TOPE):
+// solo sirve para validar el rango del body y para devolver 'tope'.
+// Las variantes validas viven en lib/cartas-config.js (fuente unica, ADR-108
+// D9) junto al coste de fusion y al tope del museo: la lectura de usuarios.js
+// valida contra la MISMA lista. El binding conserva el nombre para no tocar
+// ninguno de los usos (indexOf en las 3 ramas nuevas).
+var CARTA_VARIANTES = CartasConfig.CARTA_VARIANTES;
+
 // ADR-066 (Fase 2D, T12): Tithe de Parche (0..10 %, migracion 041). El
 // porcentaje lo fija el fundador/oficial en pandillas.tithe_pct.
 var PARCHE_TITHE_MAX = 10;
@@ -3119,6 +3144,22 @@ function responderCartasMercadoAusente(res, e, etiqueta) {
   return res.status(503).json({
     ok: false,
     error: 'Mercado de cartas no disponible (migracion 041 pendiente)',
+    code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+
+// ADR-108 D11/D12: 503 tipado de la FUSION 4->1. Es SOLO degradacion por
+// ESQUEMA AUSENTE: cubre la 060 sin aplicar (columna variante ausente ->
+// 42703), igual que responderCartasAusente en las otras dos ramas. El
+// statement aborta entero: CERO cobro de XP y CERO consumo de las 4 copias
+// (atomicidad, no estado parcial). Prohibido usarlo como pre-chequeo antes de
+// escribir ni como guard de constraints: la PK de 3 columnas la pone la 061.
+function responderFusionPendiente(res, e, etiqueta) {
+  console.warn('[cartas] ' + etiqueta + ' 503 (migracion 060 pendiente): '
+    + (e && e.code ? e.code + ' ' : '') + (e && e.message));
+  return res.status(503).json({
+    ok: false,
+    error: 'FUSION_PENDIENTE',
     code: 'SCHEMA_NOT_MIGRATED'
   });
 }
@@ -7028,7 +7069,8 @@ module.exports = async function handler(req, res) {
       // FASE 2D (T11 / ADR-062): GET publico ?tipo=cartas_ofertas con el
       // libro de ofertas activas ('abierta'/'parcial') de cartas. Sin PII:
       // solo el nombre publico del vendedor + catalogo (nombre/rareza/
-      // imagen). Filtro opcional ?carta_id=. Requiere la migracion 041.
+      // imagen) + variante y emisor (ADR-108: la UI marca la shiny y el badge
+      // de marca/ugc). Filtro opcional ?carta_id=. Requiere la migracion 041.
       if (tipo === 'cartas_ofertas') {
         var coParams = [];
         var coWhere = [
@@ -7043,14 +7085,15 @@ module.exports = async function handler(req, res) {
         var coRows;
         try {
           coRows = await sql(
-            'SELECT o.id, o.carta_id, o.cantidad, o.cantidad_restante, o.precio_xp,'
+            'SELECT o.id, o.carta_id, o.variante, o.cantidad, o.cantidad_restante, o.precio_xp,'
             + ' o.estado, o.creado_en, o.expira_en, o.vendedor_id,'
             + ' u.nombre AS vendedor_nombre,'
             + ' c.nombre AS carta_nombre, c.rareza, c.imagen_url, c.set_slug,'
-            + ' c.nivel_gate, c.es_evento'
+            + ' c.nivel_gate, c.es_evento, c.emisor_tipo, m.nombre AS marca_nombre'
             + ' FROM cartas_ofertas o'
             + ' JOIN cartas_catalogo c ON c.id = o.carta_id'
             + ' LEFT JOIN usuarios u ON u.id = o.vendedor_id'
+            + ' LEFT JOIN marcas m ON m.id = c.marca_id'
             + ' WHERE ' + coWhere.join(' AND ')
             + ' ORDER BY o.precio_xp ASC, o.creado_en ASC LIMIT $' + coParams.length,
             coParams
@@ -15167,7 +15210,9 @@ module.exports = async function handler(req, res) {
             + ' WHERE id=$2 AND activo=true AND es_evento=true LIMIT 1'
             + '), upd AS ('
             + ' UPDATE usuarios_cartas SET cantidad = cantidad - 1,'
-            + '  activo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE activo END'
+            + '  activo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE activo END,'
+            + '  en_museo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE en_museo END,'
+            + '  orden_museo = CASE WHEN cantidad - 1 <= 0 THEN NULL ELSE orden_museo END'
             + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND activo=true AND cantidad >= 1'
             + '  AND EXISTS (SELECT 1 FROM ok_carta)'
             + ' RETURNING cantidad, activo'
@@ -15215,6 +15260,13 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ ok: false, error: 'AUTOINTERCAMBIO_PROHIBIDO' });
         var cixCarta = String(body.carta_id || '').trim();
         if (!cixCarta) return res.status(400).json({ ok: false, error: 'carta_id requerido' });
+        // ADR-108: la variante es opcional y por omision 'base' (comportamiento
+        // previo intacto). El stock se mide por (carta, variante): una shiny y
+        // una base son inventario distinto.
+        var cixVar = String(body.variante || CARTA_VARIANTE_DEFECTO).trim().toLowerCase();
+        if (!cixVar) cixVar = CARTA_VARIANTE_DEFECTO;
+        if (CARTA_VARIANTES.indexOf(cixVar) === -1)
+          return res.status(400).json({ ok: false, error: 'PARAMETROS_INVALIDOS', campo: 'variante' });
         try {
           var cixCartaRow = await sql(
             'SELECT id, es_evento, nivel_gate FROM cartas_catalogo'
@@ -15247,17 +15299,21 @@ module.exports = async function handler(req, res) {
           cixRes = await sql(
             'WITH bumi AS ('
             + ' SELECT usuario_id FROM usuarios_cartas'
-            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND activo=true AND cantidad >= 1'
+            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=$4'
+            + '  AND activo=true AND cantidad >= 1'
             + '), dec AS ('
             + ' UPDATE usuarios_cartas SET cantidad = cantidad - 1,'
-            + '  activo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE activo END'
-            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND activo=true AND cantidad >= 1'
+            + '  activo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE activo END,'
+            + '  en_museo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE en_museo END,'
+            + '  orden_museo = CASE WHEN cantidad - 1 <= 0 THEN NULL ELSE orden_museo END'
+            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=$4'
+            + '  AND activo=true AND cantidad >= 1'
             + '  AND EXISTS (SELECT 1 FROM bumi)'
             + ' RETURNING cantidad, activo'
             + '), up AS ('
-            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, cantidad, activo, obtenida_en)'
-            + ' SELECT $3::uuid, $2, 1, true, NOW() FROM dec'
-            + ' ON CONFLICT (usuario_id, carta_id) DO UPDATE SET'
+            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo, obtenida_en)'
+            + ' SELECT $3::uuid, $2, $4, 1, true, NOW() FROM dec'
+            + ' ON CONFLICT (usuario_id, carta_id, variante) DO UPDATE SET'
             + '  cantidad = usuarios_cartas.cantidad + 1, activo=true, obtenida_en=NOW()'
             + ' RETURNING cantidad'
             + '), log AS ('
@@ -15269,7 +15325,7 @@ module.exports = async function handler(req, res) {
             + ' (SELECT activo FROM dec) AS emisor_activo,'
             + ' (SELECT cantidad FROM up) AS receptor_cantidad,'
             + ' (SELECT id FROM log) AS intercambio_id',
-            [cixUid, cixCarta, cixReceptor]
+            [cixUid, cixCarta, cixReceptor, cixVar]
           );
         } catch (eCix) {
           if (esEsquemaFaltante(eCix)) return responderCartasAusente(res, eCix, 'carta_intercambiar');
@@ -15281,7 +15337,7 @@ module.exports = async function handler(req, res) {
         if (cixR.emisor_cantidad === null || cixR.emisor_cantidad === undefined)
           return res.status(409).json({ ok: false, error: 'SIN_COPIA' });
         return res.status(200).json({
-          ok: true, carta_id: cixCarta, receptor_id: cixReceptor,
+          ok: true, carta_id: cixCarta, variante: cixVar, receptor_id: cixReceptor,
           emisor_cantidad: Number(cixR.emisor_cantidad),
           emisor_activo: cixR.emisor_activo === true,
           receptor_cantidad: Number(cixR.receptor_cantidad),
@@ -15313,6 +15369,13 @@ module.exports = async function handler(req, res) {
         var cpHoras = parseInt(body.horas, 10);
         if (!isFinite(cpHoras) || cpHoras < 1) cpHoras = CARTA_OFERTA_HORAS_DEFAULT;
         if (cpHoras > 8760) cpHoras = 8760;
+        // ADR-108: variante opcional, por omision 'base'. El escrow descuenta
+        // SOLO esa variante, luego el stock se valida por (carta, variante) y
+        // nunca por la suma de las dos filas.
+        var cpVar = String(body.variante || CARTA_VARIANTE_DEFECTO).trim().toLowerCase();
+        if (!cpVar) cpVar = CARTA_VARIANTE_DEFECTO;
+        if (CARTA_VARIANTES.indexOf(cpVar) === -1)
+          return res.status(400).json({ ok: false, error: 'PARAMETROS_INVALIDOS', campo: 'variante' });
 
         var cpRes;
         try {
@@ -15321,14 +15384,17 @@ module.exports = async function handler(req, res) {
             + ' SELECT id FROM cartas_catalogo WHERE id=$2 AND activo=true LIMIT 1'
             + '), escrow AS ('
             + ' UPDATE usuarios_cartas SET cantidad = cantidad - $3::int,'
-            + '  activo = CASE WHEN cantidad - $3::int <= 0 THEN false ELSE activo END'
-            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND activo=true AND cantidad >= $3::int'
+            + '  activo = CASE WHEN cantidad - $3::int <= 0 THEN false ELSE activo END,'
+            + '  en_museo = CASE WHEN cantidad - $3::int <= 0 THEN false ELSE en_museo END,'
+            + '  orden_museo = CASE WHEN cantidad - $3::int <= 0 THEN NULL ELSE orden_museo END'
+            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=$6'
+            + '  AND activo=true AND cantidad >= $3::int'
             + '  AND EXISTS (SELECT 1 FROM ok_carta)'
             + ' RETURNING cantidad, activo'
             + '), oferta AS ('
-            + ' INSERT INTO cartas_ofertas (vendedor_id, carta_id, cantidad,'
+            + ' INSERT INTO cartas_ofertas (vendedor_id, carta_id, variante, cantidad,'
             + '  cantidad_restante, precio_xp, estado, activo, expira_en)'
-            + ' SELECT $1::uuid, $2, $3::int, $3::int, $4::numeric, \'abierta\', true,'
+            + ' SELECT $1::uuid, $2, $6, $3::int, $3::int, $4::numeric, \'abierta\', true,'
             + '  NOW() + ($5::int * INTERVAL \'1 hour\')'
             + ' FROM escrow'
             + ' RETURNING id, estado, expira_en'
@@ -15339,7 +15405,7 @@ module.exports = async function handler(req, res) {
             + ' (SELECT id::text FROM oferta) AS oferta_id,'
             + ' (SELECT estado FROM oferta) AS estado,'
             + ' (SELECT expira_en FROM oferta) AS expira_en',
-            [cpUid, cpCarta, cpCant, cpPrecio, cpHoras]
+            [cpUid, cpCarta, cpCant, cpPrecio, cpHoras, cpVar]
           );
         } catch (eCp) {
           if (esEsquemaFaltante(eCp)) return responderCartasMercadoAusente(res, eCp, 'carta_publicar');
@@ -15356,7 +15422,7 @@ module.exports = async function handler(req, res) {
             carta_id: cpCarta, cantidad_solicitada: cpCant
           });
         return res.status(201).json({
-          ok: true, oferta_id: cpR.oferta_id, carta_id: cpCarta,
+          ok: true, oferta_id: cpR.oferta_id, carta_id: cpCarta, variante: cpVar,
           cantidad: cpCant, cantidad_restante: cpCant,
           precio_xp: cpPrecio, estado: cpR.estado || 'abierta',
           expira_en: cpR.expira_en,
@@ -15426,7 +15492,7 @@ module.exports = async function handler(req, res) {
         try {
           cbcRes = await sql(
             'WITH ok_oferta AS ('
-            + ' SELECT id, vendedor_id, carta_id, precio_xp FROM cartas_ofertas'
+            + ' SELECT id, vendedor_id, carta_id, variante, precio_xp FROM cartas_ofertas'
             + ' WHERE id=$1::uuid AND activo=true AND estado IN (\'abierta\',\'parcial\')'
             + '  AND cantidad_restante >= $2::int AND vendedor_id <> $3::uuid'
             + '  AND (expira_en IS NULL OR expira_en > NOW())'
@@ -15450,18 +15516,20 @@ module.exports = async function handler(req, res) {
             + ' WHERE id=(SELECT vendedor_id FROM ok_oferta) AND EXISTS (SELECT 1 FROM debit)'
             + ' RETURNING id'
             + '), cartas AS ('
-            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, cantidad, activo, obtenida_en)'
-            + ' SELECT $3::uuid, (SELECT carta_id FROM ok_oferta), $2::int, true, NOW()'
+            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo, obtenida_en)'
+            + ' SELECT $3::uuid, (SELECT carta_id FROM ok_oferta), (SELECT variante FROM ok_oferta),'
+            + '  $2::int, true, NOW()'
             + ' FROM debit'
-            + ' ON CONFLICT (usuario_id, carta_id) DO UPDATE SET'
+            + ' ON CONFLICT (usuario_id, carta_id, variante) DO UPDATE SET'
             + '  cantidad = usuarios_cartas.cantidad + EXCLUDED.cantidad,'
             + '  activo = true, obtenida_en = NOW()'
             + ' RETURNING cantidad'
             + '), venta AS ('
             + ' INSERT INTO cartas_ventas (oferta_id, vendedor_id, comprador_id, carta_id,'
-            + '  cantidad, precio_unitario, subtotal, creado_en)'
+            + '  variante, cantidad, precio_unitario, subtotal, creado_en)'
             + ' SELECT $1::uuid, (SELECT vendedor_id FROM ok_oferta), $3::uuid,'
-            + '  (SELECT carta_id FROM ok_oferta), $2::int, $5::numeric, $4::numeric, NOW()'
+            + '  (SELECT carta_id FROM ok_oferta), (SELECT variante FROM ok_oferta),'
+            + '  $2::int, $5::numeric, $4::numeric, NOW()'
             + ' FROM debit RETURNING id'
             + '), led_d AS ('
             + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final, es_exento, contexto)'
@@ -15523,12 +15591,13 @@ module.exports = async function handler(req, res) {
             + ' UPDATE cartas_ofertas SET estado=\'cancelada\', activo=false'
             + ' WHERE id=$1::uuid AND vendedor_id=$2::uuid AND activo=true'
             + '  AND estado IN (\'abierta\',\'parcial\')'
-            + ' RETURNING carta_id, cantidad_restante'
+            + ' RETURNING carta_id, variante, cantidad_restante'
             + '), dev AS ('
-            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, cantidad, activo, obtenida_en)'
-            + ' SELECT $2::uuid, (SELECT carta_id FROM upd), (SELECT cantidad_restante FROM upd), true, NOW()'
+            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo, obtenida_en)'
+            + ' SELECT $2::uuid, (SELECT carta_id FROM upd), (SELECT variante FROM upd),'
+            + '  (SELECT cantidad_restante FROM upd), true, NOW()'
             + ' WHERE (SELECT cantidad_restante FROM upd) > 0'
-            + ' ON CONFLICT (usuario_id, carta_id) DO UPDATE SET'
+            + ' ON CONFLICT (usuario_id, carta_id, variante) DO UPDATE SET'
             + '  cantidad = usuarios_cartas.cantidad + EXCLUDED.cantidad,'
             + '  activo = true, obtenida_en = NOW()'
             + ' RETURNING cantidad'
@@ -15553,6 +15622,437 @@ module.exports = async function handler(req, res) {
           devueltas: Number(czR.devueltas) || 0,
           vendedor_cantidad: (czR.vendedor_cantidad === null || czR.vendedor_cantidad === undefined)
             ? null : Number(czR.vendedor_cantidad)
+        });
+      }
+
+      // ADR-108 D6 (migracion 060): museo publico. Equipa o retira UNA pieza.
+      // El tope 12 y la unicidad del orden los arbitra la BASE
+      // (chk_usuarios_cartas_museo -> 23514, ux_usuarios_cartas_museo_orden ->
+      // 23505); la lectura de total de abajo es solo cortesia para responder
+      // 409 antes de intentarlo y NUNCA autoriza la escritura (D10).
+      if (tipo2 === 'carta_equipar_museo') {
+        var cemSes = usuarioDeSesion(req);
+        if (!cemSes.ok) return responderSesion(res, cemSes.razon);
+        var cemUid = cemSes.usuario_id;
+        var cemCarta = String(body.carta_id || '').trim();
+        if (!cemCarta)
+          return res.status(400).json({ ok: false, error: 'PARAMETROS_INVALIDOS', campo: 'carta_id' });
+        var cemAccion = String(body.accion || '').trim().toLowerCase();
+        if (cemAccion !== 'equipar' && cemAccion !== 'retirar')
+          return res.status(400).json({ ok: false, error: 'ORDEN_INVALIDO', motivo: 'accion' });
+        var cemVar = String(body.variante || CARTA_VARIANTE_DEFECTO).trim().toLowerCase();
+        if (!cemVar) cemVar = CARTA_VARIANTE_DEFECTO;
+        if (CARTA_VARIANTES.indexOf(cemVar) === -1)
+          return res.status(400).json({ ok: false, error: 'PARAMETROS_INVALIDOS', campo: 'variante' });
+        // ADR-108 D6/D10 (AJUSTE: orden opcional). Si el body no trae orden,
+        // el servidor asigna el primer hueco libre de 1..12; si lo trae, se
+        // respeta. Los huecos son LECTURA (autoasignacion + 409 temprano):
+        // el tope 12 lo siguen arbitrando el CHECK y el indice unico parcial,
+        // NUNCA este listado (D10). La propia pieza no ocupa su hueco, de modo
+        // que retirar+equipar sigue sirviendo para reordenar.
+        var cemSqlLibres = 'SELECT g.orden FROM generate_series(1, $4::int) AS g(orden)'
+          + ' WHERE NOT EXISTS (SELECT 1 FROM usuarios_cartas uc'
+          + '  WHERE uc.usuario_id = $1::uuid AND uc.en_museo = true'
+          + '   AND uc.orden_museo = g.orden'
+          + '   AND NOT (uc.carta_id = $2 AND uc.variante = $3))'
+          + ' ORDER BY g.orden ASC';
+        var cemLeeLibres = function() {
+          return sql(cemSqlLibres, [cemUid, cemCarta, cemVar, CARTA_MUSEO_TOPE])
+            .then(function(cemF) {
+              return (cemF || []).map(function(cemX) { return Number(cemX.orden); });
+            });
+        };
+        var cemIntenta = function(ord) {
+          return sql(
+            'UPDATE usuarios_cartas SET en_museo = true, orden_museo = $4::smallint'
+            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=$3'
+            + '  AND activo = true AND cantidad >= 1'
+            + ' RETURNING carta_id',
+            [cemUid, cemCarta, cemVar, ord]
+          );
+        };
+        // orden ausente = autoasignacion (null). Presente = se respeta.
+        var cemPide = (body.orden === undefined || body.orden === null
+          || String(body.orden).trim() === '') ? null : parseInt(body.orden, 10);
+        if (cemPide !== null && (!isFinite(cemPide) || cemPide < 1 || cemPide > CARTA_MUSEO_TOPE))
+          return res.status(400).json({
+            ok: false, error: 'ORDEN_INVALIDO',
+            orden: isFinite(cemPide) ? cemPide : null, tope: CARTA_MUSEO_TOPE
+          });
+        var cemRes;
+        if (cemAccion === 'retirar') {
+          try {
+            cemRes = await sql(
+              'UPDATE usuarios_cartas SET en_museo = false, orden_museo = NULL'
+              + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=$3'
+              + ' RETURNING carta_id',
+              [cemUid, cemCarta, cemVar]
+            );
+          } catch (eCemR) {
+            if (esEsquemaFaltante(eCemR)) return responderCartasAusente(res, eCemR, 'carta_equipar_museo');
+            throw eCemR;
+          }
+        } else {
+          var cemLibres;
+          try {
+            cemLibres = await cemLeeLibres();
+          } catch (eCemL0) {
+            if (esEsquemaFaltante(eCemL0)) return responderCartasAusente(res, eCemL0, 'carta_equipar_museo');
+            throw eCemL0;
+          }
+          if (!cemLibres.length)
+            return res.status(409).json({
+              ok: false, error: 'MUSEO_LLENO',
+              total: CARTA_MUSEO_TOPE, tope: CARTA_MUSEO_TOPE
+            });
+          var cemOrden = cemPide === null ? cemLibres[0] : cemPide;
+          var cemChoca = false;
+          try {
+            cemRes = await cemIntenta(cemOrden);
+          } catch (eCem1) {
+            if (esEsquemaFaltante(eCem1)) return responderCartasAusente(res, eCem1, 'carta_equipar_museo');
+            // El indice unico parcial decide la colision: UN reintento con el
+            // siguiente hueco libre antes de rendirse con 409.
+            if (!eCem1 || eCem1.code !== '23505') {
+              if (eCem1 && eCem1.code === '23514')
+                return res.status(409).json({ ok: false, error: 'MUSEO_LLENO', tope: CARTA_MUSEO_TOPE });
+              throw eCem1;
+            }
+            cemChoca = true;
+          }
+          if (cemChoca) {
+            var cemLibres2;
+            try {
+              cemLibres2 = await cemLeeLibres();
+            } catch (eCemL1) {
+              if (esEsquemaFaltante(eCemL1)) return responderCartasAusente(res, eCemL1, 'carta_equipar_museo');
+              throw eCemL1;
+            }
+            var cemAlt = null;
+            for (var cemI = 0; cemI < cemLibres2.length; cemI++) {
+              if (cemLibres2[cemI] !== cemOrden) { cemAlt = cemLibres2[cemI]; break; }
+            }
+            if (cemAlt === null)
+              return res.status(409).json({
+                ok: false, error: 'ORDEN_OCUPADO',
+                orden: cemOrden, tope: CARTA_MUSEO_TOPE
+              });
+            try {
+              cemRes = await cemIntenta(cemAlt);
+            } catch (eCem2) {
+              if (esEsquemaFaltante(eCem2)) return responderCartasAusente(res, eCem2, 'carta_equipar_museo');
+              if (eCem2 && eCem2.code === '23505')
+                return res.status(409).json({
+                  ok: false, error: 'ORDEN_OCUPADO',
+                  orden: cemAlt, tope: CARTA_MUSEO_TOPE
+                });
+              if (eCem2 && eCem2.code === '23514')
+                return res.status(409).json({ ok: false, error: 'MUSEO_LLENO', tope: CARTA_MUSEO_TOPE });
+              throw eCem2;
+            }
+          }
+        }
+        if (cemAccion === 'equipar' && !cemRes.length)
+          return res.status(404).json({
+            ok: false, error: 'CARTA_NO_POSEE',
+            carta_id: cemCarta, variante: cemVar
+          });
+        var cemMuseo;
+        try {
+          cemMuseo = await sql(
+            'SELECT uc.carta_id, uc.variante, uc.orden_museo,'
+            + ' c.nombre, c.rareza, c.imagen_url'
+            + ' FROM usuarios_cartas uc'
+            + ' JOIN cartas_catalogo c ON c.id = uc.carta_id'
+            + ' WHERE uc.usuario_id=$1::uuid AND uc.en_museo = true'
+            + '  AND uc.cantidad >= 1 AND uc.activo = true AND c.activo = true'
+            + ' ORDER BY uc.orden_museo ASC',
+            [cemUid]
+          );
+        } catch (eCemL) {
+          if (esEsquemaFaltante(eCemL)) return responderCartasAusente(res, eCemL, 'carta_equipar_museo');
+          throw eCemL;
+        }
+        var cemPiezas = (cemMuseo || []).map(function(cemP) {
+          return {
+            carta_id: cemP.carta_id, variante: cemP.variante,
+            orden: Number(cemP.orden_museo), nombre: cemP.nombre,
+            rareza: cemP.rareza, imagen_url: cemP.imagen_url
+          };
+        });
+        return res.status(200).json({
+          ok: true,
+          data: { total: cemPiezas.length, tope: CARTA_MUSEO_TOPE, museo: cemPiezas }
+        });
+      }
+
+      // ADR-108 D7 (migracion 060): fusion 4->1 determinista. Consume 4
+      // unidades 'base' de la MISMA carta y acredita 1 'shiny'. Todo o nada en
+      // UNA sentencia (CTE-DML): el cargo de XP y el decremento de las 4 copias
+      // viven en el mismo statement, luego no existe el estado parcial.
+      // El cobro replica el mecanismo REAL de compra (comprar_consumible,
+      // ~:13996-14001): resta xp_total con doble guard (xp_total >= coste Y
+      // GREATEST(xp_total - xp_gastado_sinks, 0) >= coste). Con 060 ausente
+      // degrada a 503 tipado, igual que las otras dos ramas.
+      if (tipo2 === 'carta_fusionar') {
+        var cfuSes = usuarioDeSesion(req);
+        if (!cfuSes.ok) return responderSesion(res, cfuSes.razon);
+        var cfuUid = cfuSes.usuario_id;
+        var cfuCarta = String(body.carta_id || '').trim();
+        if (!cfuCarta)
+          return res.status(400).json({ ok: false, error: 'PARAMETROS_INVALIDOS', campo: 'carta_id' });
+        var cfuCat;
+        try {
+          cfuCat = await sql(
+            'SELECT fusionable, nivel_gate, es_evento, emisor_tipo, es_canjeable_qr'
+            + ' FROM cartas_catalogo WHERE id=$1 AND activo=true LIMIT 1',
+            [cfuCarta]
+          );
+        } catch (eCfuC) {
+          if (esEsquemaFaltante(eCfuC)) return responderFusionPendiente(res, eCfuC, 'carta_fusionar');
+          throw eCfuC;
+        }
+        if (!cfuCat.length)
+          return res.status(404).json({ ok: false, error: 'CARTA_NO_ENCONTRADA', carta_id: cfuCarta });
+        if (cfuCat[0].fusionable !== true) {
+          var cfuMotivo = 'no_declarada';
+          if (cfuCat[0].es_evento === true) cfuMotivo = 'evento';
+          else if (cfuCat[0].nivel_gate !== null && cfuCat[0].nivel_gate !== undefined) cfuMotivo = 'gate';
+          else if (cfuCat[0].emisor_tipo === 'marca') cfuMotivo = 'marca';
+          else if (cfuCat[0].es_canjeable_qr === true) cfuMotivo = 'qr';
+          return res.status(400).json({
+            ok: false, error: 'CARTA_NO_FUSIONABLE',
+            carta_id: cfuCarta, motivo: cfuMotivo
+          });
+        }
+        var cfuRes;
+        try {
+          cfuRes = await sql(
+            'WITH src AS ('
+            + ' SELECT cantidad FROM usuarios_cartas'
+            + ' WHERE usuario_id = $1::uuid AND carta_id = $2 AND variante = \'base\''
+            + '  AND activo = true AND cantidad >= 4'
+            + ' FOR UPDATE),'
+            + ' cobro AS ('
+            + ' UPDATE usuarios u SET xp_total = u.xp_total - $3::numeric'
+            + ' WHERE u.id = $1::uuid AND EXISTS (SELECT 1 FROM src)'
+            + '  AND u.xp_total >= $3::numeric'
+            + '  AND GREATEST(u.xp_total - COALESCE(u.xp_gastado_sinks, 0), 0) >= $3::numeric'
+            + ' RETURNING u.xp_total, u.xp_gastado_sinks),'
+            + ' decr AS ('
+            + ' UPDATE usuarios_cartas uc SET cantidad = uc.cantidad - 4,'
+            + '  activo = CASE WHEN uc.cantidad - 4 <= 0 THEN false ELSE uc.activo END,'
+            + '  en_museo = CASE WHEN uc.cantidad - 4 <= 0 THEN false ELSE uc.en_museo END,'
+            + '  orden_museo = CASE WHEN uc.cantidad - 4 <= 0 THEN NULL ELSE uc.orden_museo END'
+            + ' WHERE uc.usuario_id = $1::uuid AND uc.carta_id = $2 AND uc.variante = \'base\''
+            + '  AND uc.cantidad >= 4 AND EXISTS (SELECT 1 FROM cobro)'
+            + ' RETURNING uc.cantidad),'
+            + ' out AS ('
+            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo)'
+            + ' SELECT $1::uuid, $2, \'shiny\', 1, true WHERE EXISTS (SELECT 1 FROM decr)'
+            + ' ON CONFLICT (usuario_id, carta_id, variante)'
+            + ' DO UPDATE SET cantidad = usuarios_cartas.cantidad + 1, activo = true'
+            + ' RETURNING cantidad)'
+            + ' SELECT (SELECT cantidad FROM decr) AS cantidad_base,'
+            + ' (SELECT cantidad FROM out) AS cantidad_shiny,'
+            + ' (SELECT xp_total FROM cobro) AS xp_total,'
+            + ' (SELECT xp_gastado_sinks FROM cobro) AS xp_gastado_sinks,'
+            + ' (SELECT COUNT(*)::int FROM src) AS src_n,'
+            + ' COALESCE((SELECT cantidad FROM usuarios_cartas'
+            + '  WHERE usuario_id = $1::uuid AND carta_id = $2 AND variante = \'base\'), 0) AS cantidad_actual',
+            [cfuUid, cfuCarta, CARTA_FUSION_XP]
+          );
+        } catch (eCfu) {
+          // Solo degradacion por ESQUEMA AUSENTE (060 sin aplicar), igual que
+          // las otras dos ramas. Nunca un pre-chequeo de constraints: la 061
+          // depromueve la PK y el INSERT de la fila shiny pasa a funcionar.
+          if (esEsquemaFaltante(eCfu))
+            return responderFusionPendiente(res, eCfu, 'carta_fusionar');
+          throw eCfu;
+        }
+        var cfuR = cfuRes[0] || {};
+        if (cfuR.cantidad_base === null || cfuR.cantidad_base === undefined) {
+          // Sin efectos: la sentencia no decremento ni cargo nada.
+          var cfuCant = Number(cfuR.cantidad_actual) || 0;
+          if (Number(cfuR.src_n) === 1) {
+            var cfuXpTotal = 0, cfuXpSinks = 0, cfuDisp;
+            try {
+              var cfuXpRow = await sql(
+                'SELECT xp_total, COALESCE(xp_gastado_sinks, 0) AS xp_gastado_sinks'
+                + ' FROM usuarios WHERE id=$1::uuid LIMIT 1',
+                [cfuUid]
+              );
+              cfuXpTotal = numXp(cfuXpRow[0] ? cfuXpRow[0].xp_total : 0);
+              cfuXpSinks = numXp(cfuXpRow[0] ? cfuXpRow[0].xp_gastado_sinks : 0);
+            } catch (eCfuX) {
+              if (esEsquemaFaltante(eCfuX)) return responderFusionPendiente(res, eCfuX, 'carta_fusionar');
+              throw eCfuX;
+            }
+            cfuDisp = Math.max(cfuXpTotal - cfuXpSinks, 0);
+            return res.status(409).json({
+              ok: false, error: 'XP_INSUFICIENTE',
+              carta_id: cfuCarta, xp_disponible: red2(cfuDisp),
+              coste_xp: CARTA_FUSION_XP,
+              faltante: red2(Math.max(0, CARTA_FUSION_XP - cfuDisp))
+            });
+          }
+          return res.status(409).json({
+            ok: false, error: 'CARTAS_INSUFICIENTES',
+            carta_id: cfuCarta, cantidad_actual: cfuCant, requeridas: 4
+          });
+        }
+        var cfuXpFinal = numXp(cfuR.xp_total) - numXp(cfuR.xp_gastado_sinks);
+        var cfuNivel = calcularNivelLocal(numXp(cfuR.xp_total)).nivel;
+        await registrarXpLedger(sql, {
+          usuario_id: cfuUid, accion: 'carta_fusion', xp_base: CARTA_FUSION_XP,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: red2(-CARTA_FUSION_XP), es_exento: true,
+          nivel: cfuNivel,
+          contexto: { carta_id: cfuCarta, variante_origen: 'base', variante_resultado: 'shiny' }
+        });
+        return res.status(200).json({
+          ok: true,
+          data: {
+            carta_id: cfuCarta, variante_resultado: 'shiny',
+            cantidad_base: Number(cfuR.cantidad_base),
+            cantidad_shiny: Number(cfuR.cantidad_shiny),
+            xp_gastado: CARTA_FUSION_XP,
+            xp_disponible: red2(Math.max(cfuXpFinal, 0))
+          }
+        });
+      }
+
+      // ADR-108 D5 (migracion 060): reclama el drop pendiente del gate ya
+      // alcanzado. Idempotente y SIN drop gratis: drop_en es el token (NULL =
+      // pendiente) y la reclamacion es el propio INSERT ... ON CONFLICT DO
+      // UPDATE ... WHERE drop_en IS NULL RETURNING, evaluado bajo el row-lock.
+      // Entrega UNA sola carta por gate (no el set): la del set_slug derivado
+      // del nivel_gate que el usuario tenga en MENOR cantidad, con desempate
+      // determinista por carta_id ASC y LIMIT 1. Sin azar. set_slug se DERIVA
+      // en servidor desde nivel_gate, jamas del body.
+      if (tipo2 === 'carta_obtener_drop') {
+        var codSes = usuarioDeSesion(req);
+        if (!codSes.ok) return responderSesion(res, codSes.razon);
+        var codUid = codSes.usuario_id;
+        var codGate = parseInt(body.nivel_gate, 10);
+        if (CARTA_GATES.indexOf(codGate) === -1)
+          return res.status(400).json({
+            ok: false, error: 'NIVEL_GATE_INVALIDO', permitidos: CARTA_GATES
+          });
+        var codUsr, codSet;
+        try {
+          codUsr = await sql(
+            'SELECT xp_total, COALESCE(nivel_max, 1) AS nivel_max'
+            + ' FROM usuarios WHERE id=$1::uuid LIMIT 1',
+            [codUid]
+          );
+        } catch (eCodU) {
+          if (esEsquemaFaltante(eCodU)) return responderCartasAusente(res, eCodU, 'carta_obtener_drop');
+          throw eCodU;
+        }
+        if (!codUsr.length)
+          return res.status(404).json({ ok: false, error: 'USUARIO_NO_ENCONTRADO' });
+        var codNivel = calcularNivelVisibleLocal(codUsr[0].xp_total, codUsr[0].nivel_max);
+        if (codNivel < codGate)
+          return res.status(403).json({
+            ok: false, error: 'GATE_NO_ALCANZADO',
+            nivel_actual: codNivel, nivel_requerido: codGate
+          });
+        try {
+          // Misma derivacion que la rama cartas_gate de api/usuarios.js: el
+          // set sale del catalogo por nivel_gate, jamas del body.
+          codSet = await sql(
+            'SELECT DISTINCT set_slug FROM cartas_catalogo'
+            + ' WHERE activo=true AND nivel_gate=$1 ORDER BY set_slug LIMIT 1',
+            [codGate]
+          );
+        } catch (eCodS) {
+          if (esEsquemaFaltante(eCodS)) return responderCartasAusente(res, eCodS, 'carta_obtener_drop');
+          throw eCodS;
+        }
+        if (!codSet.length)
+          return res.status(404).json({ ok: false, error: 'SET_NO_ENCONTRADO', nivel_gate: codGate });
+        var codSlug = String(codSet[0].set_slug);
+        var codRes;
+        try {
+          codRes = await sql(
+            'WITH stamp AS ('
+            + ' INSERT INTO cartas_gates (usuario_id, nivel_gate, set_slug, drop_en)'
+            + ' VALUES ($1::uuid, $2::smallint, $3::text, now())'
+            + ' ON CONFLICT (usuario_id, nivel_gate)'
+            + ' DO UPDATE SET drop_en = now() WHERE cartas_gates.drop_en IS NULL'
+            + ' RETURNING nivel_gate, drop_en),'
+            + ' ins AS ('
+            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo)'
+            + ' SELECT $1::uuid, c.id, \'base\', 1, true'
+            + ' FROM cartas_catalogo c'
+            + ' LEFT JOIN usuarios_cartas uc ON uc.usuario_id = $1::uuid'
+            + '  AND uc.carta_id = c.id AND uc.variante = \'base\''
+            + ' WHERE c.set_slug = $3::text AND c.activo = true'
+            + '  AND EXISTS (SELECT 1 FROM stamp)'
+            + ' ORDER BY COALESCE(uc.cantidad, 0) ASC, c.id ASC'
+            + ' LIMIT 1'
+            + ' ON CONFLICT (usuario_id, carta_id, variante)'
+            + ' DO UPDATE SET cantidad = usuarios_cartas.cantidad + 1, activo = true'
+            + ' RETURNING carta_id)'
+            + ' SELECT (SELECT COUNT(*)::int FROM stamp) AS cobrado,'
+            + ' (SELECT drop_en FROM stamp) AS drop_en,'
+            + ' (SELECT carta_id FROM ins) AS carta_id'
+          , [codUid, codGate, codSlug]);
+        } catch (eCod) {
+          if (esEsquemaFaltante(eCod)) return responderCartasAusente(res, eCod, 'carta_obtener_drop');
+          throw eCod;
+        }
+        var codR = codRes[0] || {};
+        if (Number(codR.cobrado) !== 1) {
+          // Replay: ya se cobro antes. No es error y NO se entrega carta.
+          var codPrev = [];
+          try {
+            codPrev = await sql(
+              'SELECT drop_en FROM cartas_gates'
+              + ' WHERE usuario_id=$1::uuid AND nivel_gate=$2::smallint LIMIT 1',
+              [codUid, codGate]
+            );
+          } catch (eCodP) {
+            if (esEsquemaFaltante(eCodP)) return responderCartasAusente(res, eCodP, 'carta_obtener_drop');
+            throw eCodP;
+          }
+          return res.status(200).json({
+            ok: true,
+            data: {
+              nivel_gate: codGate, set_slug: codSlug, ya_obtenido: true,
+              drop_en: (codPrev[0] && codPrev[0].drop_en) || null, cartas: []
+            }
+          });
+        }
+        var codCartas;
+        try {
+          codCartas = await sql(
+            'SELECT c.id AS carta_id, c.nombre, c.rareza, c.imagen_url,'
+            + ' COALESCE(uc.cantidad, 0) AS cantidad'
+            + ' FROM cartas_catalogo c'
+            + ' LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id'
+            + '  AND uc.usuario_id = $1::uuid AND uc.variante = \'base\''
+            + ' WHERE c.id = $2 AND c.activo = true'
+            + ' LIMIT 1',
+            [codUid, codR.carta_id]
+          );
+        } catch (eCodC) {
+          if (esEsquemaFaltante(eCodC)) return responderCartasAusente(res, eCodC, 'carta_obtener_drop');
+          throw eCodC;
+        }
+        return res.status(200).json({
+          ok: true,
+          data: {
+            nivel_gate: codGate, set_slug: codSlug, ya_obtenido: false,
+            drop_en: codR.drop_en || null,
+            cartas: (codCartas || []).map(function(codC) {
+              return {
+                carta_id: codC.carta_id, nombre: codC.nombre, rareza: codC.rareza,
+                imagen_url: codC.imagen_url, cantidad: Number(codC.cantidad)
+              };
+            })
+          }
         });
       }
 

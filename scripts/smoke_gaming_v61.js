@@ -89,9 +89,13 @@ check('S4: el debito exige saldo (xp_total >= $7::numeric + saldo_insuficiente)'
 // === 4. CARTAS: ramas carta_* apagan con activo=false (CERO DELETE) ===
 check('C1: cero DELETE FROM usuarios_cartas',
   contar(srcInt, /DELETE FROM usuarios_cartas/g) === 0);
+// ADR-006: la lista se contrasto contra el archivo REAL. El brief hablaba de
+// ~92 ramas, pero api/interacciones.js declara 8 ramas tipo2 === 'carta_*';
+// se listan las 8 (5 historicas + 3 de la entrega museo/fusion/drop).
 var ramasCartas = ['carta_evento_usar', 'carta_intercambiar', 'carta_publicar',
-  'carta_comprar', 'carta_cancelar'];
-check('C2: existen las 5 ramas carta_*',
+  'carta_comprar', 'carta_cancelar', 'carta_equipar_museo', 'carta_fusionar',
+  'carta_obtener_drop'];
+check('C2: existen las 8 ramas carta_* (5 historicas + museo/fusion/drop)',
   ramasCartas.every(function(r) {
     return srcInt.indexOf("tipo2 === '" + r + "'") !== -1;
   }));
@@ -118,6 +122,128 @@ var migAscii = [m039[0], m040[0], m041[0]].every(function(f) {
   return !!f && bytesAltos('db/migrations/' + f) === 0;
 });
 check('M2: 039/040/041 son ASCII-safe (0 bytes > 127)', migAscii);
+
+// === 7. SISTEMA DE CARTAS v6.1: emisor / variante / museo / fusion / drop ===
+// Estatico: lee fuente real, nunca conecta a Neon (sin DATABASE_URL aqui).
+var srcMercado = read('mercado.js');
+var srcCartasUi = read('cartas-ui.js');
+var srcCssCartas = read('cartas-ui.css');
+var srcMiPerfil = read('mi-perfil.html');
+var srcPerfil = read('perfil.html');
+
+// 7.1 ramas nuevas: cada una responde a su tipo2
+check('X1: las 3 ramas nuevas responden a su tipo2 (museo / fusion / drop)',
+  ramasCartas.every(function(r) {
+    return srcInt.indexOf("tipo2 === '" + r + "'") !== -1;
+  }));
+
+// 7.2 usuarios.js: museo_cartas presente, museo_publico erradicado
+check('X2: api/usuarios.js expone museo_cartas y no queda museo_publico',
+  srcUsu.indexOf('museo_cartas') !== -1
+  && contar(srcUsu, /museo_publico/g) === 0);
+
+// 7.3 PK con variante: ON CONFLICT migrado en interacciones
+check('X3: ON CONFLICT (usuario_id, carta_id, variante) >= 3 y el par viejo = 0',
+  contar(srcInt, /ON CONFLICT \(usuario_id, carta_id, variante\)/g) >= 3
+  && contar(srcInt, /ON CONFLICT \(usuario_id, carta_id\)/g) === 0);
+
+// 7.4 el album no duplica cartas: agrega por c.id
+check('X4: cartas_mias agrega por carta con COUNT(DISTINCT c.id)',
+  contar(srcUsu, /COUNT\(DISTINCT c\.id\)/g) >= 1);
+
+// 7.5 CartasUI.urlMuseo apunta a la rama correcta (no al arbol de casas)
+var iUrlMuseo = srcCartasUi.indexOf('function urlMuseo(');
+var urlMuseoBlock = iUrlMuseo === -1 ? '' : srcCartasUi.slice(iUrlMuseo, iUrlMuseo + 400);
+check('X5: CartasUI.urlMuseo usa tipo=museo_cartas y no museo_publico',
+  urlMuseoBlock.indexOf('tipo=museo_cartas') !== -1
+  && urlMuseoBlock.indexOf('museo_publico') === -1);
+
+// 7.6 ADR-004: el silo CSS no cuelga de :root
+check('X6: cartas-ui.css sin :root como selector (ADR-004)',
+  contar(srcCssCartas, /(^|[\s,}*]):root\s*\{/gm) === 0
+  && srcCssCartas.indexOf('.cartas-silo') !== -1);
+
+// 7.7 coste de fusion: lo emite el servidor y la UI lo lee, sin literal
+check('X7: coste de fusion leido de fusion_coste_xp (sin 200 literal en la UI)',
+  srcUsu.indexOf('fusion_coste_xp: CARTA_FUSION_XP') !== -1
+  && srcMiPerfil.indexOf('c.fusion_coste_xp') !== -1
+  && contar(srcMiPerfil, /coste\s*=\s*200/g) === 0);
+
+// 7.8-7.10 fusion: decremento con lock, validacion y cobro con guard
+var iCem = srcInt.indexOf("if (tipo2 === 'carta_equipar_museo')");
+var iFus = srcInt.indexOf("if (tipo2 === 'carta_fusionar')");
+var iCod = srcInt.indexOf("if (tipo2 === 'carta_obtener_drop')");
+var cemBlock = (iCem === -1 || iFus === -1) ? '' : srcInt.slice(iCem, iFus);
+var fusBlock = (iFus === -1 || iCod === -1) ? '' : srcInt.slice(iFus, iCod);
+var codBlock = iCod === -1 ? '' : srcInt.slice(iCod, iCod + 12000);
+
+check('X8: la fusion exige cantidad >= 4 bajo FOR UPDATE y RETURNING',
+  fusBlock.indexOf('cantidad >= 4') !== -1
+  && fusBlock.indexOf('FOR UPDATE') !== -1
+  && fusBlock.indexOf('RETURNING') !== -1);
+check('X9: la fusion valida fusionable antes de cobrar (CARTA_NO_FUSIONABLE)',
+  fusBlock.indexOf('fusionable !== true') !== -1
+  && fusBlock.indexOf('CARTA_NO_FUSIONABLE') !== -1
+  && fusBlock.indexOf('CARTAS_INSUFICIENTES') !== -1);
+check('X10: la fusion cobra XP de usuarios.xp_total con guard de sumidero',
+  fusBlock.indexOf('xp_total = u.xp_total - $3::numeric') !== -1
+  && fusBlock.indexOf('xp_gastado_sinks') !== -1
+  && fusBlock.indexOf('XP_INSUFICIENTE') !== -1);
+check('X11: FUSION_PENDIENTE solo en el camino de degradacion por esquema',
+  contar(srcInt, /'FUSION_PENDIENTE'/g) === 1
+  && contar(srcInt, /esEsquemaFaltante\([^)]*\)\) return responderFusionPendiente/g) >= 2);
+
+// 7.11 museo: hueco autoasignado; el tope 12 NO se autoriza por COUNT(*)
+check('X12: el museo autoasigna el primer hueco (generate_series) sin COUNT(*)',
+  cemBlock.indexOf('generate_series(1, $4::int)') !== -1
+  && cemBlock.indexOf('orden_museo = $4::smallint') !== -1
+  && contar(cemBlock, /COUNT\(\*\)/g) === 0);
+
+// 7.12 drop: gate ANTES de escribir + idempotencia por drop_en IS NULL
+var iGateCod = codBlock.indexOf("'GATE_NO_ALCANZADO'");
+var iInsCod = codBlock.indexOf('ON CONFLICT (usuario_id, nivel_gate)');
+check('X13: el gate se comprueba ANTES del INSERT (GATE_NO_ALCANZADO previo)',
+  iGateCod !== -1 && iInsCod !== -1 && iGateCod < iInsCod
+  && codBlock.indexOf('calcularNivelVisibleLocal') !== -1);
+check('X14: drop idempotente con WHERE cartas_gates.drop_en IS NULL',
+  codBlock.indexOf('DO UPDATE SET drop_en = now() WHERE cartas_gates.drop_en IS NULL') !== -1
+  && codBlock.indexOf('ON CONFLICT (usuario_id, carta_id, variante)') !== -1);
+
+// 7.13 mercado: libro de cartas con variante
+check('X15: mercado.js lee el libro de cartas con variante (cartas_ofertas)',
+  srcMercado.indexOf('cartas_ofertas') !== -1
+  && srcMercado.indexOf('variante') !== -1);
+check('X16: GET cartas_ofertas ampliado sigue en interacciones (sin endpoint nuevo)',
+  contar(srcInt, /cartas_ofertas/g) >= 3);
+
+// 7.14 paginas: perfil usa CartasUI.fetchMuseo y conserva el arbol de casas
+check('X17: perfil.html no llama museo_cartas a mano (usa CartasUI.fetchMuseo)',
+  srcPerfil.indexOf('fetchMuseo') !== -1
+  && srcPerfil.indexOf('museo_cartas') === -1);
+check('X18: el museo_publico del arbol de casas sigue intacto en perfil.html',
+  srcPerfil.indexOf('tipo=museo_publico') !== -1);
+
+// 7.15 ASCII-safety y cero backticks en serverless
+check('X19: cartas-ui.js / cartas-ui.css / mercado.js ASCII-safe (0 bytes > 127)',
+  bytesAltos('cartas-ui.js') === 0 && bytesAltos('cartas-ui.css') === 0
+  && bytesAltos('mercado.js') === 0);
+check('X20: cero backticks en serverless (interacciones / usuarios)',
+  !tieneBacktick(srcInt) && !tieneBacktick(srcUsu));
+
+// 7.16 migraciones 060/061 aplicadas como contrato de esquema
+var m060 = migDe('060'), m061 = migDe('061');
+var s060 = m060.length ? read('db/migrations/' + m060[0]) : '';
+var s061 = m061.length ? read('db/migrations/' + m061[0]) : '';
+check('X21: existen migraciones 060/061 y son ASCII-safe',
+  m060.length >= 1 && m061.length >= 1
+  && bytesAltos('db/migrations/' + m060[0]) === 0
+  && bytesAltos('db/migrations/' + m061[0]) === 0);
+check('X22: 060 arbitra el tope 12 por indice unico parcial + CHECK 1..12',
+  s060.indexOf('ux_usuarios_cartas_museo_orden') !== -1
+  && s060.indexOf('orden_museo BETWEEN 1 AND 12') !== -1);
+check('X23: 061 depromueve la PK a (usuario_id, carta_id, variante)',
+  s061.indexOf('DROP CONSTRAINT IF EXISTS usuarios_cartas_pkey') !== -1
+  && s061.indexOf('variante') !== -1);
 
 // === SELF ===
 var selfRel = 'scripts/smoke_gaming_v61.js';

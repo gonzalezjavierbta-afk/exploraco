@@ -343,6 +343,85 @@ function normalizarNivelGateCarta(valor) {
   return n;
 }
 
+// -- CARTAS: EMISOR / UGC / MARCA (D-6 del ADR-108, migracion 060) --------
+// cartas_catalogo gana emisor_tipo ('sistema'|'ugc'|'marca'), emisor_id
+// (uuid del autor UGC), marca_id (uuid de marcas.id, FK con RESTRICT),
+// descripcion, stats_json (jsonb objeto), es_canjeable_qr y fusionable.
+// Los CHECK viven en la base (chk_cartas_catalogo_emisor_coherente,
+// chk_cartas_catalogo_stats, chk_cartas_catalogo_fusionable): aqui se
+// validan ANTES del SQL para responder 400 tipado en lugar de dejar que
+// revienten con un 23514 (que caeria al catch como 500). Mismo contrato que
+// normalizarNivelGateCarta: null = el campo no viene, undefined = viene mal.
+var EMISORES_CARTA = ['sistema','ugc','marca'];
+var UUID_RE_CARTA = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+function normalizarEmisorTipoCarta(valor) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return 'sistema';
+  var s = String(valor).trim().toLowerCase();
+  if (EMISORES_CARTA.indexOf(s) < 0) return undefined;
+  return s;
+}
+function normalizarUuidCarta(valor) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return null;
+  var s = String(valor).trim().toLowerCase();
+  if (!UUID_RE_CARTA.test(s)) return undefined;
+  return s;
+}
+// stats_json es jsonb OBJETO (el CHECK rechaza arrays y primitivos). Acepta
+// el objeto ya parseado o el string JSON del textarea del panel.
+function normalizarStatsCarta(valor) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return {};
+  var obj = valor;
+  if (typeof valor === 'string') {
+    try { obj = JSON.parse(valor); } catch (e) { return undefined; }
+  }
+  if (!obj || typeof obj !== 'object' || Object.prototype.toString.call(obj) === '[object Array]') return undefined;
+  if (obj.bonus_xp_pct !== undefined && obj.bonus_xp_pct !== null) {
+    if (typeof obj.bonus_xp_pct !== 'number' || !isFinite(obj.bonus_xp_pct)) return undefined;
+  }
+  return obj;
+}
+function normalizarDescripcionCarta(valor) {
+  var s = String(valor == null ? '' : valor).trim();
+  if (!s) return null;
+  if (s.length > 2000) return undefined;
+  return s;
+}
+// Boolean tolerante (la UI manda booleanos, pero el formulario puede mandar
+// '0'/'1'/'false' como texto). Cualquier otra cosa no vacia cuenta como true.
+function boolCarta(valor) {
+  if (typeof valor === 'boolean') return valor;
+  var s = String(valor == null ? '' : valor).trim().toLowerCase();
+  return !(s === '' || s === '0' || s === 'false' || s === 'no');
+}
+// Coherencia de emisor sobre el RESULTADO (no sobre el body suelto):
+// 'marca' exige marca_id, 'ugc' exige emisor_id, 'sistema' exige ambos NULL.
+// Devuelve el motivo legible o '' si es coherente.
+function coherenciaEmisorCarta(tipo, emisorId, marcaId) {
+  if (tipo === 'marca') {
+    if (!marcaId) return 'emisor_tipo=marca exige marca_id';
+    return '';
+  }
+  if (tipo === 'ugc') {
+    if (!emisorId) return 'emisor_tipo=ugc exige emisor_id';
+    return '';
+  }
+  if (emisorId || marcaId) return 'emisor_tipo=sistema exige emisor_id y marca_id en null';
+  return '';
+}
+// INVARIANTE DE FUSION (chk_cartas_catalogo_fusionable): una carta con gate,
+// de evento, canjeable por QR o de marca NO puede ser fusionable. Devuelve la
+// lista de motivos ('' si el resultado es coherente) para poder rechazar con
+// el motivo explicito en lugar de corregir el body en silencio.
+function motivoNoFusionableCarta(f) {
+  var m = [];
+  if (f.nivel_gate !== null && f.nivel_gate !== undefined) m.push('nivel_gate no nulo');
+  if (f.es_evento === true) m.push('es_evento=true');
+  if (f.es_canjeable_qr === true) m.push('es_canjeable_qr=true');
+  if (f.emisor_tipo === 'marca') m.push('emisor_tipo=marca');
+  return m.join(', ');
+}
+
 // == ORIGEN / LEJANIA (ADR-058, migracion 038) ============================
 // Umbrales de las alertas anti-gaming del panel "Salud de la Red". Fijos y
 // documentados: NO se leen de gamificacion_config (esa tabla parametriza la
@@ -937,7 +1016,8 @@ module.exports = async function handler(req, res) {
       if (tipoCa === 'cartas_lista') {
         if (req.method !== 'GET') return res.status(405).end();
         var filasCa = await sql(
-          'SELECT id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en '
+          'SELECT id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en, '
+          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable '
           + 'FROM cartas_catalogo '
           + 'ORDER BY activo DESC, set_slug ASC, nivel_gate ASC NULLS FIRST, id ASC'
         );
@@ -963,22 +1043,82 @@ module.exports = async function handler(req, res) {
         var imgCa = String(body.imagen_url == null ? '' : body.imagen_url).trim() || null;
         if (imgCa && imgCa.length > 500)
           return res.status(400).json({ ok:false, error:'IMAGEN_URL_INVALIDA' });
+        // D-6 del ADR-108 (migracion 060): emisor, descripcion, stats_json,
+        // es_canjeable_qr y fusionable entran por la MISMA via (cartas_crear).
+        var emiTipoCa = normalizarEmisorTipoCarta(body.emisor_tipo);
+        if (emiTipoCa === undefined)
+          return res.status(400).json({ ok:false, error:'EMISOR_TIPO_INVALIDO', detalle:'emisor_tipo debe ser sistema, ugc o marca' });
+        var emiCa = normalizarUuidCarta(body.emisor_id);
+        if (emiCa === undefined)
+          return res.status(400).json({ ok:false, error:'EMISOR_ID_INVALIDO', detalle:'emisor_id debe ser un uuid valido o null' });
+        var marCa = normalizarUuidCarta(body.marca_id);
+        if (marCa === undefined)
+          return res.status(400).json({ ok:false, error:'MARCA_ID_INVALIDO', detalle:'marca_id debe ser un uuid valido o null' });
+        var descCa = normalizarDescripcionCarta(body.descripcion);
+        if (descCa === undefined)
+          return res.status(400).json({ ok:false, error:'DESCRIPCION_INVALIDA', detalle:'descripcion admite hasta 2000 caracteres' });
+        var statsCa = normalizarStatsCarta(body.stats_json);
+        if (statsCa === undefined)
+          return res.status(400).json({ ok:false, error:'STATS_JSON_INVALIDO', detalle:'stats_json debe ser un objeto JSON y bonus_xp_pct numerico si viene' });
+        var qrCa = boolCarta(body.es_canjeable_qr);
+        var fusPedCa = ('fusionable' in body);
+        var fusCa = fusPedCa ? boolCarta(body.fusionable) : true;
+        var errEmiCa = coherenciaEmisorCarta(emiTipoCa, emiCa, marCa);
+        if (errEmiCa)
+          return res.status(400).json({ ok:false, error:'EMISOR_INCOHERENTE', detalle: errEmiCa });
+        var motFusCa = motivoNoFusionableCarta({
+          nivel_gate: nivCa, es_evento: evCa, es_canjeable_qr: qrCa, emisor_tipo: emiTipoCa
+        });
+        if (fusPedCa && fusCa === true && motFusCa)
+          return res.status(400).json({ ok:false, error:'FUSION_INCOHERENTE', detalle:'fusionable=true no es compatible con: ' + motFusCa });
+        // Si el body NO pide fusionable y la combinacion no admite fusion, el
+        // valor se DERIVA a false: el DEFAULT true de la 060 violaria el CHECK
+        // y la carta no se podria crear. No se rechaza porque el operador no
+        // pidio fusionar; solo se rechaza lo que se pide de forma explicita.
+        if (!fusPedCa && motFusCa) fusCa = false;
         var existCa = await sql('SELECT 1 FROM cartas_catalogo WHERE id=$1 LIMIT 1',[idCa]);
         if (existCa.length)
           return res.status(409).json({ ok:false, error:'Ya existe una carta con ese id' });
         var insCa = await sql(
-          'INSERT INTO cartas_catalogo (id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url) '
-          + 'VALUES ($1,$2,$3,$4,$5,$6,$7) '
-          + 'RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en',
-          [idCa, nomCa, setCa, rarCa, nivCa, evCa, imgCa]
+          'INSERT INTO cartas_catalogo (id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, '
+          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable) '
+          + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14) '
+          + 'RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en, '
+          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable',
+          [idCa, nomCa, setCa, rarCa, nivCa, evCa, imgCa,
+           emiTipoCa, emiCa, marCa, descCa, JSON.stringify(statsCa), qrCa, fusCa]
         );
         return res.status(201).json({ ok:true, data: insCa[0], mensaje:'Carta creada' });
       }
 
       // --- Editar: campos de contenido (NUNCA el id) --------------------
+      // D-6 del ADR-108 (migracion 060): emisor, descripcion, stats_json,
+      // es_canjeable_qr y fusionable se editan por esta MISMA via. Los CHECK
+      // de la 060 miran el RESULTADO de la fila (no el body suelto): si el
+      // body toca emisor/gate/evento/qr/fusion se lee la fila ACTUAL y se
+      // valida el merge (body sobre fila) antes de escribir nada.
       if (tipoCa === 'cartas_editar') {
         if (req.method !== 'POST') return res.status(405).end();
         if (!body.id) return res.status(400).json({ ok:false, error:'id requerido' });
+        var tocaEmiCa = ('emisor_tipo' in body) || ('emisor_id' in body) || ('marca_id' in body);
+        var tocaInvCa = tocaEmiCa || ('fusionable' in body) || ('nivel_gate' in body)
+          || ('es_evento' in body) || ('es_canjeable_qr' in body);
+        var curCa = [];
+        if (tocaInvCa) {
+          curCa = await sql(
+            'SELECT nivel_gate, es_evento, es_canjeable_qr, emisor_tipo, emisor_id, marca_id, fusionable '
+            + 'FROM cartas_catalogo WHERE id=$1 LIMIT 1',
+            [body.id]
+          );
+          if (!curCa.length) return res.status(404).json({ ok:false, error:'Carta no encontrada' });
+        }
+        var effNivCa  = curCa.length ? curCa[0].nivel_gate : null;
+        var effEvCa   = curCa.length ? curCa[0].es_evento === true : false;
+        var effQrCa   = curCa.length ? curCa[0].es_canjeable_qr === true : false;
+        var effFusCa  = curCa.length ? curCa[0].fusionable !== false : true;
+        var effTipoCa = curCa.length ? curCa[0].emisor_tipo : 'sistema';
+        var effEmiCa  = curCa.length ? curCa[0].emisor_id : null;
+        var effMarCa  = curCa.length ? curCa[0].marca_id : null;
         var setsCa = []; var paramsCa = []; var piCa = 1;
         if ('nombre' in body) {
           var nomE2 = String(body.nombre || '').trim();
@@ -1000,10 +1140,12 @@ module.exports = async function handler(req, res) {
           var nivE2 = normalizarNivelGateCarta(body.nivel_gate);
           if (nivE2 === undefined)
             return res.status(400).json({ ok:false, error:'NIVEL_GATE_INVALIDO' });
+          effNivCa = nivE2;
           setsCa.push('nivel_gate=$' + piCa++); paramsCa.push(nivE2);
         }
         if ('es_evento' in body) {
-          setsCa.push('es_evento=$' + piCa++); paramsCa.push(Boolean(body.es_evento));
+          effEvCa = Boolean(body.es_evento);
+          setsCa.push('es_evento=$' + piCa++); paramsCa.push(effEvCa);
         }
         if ('imagen_url' in body) {
           var imgE2 = String(body.imagen_url == null ? '' : body.imagen_url).trim() || null;
@@ -1011,12 +1153,90 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ ok:false, error:'IMAGEN_URL_INVALIDA' });
           setsCa.push('imagen_url=$' + piCa++); paramsCa.push(imgE2);
         }
+        if ('descripcion' in body) {
+          var descE2 = normalizarDescripcionCarta(body.descripcion);
+          if (descE2 === undefined)
+            return res.status(400).json({ ok:false, error:'DESCRIPCION_INVALIDA', detalle:'descripcion admite hasta 2000 caracteres' });
+          setsCa.push('descripcion=$' + piCa++); paramsCa.push(descE2);
+        }
+        if ('stats_json' in body) {
+          var statsE2 = normalizarStatsCarta(body.stats_json);
+          if (statsE2 === undefined)
+            return res.status(400).json({ ok:false, error:'STATS_JSON_INVALIDO', detalle:'stats_json debe ser un objeto JSON y bonus_xp_pct numerico si viene' });
+          setsCa.push('stats_json=$' + piCa++ + '::jsonb'); paramsCa.push(JSON.stringify(statsE2));
+        }
+        if ('es_canjeable_qr' in body) {
+          effQrCa = boolCarta(body.es_canjeable_qr);
+          setsCa.push('es_canjeable_qr=$' + piCa++); paramsCa.push(effQrCa);
+        }
+        if ('emisor_tipo' in body) {
+          var emiE2 = normalizarEmisorTipoCarta(body.emisor_tipo);
+          if (emiE2 === undefined)
+            return res.status(400).json({ ok:false, error:'EMISOR_TIPO_INVALIDO', detalle:'emisor_tipo debe ser sistema, ugc o marca' });
+          effTipoCa = emiE2;
+          setsCa.push('emisor_tipo=$' + piCa++); paramsCa.push(emiE2);
+        }
+        if ('emisor_id' in body) {
+          var emiIdE2 = normalizarUuidCarta(body.emisor_id);
+          if (emiIdE2 === undefined)
+            return res.status(400).json({ ok:false, error:'EMISOR_ID_INVALIDO', detalle:'emisor_id debe ser un uuid valido o null' });
+          effEmiCa = emiIdE2;
+          setsCa.push('emisor_id=$' + piCa++); paramsCa.push(emiIdE2);
+        }
+        if ('marca_id' in body) {
+          var marIdE2 = normalizarUuidCarta(body.marca_id);
+          if (marIdE2 === undefined)
+            return res.status(400).json({ ok:false, error:'MARCA_ID_INVALIDO', detalle:'marca_id debe ser un uuid valido o null' });
+          effMarCa = marIdE2;
+          setsCa.push('marca_id=$' + piCa++); paramsCa.push(marIdE2);
+        }
+        // Coherencia de emisor sobre el RESULTADO del merge (nunca dejar que
+        // el 23514 de chk_cartas_catalogo_emisor_coherente caiga como 500).
+        var expEmiCa = ('emisor_id' in body) && effEmiCa !== null;
+        var expMarCa = ('marca_id' in body) && effMarCa !== null;
+        if (effTipoCa === 'sistema') {
+          if (expEmiCa || expMarCa)
+            return res.status(400).json({ ok:false, error:'EMISOR_INCOHERENTE', detalle:'emisor_tipo=sistema no admite emisor_id ni marca_id: envialos en null' });
+          // Pasar a sistema LIMPIA los dos: es la unica representacion que
+          // admite el CHECK y el operador no puede mandar "null" sin tocar
+          // el campo. No es correccion silenciosa: es el unico estado valido.
+          if (effEmiCa !== null) {
+            effEmiCa = null;
+            setsCa.push('emisor_id=$' + piCa++); paramsCa.push(null);
+          }
+          if (effMarCa !== null) {
+            effMarCa = null;
+            setsCa.push('marca_id=$' + piCa++); paramsCa.push(null);
+          }
+        } else {
+          var errEmiE2 = coherenciaEmisorCarta(effTipoCa, effEmiCa, effMarCa);
+          if (errEmiE2)
+            return res.status(400).json({ ok:false, error:'EMISOR_INCOHERENTE', detalle: errEmiE2 });
+        }
+        if ('fusionable' in body) {
+          effFusCa = boolCarta(body.fusionable);
+          setsCa.push('fusionable=$' + piCa++); paramsCa.push(effFusCa);
+        }
+        // INVARIANTE DE FUSION (chk_cartas_catalogo_fusionable) sobre el
+        // resultado. fusionable=true incompatible se RECHAZA con el motivo:
+        // no se corrige en silencio a false, el operador pidio algo
+        // incoherente y debe saberlo.
+        var motFusE2 = motivoNoFusionableCarta({
+          nivel_gate: effNivCa, es_evento: effEvCa, es_canjeable_qr: effQrCa, emisor_tipo: effTipoCa
+        });
+        if (effFusCa === true && motFusE2) {
+          var detFusE2 = ('fusionable' in body)
+            ? ('fusionable=true no es compatible con: ' + motFusE2)
+            : ('la carta ya es fusionable=true y el cambio pide: ' + motFusE2 + '; envia fusionable=false');
+          return res.status(400).json({ ok:false, error:'FUSION_INCOHERENTE', detalle: detFusE2 });
+        }
         if (!setsCa.length)
-          return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, set_slug, rareza, nivel_gate, es_evento o imagen_url' });
+          return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr o fusionable' });
         paramsCa.push(body.id);
         var updCa = await sql(
           'UPDATE cartas_catalogo SET ' + setsCa.join(', ') + ' WHERE id=$' + piCa
-          + ' RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo',
+          + ' RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, '
+          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable',
           paramsCa
         );
         if (!updCa.length) return res.status(404).json({ ok:false, error:'Carta no encontrada' });
