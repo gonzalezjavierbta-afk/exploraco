@@ -192,6 +192,36 @@
 const { neon } = require('@neondatabase/serverless');
 var crypto = require('crypto');
 
+// ADR-109 paso 4b: el secreto admin NO tiene fallback publico (fail-closed).
+// Sin process.env.ADMIN_SECRET las ramas admin responden 503; la comparacion
+// es en tiempo constante. Refactor a lib/ pendiente (deuda del arquitecto).
+function adminSecretValor() {
+  var s = process.env.ADMIN_SECRET;
+  return (typeof s === 'string' && s.length > 0) ? s : null;
+}
+// Bytes UTF-16 -> octetos bajos. Sin Buffer a proposito: el arnes de smoke
+// carga el handler en un sandbox vm sin globales de Node, y typed arrays son
+// intrinsecos de ECMAScript.
+function adminBytes(v) {
+  var s = String(v === undefined || v === null ? '' : v);
+  var out = new Uint8Array(s.length);
+  for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
+  return out;
+}
+function adminSecretIgual(candidato) {
+  var real = adminSecretValor();
+  if (!real) return false;
+  var cand = String(candidato === undefined || candidato === null ? '' : candidato);
+  if (cand.length !== real.length || cand.length === 0) return false;
+  return crypto.timingSafeEqual(adminBytes(cand), adminBytes(real));
+}
+function adminSecretAusente(res, contexto) {
+  if (adminSecretValor()) return false;
+  console.error('[auth] CONFIG_ADMIN_SECRET_AUSENTE ' + contexto);
+  res.status(503).json({ ok: false, error: 'CONFIG_ADMIN_SECRET_AUSENTE' });
+  return true;
+}
+
 // ADR-086: motor COMPARTIDO del score compuesto. Vive en lib/score.js, fuera
 // de api/ a proposito (8/8 funciones serverless, cero endpoints nuevos), y lo
 // consumen los CUATRO rankings: leaderboard, faccion_ranking y casa_ranking en
@@ -6577,8 +6607,7 @@ module.exports = async function handler(req, res) {
       // no hay quorum y pasaron 30 dias (sin actividad de votos o sin
       // propuesta nueva) la propuesta se lee como rechazada.
       if (tipo === 'activos_ocultos_pendientes') {
-        var esAdminAo = (req.headers.authorization || '').slice(7)
-          === (process.env.ADMIN_SECRET || 'exploraco12345');
+        var esAdminAo = adminSecretIgual((req.headers.authorization || '').slice(7));
         if (!usuarioId && !esAdminAo)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
         var aoPend = await sql(
@@ -6965,7 +6994,7 @@ module.exports = async function handler(req, res) {
       if (tipo === 'canjes_marca') {
         var cmBear = String(req.headers.authorization || '');
         var cmEsAdmin = cmBear.indexOf('Bearer ') === 0
-          && cmBear.slice(7) === (process.env.ADMIN_SECRET || 'exploraco12345');
+          && adminSecretIgual(cmBear.slice(7));
         var cmUid = null;
         if (!cmEsAdmin) {
           var cmSes = usuarioDeSesion(req);
@@ -8742,8 +8771,8 @@ module.exports = async function handler(req, res) {
         if (crToken.indexOf('Bearer ') !== 0)
           return res.status(401).json({ ok: false, error: 'Token requerido' });
         crToken = crToken.slice(7);
-        var crSecret = process.env.ADMIN_SECRET || 'exploraco12345';
-        if (crToken !== crSecret)
+        if (adminSecretAusente(res, 'cr_ranking')) return;
+        if (!adminSecretIgual(crToken))
           return res.status(403).json({ ok: false, error: 'Token invalido' });
 
         var crLimit = Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 100);
@@ -11635,7 +11664,7 @@ module.exports = async function handler(req, res) {
         var chatEsAdmin = false;
         var chatBearer = (req.headers.authorization || '');
         if (chatBearer.indexOf('Bearer ') === 0) {
-          chatEsAdmin = (chatBearer.slice(7) === (process.env.ADMIN_SECRET || 'exploraco12345'));
+          chatEsAdmin = adminSecretIgual(chatBearer.slice(7));
         }
         if (!chatEsAdmin && usuarioId2) {
           var chatUE = await sql('SELECT email FROM usuarios WHERE id=$1::uuid LIMIT 1', [usuarioId2]).catch(function(e){ console.error('[chat_msg] admin email lookup: ' + (e && e.message)); return []; });
@@ -11706,8 +11735,9 @@ module.exports = async function handler(req, res) {
       // opcional (columna nullable) y jamas se inventa un id inexistente.
       if (tipo2 === 'anuncio_oficial') {
         var anunBearer = req.headers.authorization || '';
+        if (adminSecretAusente(res, 'anuncio_oficial')) return;
         var anunEsAdmin = anunBearer.indexOf('Bearer ') === 0
-          && anunBearer.slice(7) === (process.env.ADMIN_SECRET || 'exploraco12345');
+          && adminSecretIgual(anunBearer.slice(7));
         if (!anunEsAdmin)
           return res.status(403).json({ ok: false, error: 'Solo el administrador puede publicar anuncios oficiales' });
         var anunTexto = String(body.texto || '').trim();
@@ -11741,7 +11771,7 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ ok: false, error: 'tributo_pct debe estar entre 0 y 15' });
         var ctcBearer = req.headers.authorization || '';
         var ctcEsAdmin = ctcBearer.indexOf('Bearer ') === 0
-          && ctcBearer.slice(7) === (process.env.ADMIN_SECRET || 'exploraco12345');
+          && adminSecretIgual(ctcBearer.slice(7));
         var ctcAutorizado = ctcEsAdmin;
         if (!ctcAutorizado && usuarioId2 && validarSesion(req, usuarioId2).ok) {
           var ctcLider = await sql(
@@ -13458,8 +13488,8 @@ module.exports = async function handler(req, res) {
         if (aftAdminToken.indexOf('Bearer ') !== 0)
           return res.status(401).json({ ok: false, error: 'Token requerido' });
         aftAdminToken = aftAdminToken.slice(7);
-        var adminSecret = process.env.ADMIN_SECRET || 'exploraco12345';
-        if (aftAdminToken !== adminSecret)
+        if (adminSecretAusente(res, 'aft')) return;
+        if (!adminSecretIgual(aftAdminToken))
           return res.status(403).json({ ok: false, error: 'Token invalido' });
 
         var aftDestinoId = body.destino_id || null;
@@ -13477,8 +13507,8 @@ module.exports = async function handler(req, res) {
         if (amaAdminToken.indexOf('Bearer ') !== 0)
           return res.status(401).json({ ok: false, error: 'Token requerido' });
         amaAdminToken = amaAdminToken.slice(7);
-        var adminSecret2 = process.env.ADMIN_SECRET || 'exploraco12345';
-        if (amaAdminToken !== adminSecret2)
+        if (adminSecretAusente(res, 'ama')) return;
+        if (!adminSecretIgual(amaAdminToken))
           return res.status(403).json({ ok: false, error: 'Token invalido' });
 
         var amaFotoId = body.foto_id || null;
@@ -13502,8 +13532,8 @@ module.exports = async function handler(req, res) {
         if (axToken.indexOf('Bearer ') !== 0)
           return res.status(401).json({ ok: false, error: 'Token requerido' });
         axToken = axToken.slice(7);
-        var axSecret = process.env.ADMIN_SECRET || 'exploraco12345';
-        if (axToken !== axSecret)
+        if (adminSecretAusente(res, 'ax')) return;
+        if (!adminSecretIgual(axToken))
           return res.status(403).json({ ok: false, error: 'Token invalido' });
         var axUserId = String(body.usuario_id || '');
         if (!axUserId)
@@ -13752,8 +13782,7 @@ module.exports = async function handler(req, res) {
         var cfeAdmin = false;
         var cfeToken = req.headers.authorization || '';
         if (cfeToken.indexOf('Bearer ') === 0) {
-          var cfeSecret = process.env.ADMIN_SECRET || 'exploraco12345';
-          if (cfeToken.slice(7) === cfeSecret) cfeAdmin = true;
+          if (adminSecretIgual(cfeToken.slice(7))) cfeAdmin = true;
         }
         if (!usuarioId2 && !cfeAdmin)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
@@ -15008,11 +15037,11 @@ module.exports = async function handler(req, res) {
       // (interacciones.xp_ganado); el body no puede fijar el monto.
       if (tipo2 === 'spot_dividendo') {
         var sdHdr = req.headers.authorization || '';
-        var sdSecret = process.env.ADMIN_SECRET || 'exploraco12345';
         var sdTraeCred = (sdHdr.indexOf('Bearer ') === 0)
           || (req.headers['x-internal-secret'] !== undefined);
-        var sdEsAdmin = (sdHdr.indexOf('Bearer ') === 0 && sdHdr.slice(7) === sdSecret)
-          || (req.headers['x-internal-secret'] === sdSecret);
+        if (adminSecretAusente(res, 'spot_dividendo')) return;
+        var sdEsAdmin = (sdHdr.indexOf('Bearer ') === 0 && adminSecretIgual(sdHdr.slice(7)))
+          || adminSecretIgual(req.headers['x-internal-secret']);
         if (!sdEsAdmin)
           return res.status(sdTraeCred ? 403 : 401)
             .json({ ok: false, error: sdTraeCred ? 'Solo admin' : 'Token requerido' });
@@ -16880,8 +16909,9 @@ module.exports = async function handler(req, res) {
       // =====================================================================
       if (tipo2 === 'marca_premio_otorgar') {
         var moBear = String(req.headers.authorization || '');
+        if (adminSecretAusente(res, 'marca_premio_otorgar')) return;
         var moEsAdmin = moBear.indexOf('Bearer ') === 0
-          && moBear.slice(7) === (process.env.ADMIN_SECRET || 'exploraco12345');
+          && adminSecretIgual(moBear.slice(7));
         if (!moEsAdmin)
           return res.status(401).json({ ok: false, error: 'No autorizado' });
 
@@ -17995,8 +18025,9 @@ module.exports = async function handler(req, res) {
       // (D5.5): un destino ya 'otorgado' sale por la puerta de abajo sin que
       // se le reescriba pub_tier.
       if (tipo2 === 'publicar_lugar_otorgar') {
+        if (adminSecretAusente(res, 'publicar_lugar_otorgar')) return;
         var admSecretPub = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
-        if (admSecretPub !== (process.env.ADMIN_SECRET || 'exploraco12345'))
+        if (!adminSecretIgual(admSecretPub))
           return res.status(401).json({ ok: false, error: 'No autorizado' });
         if (!destinoId2) return res.status(400).json({ ok: false, error: 'destino_id requerido' });
         // D5.1 -- SELECT ampliado: la fila final completa (la galeria NO vive
@@ -18186,6 +18217,252 @@ module.exports = async function handler(req, res) {
           completitud: persPub.pub_completitud,
           fotos_total: persPub.pub_fotos_total,
           fotos_no_hero: persPub.pub_fotos_no_hero
+        });
+      }
+
+      // ADR-109 D4/B5 -- APROBAR Y PAGAR EN LA MISMA INVOCACION.
+      // Rama POST de esta misma funcion (8/8: cero endpoint nuevo, cero
+      // funcion serverless nueva). Sustituye el doble salto
+      // admin.js -> fetch -> publicar_lugar_otorgar, que podia publicar y
+      // NO pagar si el segundo salto fallaba.
+      //
+      // Orden de D4: (1) Bearer ADMIN_SECRET; (2) exencion de destinatario
+      // (B1: origen_envio='admin'); (3) idempotencia por pub_xp_estado (D7);
+      // (4) 409 si la fila es de usuario y no hay autor (D2); (5) tier y
+      // completitud recalculados sobre la ficha final (ADR-099 D5); (6) UNA
+      // sola CTE que publica + claim + saldo (B5); (7) ledger SOLO si el
+      // claim devolvio 1 fila; (8) clase/cofre y referidos best-effort,
+      // igual que en otorgar.
+      if (tipo2 === 'publicar_lugar_aprobar') {
+        if (adminSecretAusente(res, 'publicar_lugar_aprobar')) return;
+        var alSecret = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
+        if (!adminSecretIgual(alSecret))
+          return res.status(401).json({ ok: false, error: 'No autorizado' });
+        if (!destinoId2) return res.status(400).json({ ok: false, error: 'destino_id requerido' });
+        if (!MERCADO_UUID_RE.test(String(destinoId2)))
+          return res.status(400).json({ ok: false, error: 'destino_id_invalido' });
+        // Misma fila final que usa otorgar (D5.1): la galeria NO vive en
+        // tags, los dos conteos se hacen aqui y el hero no se cuenta dos
+        // veces. Solo se lee; el motor no se toca ni se mueve.
+        var filasAl = await sql(
+          'SELECT d.id, d.nombre, d.categoria_slug, d.ciudad, d.region, d.zona, '
+          + 'd.barrio, d.lead, d.descripcion, d.precio_desde, d.horario, '
+          + 'd.whatsapp, d.email, d.telefono, d.web, d.instagram, '
+          + 'd.foto_hero, d.lat, d.lng, d.status, d.tags, '
+          + '(SELECT COUNT(DISTINCT df.url)::int FROM destinos_fotos df '
+          + 'WHERE df.destino_id = d.id AND df.url IS NOT NULL) AS galeria_n, '
+          + '(SELECT COUNT(*)::int FROM destinos_fotos df '
+          + 'WHERE df.destino_id = d.id AND d.foto_hero IS NOT NULL '
+          + 'AND df.url = d.foto_hero) AS hero_en_galeria '
+          + 'FROM destinos d WHERE d.id = $1',
+          [destinoId2]
+        );
+        if (!filasAl.length)
+          return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
+        var filaAl = filasAl[0];
+        var tagsAl = filaAl.tags || {};
+        var statusAl = String(filaAl.status || '');
+        var estadoEnvioAl = String(tagsAl.estado_envio || '');
+        // B1 -- el alta directa del admin NO tiene usuario destinatario: esta
+        // fuera del universo de pago. No se escribe NADA (ni status ni XP).
+        if (String(tagsAl.origen_envio || '') === 'admin')
+          return res.status(200).json({ ok: true, publicado: false, motivo: 'sin_destinatario' });
+        // D7 -- idempotencia: el doble clic del panel no puede pagar dos
+        // veces. 'sin_autor' NO bloquea (es recuperable y es la via de
+        // reparacion de Paloquemao, B2); solo 'otorgado' bloquea.
+        if (tagsAl.pub_xp_estado === 'otorgado')
+          return res.status(200).json({ ok: true, otorgado: false, motivo: 'ya_otorgado' });
+        // B2/B5 -- estados aprobables: la cola (enviado) y la REPARACION de
+        // una ficha ya publicada e impagada (published). Ademas se admite
+        // 'draft' SOLO si el envio esta marcado como enviado: es el estado
+        // real que escribe api/publicar-lugar.js:937 para un envio de
+        // usuario, y sin esta excepcion ninguna ficha nueva seria aprobable.
+        var estadoAprobableAl = (statusAl === 'enviado' || statusAl === 'published'
+          || (statusAl === 'draft' && estadoEnvioAl === 'enviado'));
+        if (!estadoAprobableAl)
+          return res.status(409).json({
+            ok: false, publicado: false, otorgado: false,
+            error: 'ESTADO_NO_APROBABLE', motivo: 'status_no_aprobable', status: statusAl
+          });
+        // D2 -- nunca se publica una ficha de usuario que no se puede pagar:
+        // sin autor no hay destinatario del XP, luego 409 y CERO escrituras.
+        var autorAl = tagsAl.autor_id;
+        if (!autorAl || !MERCADO_UUID_RE.test(String(autorAl)))
+          return res.status(409).json({
+            ok: false, publicado: false, otorgado: false,
+            error: 'SIN_AUTOR_NO_APROBABLE', motivo: 'sin_autor'
+          });
+        var pubLatAl = typeof filaAl.lat === 'number' ? filaAl.lat : parseFloat(filaAl.lat);
+        var pubLngAl = typeof filaAl.lng === 'number' ? filaAl.lng : parseFloat(filaAl.lng);
+        var pubPuntoAl = tieneCoordsValidas(pubLatAl, pubLngAl)
+          ? { lat: pubLatAl, lng: pubLngAl } : null;
+        var galeriaNAl = parseInt(filaAl.galeria_n, 10);
+        if (!isFinite(galeriaNAl) || galeriaNAl < 0) galeriaNAl = 0;
+        var heroEnGaleriaAl = parseInt(filaAl.hero_en_galeria, 10);
+        if (!isFinite(heroEnGaleriaAl) || heroEnGaleriaAl < 0) heroEnGaleriaAl = 0;
+        var fotosTotalAl = galeriaNAl
+          + ((filaAl.foto_hero && heroEnGaleriaAl === 0) ? 1 : 0);
+        var fotosNoHeroAl = Math.max(0, galeriaNAl - (heroEnGaleriaAl > 0 ? 1 : 0));
+        var normAl = ECCompletitud.normalizarFila(filaAl, []);
+        var entradaAl = Object.assign({}, filaAl, normAl);
+        entradaAl.fotos_total = fotosTotalAl;
+        entradaAl.fotos_no_hero = fotosNoHeroAl;
+        var resCompAl = ECCompletitud.calcular(entradaAl);
+        var persAl = ECCompletitud.persistible(resCompAl);
+        // D5 -- el tier se RECALCULA sobre la ficha final; no se lee congelado.
+        var tierAl = String(persAl.pub_tier || 'basico');
+        var fotoBonoAl = fotosTotalAl >= 1;
+        var geoAlFinal = null;
+        if (tagsAl.pub_geo === true || tagsAl.pub_geo === false) {
+          geoAlFinal = tagsAl.pub_geo;
+        } else if (tagsAl.pub_geo_dist_m !== undefined && tagsAl.pub_geo_dist_m !== null) {
+          var distAlM = parseFloat(tagsAl.pub_geo_dist_m);
+          geoAlFinal = isFinite(distAlM) && distAlM <= 300;
+        }
+        var baseKeyAl = 'publicar_' + tierAl;
+        if (XP_BASES[baseKeyAl] === undefined) baseKeyAl = 'publicar_basico';
+        var xpBaseAl = numXp(XP_BASES[baseKeyAl]);
+        var bonoGeoAl = geoAlFinal ? numXp(XP_BASES.publicar_bono_geo) : 0;
+        var bonoFotoAl = fotoBonoAl ? numXp(XP_BASES.publicar_bono_foto) : 0;
+        // Motor existente, sin duplicarlo ni moverlo (el gate de
+        // scripts/smoke_038_casas_clases.js verifica por TEXTO que exista
+        // exactamente una async function contextoXpE).
+        var ctxAl = await contextoXpE(sql, autorAl);
+        var resAl = await calcularXpAcreditado(sql, xpBaseAl, ctxAl.nivel_clase,
+          ctxAl.clase_id, ctxAl.tag,
+          { nivel_usuario: ctxAl.nivel_usuario, usuario_id: autorAl, punto: pubPuntoAl });
+        var xpTotalAl = red2(resAl.xp_final + bonoGeoAl + bonoFotoAl);
+        // 'otorgado' con 0 XP es INALCANZABLE por construccion (D4): si el
+        // calculo da 0 o NaN se marca error_calculo (estado recuperable, no
+        // bloquea el claim), NO se publica y NO se toca xp_total.
+        if (!isFinite(xpTotalAl) || xpTotalAl <= 0) {
+          try {
+            await sql(
+              'UPDATE destinos SET tags = COALESCE(tags, \'{}\'::jsonb) || $2::jsonb '
+              + 'WHERE id = $1',
+              [destinoId2, JSON.stringify({ pub_xp_estado: 'error_calculo' })]
+            );
+          } catch (eCalcAl) {
+            console.warn('[publicar_lugar_aprobar] error_calculo no escrito: '
+              + (eCalcAl && eCalcAl.message));
+          }
+          return res.status(500).json({
+            ok: false, publicado: false, otorgado: false,
+            error: 'XP_CERO', motivo: 'error_calculo',
+            xp: (isFinite(xpTotalAl) ? xpTotalAl : 0)
+          });
+        }
+        var tagsClaimAl = {
+          pub_xp_estado: 'otorgado',
+          pub_tier: persAl.pub_tier,
+          pub_completitud: persAl.pub_completitud,
+          pub_faltantes: persAl.pub_faltantes,
+          pub_fotos_total: persAl.pub_fotos_total,
+          pub_fotos_no_hero: persAl.pub_fotos_no_hero,
+          pub_foto: fotoBonoAl
+        };
+        if (geoAlFinal !== null) tagsClaimAl.pub_geo = geoAlFinal;
+        // B5 -- status + claim + xp_total en UNA SOLA CTE y por tanto en UNA
+        // sola sentencia: si el saldo falla, el claim no existe; si el claim
+        // no devuelve fila, no se suma nada. NO se usa bloqueo pesimista de
+        // fila: el driver HTTP de Neon no retiene el lock entre llamadas, asi
+        // que solo daria una falsa exclusion. La exclusion mutua la da el
+        // claim condicional por fila: dos aprobaciones simultaneas compiten
+        // por el mismo recuento y solo una escribe.
+        //
+        // La CTE usr reproduce la correccion 2026-10-24 de otorgar: sin autor
+        // existente no hay claim, luego no hay 'otorgado' con 0 XP.
+        var cteAl = await sql(
+          'WITH usr AS ('
+          + 'SELECT u.id FROM usuarios u WHERE u.id = $4::uuid'
+          + '), claim AS ('
+          + 'UPDATE destinos SET status = \'published\', actualizado_en = NOW(), '
+          + 'tags = COALESCE(tags, \'{}\'::jsonb) || $2::jsonb '
+          // Comillas dobles A PROPOSITO en el fragmento del filtro de estado:
+          // el gate estatico de ADR-109 T9 (viii) lee el TEXTO de la rama y
+          // exige el literal status IN ('enviado','published').
+          + "WHERE id=$1 AND (status IN ('enviado','published') "
+          + 'OR (status = \'draft\' AND COALESCE(tags->>\'estado_envio\', \'\') = \'enviado\')) '
+          + 'AND COALESCE(tags->>\'pub_xp_estado\', \'\') <> \'otorgado\' '
+          + 'AND COALESCE(tags->>\'origen_envio\', \'\') <> \'admin\' '
+          + 'AND EXISTS (SELECT 1 FROM usr) '
+          + 'RETURNING id'
+          + '), saldo AS ('
+          + 'UPDATE usuarios SET xp_total = xp_total + $3::numeric '
+          + 'WHERE id = $4::uuid AND EXISTS (SELECT 1 FROM claim) '
+          + 'RETURNING xp_total'
+          + ') SELECT (SELECT COUNT(*)::int FROM claim) AS claim_n, '
+          + '(SELECT COUNT(*)::int FROM usr) AS usr_n, '
+          + '(SELECT xp_total FROM saldo) AS xp_total_nuevo',
+          [destinoId2, JSON.stringify(tagsClaimAl), xpTotalAl, autorAl]
+        );
+        var claimNAl = parseInt((cteAl && cteAl[0] && cteAl[0].claim_n) || 0, 10);
+        if (!isFinite(claimNAl)) claimNAl = 0;
+        if (claimNAl !== 1) {
+          var usrNAl = parseInt((cteAl && cteAl[0] && cteAl[0].usr_n) || 0, 10);
+          if (!isFinite(usrNAl) || usrNAl < 1)
+            return res.status(409).json({
+              ok: false, publicado: false, otorgado: false,
+              error: 'AUTOR_INEXISTENTE', motivo: 'usuario_inexistente', autor_id: autorAl
+            });
+          // El que pierde la carrera (o el doble clic) sale por aqui.
+          return res.status(200).json({
+            ok: true, publicado: false, otorgado: false, motivo: 'ya_otorgado'
+          });
+        }
+        var xpTotalNuevoAl = (cteAl[0] && cteAl[0].xp_total_nuevo !== null
+          && cteAl[0].xp_total_nuevo !== undefined)
+          ? red2(numXp(cteAl[0].xp_total_nuevo)) : null;
+        // Deuda D-2 (heredada de ADR-099 Deuda 9): el asiento va FUERA de la
+        // CTE, pero SOLO si el claim devolvio 1 fila. Un fallo aqui es
+        // contable, no de pago: se responde ledger:false y no se revierte.
+        var ledgerAl = false;
+        if (claimNAl === 1) {
+          try {
+            if (process.env.XP_FORCE_FAIL === 'ledger')
+              throw new Error('XP_FORCE_FAIL=ledger (smoke)');
+            await registrarXpLedger(sql, Object.assign({
+              usuario_id: autorAl, accion: 'publicar_lugar', xp_base: xpBaseAl,
+              mult_nivel: resAl.m_nivel, mult_stack: resAl.mult_stack,
+              mult_final: resAl.mult_global_c, cap_aplicado: resAl.cap_aplicado,
+              bonos_planos: red2(bonoGeoAl + bonoFotoAl), xp_final: xpTotalAl,
+              contexto: {
+                destino_id: destinoId2, tier: tierAl,
+                completitud: persAl.pub_completitud,
+                pub_completitud: persAl.pub_completitud,
+                fotos_total: persAl.pub_fotos_total,
+                fotos_no_hero: persAl.pub_fotos_no_hero,
+                faltantes_n: (persAl.pub_faltantes || []).length,
+                recalculo: true, aprobacion: true,
+                origen_envio: tagsAl.origen_envio || null,
+                geo: geoAlFinal === true, foto: fotoBonoAl
+              }
+            }, origenLedger(resAl, 'destino', pubPuntoAl)));
+            ledgerAl = true;
+          } catch (eLedgerAl) {
+            console.warn('[publicar_lugar_aprobar] ledger no registrado (Deuda 9): '
+              + (eLedgerAl && eLedgerAl.message));
+          }
+        }
+        // Progresion de clase/cofre y referidos: best-effort con swallow
+        // propio, igual que en otorgar. No se pueden omitir (regresion
+        // silenciosa de clase si se eliminan junto al catch).
+        try {
+          await acreditarClaseYCofre(sql, autorAl, ctxAl, xpTotalAl);
+        } catch (eClaseAl) {
+          console.warn('[publicar_lugar_aprobar] clase/cofre best-effort: '
+            + (eClaseAl && eClaseAl.message));
+        }
+        try {
+          await repartirXpReferidos(sql, autorAl, xpTotalAl);
+        } catch (eRefAl) {
+          console.warn('[publicar_lugar_aprobar] referidos best-effort: '
+            + (eRefAl && eRefAl.message));
+        }
+        return res.status(200).json({
+          ok: true, publicado: true, otorgado: true, motivo: 'otorgado',
+          xp: xpTotalAl, autor_id: autorAl, xp_total: xpTotalNuevoAl,
+          tier: tierAl, completitud: persAl.pub_completitud, ledger: ledgerAl
         });
       }
 
@@ -18405,7 +18682,7 @@ module.exports = async function handler(req, res) {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'X-Internal-Secret': process.env.ADMIN_SECRET || 'exploraco12345',
+                  'X-Internal-Secret': (adminSecretValor() || ''),
                 },
                 body: JSON.stringify({
                   tipo:            'resena',
@@ -19225,8 +19502,8 @@ topes_bloqueados: ['REF_SIN_SOPORTE'],
       // numero de despliegues.
       if (tipo2 === 'slot_rampa_avanzar') {
         var sraBearer = (req.headers.authorization || '').slice(7).trim();
-        var sraAdmin = sraBearer
-          && sraBearer === (process.env.ADMIN_SECRET || 'exploraco12345');
+        if (adminSecretAusente(res, 'slot_rampa_avanzar')) return;
+        var sraAdmin = sraBearer && adminSecretIgual(sraBearer);
         if (!sraAdmin) {
           return res.status(403).json({
             ok: false,

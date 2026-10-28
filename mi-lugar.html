@@ -198,8 +198,35 @@ a{color:var(--gd);text-decoration:none}
   </div>
 </div>
 
+<script src="usuario-session.js"></script>
 <script>
 var API = '';
+
+/* Token de sesion del sitio (usuario-session.js): ExploraCO.obtenerJwt()
+   con respaldo de lectura de localStorage['exploraco_user'].jwt, la misma
+   via que usa publicar.html. Sin sesion devuelve null y la peticion sale
+   anonima: los GET de datos del destino no llevan secreto. */
+function jwtSesion() {
+  try {
+    if (window.ExploraCO && typeof window.ExploraCO.obtenerJwt === 'function') {
+      var j = window.ExploraCO.obtenerJwt();
+      if (j) return j;
+    }
+  } catch (eJwt1) { /* se intenta con localStorage */ }
+  try {
+    var raw = localStorage.getItem('exploraco_user');
+    if (!raw) return null;
+    var ses = JSON.parse(raw);
+    return (ses && ses.jwt) ? ses.jwt : null;
+  } catch (eJwt2) { return null; }
+}
+
+/* Cabeceras de los GET del destino: Authorization solo con sesion.
+   Objeto vacio = peticion anonima (lectura publica de un destino publicado). */
+function cabecerasSesion() {
+  var jwt = jwtSesion();
+  return jwt ? { 'Authorization': 'Bearer ' + jwt } : {};
+}
 
 async function init() {
   var slug = new URLSearchParams(location.search).get('slug');
@@ -207,17 +234,25 @@ async function init() {
 
   try {
     // Cargar stats de visitas y destacado en paralelo
+    var cabeceras = cabecerasSesion();
+
     var [visitasRes, destRes] = await Promise.all([
       fetch(API+'/api/utilidades?tipo=visitas&slug='+encodeURIComponent(slug), {
-        headers: { Authorization: 'Bearer exploraco12345' }
+        headers: cabeceras
       }),
       fetch(API+'/api/admin?recurso=destacado&slug='+encodeURIComponent(slug), {
-        headers: { Authorization: 'Bearer exploraco12345' }
+        headers: cabeceras
       }),
     ]);
 
     var visitasData = await visitasRes.json();
     var destData    = await destRes.json();
+
+    // 403 en visitas = destino no publicado y sin sesion de propietario.
+    if (visitasRes.status === 403) {
+      showError('Este espacio aun no esta publicado. Entra con la cuenta de propietario para verlo.');
+      return;
+    }
 
     if (!visitasData.ok) throw new Error(visitasData.error || 'No encontrado');
 
@@ -241,8 +276,12 @@ async function init() {
     // Gráfica de visitas
     renderChart(visitasData.historico || []);
 
-    // Destacado
-    renderDestacado(destData);
+    // Destacado (el 403 de un destino no publicado no aborta visitas ni resenas)
+    if (destRes.status === 403) {
+      renderDestacadoNoPublicado();
+    } else {
+      renderDestacado(destData);
+    }
 
     // Reseñas
     await renderResenas(slug);
@@ -322,14 +361,42 @@ function renderDestacado(data) {
   }
 }
 
+/* Aviso de destacado cuando el backend responde 403 (destino no publicado
+   y sin sesion de propietario). Reutiliza los contenedores existentes:
+   no crea nodos ni elimina IDs (ADR-003). */
+function renderDestacadoNoPublicado() {
+  var activo = document.getElementById('destacado-activo-banner');
+  var planes = document.getElementById('destacado-planes');
+  var tag    = document.getElementById('dest-status-tag');
+  if (activo) activo.style.display = 'none';
+  if (tag) {
+    tag.textContent = 'No disponible';
+    tag.style.color = 'var(--muted)';
+  }
+  if (!planes) return;
+  planes.style.display = 'block';
+  var alerta = planes.querySelector('.alert');
+  if (alerta) {
+    alerta.textContent = 'Este espacio aun no esta publicado: el perfil destacado se muestra al publicar el destino.';
+  }
+}
+
 async function renderResenas(slug) {
   var panel = document.getElementById('resenas-panel');
   panel.innerHTML = '<div class="skeleton" style="height:80px;margin-bottom:8px"></div>';
 
   try {
     var res  = await fetch(API+'/api/admin?recurso=resenas&slug='+encodeURIComponent(slug)+'&limit=5', {
-      headers: { Authorization: 'Bearer exploraco12345' }
+      headers: cabecerasSesion()
     });
+
+    // 403 = destino no publicado y sin sesion de propietario: aviso, no error.
+    if (res.status === 403) {
+      document.getElementById('rv-count').textContent = '';
+      panel.innerHTML = '<p style="color:var(--muted);font-size:.875rem">Este espacio aun no esta publicado: las resenas se muestran al publicar el destino.</p>';
+      return;
+    }
+
     var data = await res.json();
 
     if (!data.ok) throw new Error(data.error);

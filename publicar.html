@@ -207,6 +207,9 @@
     .aviso-suave { color: #a35a00; font-weight: 600; }
     .envio-error { display: none; margin-top: .75rem; font-size: .85rem; color: var(--error); font-weight: 600; text-align: center; }
     .envio-error.visible { display: block; }
+    .envio-sesion { display: block; margin-top: 1rem; padding: .85rem; border: 1.5px solid #f0c36d; border-radius: 12px; background: #fff8ec; text-align: center; }
+    .envio-sesion-txt { margin: 0 0 .55rem; font-size: .85rem; line-height: 1.5; color: #6b4a00; }
+    .envio-xp-potencial { margin-top: .9rem; font-size: .85rem; line-height: 1.5; font-weight: 600; color: var(--brand-dark); text-align: center; }
     .mios-item { border: 1px solid #E5E7EB; border-radius: 12px; padding: .85rem; margin-bottom: .6rem; background: #fff; }
     .mios-item h3 { font-size: .95rem; font-weight: 700; margin-bottom: .25rem; word-break: break-word; }
     .mios-meta { display: flex; align-items: center; gap: .5rem; font-size: .75rem; color: var(--muted); margin-bottom: .1rem; }
@@ -905,6 +908,15 @@
     </div>
 
     <p class="field-error envio-error" id="envio-error" role="alert"></p>
+
+    <!-- ADR-109 (paso 4c): puerta de sesion del ENVIO FINAL. Sin etiqueta div nueva
+         ni IDs borrados (ADR-003): el aviso se oculta, no se elimina. El
+         borrador y la semilla se siguen guardando sin sesion. -->
+    <aside class="envio-sesion" id="envio-sesion-aviso" role="status" aria-live="polite" hidden>
+      <p class="envio-sesion-txt" id="envio-sesion-txt">Para enviar tu solicitud a revision necesitas entrar a tu cuenta. Lo que llevas escrito no se pierde: tambien puedes guardarlo como borrador.</p>
+      <a class="btn-next" id="envio-sesion-login" href="/index.html">Entrar a mi cuenta</a>
+    </aside>
+    <p class="envio-xp-potencial" id="envio-xp-potencial" role="status" aria-live="polite" hidden></p>
   </div>
 
   <!-- ÉXITO -->
@@ -979,6 +991,8 @@ function setStep(n) {
     if (i < n) el.classList.add('done');
     else if (i === n) el.classList.add('active');
   }
+  // ADR-109 (paso 4c): el ultimo panel (4) es el del envio final.
+  if (n === 4) actualizarPuertaSesion();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1125,6 +1139,94 @@ function pintarErrorEnvio(msg) {
   box.textContent = msg ? msg : '';
   if (msg) box.classList.add('visible');
   else box.classList.remove('visible');
+}
+
+// ============================================================
+// ADR-109 (paso 4c) -- PUERTA DE SESION DEL ENVIO FINAL
+// El backend exige sesion firmada para estado_envio 'enviado'
+// (401 SESION_REQUERIDA). El guardado de borrador y la semilla
+// siguen abiertos: aqui solo se bloquea el envio final.
+// Misma via de token que el resto del sitio: ExploraCO.obtenerJwt()
+// y el respaldo localStorage 'exploraco_user' -> jwt.
+// ============================================================
+function ecJwtPublicar() {
+  try {
+    if (window.ExploraCO && typeof window.ExploraCO.obtenerJwt === 'function') {
+      var j = window.ExploraCO.obtenerJwt();
+      if (j) return j;
+    }
+  } catch (eSes1) { /* se intenta con localStorage */ }
+  try {
+    var raw = localStorage.getItem('exploraco_user');
+    if (!raw) return null;
+    var ses = JSON.parse(raw);
+    return (ses && ses.jwt) ? ses.jwt : null;
+  } catch (eSes2) { return null; }
+}
+
+// Mensaje por la razon del 401. Sin razon se asume ausencia de sesion.
+function mensajeSesionPorRazon(razon) {
+  var r = String(razon || 'SIN_TOKEN');
+  if (r === 'SESION_EXPIRADA') {
+    return 'Tu sesion caduco. Entra de nuevo a tu cuenta y reenvia: lo escrito sigue aqui.';
+  }
+  if (r === 'SESION_INVALIDA') {
+    return 'Tu sesion no es valida. Entra de nuevo a tu cuenta y reenvia: lo escrito sigue aqui.';
+  }
+  return 'Para enviar la solicitud necesitas entrar a tu cuenta. Lo escrito no se pierde: guardalo como borrador o entra y reenvia.';
+}
+
+// El aviso se oculta o se muestra; NUNCA se borra del DOM (ADR-003).
+function pintarAvisoSesion(msg) {
+  var box = document.getElementById('envio-sesion-aviso');
+  var txt = document.getElementById('envio-sesion-txt');
+  if (!box) return;
+  if (!msg) { box.hidden = true; return; }
+  if (txt) txt.textContent = msg;
+  box.hidden = false;
+}
+
+// XP potencial: reusa el catalogo_xp que ya carga el modulo ECXpPublicar.
+// Sin catalogo (red o 500) el aviso queda oculto: no se inventa la cifra.
+function pintarXpPotencial() {
+  var el = document.getElementById('envio-xp-potencial');
+  if (!el) return;
+  if (!ecJwtPublicar()) { el.hidden = true; el.textContent = ''; return; }
+  var M = window.ECXpPublicar;
+  if (!M || typeof M.cargar !== 'function' || typeof M.xpPotencial !== 'function') {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  M.cargar().then(function () {
+    var txt = '';
+    try { txt = M.xpPotencial() || ''; } catch (eXp) { txt = ''; }
+    if (!txt) { el.hidden = true; el.textContent = ''; return; }
+    el.textContent = txt;
+    el.hidden = false;
+  });
+}
+
+// Sincroniza el panel de envio con el estado real de la sesion. Sin sesion
+// el boton de envio final queda DESHABILITADO (no se borra, ADR-003) y el
+// boton de borrador queda intacto.
+function actualizarPuertaSesion() {
+  var hay = !!ecJwtPublicar();
+  var btn = document.getElementById('btn-submit');
+  if (btn) {
+    btn.disabled = !hay;
+    if (hay) btn.removeAttribute('aria-disabled');
+    else btn.setAttribute('aria-disabled', 'true');
+  }
+  if (!hay) pintarAvisoSesion(mensajeSesionPorRazon('SIN_TOKEN'));
+  else pintarAvisoSesion('');
+  pintarXpPotencial();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', actualizarPuertaSesion);
+} else {
+  actualizarPuertaSesion();
 }
 
 // ============================================================
@@ -1563,11 +1665,7 @@ async function submitForm(modo) {
   // Fase 2: JWT (si el usuario ya esta logueado) + geolocalizacion del
   // dispositivo para el bono "publicado desde el lugar". Ambos son
   // opcionales: si fallan, el lugar se envia igual sin XP.
-  var _jwt = null;
-  try {
-    var _rawSes = localStorage.getItem('exploraco_user');
-    if (_rawSes) { var _ses = JSON.parse(_rawSes); _jwt = (_ses && _ses.jwt) ? _ses.jwt : null; }
-  } catch(eJwt) { console.warn('[publicar] jwt no leido:', eJwt && eJwt.message); }
+  var _jwt = ecJwtPublicar();
 
   var _latU = null, _lngU = null;
   try {
@@ -1603,6 +1701,20 @@ async function submitForm(modo) {
     var minimoEnvio = v('nombre') && cat && ciudadVal && v('descripcion_corta').length >= 30
       && (!esBlog || (v('tema') && v('email')));
     if (!minimoEnvio) estadoEnvio = 'semilla';
+  }
+
+  // ADR-109 (paso 4c): el envio FINAL exige sesion (401 SESION_REQUERIDA en el
+  // backend). Se corta ANTES de la red y sin vaciar ni un campo: el borrador
+  // ('semilla') y el guardado parcial siguen permitidos sin sesion.
+  if (estadoEnvio === 'enviado' && !_jwt) {
+    state.enviando = false;
+    btn.disabled = false;
+    btn.innerHTML = etiquetaOriginal;
+    document.getElementById('loading-overlay').classList.remove('active');
+    var msgSinSes = mensajeSesionPorRazon('SIN_TOKEN');
+    pintarErrorEnvio(msgSinSes);
+    pintarAvisoSesion(msgSinSes);
+    return;
   }
 
   var payload = {
@@ -1717,6 +1829,13 @@ async function submitForm(modo) {
         if (el) el.classList.add('done');
       }
     } else {
+      // ADR-109 (paso 4c): 401 del envio final. Se traduce por la razon y se
+      // sale por el catch con la marca sesion, sin tocar el formulario.
+      if (resp.status === 401 && (data.error === 'SESION_REQUERIDA' || data.code === 'SESION_REQUERIDA')) {
+        var errSes = new Error(mensajeSesionPorRazon(data.razon));
+        errSes.sesion = true;
+        throw errSes;
+      }
       // 400 FOTOS_EXCEDIDAS / campo faltante, 409 YA_ENVIADO, 429 cupo.
       var detalle = data.error || data.mensaje || 'Error al enviar';
       if (data.campo) detalle += ' (campo: ' + data.campo + ')';
@@ -1729,6 +1848,13 @@ async function submitForm(modo) {
     btn.disabled = false;
     btn.innerHTML = etiquetaOriginal;
     var msg = (err && err.message) ? err.message : 'No se pudo conectar. Intenta de nuevo.';
+    // ADR-109 (paso 4c): fallo de sesion. Solo se avisa: los datos siguen en
+    // el formulario y el borrador se puede guardar igual.
+    if (err && err.sesion) {
+      pintarErrorEnvio(msg);
+      pintarAvisoSesion(msg);
+      return;
+    }
     pintarErrorEnvio(msg);
     alert('Error: ' + msg);
   }
@@ -2520,6 +2646,17 @@ async function submitForm(modo) {
     return txt;
   }
 
+  // ADR-109 (paso 4c): texto del XP potencial para el aviso previo al envio.
+  // Mismo catalogo ya cargado (catalogo_xp) y mismo descargo que la barra.
+  // Sin catalogo o sin motor de completitud devuelve '': no se inventa cifra.
+  function xpPotencial() {
+    if (!xpBases) return '';
+    var M = comp();
+    if (!M) return '';
+    var r = M.calcular(entradaFormulario());
+    return textoXp(r, conteoFotos());
+  }
+
   // La cifra y su descargo son una sola linea indivisible: sin la frase no se
   // pinta el numero (seria una promesa falsa).
   function pintarXp(r, c) {
@@ -2564,7 +2701,7 @@ async function submitForm(modo) {
     });
   }
 
-  window.ECXpPublicar = { cargar: cargarXp, pintarExito: pintarExito };
+  window.ECXpPublicar = { cargar: cargarXp, pintarExito: pintarExito, xpPotencial: xpPotencial };
 
   // ---------------- barra de completitud en vivo --------------------------
   function pintarCompletitud() {

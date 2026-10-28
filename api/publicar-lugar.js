@@ -16,7 +16,8 @@
 //            cola), mas el alta directa del admin (publicar_directo=true, que
 //            exige process.env.ADMIN_SECRET SIN fallback).
 //   GET   -- ?mios=1 lista mis envios; ?id=<uuid> devuelve el detalle de uno
-//            propio. Propiedad por JWT delegada a api/interacciones.js.
+//            propio. Propiedad por JWT verificada EN PROCESO con
+//            lib/sesion.js (ADR-109 D1): cero fetch, cero delegacion.
 //   PATCH -- ?id=<uuid> actualiza MI borrador con allow-list de claves.
 //   POST con borrador_id + Bearer (D6.4) RECLAMA la semilla propia y la
 //            actualiza EN SU SITIO: nunca inserta una segunda fila. Sin
@@ -35,6 +36,36 @@ const crypto = require('crypto');
 // copiar la formula aqui: si se duplica, el tier del servidor y el del
 // formulario dejan de ser comparables y el XP se paga de menos en silencio.
 const ECCompletitud = require('../lib/completitud.js');
+// ADR-109 D1/T1 -- IDENTIDAD EN PROCESO. La primitiva de sesion (payload
+// {sub,iat,exp} + HMAC-SHA256 con SESSION_JWT_SECRET) vive en lib/sesion.js y
+// es la MISMA que api/usuarios.js:610-653. Requerirla aqui es lo que elimina
+// el fetch() a /api/interacciones y, con el, el autor_id = null silencioso
+// cuando ese salto de red fallaba. Cero dependencia externa.
+const ECSesion = require('../lib/sesion.js');
+
+// ADR-109 paso 4b: el secreto admin NO tiene fallback publico (fail-closed).
+// Sin process.env.ADMIN_SECRET la rama admin responde 503; la comparacion es
+// en tiempo constante. Refactor a lib/ pendiente (deuda del arquitecto).
+function adminSecretValor() {
+  var s = process.env.ADMIN_SECRET;
+  return (typeof s === 'string' && s.length > 0) ? s : null;
+}
+// Bytes UTF-16 -> octetos bajos. Sin Buffer a proposito: el arnes de smoke
+// carga el handler en un sandbox vm sin globales de Node, y typed arrays son
+// intrinsecos de ECMAScript.
+function adminBytes(v) {
+  var s = String(v === undefined || v === null ? '' : v);
+  var out = new Uint8Array(s.length);
+  for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
+  return out;
+}
+function adminSecretIgual(candidato) {
+  var real = adminSecretValor();
+  if (!real) return false;
+  var cand = String(candidato === undefined || candidato === null ? '' : candidato);
+  if (cand.length !== real.length || cand.length === 0) return false;
+  return crypto.timingSafeEqual(adminBytes(cand), adminBytes(real));
+}
 
 const CAT_MAP = {
   // ADR-099 D8.2 -- 'blog' es una CATEGORIA mas del mismo formulario. Antes
@@ -354,7 +385,13 @@ var CLAVES_CLIENTE = [
 var CLAVES_SOLO_SERVIDOR = [
   'pub_geo', 'pub_foto', 'pub_tier', 'pub_completitud', 'pub_faltantes',
   'pub_fotos_total', 'pub_fotos_no_hero', 'pub_xp_estado', 'pub_geo_dist_m',
-  'autor_id', 'ip_hash', 'origen_envio', 'semilla_huerfana'
+  'autor_id', 'ip_hash', 'origen_envio', 'semilla_huerfana',
+  // ADR-109 D2/B4 -- el rastro de procedencia del autor es SOLO de servidor:
+  // sin esta clave en la lista, un cliente podria auto-declararse
+  // pub_autor_origen='sesion' con autor_id nulo y romper el invariante de D2
+  // por la puerta de atras. Fail-closed por los dos consumidores (POST y
+  // PATCH comparten claveProhibida, ADR-109 T9 (vi)).
+  'pub_autor_origen'
 ];
 
 var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -417,23 +454,18 @@ function formatearPrecio(v) {
   return '$' + n.toLocaleString('es-CO');
 }
 
-// Motor de sesion: publicar-lugar NO verifica el JWT, lo delega en
-// api/interacciones.js con el tipo ya existente (mismo camino que usaba el
-// POST). Devuelve autor_id o null. Nunca se loguea el token.
-async function resolverAutor(authHeader) {
-  if (!authHeader) return null;
-  try {
-    var r = await fetch(baseApi() + '/api/interacciones', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
-      body: JSON.stringify({ tipo: 'publicar_lugar_registrar' })
-    });
-    var j = await r.json();
-    if (j && j.ok && j.data && j.data.autor_id) return String(j.data.autor_id);
-  } catch (e) {
-    console.warn('[publicar-lugar] registrar autor fallo: ' + (e && e.message));
-  }
-  return null;
+// ADR-109 D1/T1 -- IDENTIDAD EN PROCESO. publicar-lugar YA NO delega el JWT en
+// api/interacciones.js: verifica el token aqui mismo con lib/sesion.js, la
+// misma primitiva que api/usuarios.js. El fetch anterior convertia cualquier
+// fallo de red o cold start en autor_id = null SILENCIOSO (3 de 3 envios sin
+// autor); ahora la identidad no puede degradarse: o hay firma valida o hay
+// razon explicita.
+// Devuelve SIEMPRE {autor_id, razon} con autor_id null cuando no hay sesion.
+// Cero I/O, cero logging del token.
+function resolverAutor(authHeader) {
+  var r = ECSesion.verificar(authHeader);
+  if (r && r.ok) return { autor_id: String(r.sub), razon: 'OK' };
+  return { autor_id: null, razon: (r && r.razon) ? r.razon : 'SESION_INVALIDA' };
 }
 
 // D6.2 -- default 'enviado' (retrocompatible: el publicar.html vivo no manda
@@ -686,17 +718,23 @@ async function manejarPost(req, res) {
         code: 'ESTADO_ENVIO_INVALIDO', campo: 'estado_envio' });
 
     var authPub = cabeceraAuth(req);
-    var autorId = await resolverAutor(authPub);
+    // ADR-109 D1 -- sin fetch: la razon viaja hasta el 401 para que el cliente
+    // distinga SIN_TOKEN de SESION_EXPIRADA o SESION_INVALIDA.
+    var aut = resolverAutor(authPub);
+    var autorId = aut.autor_id;
+    var razonAutor = aut.razon;
 
     // D6.5 -- el camino admin del mismo endpoint NO hereda un secreto
-    // publico: sin la variable de entorno no hay alta directa (401), y no
-    // existe fallback al literal que hoy usa la notificacion.
+    // publico: sin ADMIN_SECRET no hay alta directa y se responde 503
+    // CONFIG_ADMIN_SECRET_AUSENTE (ADR-109 paso 4b, antes 401).
     if (directo) {
-      var secretoAdmin = process.env.ADMIN_SECRET;
-      if (!secretoAdmin)
-        return res.status(401).json({ ok: false, error: 'ADMIN_NO_CONFIGURADO', code: 'ADMIN_NO_CONFIGURADO' });
+      if (!adminSecretValor()) {
+        console.error('[auth] CONFIG_ADMIN_SECRET_AUSENTE publicar_directo');
+        return res.status(503).json({ ok: false, error: 'CONFIG_ADMIN_SECRET_AUSENTE',
+          code: 'CONFIG_ADMIN_SECRET_AUSENTE' });
+      }
       var tokenAdmin = authPub.replace(/^Bearer\s+/i, '').trim();
-      if (!tokenAdmin || tokenAdmin !== secretoAdmin)
+      if (!adminSecretIgual(tokenAdmin))
         return res.status(401).json({ ok: false, error: 'No autorizado', code: 'NO_AUTORIZADO' });
     }
 
@@ -771,6 +809,28 @@ async function manejarPost(req, res) {
       datosValidacion.estadoEnvio = estadoEnvio;
       v = validarEnvio(datosValidacion);
       if (!v.ok) return res.status(400).json({ ok: false, error: v.error, code: v.code, campo: v.campo });
+    }
+
+    // ADR-109 D2/T1 -- el envio DE USUARIO exige sesion. Se evalua DESPUES de
+    // la rama 'directo' (ya autenticada con ADMIN_SECRET) y ANTES de tocar la
+    // base: sin autor valido NO se escribe fila. 'borrador' y 'semilla' NO
+    // cambian de regimen: el borrador anonimo del embudo sigue admitiendo
+    // anonimo (ADR-099 D2) porque no promete XP. La exencion del admin NO se
+    // hereda: sin ADMIN_SECRET, publicar_directo ya corto en 401 arriba.
+    var origenFinal = directo ? 'admin' : (estadoFinal === 'semilla' ? 'teaser' : 'formulario');
+    // xp_potencial queda en null A PROPOSITO: el motor de XP vive en
+    // api/interacciones.js y no se puede importar aqui (el regex de
+    // scripts/smoke_038_casas_clases.js:512-513 vigila que no se bifurque).
+    // No se inventa la cifra: el suelo real lo sirve
+    // GET /api/interacciones?tipo=catalogo_xp (ADR-109 D3).
+    if (!directo && estadoFinal === 'enviado'
+        && (origenFinal === 'formulario' || origenFinal === 'teaser') && !autorId) {
+      return res.status(401).json({
+        ok: false,
+        error: 'SESION_REQUERIDA',
+        razon: razonAutor,
+        xp_potencial: null
+      });
     }
 
     // D6.6 -- anti-abuso sin infraestructura nueva. Solo la SEMILLA consume
@@ -876,7 +936,7 @@ async function manejarPost(req, res) {
     // que cualquier intento de inyeccion queda pisado (D6.1).
     tags.autor_id = autorId;
     tags.estado_envio = estadoFinal;
-    tags.origen_envio = directo ? 'admin' : (estadoFinal === 'semilla' ? 'teaser' : 'formulario');
+    tags.origen_envio = origenFinal;
     if (ipHash) tags.ip_hash = ipHash;
     tags.pub_tier = ev.pers.pub_tier;
     tags.pub_completitud = ev.pers.pub_completitud;
@@ -885,7 +945,16 @@ async function manejarPost(req, res) {
     tags.pub_fotos_no_hero = ev.pers.pub_fotos_no_hero;
     tags.pub_geo = geoPub;
     tags.pub_foto = ev.pers.pub_fotos_total >= 1;
+    // ADR-109 D2 -- estado de XP y PROCEDENCIA del autor, coherentes entre si
+    // y derivados del autor resuelto, no del origen del envio. Con autor
+    // resuelto JAMAS se escribe 'sin_autor' (era el nulo silencioso que este
+    // ADR cierra). La clave pub_autor_origen es el discriminador explicito que
+    // D6 necesita para distinguir sesion / admin / anonimo sin tocar
+    // origen_envio (que no distingue formulario de teaser ni de admin).
+    // 'manual' (reparacion del admin, D8) NO se escribe aqui: lo escribe el
+    // editor (merge JSONB). Asi la reparacion se distingue del alta real.
     tags.pub_xp_estado = autorId ? 'pendiente' : 'sin_autor';
+    tags.pub_autor_origen = autorId ? 'sesion' : (directo ? 'admin' : 'anonimo');
     if (geoDist !== null) tags.pub_geo_dist_m = geoDist;
 
     // Alta directa del admin: conserva la publicacion inmediata de hoy. La
@@ -1030,8 +1099,8 @@ async function manejarPost(req, res) {
 
     // D6.4 -- notificar al admin SOLO cuando entra en la cola: las semillas
     // no ensucian la cola y el alta directa del admin no se auto-notifica.
-    // NOTA (ADR-099 Deuda 7): el fallback 'exploraco12345' de esta llamada
-    // interna es uno de los tres usos existentes y NO se toca aqui.
+    // ADR-109 paso 4b: la llamada interna NO usa fallback. Sin ADMIN_SECRET
+    // viaja una cabecera sin valor y api/admin responde 503 (fail-closed).
     if (estadoFinal === 'enviado' && !directo) {
       try {
         fetch(
@@ -1040,7 +1109,7 @@ async function manejarPost(req, res) {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + (process.env.ADMIN_SECRET || 'exploraco12345'),
+              'Authorization': 'Bearer ' + (adminSecretValor() || ''),
             },
             body: JSON.stringify({
               tipo:             'solicitud',
@@ -1096,9 +1165,10 @@ async function manejarGet(req, res) {
     var authPub = cabeceraAuth(req);
     if (!authPub)
       return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA', code: 'SESION_REQUERIDA' });
-    var autorId = await resolverAutor(authPub);
+    var autGet = resolverAutor(authPub);
+    var autorId = autGet.autor_id;
     if (!autorId)
-      return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA', code: 'SESION_REQUERIDA' });
+      return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA', code: 'SESION_REQUERIDA', razon: autGet.razon });
 
     var sql = neon(process.env.DATABASE_URL);
     var id = String(q.id || '').trim();
@@ -1237,9 +1307,10 @@ async function manejarPatch(req, res) {
     var authPub = cabeceraAuth(req);
     if (!authPub)
       return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA', code: 'SESION_REQUERIDA' });
-    var autorId = await resolverAutor(authPub);
+    var autPatch = resolverAutor(authPub);
+    var autorId = autPatch.autor_id;
     if (!autorId)
-      return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA', code: 'SESION_REQUERIDA' });
+      return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA', code: 'SESION_REQUERIDA', razon: autPatch.razon });
 
     // D6.1 -- allow-list ANTES de tocar la base: fail-closed y visible.
     var prohibida = claveProhibida(body);

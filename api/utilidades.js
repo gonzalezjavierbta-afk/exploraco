@@ -1,6 +1,7 @@
 // api/utilidades.js  v3 - sitemap + visitas + diagnostico + fotos + hero_home
 // ?tipo=sitemap     -> genera sitemap.xml dinamico (sin auth)
-// ?tipo=visitas     -> tracking visitas (POST sin auth, GET con auth)
+// ?tipo=visitas     -> tracking visitas (POST sin auth; GET libre si el destino
+//                      esta publicado, si no solo admin o su autor)
 // ?tipo=diagnostico -> info sistema (auth)
 // ?tipo=fotos       -> CRUD galeria destinos_fotos (GET sin auth, resto con auth)
 // ?tipo=hero_home   -> slots del hero del index en home_hero_fotos (GET sin auth, POST con auth)
@@ -13,6 +14,9 @@ const crypto = require('crypto');
 // ADR-090 D4/D12: motor UNICO de busqueda compartido con api/destinos.js.
 const BUSQ = require('../busqueda.js');
 const { esFalloEsquema } = require('../lib/score.js');
+// ADR-109 D-1: verificador UNICO del JWT de usuario (no se duplica la firma
+// HMAC en este fichero; blobVerificarJwt es anterior y solo sirve a blob).
+const sesion = require('../lib/sesion.js');
 
 var BASE = process.env.SITE_BASE_URL || 'https://latawel.com';
 var OG_IMAGE = process.env.OG_IMAGE_URL || (BASE + '/assets/brand/og/latawel-og-1200x630.png');
@@ -31,9 +35,50 @@ var STATIC_PAGES = [
 ];
 var CAT_PRIORITY = { hostal:'0.85', comida:'0.80', sitio:'0.80', evento:'0.75', blog:'0.80' };
 
+// ADR-109 paso 4b: el secreto admin NO tiene fallback publico (fail-closed).
+// Sin process.env.ADMIN_SECRET las ramas admin responden 503; la comparacion
+// es en tiempo constante. Refactor a lib/ pendiente (deuda del arquitecto).
+function adminSecretValor() {
+  var s = process.env.ADMIN_SECRET;
+  return (typeof s === 'string' && s.length > 0) ? s : null;
+}
+// Bytes UTF-16 -> octetos bajos. Sin Buffer a proposito: el arnes de smoke
+// carga el handler en un sandbox vm sin globales de Node, y typed arrays son
+// intrinsecos de ECMAScript.
+function adminBytes(v) {
+  var s = String(v === undefined || v === null ? '' : v);
+  var out = new Uint8Array(s.length);
+  for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
+  return out;
+}
+function adminSecretIgual(candidato) {
+  var real = adminSecretValor();
+  if (!real) return false;
+  var cand = String(candidato === undefined || candidato === null ? '' : candidato);
+  if (cand.length !== real.length || cand.length === 0) return false;
+  return crypto.timingSafeEqual(adminBytes(cand), adminBytes(real));
+}
+function denegar(res, contexto) {
+  if (!adminSecretValor()) {
+    console.error('[auth] CONFIG_ADMIN_SECRET_AUSENTE ' + contexto);
+    return res.status(503).json({ ok:false, error:'CONFIG_ADMIN_SECRET_AUSENTE' });
+  }
+  return res.status(401).json({ ok:false, error:'No autorizado' });
+}
 function auth(req) {
-  return (req.headers['authorization']||'').replace('Bearer ','').trim()
-    === (process.env.ADMIN_SECRET || 'exploraco12345');
+  return adminSecretIgual((req.headers['authorization']||'').replace('Bearer ','').trim());
+}
+// Propiedad de un destino en la rama publica de ?tipo=visitas: el Bearer debe
+// ser un JWT de USUARIO valido y su 'sub' debe coincidir con el autor del
+// destino (destinos.tags->>'autor_id'). Unico verificador: lib/sesion.js.
+// Un Bearer con el secreto admin NO pasa por aqui: no es un JWT y caduca en la
+// comprobacion de firma.
+function esPropietarioDestino(req, autorId) {
+  if (!autorId) return false;
+  var token = String(req.headers['authorization']||'').replace(/^Bearer\s+/i,'').trim();
+  if (!token) return false;
+  var r = sesion.verificarParaUsuario(token, autorId);
+  return !!(r && r.ok);
 }
 function xe(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -90,8 +135,12 @@ async function blobUpload(req, res) {
   var body = req.body || {};
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
   var authHeader = String(req.headers.authorization || '');
-  var adminSecret = process.env.ADMIN_SECRET || 'exploraco12345';
-  var esAdmin = (authHeader === ('Bearer ' + adminSecret));
+  // ADR-109 paso 4b: sin secreto configurado NO hay rama admin. Esta ruta es
+  // publica para subidas anonimas, por eso degrada (no responde 503) y nunca
+  // cae a un literal.
+  if (!adminSecretValor()) console.error('[auth] CONFIG_ADMIN_SECRET_AUSENTE blob_upload');
+  var esAdmin = (authHeader.indexOf('Bearer ') === 0
+    && adminSecretIgual(authHeader.slice(7)));
   try {
     var resultado = await handleUpload({
       body: body,
@@ -216,12 +265,16 @@ module.exports = async function handler(req, res) {
       if (!slug) return res.status(400).json({ ok:false, error:'slug requerido' });
       var isAdm = auth(req);
       var dr = await sql(
-        'SELECT id,nombre,ciudad,rating,total_resenas,status FROM destinos WHERE slug=$1 LIMIT 1',
+        'SELECT id,nombre,ciudad,rating,total_resenas,status, '
+        + 'tags->>\'autor_id\' AS autor_id FROM destinos WHERE slug=$1 LIMIT 1',
         [slug]
       );
       if (!dr.length) return res.status(404).json({ ok:false, error:'No encontrado' });
       var d = dr[0];
-      if (d.status !== 'published' && !isAdm)
+      // Destino publicado -> lectura libre (igual que hasta ahora). Destino no
+      // publicado -> solo el admin o el AUTOR del destino (JWT de usuario con
+      // sub == destinos.tags->>'autor_id'). Sin token valido: 403.
+      if (d.status !== 'published' && !isAdm && !esPropietarioDestino(req, d.autor_id))
         return res.status(403).json({ ok:false, error:'No autorizado' });
       var ahora = new Date();
       var h30   = new Date(ahora-30*86400000).toISOString();
@@ -269,7 +322,7 @@ module.exports = async function handler(req, res) {
   // == VISITAS GLOBAL (admin) ======================================
   // GET ?tipo=visitas_global -> conteo global de visitas activas (solo admin)
   if (tipo === 'visitas_global') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'utilidades');
     try {
       var rg = await sql(
         "SELECT COUNT(*)::int AS total, "
@@ -317,7 +370,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+      if (!auth(req)) return denegar(res, 'utilidades');
       var b2      = req.body || {};
       var destId3 = b2.destino_id;
       if (!destId3) return res.status(400).json({ ok:false, error:'destino_id requerido' });
@@ -371,7 +424,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'PUT') {
-      if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+      if (!auth(req)) return denegar(res, 'utilidades');
       var fid  = req.query.id || (req.body&&req.body.id);
       var b3   = req.body || {};
       if (!fid) return res.status(400).json({ ok:false, error:'id requerido' });
@@ -398,7 +451,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
-      if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+      if (!auth(req)) return denegar(res, 'utilidades');
       var fid2 = req.query.id || (req.body&&req.body.id);
       if (!fid2) return res.status(400).json({ ok:false, error:'id requerido' });
       var fr = await sql(
@@ -457,7 +510,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+      if (!auth(req)) return denegar(res, 'utilidades');
       var bHero = req.body || {};
       var heroIn = Array.isArray(bHero.fotos) ? bHero.fotos : [];
       if (!heroIn.length) {
@@ -989,7 +1042,7 @@ if (tipo === 'blog-lista') {
   }
 
   if (tipo === 'diagnostico') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'utilidades');
     var tbls = await sql(
       "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"
     );

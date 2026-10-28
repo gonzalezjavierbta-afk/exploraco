@@ -17,6 +17,22 @@ var fs = require('fs');
 var vm = require('vm');
 var Module = require('module');
 
+// --- Fixture de ADMIN_SECRET (ADR-109) --------------------------------
+// El backend es fail-closed desde ADR-109: sin process.env.ADMIN_SECRET
+// las ramas admin responden 503 CONFIG_ADMIN_SECRET_AUSENTE. El fallback
+// publico se elimino, asi que el harness define su PROPIO fixture, que no
+// es el secreto real ni ningun valor publicado: si el handler acepta este
+// Bearer es porque lee la variable, y solo la variable.
+var ADMIN_SECRET_FIXTURE = 'smoke_fixture_epic_prompt_0001';
+var ADMIN_SECRET_PREV = Object.prototype.hasOwnProperty.call(process.env, 'ADMIN_SECRET')
+  ? process.env.ADMIN_SECRET : null;
+process.env.ADMIN_SECRET = ADMIN_SECRET_FIXTURE;
+function restoreAdminSecret() {
+  if (ADMIN_SECRET_PREV === null) delete process.env.ADMIN_SECRET;
+  else process.env.ADMIN_SECRET = ADMIN_SECRET_PREV;
+}
+process.on('exit', restoreAdminSecret);
+
 // --- Fake neon (reusa scripts/fake_neon.js, patron comunidad) --------
 var origResolve = Module._resolveFilename;
 Module._resolveFilename = function(request) {
@@ -194,30 +210,30 @@ function runHandler() {
     return invoke({ method: 'POST', headers: { authorization: 'Bearer token-malo' }, body: { tipo: 'admin_xp', usuario_id: 'u1', nivel: 5 } });
   }).then(function(r6) {
     check('POST admin_xp header Bearer invalido -> 403', r6.status === 403);
-    return invoke({ method: 'POST', headers: { authorization: 'Bearer exploraco12345' }, body: { tipo: 'admin_xp' } });
+    return invoke({ method: 'POST', headers: { authorization: 'Bearer ' + ADMIN_SECRET_FIXTURE }, body: { tipo: 'admin_xp' } });
   }).then(function(r7) {
     check('POST admin_xp body sin usuario_id -> 400', r7.status === 400);
-    return invoke({ method: 'POST', headers: { authorization: 'Bearer exploraco12345' }, body: { tipo: 'admin_xp', usuario_id: 'u1' } });
+    return invoke({ method: 'POST', headers: { authorization: 'Bearer ' + ADMIN_SECRET_FIXTURE }, body: { tipo: 'admin_xp', usuario_id: 'u1' } });
   }).then(function(r7b) {
     check('POST admin_xp sin nivel ni delta_xp -> 400', r7b.status === 400 && String(r7b.error).indexOf('nivel o delta_xp') !== -1);
-    return invoke({ method: 'POST', headers: { authorization: 'Bearer exploraco12345' }, body: { tipo: 'admin_xp', usuario_id: 'u1', nivel: 5 } },
+    return invoke({ method: 'POST', headers: { authorization: 'Bearer ' + ADMIN_SECRET_FIXTURE }, body: { tipo: 'admin_xp', usuario_id: 'u1', nivel: 5 } },
       function(){ return Promise.resolve([]); });
   }).then(function(r8) {
     check('POST admin_xp usuario inexistente (mock []) -> 404', r8.status === 404);
     var filaU = { id: 'u1', nombre: 'Ana', email: 'ana@x.co', xp_total: 0, badge_actual: '' };
-    return invoke({ method: 'POST', headers: { authorization: 'Bearer exploraco12345' }, body: { tipo: 'admin_xp', usuario_id: 'u1', nivel: 5 } },
+    return invoke({ method: 'POST', headers: { authorization: 'Bearer ' + ADMIN_SECRET_FIXTURE }, body: { tipo: 'admin_xp', usuario_id: 'u1', nivel: 5 } },
       function(){ return Promise.resolve([filaU]); });
   }).then(function(r9) {
     check('POST admin_xp nivel=5 con xp 0 -> xp_total 1650 (umbral nivel 5)',
       r9.ok === true && r9.data && r9.data.usuario && r9.data.usuario.xp_total === 1650);
     check('POST admin_xp nivel=5 con xp 0 -> nivel 5', r9.ok === true && r9.data.usuario.nivel === 5);
     var filaD = { id: 'u1', nombre: 'Ana', email: 'ana@x.co', xp_total: 0, badge_actual: '' };
-    return invoke({ method: 'POST', headers: { authorization: 'Bearer exploraco12345' }, body: { tipo: 'admin_xp', usuario_id: 'u1', delta_xp: 150 } },
+    return invoke({ method: 'POST', headers: { authorization: 'Bearer ' + ADMIN_SECRET_FIXTURE }, body: { tipo: 'admin_xp', usuario_id: 'u1', delta_xp: 150 } },
       function(){ return Promise.resolve([filaD]); });
   }).then(function(r10) {
     check('POST admin_xp delta_xp=150 -> xp_total 150', r10.ok === true && r10.data.usuario.xp_total === 150);
     var filaNeg = { id: 'u1', nombre: 'Ana', email: 'ana@x.co', xp_total: 100, badge_actual: '' };
-    return invoke({ method: 'POST', headers: { authorization: 'Bearer exploraco12345' }, body: { tipo: 'admin_xp', usuario_id: 'u1', delta_xp: -500 } },
+    return invoke({ method: 'POST', headers: { authorization: 'Bearer ' + ADMIN_SECRET_FIXTURE }, body: { tipo: 'admin_xp', usuario_id: 'u1', delta_xp: -500 } },
       function(){ return Promise.resolve([filaNeg]); });
   }).then(function(r11) {
     check('POST admin_xp delta negativo (100-500) -> xp_total 0', r11.ok === true && r11.data.usuario.xp_total === 0);
@@ -266,12 +282,14 @@ function runHandler() {
       r17.status === 200 && r17.ok === false && String(r17.error).indexOf('Este plan aun no tiene chat') !== -1);
     return finish();
   }).catch(function(err) {
+    restoreAdminSecret();
     console.log('FAIL - smoke epic prompt lanz\u00f3 error: ' + err.message);
     process.exitCode = 1;
   });
 }
 
 function finish() {
+  restoreAdminSecret();
   var selfBuf = fs.readFileSync(__filename);
   var asciiOk = true;
   for (var i = 0; i < selfBuf.length; i++) {

@@ -601,13 +601,16 @@ async function run() {
   // 21 = +1 por publicar_lugar (Fase 2: XP de publicacion al aprobar).
   // 23 = +2 por guardar_media (v28: XP dual al guardar album, ejecutor +
   // dueno; cada uno con su propio contextoXpE/calcularXpAcreditado).
-  var XP_CALLSITES_ESPERADOS = 23;
-  var XP_ACREDITADO_ESPERADOS = 23;
+  // 24 = +1 por publicar_lugar_aprobar (ADR-109 D4: la aprobacion y el pago
+  // ocurren en la misma invocacion, un solo call-site mas del motor).
+  var XP_CALLSITES_ESPERADOS = 24;
+  var XP_ACREDITADO_ESPERADOS = 24;
   // El +10 al autor original de album_agregar_foto queda EXENTO de
   // acreditarClaseYCofre (no tributa clase/cofre), pero SI usa el motor.
   // 20 = 19 previos + publicar_lugar (Fase 2).
   // 22 = +2 por guardar_media (v28: ejecutor y dueno tributan clase/cofre).
-  var ACREDITAR_CLASE_ESPERADOS = 22;
+  // 23 = +1 por publicar_lugar_aprobar (ADR-109 D4).
+  var ACREDITAR_CLASE_ESPERADOS = 23;
   var anclas = [];
   var posCtx = srcInt.indexOf('contextoXpE(');
   while (posCtx !== -1) {

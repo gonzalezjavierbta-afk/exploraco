@@ -9,10 +9,40 @@
 //       en el UPDATE (votos/comentarios curados cuelgan de id::text), sin DELETE+re-INSERT.
 
 const { neon } = require('@neondatabase/serverless');
+const crypto = require('crypto');
 
+// ADR-109 paso 4b: el secreto admin NO tiene fallback publico (fail-closed).
+// Sin process.env.ADMIN_SECRET la ruta admin responde 503; la comparacion es
+// en tiempo constante. Refactor a lib/ pendiente (deuda del arquitecto).
+function adminSecretValor() {
+  var s = process.env.ADMIN_SECRET;
+  return (typeof s === 'string' && s.length > 0) ? s : null;
+}
+// Bytes UTF-16 -> octetos bajos. Sin Buffer a proposito: el arnes de smoke
+// carga el handler en un sandbox vm sin globales de Node, y typed arrays son
+// intrinsecos de ECMAScript.
+function adminBytes(v) {
+  var s = String(v === undefined || v === null ? '' : v);
+  var out = new Uint8Array(s.length);
+  for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
+  return out;
+}
+function adminSecretIgual(candidato) {
+  var real = adminSecretValor();
+  if (!real) return false;
+  var cand = String(candidato === undefined || candidato === null ? '' : candidato);
+  if (cand.length !== real.length || cand.length === 0) return false;
+  return crypto.timingSafeEqual(adminBytes(cand), adminBytes(real));
+}
+function denegar(res, contexto) {
+  if (!adminSecretValor()) {
+    console.error('[auth] CONFIG_ADMIN_SECRET_AUSENTE ' + contexto);
+    return res.status(503).json({ ok: false, error: 'CONFIG_ADMIN_SECRET_AUSENTE' });
+  }
+  return res.status(401).json({ ok: false, error: 'No autorizado' });
+}
 function auth(req) {
-  return (req.headers['authorization'] || '').replace('Bearer ', '').trim()
-    === (process.env.ADMIN_SECRET || 'exploraco12345');
+  return adminSecretIgual((req.headers['authorization'] || '').replace('Bearer ', '').trim());
 }
 
 function safeJSON(v) {
@@ -184,7 +214,7 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (!auth(req)) return res.status(401).json({ ok: false, error: 'No autorizado' });
+  if (!auth(req)) return denegar(res, 'admin-destinos');
 
   console.log('[admin-destinos-v2]', req.method, req.query.id || req.query.limit || 'new');
 

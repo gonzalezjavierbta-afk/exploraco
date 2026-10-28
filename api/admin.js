@@ -1,6 +1,8 @@
 // api/admin.js -- endpoint unificado para todas las funciones del admin (ASCII-safe: 0 backticks, 0 no-ASCII)
 // Ruta por ?recurso=X:
-//   solicitudes  -> moderar-destinos (listar/aprobar/rechazar)
+//   solicitudes  -> moderar-destinos (listar/rechazar/pendiente). ADR-109:
+//     'aprobar' ya NO se atiende aqui; responde 410 APROBAR_MOVIDO porque
+//     publicar y pagar XP son una sola operacion en api/interacciones.js
 //   resenas      -> resenas-admin (listar/eliminar resenas)
 //   destacado    -> destacar (activar/desactivar perfiles)
 //   notificaciones -> envio de emails
@@ -27,7 +29,9 @@
 //     (mercado_ofertas_lista / mercado_ofertas_moderar). La moderacion NO
 //     devuelve inventario (es sancion admin, no cancelacion del dueno).
 //     Degrada 503 SCHEMA_NOT_MIGRATED (42P01/42703) si la 034 no corrio.
-// Auth: Bearer exploraco12345 (o X-Internal-Secret) en todos los casos
+// Auth: Bearer ADMIN_SECRET (o X-Internal-Secret) en todos los casos. Sin la
+// variable de entorno el handler responde 503 CONFIG_ADMIN_SECRET_AUSENTE
+// (ADR-109 paso 4b: sin fallback publico).
 // v4 (ADR-053, 2026-09-21): en salud_red, distribucion_nivel pasa a exponer
 // las DOS vistas {derivado, visible} (economia vs insignia, Dec 5) y se
 // agrega el bloque exentos {xp_total_entregado, eventos, por_accion}
@@ -73,6 +77,7 @@
 // Cero DELETE fisico; no crea endpoints (8/8, ADR-001).
 
 const { neon } = require('@neondatabase/serverless');
+const crypto = require('crypto');
 
 var RESEND_API  = 'https://api.resend.com/emails';
 var FROM_EMAIL  = 'LATAWEL <noreply@latawel.com>';
@@ -84,13 +89,41 @@ var PLANES = {
   anual:      { precio: 390000, dias: 365, label: 'Anual'       },
 };
 
+// ADR-109 paso 4b: el secreto admin NO tiene fallback publico (fail-closed).
+// Sin process.env.ADMIN_SECRET las ramas admin responden 503; la comparacion
+// es en tiempo constante. Refactor a lib/ pendiente (deuda del arquitecto).
+function adminSecretValor() {
+  var s = process.env.ADMIN_SECRET;
+  return (typeof s === 'string' && s.length > 0) ? s : null;
+}
+// Bytes UTF-16 -> octetos bajos. Sin Buffer a proposito: el arnes de smoke
+// carga el handler en un sandbox vm sin globales de Node, y typed arrays son
+// intrinsecos de ECMAScript.
+function adminBytes(v) {
+  var s = String(v === undefined || v === null ? '' : v);
+  var out = new Uint8Array(s.length);
+  for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
+  return out;
+}
+function adminSecretIgual(candidato) {
+  var real = adminSecretValor();
+  if (!real) return false;
+  var cand = String(candidato === undefined || candidato === null ? '' : candidato);
+  if (cand.length !== real.length || cand.length === 0) return false;
+  return crypto.timingSafeEqual(adminBytes(cand), adminBytes(real));
+}
+function denegar(res, contexto) {
+  if (!adminSecretValor()) {
+    console.error('[auth] CONFIG_ADMIN_SECRET_AUSENTE ' + contexto);
+    return res.status(503).json({ ok:false, error:'CONFIG_ADMIN_SECRET_AUSENTE' });
+  }
+  return res.status(401).json({ ok:false, error:'No autorizado' });
+}
 function auth(req) {
-  return (req.headers['authorization']||'').replace('Bearer ','').trim()
-    === (process.env.ADMIN_SECRET || 'exploraco12345');
+  return adminSecretIgual((req.headers['authorization']||'').replace('Bearer ','').trim());
 }
 function authInternal(req) {
-  return (req.headers['x-internal-secret']||'').trim()
-    === (process.env.ADMIN_SECRET || 'exploraco12345');
+  return adminSecretIgual((req.headers['x-internal-secret']||'').trim());
 }
 
 // XP decimal (ADR-035): las columnas XP son numeric(12,2) y Neon las
@@ -547,7 +580,7 @@ module.exports = async function handler(req, res) {
 
   // == SOLICITUDES (moderar-destinos) ==================================
   if (recurso === 'solicitudes') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'admin');
 
     if (req.method === 'GET') {
       var status  = req.query.status || 'draft';
@@ -584,7 +617,19 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      var acciones = { aprobar:'published', rechazar:'archived', pendiente:'draft' };
+      // ADR-109 T3a: aprobar deja de publicar y deja de pagar. Publicar y
+      // otorgar XP son UNA sola operacion y solo existen en
+      // POST /api/interacciones {tipo:'publicar_lugar_aprobar', destino_id}
+      // con Bearer de ADMIN_SECRET. El 410 es DELIBERADO: un admin.html
+      // cacheado debe romper de forma visible, no en silencio.
+      if (body.accion === 'aprobar') {
+        return res.status(410).json({
+          ok:false,
+          error:'APROBAR_MOVIDO',
+          movido_a:"POST /api/interacciones {tipo:'publicar_lugar_aprobar', destino_id}"
+        });
+      }
+      var acciones = { rechazar:'archived', pendiente:'draft' };
       if (!body.id || !acciones[body.accion])
         return res.status(400).json({ ok:false, error:'Falta id o accion v\u00e1lida' });
       var nuevo = acciones[body.accion];
@@ -594,62 +639,56 @@ module.exports = async function handler(req, res) {
         [nuevo, Boolean(body.destacado||false), body.id]
       );
       if (!upd.length) return res.status(404).json({ ok:false, error:'No encontrado' });
-      // ADR-099 T3: el POST ESPERA la respuesta del otorgar y la devuelve.
-      // Antes se descartaba y la UI no podia mostrar el numero; ademas un
-      // fallo del otorgar quedaba invisible.
-      var otorgamiento = null;
-      if (nuevo === 'published') {
-        try {
-          var baseUrlAdm = (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://exploraco.vercel.app');
-          var respOtorga = await fetch(baseUrlAdm + '/api/interacciones', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + (process.env.ADMIN_SECRET || 'exploraco12345')
-            },
-            body: JSON.stringify({ tipo: 'publicar_lugar_otorgar', destino_id: body.id })
-          });
-          var jsonOtorga = null;
-          try { jsonOtorga = await respOtorga.json(); } catch (eJsonOtorga) { jsonOtorga = null; }
-          var jOt = jsonOtorga || {};
-          otorgamiento = {
-            otorgado: jOt.otorgado === true,
-            xp: (jOt.xp === undefined ? null : jOt.xp),
-            tier: jOt.tier || null,
-            motivo: jOt.motivo || jOt.error || (respOtorga.ok ? null : 'error_otorgar')
-          };
-        } catch (eOtorga) {
-          console.warn('[admin solicitudes] otorgar XP fallo: ' + (eOtorga && eOtorga.message));
-          otorgamiento = { otorgado:false, xp:null, tier:null, motivo:'error_otorgar' };
-        }
-      }
-      var msgs = { published:'\u2705 Publicado', archived:'\ud83d\uddc4\ufe0f Archivado', draft:'\u23f3 Borrador' };
+      var msgs = { archived:'\ud83d\uddc4\ufe0f Archivado', draft:'\u23f3 Borrador' };
       return res.status(200).json({
         ok:true, mensaje: msgs[nuevo],
-        url: nuevo==='published' ? 'https://exploraco.vercel.app/'+upd[0].slug+'.html' : null,
+        url: null,
         destino: upd[0],
-        otorgamiento: otorgamiento,
       });
     }
   }
 
   // == RESENAS (resenas-admin) ==========================================
+  // Excepcion POR RAMA (ADR-109 D-1, cierra la deuda del secreto embebido):
+  // la lectura de resenas de un destino PUBLICADO es publica. NO se relaja
+  // auth(): se anade un camino ANONIMO con estas condiciones cerradas.
+  //   - solo GET (una escritura sin secreto sigue recibiendo denegar());
+  //   - solo con slug explicito: la ruta anonima NO enumera;
+  //   - el slug debe existir con status='published' (si no -> 403);
+  //   - la consulta lleva ademas d.status='published' (defensa en profundidad,
+  //     no se puede saltar el filtro);
+  //   - campos publicos: sin email del autor, sin xp_ganado, sin id interno.
   if (recurso === 'resenas') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    var esAdminRes = auth(req);
+    if (!esAdminRes && req.method !== 'GET') return denegar(res, 'admin');
 
     if (req.method === 'GET') {
       var limit2  = Math.min(parseInt(req.query.limit)||50, 200);
       var offset2 = Math.max(parseInt(req.query.offset)||0, 0);
       var slug2   = req.query.slug || null;
 
+      if (!esAdminRes) {
+        if (!slug2) return denegar(res, 'admin');
+        var pub2 = await sql(
+          "SELECT 1 AS ok FROM destinos WHERE slug=$1 AND status='published' LIMIT 1",
+          [slug2]
+        );
+        // 403 tambien si el slug no existe: no se revela su existencia.
+        if (!pub2.length) return res.status(403).json({ ok:false, error:'No autorizado' });
+      }
+
       var conds2 = ["i.tipo='resena'"]; var params2=[]; var pi2=1;
       if (slug2) { conds2.push('d.slug=$'+pi2++); params2.push(slug2); }
+      if (!esAdminRes) conds2.push("d.status='published'");
+
+      var cols2 = 'i.id, i.rating, i.texto, i.creado_en, i.xp_ganado, '
+        + 'u.nombre AS usuario_nombre, '
+        + (esAdminRes ? 'u.email AS usuario_email, ' : '')
+        + 'd.id AS destino_id, d.slug AS destino_slug, '
+        + 'd.nombre AS destino_nombre, d.ciudad AS destino_ciudad ';
 
       var rows2 = await sql(
-        'SELECT i.id, i.rating, i.texto, i.creado_en, i.xp_ganado, '
-        + 'u.nombre AS usuario_nombre, u.email AS usuario_email, '
-        + 'd.id AS destino_id, d.slug AS destino_slug, '
-        + 'd.nombre AS destino_nombre, d.ciudad AS destino_ciudad '
+        'SELECT ' + cols2
         + 'FROM interacciones i '
         + 'LEFT JOIN usuarios u ON u.id=i.usuario_id '
         + 'LEFT JOIN destinos d ON d.id=i.destino_id '
@@ -670,9 +709,18 @@ module.exports = async function handler(req, res) {
         stats: { total:parseInt(st2.n||0), rating_promedio:parseFloat(st2.avg||0), positivas:parseInt(st2.pos||0), negativas:parseInt(st2.neg||0) },
         data: rows2.map(function(r){
           var txt=r.texto||''; var m=txt.match(/^\[([^\]]+)\]\s*/);
-          return { id:r.id, rating: r.rating?parseFloat(r.rating):0, texto: m?txt.slice(m[0].length):txt,
+          var nomU = r.usuario_nombre||(m?m[1]:'An\u00f3nimo');
+          var txtL = m?txt.slice(m[0].length):txt;
+          if (!esAdminRes) {
+            // Ruta anonima: SOLO campos publicos del destino publicado.
+            return { id:r.id, rating: r.rating?parseFloat(r.rating):0, texto: txtL,
+              fecha:r.creado_en,
+              usuario:{ nombre: nomU },
+              destino:{ slug:r.destino_slug||'', nombre:r.destino_nombre||'', ciudad:r.destino_ciudad||'' }};
+          }
+          return { id:r.id, rating: r.rating?parseFloat(r.rating):0, texto: txtL,
             fecha:r.creado_en, xp:red2(numXp(r.xp_ganado)),
-            usuario:{ nombre:r.usuario_nombre||(m?m[1]:'An\u00f3nimo'), email:r.usuario_email||null },
+            usuario:{ nombre: nomU, email:r.usuario_email||null },
             destino:{ id:r.destino_id, slug:r.destino_slug||'', nombre:r.destino_nombre||'', ciudad:r.destino_ciudad||'' }};
         }),
       });
@@ -698,12 +746,17 @@ module.exports = async function handler(req, res) {
   }
 
   // == DESTACADO =========================================================
+  // Misma excepcion POR RAMA que resenas: GET anonimo permitido solo con slug
+  // de un destino status='published'. La lista sin slug y toda escritura
+  // (POST/DELETE) siguen exigiendo el secreto admin.
   if (recurso === 'destacado') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    var esAdminDes = auth(req);
+    if (!esAdminDes && req.method !== 'GET') return denegar(res, 'admin');
 
     if (req.method === 'GET') {
       var slug3 = req.query.slug;
       if (!slug3) {
+        if (!esAdminDes) return denegar(res, 'admin');
         var todos = await sql(
           'SELECT slug,nombre,ciudad,categoria_slug,destacado, '
           + 'tags->>\'destacado_hasta\' AS destacado_hasta, tags->>\'plan\' AS plan '
@@ -712,12 +765,18 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok:true, data:todos });
       }
       var dr = await sql(
-        'SELECT id,slug,nombre,ciudad,destacado, '
+        'SELECT id,slug,nombre,ciudad,destacado,status, '
         + 'tags->>\'destacado_hasta\' AS destacado_hasta, tags->>\'plan\' AS plan '
         + 'FROM destinos WHERE slug=$1 LIMIT 1', [slug3]
       );
-      if (!dr.length) return res.status(404).json({ ok:false, error:'No encontrado' });
+      if (!dr.length) {
+        // Anonimo: 403 (no se revela si el slug existe). Admin: 404 de siempre.
+        if (!esAdminDes) return res.status(403).json({ ok:false, error:'No autorizado' });
+        return res.status(404).json({ ok:false, error:'No encontrado' });
+      }
       var dd = dr[0];
+      if (!esAdminDes && dd.status !== 'published')
+        return res.status(403).json({ ok:false, error:'No autorizado' });
       var hasta3 = dd.destacado_hasta ? new Date(dd.destacado_hasta) : null;
       var activo3 = dd.destacado && hasta3 && hasta3 > new Date();
       return res.status(200).json({ ok:true, slug:dd.slug, nombre:dd.nombre, destacado:dd.destacado||false,
@@ -753,8 +812,7 @@ module.exports = async function handler(req, res) {
 
   // == NOTIFICACIONES (email) ============================================
   if (recurso === 'notificaciones') {
-    if (!auth(req) && !authInternal(req))
-      return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req) && !authInternal(req)) return denegar(res, 'admin');
     if (req.method !== 'POST') return res.status(405).end();
 
     if (body.tipo === 'resena') {
@@ -778,7 +836,7 @@ module.exports = async function handler(req, res) {
   // Cero Borrado Logico: no existe DELETE; el estado se controla con
   // consumibles_toggle (activo = NOT activo).
   if (recurso === 'consumibles') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'admin');
 
     var tipo = req.query.tipo || '';
 
@@ -1008,7 +1066,7 @@ module.exports = async function handler(req, res) {
   // 503 SCHEMA_NOT_MIGRATED (42P01/42703) si la 040 no corrio (patron
   // BUG-021). No crea endpoints (8/8, ADR-001).
   if (recurso === 'cartas') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'admin');
     var tipoCa = req.query.tipo || 'cartas_lista';
 
     try {
@@ -1281,8 +1339,7 @@ module.exports = async function handler(req, res) {
   // vendedor: es una sancion administrativa, no el desistimiento del dueno
   // (que si reintegraria cantidad_restante al inventario del vendedor).
   if (recurso === 'mercado') {
-    if (!auth(req) && !authInternal(req))
-      return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req) && !authInternal(req)) return denegar(res, 'admin');
 
     var tipoM = req.query.tipo || '';
     var CASAS_MERCADO = ['condor','jaguar','delfin'];
@@ -1442,7 +1499,7 @@ module.exports = async function handler(req, res) {
   // api/interacciones.js v13; esta rama es la via directa del admin.
   // Cero borrado fisico: se cambia estado/resuelto_en, nunca DELETE.
   if (recurso === 'activos_ocultos') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'admin');
     if (req.method !== 'POST') return res.status(405).end();
     var tipoAO = body.tipo || req.query.tipo || '';
 
@@ -1518,7 +1575,7 @@ module.exports = async function handler(req, res) {
   // CERO BORRADO FISICO (no DELETE). Degradacion 503 SCHEMA_NOT_MIGRATED
   // (42P01/42703) si la 040 no corrio (patron BUG-021). No crea endpoints.
   if (recurso === 'gobernanza') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'admin');
     var tipoGo = req.query.tipo || 'gobernanza_lista';
 
     try {
@@ -1603,7 +1660,7 @@ module.exports = async function handler(req, res) {
   // SCHEMA_NOT_MIGRATED (42P01/42703) si la 040/027 no corrio. No crea
   // endpoints (8/8, ADR-001).
   if (recurso === 'marcas_spots') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'admin');
     var tipoMs = req.query.tipo || 'spot_presencia_lista';
 
     try {
@@ -1674,7 +1731,7 @@ module.exports = async function handler(req, res) {
   // degradado:true y console.warn, nunca 500 ni catch vacio.
   // Sin SELECT *: cada consulta lista sus columnas explicitamente.
   if (recurso === 'salud_red') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'admin');
     if (req.method !== 'GET') return res.status(405).end();
 
     // Ventana parametrizable en dias (default 30), acotada 1..365 para no
@@ -2222,7 +2279,7 @@ module.exports = async function handler(req, res) {
   // (42P01) o le falta una columna (42703); nunca 500 ciego ni catch vacio
   // (patron BUG-021). Sin SELECT *: se listan las columnas.
   if (recurso === 'gamificacion_config') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'admin');
     if (req.method !== 'POST') return res.status(405).end();
 
     try {
@@ -2338,7 +2395,7 @@ module.exports = async function handler(req, res) {
   // JS y paga con UPDATE usuarios suelto FUERA de xp_ledger (puede pagar dos
   // veces). Aqui el unico que decide es el claim.
   if (recurso === 'reclamaciones') {
-    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (!auth(req)) return denegar(res, 'admin');
 
     var RECLAM_ESTADOS  = ['pendiente','aprobada','rechazada'];
     var RECLAM_ACCIONES = ['aprobar','rechazar','revertir'];

@@ -7155,12 +7155,46 @@ function _downloadIndividual(files) {
    Cada save/delete se refleja inmediatamente en el sitio
 ════════════════════════════════════════════════════════ */
 
-var ADMIN_SECRET = localStorage.getItem('admin_secret') || 'exploraco12345';
+/* Secreto admin SIN fallback literal: el backend es fail-closed y el valor
+   antiguo se va a rotar, asi que un literal aqui enviaria en silencio el
+   secreto VIEJO y fallaria de forma incomprensible. Si localStorage
+   ('admin_secret') esta vacio se PIDE una vez al operador (window.prompt,
+   mismo patron que _reclamEnsureAdminId) y se guarda. Cancelar = '' y el
+   llamador NO debe enviar la peticion. */
+var ADMIN_SECRET = '';
+var _adminSecretPedido = false;
+function _adminSecretResolver() {
+  var v = '';
+  try { v = localStorage.getItem('admin_secret') || ''; } catch (e) { v = ''; }
+  v = String(v).trim();
+  if (v) return v;
+  if (!_adminSecretPedido) {
+    _adminSecretPedido = true;
+    var resp = null;
+    try {
+      resp = window.prompt('admin_secret de este navegador (secreto admin). '
+        + 'Sin el no se puede guardar, publicar ni subir nada:', '');
+    } catch (e) { resp = null; }
+    v = (resp === null) ? '' : String(resp).trim();
+    if (v) {
+      try { localStorage.setItem('admin_secret', v); } catch (e) {}
+      return v;
+    }
+  }
+  showAdminToast('Sin admin_secret no se envia nada al servidor. Escribe el secreto para operar.', 'error');
+  return '';
+}
 var _localToUUID = {};
 try { _localToUUID = JSON.parse(localStorage.getItem('admin_local_to_uuid')||'{}'); } catch(e){}
 
 function _adminHeaders() {
-  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET };
+  var s = ADMIN_SECRET || _adminSecretResolver();
+  if (!s) {
+    /* Cancelado o vacio: se aborta aqui para NO enviar un Bearer invalido. */
+    throw new Error('admin_secret ausente');
+  }
+  ADMIN_SECRET = s;
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s };
 }
 
 /* ── BLOG: buscador de autor (Sprint Inspirate) ──────────────────
@@ -8711,6 +8745,94 @@ async function moderarDestino(id, accion) {
   var card = document.getElementById('mod-card-'+id);
   if(card) card.style.opacity = '.5';
 
+  /* ADR-109 D4/B5 -- APROBAR sale por la RUTA UNICA /api/interacciones
+     (tipo publicar_lugar_aprobar): publica y paga en la MISMA invocacion.
+     La via vieja /api/admin?recurso=solicitudes queda SOLO para rechazar
+     y pendiente; 'aprobar' retorna arriba y ya no la toca. */
+  if (accion === 'aprobar') {
+    var msgAl = '';
+    var tipoAl = 'error';
+    var refrescarAl = false;
+    var bajarBadgeAl = false;
+    try {
+      var respAl = await fetch('/api/interacciones', {
+        method: 'POST',
+        headers: _adminHeaders(),
+        body: JSON.stringify({ tipo: 'publicar_lugar_aprobar', destino_id: id })
+      });
+      var dataAl = null;
+      try { dataAl = await respAl.json(); } catch (eJsonAl) { dataAl = null; }
+      if (!dataAl) {
+        msgAl = 'Error al aprobar: respuesta no valida del servidor (HTTP ' + respAl.status + ')';
+      } else {
+        var errAl = String(dataAl.error || '');
+        var motAl = String(dataAl.motivo || '');
+        if (errAl === 'No autorizado') {
+          msgAl = 'Error: sesion admin no autorizada (401). Revisa el Bearer ADMIN_SECRET; no se publico nada.';
+        } else if (errAl === 'destino_id requerido' || errAl === 'destino_id_invalido') {
+          msgAl = 'Error de programacion: ' + errAl;
+        } else if (errAl === 'Destino no encontrado') {
+          msgAl = 'Error: el destino ya no existe. Lista refrescada.';
+          refrescarAl = true;
+        } else if (errAl === 'ESTADO_NO_APROBABLE') {
+          msgAl = 'Aviso: la ficha no esta en estado aprobable (status: '
+            + String(dataAl.status || '?') + '). No se publico ni se pago.';
+          refrescarAl = true;
+        } else if (errAl === 'SIN_AUTOR_NO_APROBABLE') {
+          msgAl = 'Aviso: la ficha es de usuario y NO tiene autor. No se publico ni se pago. '
+            + 'Asigna el autor_id del usuario en los tags de la ficha y vuelve a aprobar.';
+        } else if (errAl === 'AUTOR_INEXISTENTE') {
+          msgAl = 'Aviso: el autor_id ' + String(dataAl.autor_id || '?')
+            + ' apunta a un usuario que ya no existe. No se publico ni se pago.';
+        } else if (errAl === 'XP_CERO') {
+          msgAl = 'Error: el calculo de XP dio 0. La ficha quedo marcada error_calculo y NO se publico.';
+        } else if (errAl === 'APROBAR_MOVIDO') {
+          msgAl = 'Error: la ruta de aprobacion se movio (410 APROBAR_MOVIDO). Recarga el panel.';
+        } else if (errAl) {
+          msgAl = 'Error al aprobar: ' + errAl + ' (HTTP ' + respAl.status + ')';
+        } else if (dataAl.ok !== true) {
+          msgAl = 'Error al aprobar: respuesta sin ok (HTTP ' + respAl.status + ')';
+        } else if (dataAl.otorgado === true) {
+          /* Exito real: se publico Y se pago. El numero es el del servidor. */
+          msgAl = _modXpMensaje(dataAl);
+          if (dataAl.xp_total !== null && dataAl.xp_total !== undefined)
+            msgAl += ' | XP total: ' + dataAl.xp_total;
+          if (dataAl.ledger === false)
+            msgAl += ' | aviso: el asiento de ledger NO se registro';
+          tipoAl = 'success';
+          refrescarAl = true;
+          bajarBadgeAl = true;
+        } else if (motAl === 'sin_destinatario') {
+          /* B1: alta directa del admin, fuera del universo de pago. Neutro. */
+          msgAl = 'Info: ficha del admin, sin destinatario de XP. No se pago ni se modifico nada.';
+          tipoAl = '';
+          refrescarAl = true;
+        } else if (motAl === 'ya_otorgado' || dataAl.otorgado === false) {
+          /* D7: doble clic o carrera perdida. Neutro, no es un error. */
+          msgAl = 'Info: el XP ya estaba otorgado; no se paga dos veces.';
+          tipoAl = '';
+          refrescarAl = true;
+        } else {
+          msgAl = 'Error al aprobar: respuesta no reconocida (HTTP ' + respAl.status + ')';
+        }
+      }
+    } catch (errRedAl) {
+      msgAl = 'Error de red al aprobar: ' + errRedAl.message;
+    }
+    if (card) card.style.opacity = '1';
+    showAdminToast(msgAl || 'Error al aprobar: sin mensaje', tipoAl);
+    if (refrescarAl) loadPendientes();
+    if (bajarBadgeAl) {
+      var badgeAl = document.getElementById('badge-pending');
+      if (badgeAl && badgeAl.style.display !== 'none') {
+        var nAl = Math.max(0, parseInt(badgeAl.textContent||'0', 10) - 1);
+        _updatePendingBadge(nAl);
+      }
+    }
+    return;
+  }
+
+  /* Solo rechazar/pendiente llegan aqui: 'aprobar' retorna arriba. */
   try {
     var resp = await fetch('/api/admin?recurso=solicitudes', {
       method: 'POST',
@@ -8721,24 +8843,15 @@ async function moderarDestino(id, accion) {
     if(!data.ok) throw new Error(data.error || 'Error');
 
     var msgs = {
-      aprobar:   '\u2705 Publicado en el directorio',
       rechazar:  '\u274c Solicitud rechazada',
       pendiente: '\u23f3 Movido a pendientes'
     };
-    if (accion === 'aprobar') {
-      /* ADR-099 D10: el numero REAL viaja en otorgamiento. Si el
-         otorgamiento falla se dice; nunca se oculta. */
-      var ot = (data && data.otorgamiento) ? data.otorgamiento : null;
-      var okXp = !!(ot && ot.otorgado === true);
-      showAdminToast(_modXpMensaje(ot), okXp ? 'success' : 'error');
-    } else {
-      showAdminToast(msgs[accion] || 'OK', '');
-    }
+    showAdminToast(msgs[accion] || 'OK', '');
 
     // Recargar lista
     loadPendientes();
 
-    // Actualizar badge si se aprobó o rechazó desde "pending"
+    // Actualizar badge si se aprobo o rechazo desde "pending"
     if(accion !== 'pendiente' && accion !== 'draft') {
       var badge = document.getElementById('badge-pending');
       if(badge && badge.style.display !== 'none') {
@@ -11276,7 +11389,8 @@ function adminSubirImagen(campoId, onDone) {
     var v = window.MediaUpload.validar(file, 'foto');
     if (!v.ok) { showAdminToast(v.error, 'error'); return; }
     showAdminToast('Subiendo imagen...');
-    var secret = localStorage.getItem('admin_secret') || 'exploraco12345';
+    var secret = ADMIN_SECRET || _adminSecretResolver();
+    if (!secret) { return; }
     window.MediaUpload.subir({ file: file, tipo: 'foto', contexto: 'admin', adminToken: secret })
       .then(function (r) {
         showAdminToast('Imagen subida', 'success');

@@ -657,11 +657,44 @@ function validarSesionUsuario(req, usuarioIdEsperado) {
 // el repo (api/admin.js acepta X-Internal-Secret; api/utilidades.js acepta
 // Authorization: Bearer): no inventa un canal nuevo. admin.html envia
 // Authorization: Bearer ADMIN_SECRET (ver _adminHeaders, linea ~5791).
+// ADR-109 paso 4b: el secreto admin NO tiene fallback publico (fail-closed).
+// Sin process.env.ADMIN_SECRET las ramas admin responden 503; la comparacion
+// es en tiempo constante. Refactor a lib/ pendiente (deuda del arquitecto).
+function adminSecretValor() {
+  var s = process.env.ADMIN_SECRET;
+  return (typeof s === 'string' && s.length > 0) ? s : null;
+}
+// Bytes UTF-16 -> octetos bajos. Sin Buffer a proposito: el arnes de smoke
+// carga el handler en un sandbox vm sin globales de Node, y typed arrays son
+// intrinsecos de ECMAScript.
+function adminBytes(v) {
+  var s = String(v === undefined || v === null ? '' : v);
+  var out = new Uint8Array(s.length);
+  for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
+  return out;
+}
+function adminSecretIgual(candidato) {
+  var real = adminSecretValor();
+  if (!real) return false;
+  var cand = String(candidato === undefined || candidato === null ? '' : candidato);
+  if (cand.length !== real.length || cand.length === 0) return false;
+  return crypto.timingSafeEqual(adminBytes(cand), adminBytes(real));
+}
+function denegarUsuario(res, contexto) {
+  if (!adminSecretValor()) {
+    console.error('[auth] CONFIG_ADMIN_SECRET_AUSENTE ' + contexto);
+    return res.status(503).json({ ok: false, error: 'CONFIG_ADMIN_SECRET_AUSENTE' });
+  }
+  return res.status(401).json({ ok: false, error: 'No autorizado' });
+}
 function esAdminUsuario(req) {
-  var secreto = process.env.ADMIN_SECRET || 'exploraco12345';
+  if (!adminSecretValor()) {
+    console.error('[auth] CONFIG_ADMIN_SECRET_AUSENTE usuarios');
+    return false;
+  }
   var bearer = String(req.headers['authorization'] || '').replace('Bearer ', '').trim();
   var interno = String(req.headers['x-internal-secret'] || '').trim();
-  return bearer === secreto || interno === secreto;
+  return adminSecretIgual(bearer) || adminSecretIgual(interno);
 }
 
 // Alfabeto de codigos de referido sin caracteres ambiguos (sin 0/O y sin
@@ -1504,8 +1537,7 @@ module.exports = async (req, res) => {
         // Solo admin: la proyeccion incluye email (PII) y el buscador por
         // email no debe ser enumerable por cualquiera. admin.html ya envia
         // _adminHeaders() (Authorization: Bearer ADMIN_SECRET).
-        if (!esAdminUsuario(req))
-          return res.status(401).json({ ok: false, error: 'No autorizado' });
+        if (!esAdminUsuario(req)) return denegarUsuario(res, 'usuarios_admin');
         const palabra = String(req.query.buscar || '').trim();
         if (palabra.length < 2) return res.status(400).json({ ok: false, error: 'Minimo 2 caracteres' });
         const rows = await sql(
@@ -2626,8 +2658,7 @@ module.exports = async (req, res) => {
       // referidos/facciones de usuarios legitimos. Idempotente: el valor
       // enviado es el estado final.
       else if (c.tipo === 'verificar_usuario') {
-        if (!esAdminUsuario(req))
-          return res.status(401).json({ ok: false, error: 'No autorizado' });
+        if (!esAdminUsuario(req)) return denegarUsuario(res, 'usuarios_admin');
         var vId = String(c.usuario_id || '');
         if (!vId)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
