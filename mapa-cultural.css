@@ -59,6 +59,27 @@
 /* Item individual de video: se mantiene REDONDO (solo tinte rojo). */
 .mc-root .mpa-media-pin-video{border-style:solid;border-color:#ff8a80;box-shadow:0 3px 10px rgba(231,76,60,.55)}
 
+/* ---- Pin de ubicacion del usuario ----------------------------- */
+/* Identifica PERSONA, no categoria: por eso es punto CENTRADO con anillo
+   blanco y no gota con emoji. El color de marca lo inyecta el motor como
+   style inline (userPinColor), asi que aqui no se repite: solo se anade el
+   acabado fino y el pulso. El pin es DECORATIVO (sin click, sin cursor, sin
+   tabindex): todo el arbol queda con pointer-events:none para no robar el
+   hit-test a los pines de lugar. La opacidad de base del halo vive AQUI y no
+   inline, para que el keyframe del pulso gane sin competencia; con
+   prefers-reduced-motion la animacion se apaga y queda el anillo a .5. */
+.mc-root .mc-user-pin-wrap{pointer-events:none}
+.mc-root .mc-user-pin{pointer-events:none;border-radius:50%}
+.mc-root .mc-user-pin-halo{pointer-events:none;border-radius:50%;transform-origin:50% 50%;opacity:.5;animation:mc-user-pin-pulse 2.6s cubic-bezier(.22,.8,.24,1) infinite}
+@keyframes mc-user-pin-pulse{
+  0%{transform:scale(.62);opacity:.5}
+  70%{transform:scale(1.5);opacity:0}
+  100%{transform:scale(1.5);opacity:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .mc-root .mc-user-pin-halo{animation:none}
+}
+
 /* ---- Drawer lateral ------------------------------------------- */
 /* El drawer raiz lleva .mc-root + .mapa-drawer en el mismo nodo. */
 .mc-root.mapa-drawer{position:fixed;inset:0;z-index:1200;visibility:hidden;pointer-events:none}

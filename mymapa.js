@@ -1034,12 +1034,25 @@
     return true;
   }
 
+  // Boton "Mi ubicacion" de la barra de filtros de comunidad.html. El boton es
+  // MARKUP ESTATICO de la pagina (id="mf-locate", ADR-006: el baseline es el
+  // archivo real, no lo que inyecta el JS); aqui solo vive el handler de su
+  // onclick. Reusa la instancia que creo ensureMC(): el motor ya pinta el pin
+  // del usuario en las coordenadas exactas y hace el flyTo. Nunca se crea una
+  // segunda instancia de MapaCultural (esa caeria en otro mapa, con otra capa).
+  function geolocate() {
+    if (!mc || typeof mc.geolocate !== 'function') return false;
+    mc.geolocate();
+    return true;
+  }
+
   window.MyMap = {
     init: init,
     refresh: refresh,
     openNuevo: openNuevo,
     getMap: getMap,
     getMC: getMC,
+    geolocate: geolocate,
     esUnificado: esUnificado,
     setMediaTipos: setMediaTipos,
     setMediaVista: setMediaVista,

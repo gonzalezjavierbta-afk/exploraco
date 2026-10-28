@@ -12046,3 +12046,111 @@ Registro de lo **ejecutado y medido hoy**, verificado contra el archivo real (AD
 6. **Verificacion:** **Escudo GOLD 9/9 PASS**; `api/` = **8** (cero endpoint nuevo); **0 bytes > 127 anadidos** en los 3 HTML, **0** en `api/`, `mercado.js` y la 062; smokes **mercado 38/38**, **gaming_v61 43/43**, **cartas_constantes 28/28**, **038_casas 78/78**; `smoke_057_consumibles_faccion.js` **149/149** (antes 122) y `smoke_test_consumibles_era.js` **63/63** (antes 59) reajustados al contrato **D5**, conservando nivel 4, era, limite diario y stock. **SIN COMMIT Y SIN DEPLOY**; el **run real de la 062** queda **pendiente del operador**.
 7. **Migraciones APLICADAS EN NEON CON COMMIT (segunda edicion del pase, misma fecha).** **062**: `schema_migrations` **`numero=62`**, notas **"ADR-110 D4"** -> **4 filas** con `faccion_requerida IS NULL` y `nivel_requerido=4`, `categoria='faccion' AND faccion_requerida IS NOT NULL` = **0** (era 4), **0** otros campos cambiados, idempotencia **`update=0`**. **063** `db/migrations/063_consumibles_faccion_copy.sql` (NUEVA, 215 lineas): **`numero=63`**, notas **"ADR-110 D4 copy"** -> **`nuevo_copy=4`**, `copy_obsoleto=0`, `idem=0`, otros campos **0**; las 4 `descripcion` pasan a "Cualquier faccion. +{15,3,10,30} XP..." (cierra la deuda del copy). **ASCII 0** en 062 y 063.
 8. **T8 CON CONTROL POSITIVO PASS en produccion, con `BEGIN`/`ROLLBACK` (`hubo_commit=false`, cero persistencia):** con fixture de **faccion no nula -> bloquea**; **sin faccion -> bloquea** (el **nivel 4** sigue mandando); **faccion coincidente -> no bloquea**; las **4 reales no bloquean 4/4**; el **CHECK rechaza faccion invalida** (`23514`); **estado final identico al post-062**. **Lo unico que queda abierto es el COMMIT y el DEPLOY del codigo** (backend -> `mercado.js` -> HTML con `?v=3`): el esquema va por delante del codigo desplegado. **El argumento de esta decision sigue viviendo solo en este ADR (ADR-084 D1)**; `TASKS.md` (TSK-245) y `NEXT.md` solo apuntan.
+
+## ADR-111: El pin de ubicación del usuario es **capa propia, decorativa y de color de marca** (nunca color de categoría ni filtrable), es **punto centrado** (no gota), persiste en `localStorage` con **borrado explícito** y tiene **fuente única de CSS** (`.mc-root` en `mapa-cultural.css`; la copia inline de `index.html` es excepción **cerrada** y la deriva se vigila con guarda de paridad) [NO deroga ninguna premisa de ADR previos; acota ADR-004 en UI y fija el contrato de superficie del motor de ADR-045]
+
+**ID:** ADR-111
+**Fecha:** 2026-10-28
+**Autor:** `@architect` en función **normativa**, no de diseño. Gate de riesgo `@architect` **CONSUMIDO**: el operador confirmó explícitamente ("a todo sí") que esta convención se codifique como **ADR corto de UI**. El código se implementó **antes** del ADR y ya está certificado; este documento fija por escrito lo que **ya rige** para que no derive, y **no reabre** ninguna decisión de producto.
+**Estado:** **Aceptado.** Implementado en el árbol de trabajo, **commit y deploy pendientes**. El argumento completo vive **solo** en esta sección (ADR-084 D1); `TASKS.md` (TSK-246), `NEXT.md` y `BLUEPRINT.md` **apuntan**, no repiten.
+**Numeración (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-110`** (línea 11850); **no existía ningún `ADR-111`**. Se escribe como **111**, siguiente consecutivo del mayor. Conteo de encabezados `^## ADR-` **antes** de esta sección: **109**, con **110** como máximo y un único hueco histórico (`ADR-005`, nunca redactado). No hay índice/TOC en la cabecera del fichero, así que no hay entrada que insertar.
+
+### Problema
+
+El mapa cultural se comparte hoy entre la portada y Comunidad/Mi Mapa (ADR-045, TSK-133/TSK-134), y el pin de la **persona** convive en el mismo lienzo con los pines del **catálogo**. Esa convivencia abre cuatro preguntas que, sin norma escrita, cada anfitrión responde distinto: **de qué color** se pinta, **en qué colección** vive, **qué forma** tiene y **qué pasa con la posición** al recargar o al destruir el mapa. La respuesta implícita "que lo decida la página" ya produjo dos patrones que se rechazan aquí: un pin teñido por categoría (el usuario no es una categoría) y un botón de ubicación **inyectado por DOM**, que esquiva la guarda de markup del smoke y fue la vía de BUG-134/BUG-136.
+
+A esto se suma el riesgo de **deriva de CSS**: el pin vive en `mapa-cultural.css` y, además, en una copia inline dentro de `index.html`. Dos copias son una invitación a que la tercera aparezca. Este ADR cierra la puerta: **dos copias y ninguna más**, con guarda que las compara.
+
+### Datos medidos (2026-10-28, contra el archivo real; ADR-006)
+
+1. **Motor `mapa-cultural.js` v1.5.0** (`VERSION` en `:179`): declara `userPinEnabled` (default `true`), `userPinColor` (default **`#FF4A00`**, `:768`) y `persistKey` (`:135`, `:749`). API nueva: `setUserPos(lat,lng)`, `clearUserPos()`, `getUserPos()` (`:29`, export `:2819`); `clearUserPos` borra **también** lo persistido (`:1916`).
+2. **Capa propia:** `st.userPin` (`:805`) con pane dedicado (`userPinPane()`, `:1802`) y altas/bajas por `removeUserPin()` (`:1815-1819`). **No** está en `st.markers` ni en `clusterLayer`; `destroy()` lo retira a mano antes de tirar el mapa (`:2656-2658`).
+3. **Persistencia:** clave **propia** `mc_user_pos` (`:1735`), derivada de `persistKey` como `<persistKey>:userpos` (`:46`, `:154`, `:1739`). `destroy()` **no** la borra: pone `st.userPos = null` (`:2659`) y deja el `localStorage` intacto.
+4. **Autocentrado:** `flyTo([lat,lng], 16, {animate:true})` **solo** en geolocalización exitosa (`:1940`); el encuadre inicial del mapa es `setView(...,13)` (`:994`) y no se repite al restaurar.
+5. **Una sola copia canónica de CSS:** `mapa-cultural.css:62-81` bajo `.mc-root` (`.mc-user-pin-wrap`, `.mc-user-pin`, `.mc-user-pin-halo`, `@keyframes mc-user-pin-pulse`, `prefers-reduced-motion`).
+6. **Una única copia inline:** `index.html:587-600`, **documentada en el propio archivo** (`:587-589`) como excepción por no cargar `mapa-cultural.css` (paridad visual desde TSK-134).
+7. **Anfitrión con marcado estático:** `comunidad.html:1015` declara `<button ... id="mf-locate" onclick="MyMap.geolocate()">` en HTML, y `mymapa.js:1043-1047` **delega** en la instancia única del motor (`mc.geolocate()`), sin crear una segunda instancia.
+8. **Guarda de paridad ya existe:** `scripts/smoke_mapa_cultural.js` compara las **dos** copias del CSS (`:667-701`: 3 clases + keyframe + duración + curva + stops).
+9. **Certificación:** `node scripts/smoke_mapa_cultural.js` -> **272 PASS / 0 FAIL**, `EXIT=0` (línea de cierre `SMOKE MAPA CULTURAL: OK`). Escudo GOLD: **APTO CON OBSERVACIONES**. QA visual en navegador **pendiente** (ver Deudas).
+10. **Presupuesto Vercel 8/8 intacto:** este ADR no crea endpoint, ni tabla, ni campo de `tags`. `(Get-ChildItem api\*.js).Count` = **8**.
+
+### Decisión
+
+**D1. Color de marca, no color de categoría; y forma de punto centrado, no gota.**
+
+El pin de ubicación del usuario se pinta **siempre** con el color de marca `#FF4A00`, valor por defecto de `userPinColor`, y **nunca** hereda el color de categoría de `PIN_COLORS` (`mapa-cultural.js:183`). `PIN_COLORS` sigue siendo exclusivo del catálogo: `:301` (`raw.color || PIN_COLORS[cat] || '#FF4A00'`) describe **pines de lugar**, no el del usuario, que se resuelve por `userPinColorValue()` (`:1760-1761`). La forma es **punto centrado** con **anillo blanco** y **halo pulsante**; se **rechaza** la gota/teardrop de marca porque en este lenguaje visual la gota ya significa "lugar del catálogo" y un tercer significado sobre la misma silueta produce confusión de lectura. El pin es **decorativo**: `pointer-events:none` en todo el árbol (`mapa-cultural.css:71-73`), **sin** handler de click, **sin** `tabindex` y **sin** cursor; no roba el hit-test a los pines de lugar. El color se inyecta como **style inline** desde el motor y el CSS solo aporta acabado y pulso, para que el color tenga una sola fuente.
+
+**D2. Capa propia: `st.userPin` / `userPinPane`, nunca `st.markers`.**
+
+El pin del usuario vive en su propia colección y su propio pane (`:805`, `:1802`, `:1840`). Motivo normativo: `renderMarkers()` **vacía** `st.markers` en cada repintado y `filterPins()` **oculta por categoría y por rating**. Colgado de ahí, el pin del usuario desaparecería en cada refresh y sería filtrable por criterios que no le aplican: **el pin del usuario no es filtrable** y no responde a `activeCat`. `destroy()` lo retira explícitamente (`:2656-2658`) porque, al no estar en ninguna colección que se limpie sola, quedaría huérfano sobre un mapa destruido.
+
+**D3. Sin círculo de precisión.**
+
+El círculo de precisión se **descarta por decisión del operador**: tapa la zona del mapa que el usuario acaba de centrar, que es exactamente la información que quiere ver. Un anfitrión que lo quiera lo implementa como **opción** de su instancia (p. ej. `userAccuracyCircle`), **nunca** como default del motor. Esta es la única cláusula de este ADR que **no** está implementada: hoy no existe la opción, y no se exige.
+
+**D4. Persistencia local con borrado explícito.**
+
+La última posición se guarda en `localStorage` con clave `mc_user_pos` (o `<persistKey>:userpos` cuando el anfitrión provee `persistKey`). Al arrancar se **restaura sin volver a pedir permiso** de geolocalización y **sin mover la vista**: restaurar es recordar, no navegar; un mapa que salta solo al cargar rompe la lectura de la portada. `destroy()` la **conserva a propósito** (`:2659` limpia el estado, no el almacén): destruir el mapa no es un acto de privacidad. Solo `clearUserPos()` (`:1916`) borra el pin **y** lo persistido, y es la **vía de privacidad** que el anfitrión debe exponer si la ofrece. El **autocentrado a zoom 16** ocurre **solo** en geolocalización **exitosa** y **siempre**, aunque el usuario haya movido el mapa antes: es la respuesta a una acción explícita del usuario y debe verse.
+
+**D5. Fuente única de CSS (la cláusula más importante).**
+
+Toda página **nueva** que monte el mapa carga **`mapa-cultural.css`** y estiliza el pin bajo **`.mc-root`** (aislamiento atómico, ADR-004). La copia inline de `index.html` (`:587-600`) es una **excepción documentada y cerrada**: esa página conserva CSS inline por **paridad visual desde TSK-134** y no se migra en este ADR. **No se admite una tercera copia inline**, ni en una página nueva ni en un `data-*`/`style` de bloque. La deriva entre las **dos** copias se vigila con la **guarda de paridad** de `scripts/smoke_mapa_cultural.js` (`:667-701`), que falla si difieren las 3 clases, el keyframe, la duración, la curva o los stops: la guarda no evita la deriva, la **detecta**, y por eso el número de copias se mantiene en dos.
+
+### Alternativas consideradas y rechazadas
+
+- **(A) Gota/teardrop de marca para el usuario.** Rechazada por **colisión semántica**: la gota ya es "lugar del catálogo". Un segundo significado sobre la misma silueta obliga al usuario a leer el color para distinguir persona de lugar, y el color es justo lo que D1 prohíbe usar como discriminador.
+- **(B) Círculo de precisión por defecto.** Rechazada por el operador: **tapa el mapa** en el momento de mayor interés (el zoom recién hecho). Queda como opción de anfitrión (D3), no como default.
+- **(C) Botón de ubicación inyectado por DOM en Comunidad.** Rechazada: esquivaba la **guarda de markup** del smoke (el nodo no existía en el HTML y el test no podía exigirlo), y **es el patrón que produjo BUG-134/BUG-136**. Se sustituyó por **marcado estático** con `id="mf-locate"` (`comunidad.html:1015`) y delegación al motor (`mymapa.js:1043-1047`). Norma derivada: **la UI se declara en el HTML, no se inyecta desde script** cuando el smoke deba poder exigirla.
+- **(D) Colgar el pin de `st.markers`** (menos estado, reusa el repintado). Rechazada por D2: `renderMarkers()` vacía la colección y `filterPins()` la esconde.
+- **(E) Pedir permiso de geolocalización al arrancar para "refrescar" la posición guardada.** Rechazada: convierte una restauración pasiva en una petición de permiso no solicitada, y `destroy()` en un `localStorage` limpio sería un borrado silencioso.
+- **(F) Una tercera copia de CSS inline "temporal" en la próxima página.** Rechazada por D5: la tercera copia es el fin de la guarda de paridad, porque ya no hay dos originales que comparar.
+
+### Consecuencias
+
+1. **El pin del usuario es un contrato del motor, no una decisión de página:** si un anfitrión lo quiere de otro color, cambia `userPinColor` (opción), no el CSS ni `PIN_COLORS`.
+2. **Cero impacto en `tags` JSONB, cero migración, cero endpoint:** este ADR es de superficie de render y de `localStorage`. El presupuesto 8/8 sigue intacto y `collectPlace()`/`_placeToAPI()`/`loadForm()` y el motor genérico `CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS` **no se tocan**: no hay categoría ni campo nuevo.
+3. **`renderMarkers()` y `filterPins()` quedan libres de un caso especial:** el pin de persona no entra en la lógica de filtros, y eso se mantiene por diseño, no por un `if`.
+4. **`index.html` queda marcado como deuda visual cerrada:** su copia inline no crece. Si algún día carga `mapa-cultural.css`, la guarda de paridad debe relajarse **en el mismo commit**, no antes.
+5. **La privacidad tiene una sola puerta:** `clearUserPos()`. Cualquier anfitrión que ofrezca "borrar mi ubicación" llama a esa y a ninguna otra.
+6. **El coste de una página nueva baja:** montar el mapa no exige re-decidir color, forma, capa ni persistencia.
+
+### Deudas
+
+| # | Deuda | Por qué se acepta | Cómo se cerraría |
+|---|---|---|---|
+| **D-1** | **QA visual en navegador pendiente**: la certificación es por smoke (272/272) y GOLD, no por inspección visual del pulso, el anillo y el contraste del `#FF4A00` sobre el tileset. | No hay harness de navegador en el repo; el smoke prueba contrato y paridad de CSS, no píxeles. | Reservado como **TSK-247** en el cierre documental. El ID **aún no existe** en `TASKS.md` (ADR-006): lo crea `@docs-keeper`. *(Actualizado 2026-10-28, pase documental 2: **TSK-247 ya existe** en `TASKS.md:6675`, con 8 puntos de criterio de cierre y `@qa-auditor` como responsable de ejecucion.)* |
+| **D-2** | **`index.html` conserva CSS inline** del pin, con paridad vigilada por guarda pero no unificada. | Migrar el home a `mapa-cultural.css` es alcance de TSK-134 y cambia el orden de carga de una página crítica; se prefiere paridad medida a refactor de portada. | Cargar `mapa-cultural.css` en `index.html`, borrar `:587-600` y **ajustar la guarda de paridad al mismo tiempo**. ADR propio si se hace junto a otra migración de CSS. |
+| **D-3** | **El círculo de precisión no existe como opción** (solo está descartado como default). | Nadie lo ha pedido; implementar una opción sin consumidor es código muerto. | Añadir `userAccuracyCircle` al motor **solo** cuando un anfitrión real lo pida, con radio y opacidad declarados y `pointer-events:none`. |
+| **D-4** | **La clave de persistencia global `mc_user_pos` puede mezclar posiciones** entre páginas que compartan origen sin `persistKey`. | El dato es de baja sensibilidad y de bajo coste de corrección (el usuario vuelve a geolocalizar); aislar por página exige que **todos** los anfitriones pasen `persistKey`. | Exigir `persistKey` a toda página nueva (norma de D5 extendida) y documentarlo en el contrato del motor. |
+
+### Criterio de verificación (lo ejecuta `@qa-auditor`; este ADR no lo ejecuta)
+
+1. **V1 (D1):** `Select-String -Path mapa-cultural.js -Pattern "userPinColor: '#FF4A00'"` -> **1** coincidencia; y el árbol del pin **no** referencia `PIN_COLORS`.
+2. **V2 (D1, decorativo):** en `mapa-cultural.css:71-73` las **3** clases del pin llevan `pointer-events:none`; `Select-String -Path mapa-cultural.js -Pattern 'mc-user-pin[^"]*"\s*,?\s*onclick'` y cualquier `tabindex` sobre el pin -> **0** coincidencias.
+3. **V3 (D2):** `st.userPin` **no** aparece en `renderMarkers()` ni en `filterPins()`; `destroy()` llama a `removeUserPin()` (`:2658`).
+4. **V4 (D4):** `clearUserPos()` borra el `localStorage` y `destroy()` **no**; restaurar **no** llama a `geolocate()` ni a `flyTo`; el **único** `flyTo(..., 16, ...)` es el de geolocalización exitosa (`:1940`).
+5. **V5 (D5, la guarda):** `node scripts/smoke_mapa_cultural.js` -> **272 PASS / 0 FAIL / EXIT=0** y la comprobación de **paridad de las 2 copias** (`:701`) en PASS.
+6. **V6 (D5, recuento de copias):** `Select-String -Path *.html -Pattern 'mc-user-pin-halo\{'` -> **exactamente 2** ficheros (`index.html` y `mapa-cultural.css`). Un tercero es **FAIL** de este ADR.
+7. **V7 (presupuesto):** `(Get-ChildItem api\*.js).Count` = **8** (cero endpoint nuevo).
+8. **V8 (D-C):** `Select-String -Path comunidad.html -Pattern 'id="mf-locate"'` -> **1** coincidencia en **marcado estático** (`:1015`), y **0** `createElement` de ese botón en `mymapa.js`.
+
+### Evidencia (archivo real, 2026-10-28)
+
+- Motor: **`mapa-cultural.js` v1.5.0** (`:179`), opciones `userPinEnabled`/`userPinColor`/`persistKey` (`:135`,`:749`,`:768`), capa propia (`:805`,`:1802`,`:1815-1819`), persistencia (`:1735`,`:1739`,`:1916`), autocentrado (`:1940`), `destroy()` (`:2655-2676`).
+- CSS canónico: **`mapa-cultural.css:62-81`**.
+- Excepción inline: **`index.html:587-600`**.
+- Anfitrión con marcado estático: **`comunidad.html:1015`**; delegación **`mymapa.js:1043-1047`** (export `:1055`).
+- Guarda de paridad: **`scripts/smoke_mapa_cultural.js:667-701`**; certificación **272/272**, `EXIT=0`; Escudo GOLD **APTO CON OBSERVACIONES**; **QA visual en navegador pendiente** (D-1 / TSK-247).
+- Implementación y alcance real: **`TASKS.md` TSK-246** (nota: TSK-246 dice "**NO nace ADR**"; esa frase queda **superada** por el gate explícito del operador que ordena este ADR — se conserva por Cero Borrado Lógico y la corrige `@docs-keeper` en el cierre). *(Hecho en el pase documental 2 del 2026-10-28: `TASKS.md:6642` lleva la anotación que apunta a este ADR.)*
+
+### Enlaces (no repiten el argumento; ADR-084 D1)
+
+- **TSK-133 / TSK-134**: motor compartido y migración del home (paridad visual que origina la copia inline).
+- **ADR-004**: aislamiento atómico de CSS por selector padre (aquí `.mc-root`).
+- **ADR-045**: motor del mapa cultural; este ADR fija su contrato de superficie para el pin de usuario.
+- **ADR-002**: mandato ASCII-safe (el CSS y el motor no añaden bytes > 127; los comentarios del motor van sin tildes).
+- **ADR-006**: baseline = archivo real; de ahí la numeración y el recuento de copias verificados arriba.
+
+### Estado
+
+**ACEPTADO** (2026-10-28). Normativiza **código ya implementado y certificado en el árbol de trabajo**: `mapa-cultural.js` **v1.5.0**, `mapa-cultural.css:62-81`, `index.html:587-600`, `comunidad.html:1015`, `mymapa.js:1043-1047`, smoke **272/272** y GOLD **APTO CON OBSERVACIONES**. **Sin commit y sin deploy** en el momento de redactarse. No hay ADR derogado: D1-D5 **acotan** ADR-004 y ADR-045 y **cierran** la vía de la tercera copia inline. Pendiente: **QA visual en navegador** (D-1, TSK-247) y el **commit/deploy** del motor y del CSS. `TASKS.md`, `NEXT.md` y `BLUEPRINT.md` solo **apuntan** a `ADR-111`.

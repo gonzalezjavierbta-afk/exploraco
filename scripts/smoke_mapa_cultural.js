@@ -41,7 +41,7 @@ check('API: window.MapaCultural expuesto', !!MC);
 // en Medios etiqueta/chips se derivan de mediaEnabled.
 // Si el motor vuelve a 1.4.1 o sube de 1.4.2, el smoke debe detectar la
 // regresion.
-check('API: version 1.4.2', MC && MC.version === '1.4.2');
+check('API: version 1.5.0', MC && MC.version === '1.5.0');
 ['create', 'init', 'refresh', 'setPlaces', 'setMedia', 'setMediaEnabled',
  'setMediaTypes', 'getMap', 'getState', 'openDrawer', 'closeDrawer', 'normalizePlace',
  'normalizeMedia', 'esc', 'starHtml', 'photoPlaceholderHTML', 'haversineKm']
@@ -654,8 +654,56 @@ pages.forEach(function (pg) {
 // manda; los tres que quedan siguen siendo los de siempre).
 check('markup index: 3 botones libres (visitados/locate/colombia)', mfFreeButtons(indexHtml) === 3
   && /data-cat="visitados"/.test(indexHtml) && /id="mf-locate"/.test(indexHtml) && /resetMapaColombia/.test(indexHtml));
-check('markup comunidad: boton libre Visitados presente', mfFreeButtons(comunidadHtml) === 1);
+// ACTUALIZADO en v1.5.0: comunidad pasa de 1 a 2 botones libres porque su mapa
+// gano el boton ESTATICO de ubicacion por defecto (<button class="mf-btn
+// mf-loc" id="mf-locate">Cerca de mi</button> en comunidad.html), correlato
+// del pin de usuario que el motor pinta desde v1.5.0. mymapa.js ya NO inyecta
+// DOM, asi que la paridad con index se exige tambien sobre el ID: el conteo
+// solo no distingue "2 botones" de "2 botones correctos".
+check('markup comunidad: 2 botones libres Visitados + Cerca de mi (id mf-locate)',
+  mfFreeButtons(comunidadHtml) === 2 && /data-cat="visitados"/.test(comunidadHtml) && /id="mf-locate"/.test(comunidadHtml));
 check('markup comunidad: 0 boton Solo mio', comunidadHtml.indexOf('mm-solo-mio') === -1 && comunidadHtml.indexOf('Solo mio') === -1);
+
+// ---- (19b) v1.5.0: PARIDAD de las DOS copias del CSS del pin de usuario ----
+// El CSS del pin esta duplicado a proposito: mapa-cultural.css (escopado
+// .mc-root, lo cargan comunidad y otros) e inline en el <style> de index.html
+// (esa pagina NO carga el CSS compartido). Dos copias sin guarda derivan en
+// silencio, asi que se comparan las PIEZAS del pin -- las tres clases, el
+// nombre del keyframe y su duracion/curva y sus stops -- y NO el bloque byte a
+// byte: retocar el tamano del punto no debe romper el smoke, cambiar el pulso
+// si. La copia de index no lleva el prefijo .mc-root, por eso la comparacion
+// ignora selectores y solo mira declaraciones.
+var pinCss = fs.readFileSync(path.join(__dirname, '..', 'mapa-cultural.css'), 'utf8');
+function pinPieces(css) {
+  var halo = (css.match(/\.mc-user-pin-halo\{[^}]*\}/) || [''])[0];
+  var anim = halo.match(/animation:\s*([A-Za-z0-9_-]+)\s+([0-9.]+m?s)\s+([^;]+)/) || [];
+  var kf = anim[1] || '';
+  var stops = [];
+  if (kf) {
+    var ini = css.indexOf('@keyframes ' + kf);
+    var fin = (ini === -1) ? -1 : css.indexOf('\n}', ini);
+    var bloque = (ini === -1 || fin === -1) ? '' : css.slice(ini, fin);
+    var re = /(\d+)%/g, m;
+    while ((m = re.exec(bloque))) stops.push(m[1]);
+  }
+  return {
+    wrap: css.indexOf('mc-user-pin-wrap') !== -1,
+    punto: css.indexOf('mc-user-pin{') !== -1 || /\.mc-user-pin\{/.test(css),
+    halo: css.indexOf('mc-user-pin-halo') !== -1,
+    kf: kf,
+    dur: anim[2] || '',
+    curva: (anim[3] || '').replace(/\s+/g, ' ').trim(),
+    stops: stops.join(',')
+  };
+}
+var pinShared = pinPieces(pinCss);
+var pinInline = pinPieces(indexHtml);
+check('markup pin: paridad de las 2 copias CSS (3 clases + keyframe + duracion + curva + stops)',
+  pinShared.wrap && pinShared.punto && pinShared.halo
+  && pinInline.wrap && pinInline.punto && pinInline.halo
+  && pinShared.kf !== '' && pinShared.kf === pinInline.kf
+  && pinShared.dur === pinInline.dur && pinShared.curva === pinInline.curva
+  && pinShared.stops === pinInline.stops);
 
 // ---- (20) migracion: toggleVistaAlbumes / filtrarMapaAV retirados ---
 var mymapaJs = fs.readFileSync(path.join(__dirname, '..', 'mymapa.js'), 'utf8');

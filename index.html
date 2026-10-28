@@ -584,6 +584,20 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .mapa-cl-num{font-size:13px;font-weight:900;color:#fff;font-family:'Barlow Condensed',sans-serif;line-height:1;margin-top:1px}
 .mapa-note{position:absolute;left:50%;bottom:14px;transform:translateX(-50%) translateY(8px);background:rgba(10,16,32,.97);border:1px solid var(--gold);color:#E5E7EB;font-size:11px;font-family:'Outfit',sans-serif;padding:8px 14px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:900;max-width:80%;text-align:center}
 .mapa-note.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* Pin de ubicacion del usuario: aqui NO se carga mapa-cultural.css, asi que
+   se duplican SOLO las reglas imprescindibles para que se vea igual que en
+   Comunidad. El color de marca lo inyecta el motor (userPinColor) inline. */
+.mc-user-pin-wrap{pointer-events:none}
+.mc-user-pin{pointer-events:none;border-radius:50%}
+.mc-user-pin-halo{pointer-events:none;border-radius:50%;transform-origin:50% 50%;opacity:.5;animation:mc-user-pin-pulse 2.6s cubic-bezier(.22,.8,.24,1) infinite}
+@keyframes mc-user-pin-pulse{
+  0%{transform:scale(.62);opacity:.5}
+  70%{transform:scale(1.5);opacity:0}
+  100%{transform:scale(1.5);opacity:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .mc-user-pin-halo{animation:none}
+}
 @media(max-width:860px){
   .mapa-body-grid{grid-template-columns:1fr;height:auto}
   .mapa-map-container{order:1;height:300px}
@@ -1040,7 +1054,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <script src="agenda-shared.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=3"></script>
-<script src="mapa-cultural.js?v=16"></script>
+<script src="mapa-cultural.js?v=17"></script>
 <script src="mapa-fullscreen.js?v=1"></script>
 <style>
 /* ec-welcome overlay: onboarding de primer acceso. Prefijo wl- exclusivo. */

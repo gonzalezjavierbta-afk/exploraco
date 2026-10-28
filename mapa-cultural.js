@@ -1,6 +1,6 @@
 /* =============================================================
    mapa-cultural.js -- Motor compartido del Mapa Cultural LATAWEL
-   Version 1.4.2. IIFE, ASCII-safe estricto, sin backticks.
+   Version 1.5.0. IIFE, ASCII-safe estricto, sin backticks.
 
    Porta a un modulo reusable el motor del mapa de index.html
    (pines, clustering por proximidad, capa multimedia y drawer
@@ -25,7 +25,37 @@ create(opts)  -> instancia (multi-instancia por pagina)
         setMediaTypes, setRatingMin, getRatingMin, setMediaVista,
         getMediaVista, setMediaSoloMio, toggleFilter, isFilterOn,
         onFilterChange, getState, getMap, openDrawer,
-        closeDrawer, geolocate, resetColombia, fitBounds }
+        closeDrawer, geolocate, resetColombia, fitBounds,
+        setUserPos, clearUserPos, getUserPos }
+
+   1.5.0
+     - Pin de UBICACION DEL USUARIO en el mapa. geolocate() ya obtenia la
+       posicion y la guardaba en st.userPos, pero no pintaba NADA: el usuario
+       concedia el permiso y el mapa volaba a un punto vacio. Ahora el exito
+       de geolocate deja un pin en las coordenadas EXACTAS y el flyTo a
+       zoom 16 se conserva siempre.
+     - Forma: PUNTO CENTRADO con anillo blanco y halo de marca (clases
+       mc-user-pin y mc-user-pin-halo). NO es la gota de categoria -- la gota
+       identifica un LUGAR -- y NO es un circulo de precision: el pin marca
+       la posicion, no un radio de error.
+     - El pin vive FUERA de st.markers y de la capa de clusters, en su propio
+       marker y en un pane propio: no lo borra renderMarkers, no lo filtra
+       filterPins (ni por categoria ni por rating) y no lo barre clearLayers
+       al reclusterizar.
+     - Persistencia de la ultima posicion conocida en localStorage con clave
+       PROPIA (derivada de persistKey cuando existe). Al inicializar se
+       RESTAURA el pin SIN mover la vista y SIN volver a pedir permiso: una
+       restauracion que robe la camara o dispare el prompt del navegador es
+       peor que no restaurar.
+     - API nueva: setUserPos(lat,lng), clearUserPos(), getUserPos(). El
+       reposicionamiento es idempotente: llamadas repetidas mueven el pin
+       existente, nunca apilan dos. clearUserPos borra tambien lo persistido.
+     - getState suma userPos y userPinVisible; destroy tira el pin del
+       usuario. Opciones nuevas userPinEnabled (true), userPinColor
+       ('#FF4A00') y userPinPersist (true): con userPinEnabled:false no se
+       pinta nada y la API no lanza.
+     - Coordenadas no finitas o 0,0 (Null Island) no pintan ni persisten:
+       misma semantica de validez que normalizePlace.
 
    1.4.2
      - Fix de coherencia del toggle rapido de Directorio: pasa a ser un
@@ -118,6 +148,15 @@ create(opts)  -> instancia (multi-instancia por pagina)
 mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         capa multimedia (index); false dibuja un pin por item de media
         (mapa unificado de comunidad.html, mymapa.js).
+      userPinEnabled (true): pinta el pin de UBICACION DEL USUARIO cuando hay
+        posicion (geolocate, setUserPos o la ultima guardada). false = no se
+        pinta nada; la API sigue siendo segura de llamar.
+      userPinColor ('#FF4A00'): color de marca del punto y del halo. El
+        tamano y la animacion los pone el CSS del anfitrion.
+      userPinPersist (true): guarda la ultima posicion conocida en una clave
+        PROPIA de localStorage (<persistKey>:userpos o la clave namespaced
+        por defecto) y la restaura al inicializar, sin mover la vista y sin
+        volver a pedir permiso. false = ni guarda ni restaura.
       list: si se define, los items de la lista delegan en setActive
         (pan + drawer) como el index.
       mediaBtnSelector ('.mf-btn[data-media]'): selector de los botones de
@@ -137,7 +176,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 (function () {
   'use strict';
 
-  var VERSION = '1.4.2';
+  var VERSION = '1.5.0';
 
   // Paleta de pines por categoria (paridad con index-api-connector.js
   // y refreshMapaMarkers de index.html).
@@ -722,7 +761,14 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       // (agrupa las fotos curadas de un mismo destino). false: un pin por
       // item de media, que es lo que muestra el mapa unificado de
       // comunidad.html.
-      mediaOnePinPerDestino: true
+      mediaOnePinPerDestino: true,
+      // Pin de la ubicacion del usuario (v1.5.0). Se pinta en su propia capa
+      // y sobrevive a filtros, re-render de lugares y reclusterizado.
+      userPinEnabled: true,
+      userPinColor: '#FF4A00',
+      // La ultima posicion conocida se guarda para RESTAURAR el pin en la
+      // siguiente carga sin volver a pedir permiso ni mover la camara.
+      userPinPersist: true
     };
   }
 
@@ -753,6 +799,10 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       // setMediaSoloMio al ACTIVARLO.
       mediaSoloMio: !!OPT.mediaSoloMio,
       userPos: null,
+      // Marker del pin de ubicacion del usuario. Vive FUERA de st.markers a
+      // proposito: los filtros y renderMarkers barren ese diccionario y el
+      // pin del usuario no es un lugar.
+      userPin: null,
       activeId: null,
       activeCat: 'all',
       // Memoria de la ultima categoria VISIBLE (distinta de 'off'): es lo que
@@ -1676,6 +1726,200 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       st.noteTimer = setTimeout(function () { el.classList.remove('show'); }, 4500);
     }
 
+    /* ---------- pin de ubicacion del usuario ---------- */
+
+    // Clave PROPIA de persistencia. Se deriva de persistKey cuando el
+    // anfitrion la declara para que dos mapas de la misma pagina no se pisen
+    // la posicion; sin ella se usa una clave namespaced generica, porque la
+    // ultima ubicacion conocida no es una preferencia de un mapa concreto.
+    var USER_POS_KEY = 'mc_user_pos';
+    var USER_PANE = 'mcUserPos';
+
+    function userPosKey() {
+      var k = st.options.persistKey;
+      if (typeof k === 'string' && k) return k + ':userpos';
+      return USER_POS_KEY;
+    }
+
+    // Misma semantica de validez que normalizePlace (Number + isFinite) mas
+    // el descarte de 0,0: Null Island es lo que devuelven las APIs cuando no
+    // hay dato y no puede convertirse en un pin en el golfo de Guinea. El
+    // rango se acota aqui para que un swap lat/lng del anfitrion no lleve el
+    // pin a un sitio imposible.
+    function userCoordsOk(lat, lng) {
+      var la = Number(lat), ln = Number(lng);
+      if (!isFinite(la) || !isFinite(ln)) return false;
+      if (la < -90 || la > 90 || ln < -180 || ln > 180) return false;
+      if (la === 0 && ln === 0) return false;
+      return true;
+    }
+
+    // El color entra en un atributo style del icono: se acepta solo un juego
+    // de caracteres seguro y cualquier otra cosa cae al color de marca. Sin
+    // esto, un valor del anfitrion con comillas rompe el HTML del divIcon.
+    function userPinColorValue() {
+      var c = st.options.userPinColor;
+      if (typeof c === 'string' && c && /^[#a-zA-Z0-9(),.%\s-]+$/.test(c)) return c.replace(/\s+/g, ' ').trim();
+      return '#FF4A00';
+    }
+
+    // PUNTO CENTRADO, no gota: la gota identifica CATEGORIA de lugar y este
+    // pin identifica PERSONA. Anillo blanco + halo de marca. Los estilos van
+    // INLINE para que el pin se vea aunque el anfitrion no haya cargado su
+    // CSS; el CSS del host puede reestilizar por clase y animar el halo, que
+    // ya existe como nodo propio. Sin background en el halo: con relleno
+    // taparia el punto, que es lo unico que debe quedar nitido.
+    // SIN opacity inline: el pulso es un keyframe que anima opacity, y una
+    // opacidad inline pelea con el. La base la pone el CSS del anfitrion
+    // (.mc-user-pin-halo), que ademas apaga la animacion con
+    // prefers-reduced-motion.
+    function userPinIcon() {
+      var c = userPinColorValue();
+      var dot = 'position:absolute;left:50%;top:50%;width:18px;height:18px;'
+        + 'margin:-9px 0 0 -9px;box-sizing:border-box;border-radius:50%;'
+        + 'background:' + c + ';border:2px solid #fff;'
+        + 'box-shadow:0 1px 4px rgba(0,0,0,0.45),0 0 0 1px ' + c;
+      var halo = 'position:absolute;left:50%;top:50%;width:34px;height:34px;'
+        + 'margin:-17px 0 0 -17px;box-sizing:border-box;border-radius:50%;'
+        + 'border:2px solid ' + c + ';background:transparent;'
+        + 'pointer-events:none';
+      return L.divIcon({
+        className: 'mc-user-pin-wrap',
+        html: '<div class="mc-user-pin" style="' + dot + '">'
+          + '<span class="mc-user-pin-halo" style="' + halo + '"></span>'
+          + '</div>',
+        // El ancla es el CENTRO del punto: el pin cae en la coordenada exacta
+        // sin el desplazamiento vertical tipico de la gota.
+        iconSize: [44, 44],
+        iconAnchor: [22, 22]
+      });
+    }
+
+    // Pane propio: el pin del usuario no comparte cajon de z-order con los
+    // pines de lugares ni con los clusters, asi que el CSS del host puede
+    // subirlo o bajarlo sin tocar los otros. Si el mapa real no expone
+    // createPane se sigue sin pane: el marker ya es independiente.
+    function userPinPane() {
+      if (!st.map || typeof st.map.getPane !== 'function' || typeof st.map.createPane !== 'function') return null;
+      try {
+        if (!st.map.getPane(USER_PANE)) st.map.createPane(USER_PANE);
+        var el = st.map.getPane(USER_PANE);
+        if (!el) return null;
+        if (el.style) el.style.zIndex = 650;
+        return USER_PANE;
+      } catch (e) { log('user pane', e); }
+      return null;
+    }
+
+    function removeUserPin() {
+      if (!st.userPin) return;
+      try {
+        if (st.map && typeof st.map.removeLayer === 'function') st.map.removeLayer(st.userPin);
+      } catch (e) { log('user pin remove', e); }
+      st.userPin = null;
+    }
+
+    // Pinta o REPOSICIONA. Una sola instancia por mapa: si ya hay pin se
+    // mueve (setLatLng) en vez de crear otro, de modo que llamadas repetidas
+    // no apilan pines aunque el exito de geolocate llegue dos veces.
+    function paintUserPin() {
+      if (!st.options.userPinEnabled) { removeUserPin(); return false; }
+      var pos = st.userPos;
+      if (!pos || !userCoordsOk(pos.lat, pos.lng)) return false;
+      if (!st.map || typeof L === 'undefined') return false;
+      if (st.userPin) {
+        try {
+          if (typeof st.userPin.setLatLng === 'function') st.userPin.setLatLng([pos.lat, pos.lng]);
+          // setIcon por si el anfitrion cambio userPinColor entre llamadas.
+          if (typeof st.userPin.setIcon === 'function') st.userPin.setIcon(userPinIcon());
+          return true;
+        } catch (e) { log('user pin setLatLng', e); }
+        removeUserPin();
+      }
+      var opts = { icon: userPinIcon(), interactive: false, keyboard: false };
+      var pane = userPinPane();
+      if (pane) opts.pane = pane;
+      try {
+        var m = L.marker([pos.lat, pos.lng], opts);
+        m.addTo(st.map);
+        st.userPin = m;
+        return true;
+      } catch (e) {
+        log('user pin', e);
+        st.userPin = null;
+        return false;
+      }
+    }
+
+    // Guardar la posicion NO es guardar una preferencia: es un dato de
+    // localizacion del usuario, asi que el opt-in es explicito
+    // (userPinPersist). Todo en try/catch porque en modo privado puede lanzar
+    // y un pin marcador no puede tumbar el mapa (ADR-008).
+    function persistUserPos() {
+      if (!st.options.userPinPersist || !st.options.userPinEnabled) return;
+      var pos = st.userPos;
+      if (!pos || !userCoordsOk(pos.lat, pos.lng)) return;
+      try {
+        if (typeof localStorage === 'undefined') return;
+        localStorage.setItem(userPosKey(), JSON.stringify({ lat: Number(pos.lat), lng: Number(pos.lng) }));
+      } catch (e) { log('userPos setItem', e); }
+    }
+
+    function dropPersistedUserPos() {
+      try {
+        if (typeof localStorage === 'undefined') return;
+        localStorage.removeItem(userPosKey());
+      } catch (e) { log('userPos removeItem', e); }
+    }
+
+    // RESTAURACION silenciosa: repinta el pin pero NO mueve la vista y NO
+    // pide permiso. Se ejecuta al inicializar, con el mapa ya montado; un
+    // JSON corrupto o fuera de rango se ignora, porque una posicion guardada
+    // nunca puede impedir abrir el mapa.
+    function restoreUserPos() {
+      if (!st.options.userPinEnabled || !st.options.userPinPersist) return false;
+      var raw = null;
+      try {
+        if (typeof localStorage === 'undefined') return false;
+        raw = localStorage.getItem(userPosKey());
+      } catch (e) { log('userPos getItem', e); return false; }
+      if (!raw) return false;
+      var d = null;
+      try { d = JSON.parse(raw); } catch (e) { return false; }
+      if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
+      if (!userCoordsOk(d.lat, d.lng)) return false;
+      st.userPos = { lat: Number(d.lat), lng: Number(d.lng) };
+      paintUserPin();
+      return true;
+    }
+
+    // Via programatica: anfitriones que ya tienen la posicion (IP-loc, una
+    // ubicacion guardada en su backend o el boton propio) sin pasar por el
+    // permiso del navegador. Mantiene el orden por distancia de la lista,
+    // igual que geolocate. Devuelve false si la coordenada no es utilizable.
+    function setUserPos(lat, lng) {
+      if (!userCoordsOk(lat, lng)) { clearUserPos(); return false; }
+      st.userPos = { lat: Number(lat), lng: Number(lng) };
+      recomputeDists();
+      renderList(st.activeCat);
+      paintUserPin();
+      persistUserPos();
+      return true;
+    }
+
+    function getUserPos() {
+      if (!st.userPos) return null;
+      return { lat: st.userPos.lat, lng: st.userPos.lng };
+    }
+
+    // Borra pin, posicion y lo persistido: es el "olvidar mi ubicacion".
+    function clearUserPos() {
+      st.userPos = null;
+      removeUserPin();
+      dropPersistedUserPos();
+      return inst;
+    }
+
     function geolocate() {
       if (typeof navigator === 'undefined' || !navigator.geolocation) {
         showNote('Tu navegador no soporta geolocalizacion - mostrando Bogota.');
@@ -1687,14 +1931,30 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
           recomputeDists();
           renderList(st.activeCat);
           showNote(null);
-          if (st.map) st.map.flyTo([st.userPos.lat, st.userPos.lng], 16, { animate: true });
+          // El pin entra ANTES del vuelo: si el flyTo falla o el mapa esta
+          // animando, la posicion ya quedo pintada y guardada.
+          paintUserPin();
+          persistUserPos();
+          // El autocentrado se conserva SIEMPRE en exito, aunque el usuario
+          // haya movido el mapa: es la respuesta esperada a "donde estoy".
+          if (st.map && st.userPos) st.map.flyTo([st.userPos.lat, st.userPos.lng], 16, { animate: true });
         }, function () {
-          st.userPos = null;
-          showNote('No pudimos obtener tu ubicacion - mostrando Bogota.');
+          // Sin permiso no se pinta nada nuevo. Si habia un pin RESTAURADO de
+          // una visita anterior se conserva: negar el permiso hoy no invalida
+          // la ultima posicion conocida.
+          if (!st.userPin) st.userPos = null;
+          // El aviso NO puede contradecir el mapa: con pin restaurado ya no se
+          // esta "mostrando Bogota", y decir eso mientras se ve el pin del
+          // usuario es un mensaje doble. Se nombra lo que hay en pantalla.
+          showNote(st.userPin
+            ? 'No pudimos obtener tu ubicacion ahora - el pin que ves es tu ultima ubicacion.'
+            : 'No pudimos obtener tu ubicacion - mostrando Bogota.');
         }, { timeout: 10000, maximumAge: 300000 });
       } catch (e) {
-        st.userPos = null;
-        showNote('No pudimos obtener tu ubicacion - mostrando Bogota.');
+        if (!st.userPin) st.userPos = null;
+        showNote(st.userPin
+          ? 'No pudimos obtener tu ubicacion ahora - el pin que ves es tu ultima ubicacion.'
+          : 'No pudimos obtener tu ubicacion - mostrando Bogota.');
         log('geolocate', e);
       }
     }
@@ -2393,6 +2653,10 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     }
 
     function destroy() {
+      // El pin del usuario no esta en st.markers ni en clusterLayer, asi que
+      // se retira a mano ANTES de tirar el mapa (despues ya no hay donde).
+      removeUserPin();
+      st.userPos = null;
       if (st.map) {
         try { st.map.off(); st.map.remove(); } catch (e) { log('destroy', e); }
       }
@@ -2420,6 +2684,8 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         mediaTypes: { foto: st.mediaTypes.foto, video: st.mediaTypes.video, audio: st.mediaTypes.audio },
         mediaFiltered: mediaItems(),
         activeId: st.activeId,
+        userPos: getUserPos(),
+        userPinVisible: !!st.userPin,
         activeCat: st.activeCat,
         activeCatPrevio: st.activeCatPrevio,
         ratingMin: st.ratingMin,
@@ -2438,7 +2704,13 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       bindDrawerOnce();
       if (st.map) {
         bindList();
-        if (st.initialized) { renderMarkers(); renderMedia(); }
+        if (st.initialized) {
+          renderMarkers(); renderMedia();
+          // Reinit con el mapa ya montado: se reevalua el pin porque el
+          // anfitrion pudo cambiar userPinEnabled o userPinColor. Si quedo
+          // deshabilitado, paintUserPin retira el que hubiera.
+          paintUserPin();
+        }
         return inst;
       }
       var o = st.options;
@@ -2501,6 +2773,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         renderMarkers();
         renderMedia();
         syncFiltroLabels();
+        // El pin del usuario va AL FINAL y fuera de st.markers: no lo tocan
+        // renderMarkers ni los filtros. Restaurar aqui solo repinta, nunca
+        // mueve la vista ni pide permiso.
+        if (!st.userPos) restoreUserPos();
+        else paintUserPin();
       } catch (e) {
         log('init error', e);
       }
@@ -2536,6 +2813,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       openDrawer: openDrawer,
       closeDrawer: closeDrawer,
       geolocate: geolocate,
+      // Pin de ubicacion del usuario: se expone con nombre propio para que el
+      // anfitrion no dependa de geolocate (que pide permiso) para moverlo.
+      setUserPos: setUserPos,
+      clearUserPos: clearUserPos,
+      getUserPos: getUserPos,
       resetColombia: resetColombia,
       fitBounds: fitBounds
     };
