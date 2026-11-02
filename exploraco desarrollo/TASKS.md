@@ -6695,5 +6695,46 @@ El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 evento
 
 **Enlaces (no argumentos).** `DECISIONS.md` **ADR-111** (D-1 de deudas) | **TSK-246** (implementacion y alcance) | **ADR-045** (motor) | **ADR-004** (aislamiento `.mc-root`).
 
+## TSK-248 - Arte de cartas del Mercado: 5 laminas 1086x1448 en `assets/cartas/`, manifiesto estatico `cartas-arte.js` (`window.CartasArte`) con resolucion explicita -> clave -> `marca:<slug>` -> placeholder, componente `.c-card-arte` en `cartas-ui.css` bajo `.cartas-silo`, 6 superficies que ya pintan carta (Mercado, inventario, museo y vitrina), `.vercelignore` con una sola regla `/cartas/` y 2 scripts (inventario de huecos + smoke 54/54) - 2026-11-01 - COMPLETADA EN ARBOL DE TRABAJO (sin commit y sin deploy; 2 deudas abiertas: 41 huecos de diseno y decision sobre `cartas/` maestros en git)
+
+**Estado: IMPLEMENTADO Y VERIFICADO EN ARBOL DE TRABAJO / SIN COMMIT Y SIN DESPLEGAR** -- 2026-11-01 (pase documental unico de la tanda; anotacion posterior del mismo dia). **Nacio SIN ADR** (nota historica, ADR-003; la convencion se elevo despues): es UI bajo **ADR-004** (aislamiento `.cartas-silo`) y **ADR-002** (ASCII-safe), **sin cambio de esquema** (`EDITORIAL` duplica dato editorial que ya esta horneado en el PNG), **sin endpoint nuevo** (`api/` = **8**, ADR-010) y **sin columna en base de datos**: el arte es **manifiesto estatico**, decision del operador. La convencion de arte quedo **escrita aqui** (ver "Convenciones") y el operador autorizo despues su elevacion a **ADR-112** (`DECISIONS.md:12160`, aceptado 2026-11-01), que hoy **manda**: este bloque **apunta**, no repite (ADR-084 D1).
+
+**Maestros `cartas/` (10 ficheros, 15,89 MB): fuera del deploy por `.vercelignore` (`/cartas/`) y fuera de git** -- `0` ficheros trackeados y **sin regla en `.gitignore`**, porque el operador los va a **eliminar**: no se commitean. Las 5 laminas que se sirven son las de `assets/cartas/`.
+
+**Entregado (alcance REAL ejecutado).**
+
+1. **5 laminas en `assets/cartas/`**, copiadas de `cartas/jpg/` **sin recomprimir**: `consumible_catalejo_explorador.png` (515 KB), `consumible_pluma_creador.png` (533 KB), `consumible_lupa_curador.png` (507 KB), `consumible_lente_artista.png` (464 KB) y `marca_ancestral.png` (183 KB). **5/5 a 1086x1448** (ratio medido **0,7500**), **2,15 MB** en total.
+2. **`cartas-arte.js` (nuevo, raiz, 7,8 KB)** con `window.CartasArte` (`:176`): `RATIO` (`:17`), `ARTE` (`:23-28`), `EDITORIAL` (`:35-40`), `arteDe({clave,marca,imagenUrl})` (`:88`), `slotHtml(opts)` (`:110`) y `faltantes(claves)` (`:154`). Prioridad de resolucion: **imagen explicita -> clave -> `marca:<slug>` -> placeholder** (`:85`, `:73-80`). **Degrada a `''` sin el modulo**, ninguna funcion lanza.
+3. **`cartas-ui.css`** (340 lineas): bloque nuevo del componente **`.c-card-arte`** con hueco `aspect-ratio: 1086 / 1448` (`:114`), `.c-card-img`, variante **`--vacia`** (pergamino, familia **C**) y **`--marca`** (negro/oro, familia **M**), badges `.c-card-fam/-tipo/-num/-ph-n/-ph-x/-ph-tag` y densidades **desde el padre**: `--sm` **88px** (`:105`), `--md` **140px** (`:106`), `--lg` por rejilla (no fija ancho). **33 reglas bajo `.cartas-silo`**, **0 selectores fuera** del silo (ADR-004) y **0 `!important`**.
+4. **Superficies que ya muestran carta (6, cero markup nuevo por consumidor):** catalogo de productos, productos a la venta, mis ofertas y libro de cartas en **`mercado.js`** (4 llamadas a `CartasArte`), inventario de cartas + museo propio en **`mi-perfil.html`** (3) y vitrina publica en **`perfil.html`** (1). Las **21 cartas de territorio (`ct_*`)** caen a **placeholder con su nombre**: el espacio reservado funciona sin arte.
+5. **`.vercelignore` (nuevo)** con **una sola regla `/cartas/`** (con barra inicial y final a proposito: sin ellas el patron casaria tambien con `cartas-ui.js` y `cartas-ui.css` de la raiz) para no desplegar los **15,89 MB** de maestros. `assets/cartas/` guarda las copias renombradas que **si** se sirven.
+6. **`scripts/estado-arte-cartas.js` (nuevo)**: inventario de huecos contra el catalogo real de consumibles. Salida medida: **45 claves** en el catalogo, **CON ARTE 5 / PENDIENTES 41**.
+7. **`scripts/smoke_cartas_arte.js` (nuevo)**: **54/54 PASS**, exit **0**. Ya es el **ultimo eslabon de `npm run test`** (`package.json:5`), no una cadena paralela.
+
+**Verificacion (medida en este pase documental; ADR-006).**
+
+- `node scripts/smoke_cartas_arte.js` -> **54/54 PASS, 0 FAIL**, exit **0**.
+- `node scripts/estado-arte-cartas.js` -> **CON ARTE 5 / PENDIENTES 41**.
+- **Dimensiones y ratio de las 5 laminas leidos del IHDR del PNG**: **1086x1448** y **0,7500** en las 5.
+- `node scripts/docs-evidencia.js` -> GOBERNANZA medida (`TASKS.md` 981,9 KB / 6.699 lineas; `NEXT.md` 688,7 KB / 3.263 lineas) y **33** reglas `.cartas-silo` en `cartas-ui.css`.
+- **`npm run test` completo: 29/29 scripts en verde** (medido por QA en la tanda, no re-ejecutado en este pase).
+- **Cero endpoint nuevo** (presupuesto **8/8** intacto), **cero migraciones**, **cero cambios en `api/*`**.
+
+**Convenciones de arte de cartas (NORMATIVAS para el proximo diseno; no romperlas).**
+
+1. **La lamina es la CARTA ENTERA**: lleva nombre, tipo, numero y XP **horneados** en el PNG. La UI **no escribe texto encima de una lamina real**: solo anade **estado y accion** (precio dinamico, cantidad, boton).
+2. **Ratio obligatorio 1086x1448** (0,75). **Peso maximo recomendado 600 KB** por lamina (las 5 actuales: 183-533 KB).
+3. **Sin el arte el hueco se pinta igual de grande** (`aspect-ratio` fijado por CSS): **cero salto de layout** al subir el diseno despues.
+4. **Familia `C`** para objetos/coleccionables y **`M`** para cartas institucionales de marca; **numeracion por familia** en `EDITORIAL`.
+5. **Anadir un diseno nuevo** = dejar el PNG en `assets/cartas/<clave>.png` + una entrada en `ARTE` (y en `EDITORIAL` si lleva numero/tipo propios). **No hay subida por admin ni columna en base de datos**: es **manifiesto estatico** (decision del operador).
+
+**Deudas ABIERTAS de TSK-248.**
+
+- **D-A: 41 huecos de arte pendientes de diseno** (cartas de territorio `ct_*` incluidas). Se listan con `node scripts/estado-arte-cartas.js`. **No bloquea**: la UI degrada a placeholder con nombre.
+- **D-B [RESUELTA POR EL OPERADOR 2026-11-01: los maestros se eliminan, no se commitean]**: `cartas/` (maestros) son **10 ficheros / 15,89 MB untracked**, `0` ficheros trackeados y **ninguna regla en `.gitignore`**. Quedan **fuera del deploy** por `.vercelignore`, pero **entrarian al historial de git si se commitea todo**. Opciones: commitearlos, ignorarlos en `.gitignore` o dejarlos fuera del indice a proposito. **Este pase no decide.**
+- **D-C: revision visual de la densidad `--sm` (88px) en la vitrina de 6 columnas**: el smoke prueba el contrato, no el pixel.
+
+**Enlaces (no argumentos).** **TSK-243** (cartas coleccionables unificadas y libro de cartas) | **TSK-245 / ADR-110** (catalogo del Mercado e Inventario como coleccion) | **ADR-004** (aislamiento) | **ADR-006** (baseline = archivo real) | **ADR-010** (presupuesto de funciones).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

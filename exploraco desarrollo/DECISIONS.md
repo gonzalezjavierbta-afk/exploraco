@@ -12154,3 +12154,120 @@ Toda página **nueva** que monte el mapa carga **`mapa-cultural.css`** y estiliz
 ### Estado
 
 **ACEPTADO** (2026-10-28). Normativiza **código ya implementado y certificado en el árbol de trabajo**: `mapa-cultural.js` **v1.5.0**, `mapa-cultural.css:62-81`, `index.html:587-600`, `comunidad.html:1015`, `mymapa.js:1043-1047`, smoke **272/272** y GOLD **APTO CON OBSERVACIONES**. **Sin commit y sin deploy** en el momento de redactarse. No hay ADR derogado: D1-D5 **acotan** ADR-004 y ADR-045 y **cierran** la vía de la tercera copia inline. Pendiente: **QA visual en navegador** (D-1, TSK-247) y el **commit/deploy** del motor y del CSS. `TASKS.md`, `NEXT.md` y `BLUEPRINT.md` solo **apuntan** a `ADR-111`.
+
+---
+
+## ADR-112: El arte de carta es una **lámina completa 1086x1448** servida por un **manifiesto estático** (`cartas-arte.js`), nunca un dato de la base de datos: el hueco sin arte tiene **la misma geometría** que el hueco con arte, el arte **no entra en `tags`** ni crea columna ni endpoint, y los 41 huecos se rellenan en **orden de visibilidad declarado** (mercado -> perfil -> tienda -> era -> bonos) [NO deroga ninguna premisa de ADR previos; **acota** ADR-004 en UI y fija el contrato de arte de carta sobre ADR-108, sin tocar su modelo de emisor, rareza ni variante]
+
+**ID:** ADR-112
+**Fecha:** 2026-11-01
+**Autor:** `@architect` en función **normativa**, no de diseño. Gate de riesgo `@architect` **CONSUMIDO**: el operador confirmó explícitamente en sesión que esta convención sube a ADR ("3 sí" a la pregunta de si la convención de arte sube a ADR-112). El código se implementó **antes** del ADR y está **certificado en el árbol de trabajo** (TSK-248); este documento fija por escrito lo que **ya rige** para que no derive, y **no reabre** ninguna decisión de producto.
+**Estado:** **Aceptado.** Implementado en el árbol de trabajo, **commit y deploy pendientes**. El argumento completo vive **solo** en esta sección (ADR-084 D1); `TASKS.md` (TSK-248) y `BLUEPRINT.md` **apuntan**, no repiten.
+**Numeración (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-111`** (línea 12050); **no existía ningún `ADR-112`**. Conteo de encabezados `^## ADR-` **antes** de esta sección: **110**, con **111** como máximo y un único hueco histórico (`ADR-005`, nunca redactado). La cabecera del fichero **no tiene índice/TOC** (solo el párrafo de propósito), así que **no hay entrada que insertar**.
+
+### Problema
+
+Las cartas del Mercado ya se pintan en seis superficies (catálogo de productos, productos a la venta, mis ofertas y libro de cartas en `mercado.js`; inventario y museo propio en `mi-perfil.html`; vitrina pública en `perfil.html`), pero **no existía una norma de arte**. Sin norma, cada superficie resolvía su propia imagen y su propio hueco, y el sistema se enfrentaba a tres preguntas que, respondidas por separado, producen tres productos distintos:
+
+1. **¿Dónde vive la imagen?** La respuesta "natural" (columna en `consumibles` + pantalla de subida) introduce migración, backend y admin para un dato que cambia **41 veces en total y nunca en caliente**.
+2. **¿Quién escribe el texto de la carta?** Si la lámina trae nombre, tipo, número y XP **horneados**, la UI que además los escriba encima los duplica visiblemente; si no los trae, cada superficie los compone a su manera.
+3. **¿Qué se ve mientras no hay arte?** Un hueco de altura distinta a la lámina produce **salto de layout** en el momento de subir cada diseño, que es exactamente el defecto que este ADR existe para evitar.
+
+### Datos medidos (2026-11-01, contra el archivo real; ADR-006)
+
+1. **5 láminas** en `assets/cartas/`: `consumible_catalejo_explorador.png` **527.218 B**, `consumible_pluma_creador.png` **545.447 B**, `consumible_lupa_curador.png` **519.247 B**, `consumible_lente_artista.png` **474.715 B**, `marca_ancestral.png` **187.545 B**. Todas a **1086x1448**, ratio **0,7500** exacto. Total **2,15 MB**.
+2. **Láminas completas:** llevan nombre, tipo, número y XP **horneados** en el PNG. La UI **no** escribe texto encima de una lámina real.
+3. **Manifiesto estático `cartas-arte.js`** (7.836 B, módulo `window.CartasArte` + `module.exports`): `RATIO` (`:17`, `1086/1448`), `ARTE` (`:23`, 5 claves -> ruta), `EDITORIAL` (`:35`, `numero`/`tipo`/`familia` sin abrir la imagen), `arteDe()` (`:88`), `slotHtml()` (`:110`), `faltantes()` (`:154`), API exportada en `:166`. Sin el módulo, la UI **degrada al texto plano anterior**.
+4. **Componente `.c-card-arte`** en `cartas-ui.css:110` bajo el silo `.cartas-silo` (ADR-004): hueco con `aspect-ratio: 1086 / 1448` (`:114`), `.c-card-img` con `object-fit: cover` (`:125-130`), base de placeholder compartida en `:133-134`, marco interior doble `:151-152`, familia **C** pergamino `:163-167` y textura de papel `:170-178`; familia **M** en `:179+`. Densidades: `--sm` **88px** (`:105`), `--md` **140px** (`:106`), `--lg` **por rejilla** (`:107`, sin ancho fijo a propósito).
+5. **Hueco sin arte:** misma geometría y mismo tamaño que el hueco con arte, con badge de familia, tipo, número, nombre, XP y leyenda de espacio reservado. **Cero salto de layout** al subir el diseño.
+6. **Estado actual: 5 con arte / 41 pendientes** (`node scripts/estado-arte-cartas.js`; catálogo leído = **45 claves**).
+7. **`/cartas/` (maestros, 15,89 MB) fuera del deploy:** `.vercelignore:5` declara **una sola** regla `/cartas/`, con las barras documentadas (`:1-4`) porque sin ellas el patrón casaría con `cartas-ui.js`/`cartas-ui.css` de la raíz. **Los maestros no están en git:** `git ls-files cartas` = **0** ficheros, y **`.gitignore` no tiene ninguna entrada de `cartas`** hoy.
+8. **Presupuesto Vercel 8/8 intacto:** este ADR no crea endpoint, ni tabla, ni columna, ni campo de `tags`. `(Get-ChildItem api\*.js).Count` = **8**.
+
+### Decisión
+
+**D1. La lámina es completa: la UI no escribe texto sobre una imagen.**
+
+Una carta con arte renderiza **solo** `.c-card-img` dentro del hueco; nombre, tipo, número y XP viven **en el PNG**. `EDITORIAL` (`cartas-arte.js:35`) **duplica** esos datos a propósito y **solo** para el caso sin imagen (placeholder, filtros e inventario de faltantes necesitan el dato sin abrir el PNG); **nunca** se pinta encima del arte. Norma derivada: una lámina nueva entra al manifiesto **con su texto ya horneado**; si el texto cambia, se regenera la lámina, no el HTML.
+
+**D2. El arte no vive en la base de datos: manifiesto estático, cero migración, cero endpoint.**
+
+La resolución es **cliente y determinista**: `arteDe({clave, marca, imagenUrl})` (`:88`) sigue la prioridad **imagen explícita -> clave -> `marca:<slug>` -> hueco**. Cualquier `imagenUrl` que llegue por datos se respeta como override de presentación, **sin escribirla en la base**. Motivo: el arte es **presentación**, no identidad de carta; ADR-108 fija emisor, rareza y variante, y este ADR **no toca** ese modelo. Corolario operativo: subir arte es **editar un fichero y su entrada en el manifiesto**, no un despliegue de esquema.
+
+**D3. El arte NO entra en `tags` JSONB, ni ahora ni con override por usuario.**
+
+`tags` describe **atributos de la entidad** que el motor genérico (`CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS`) sabe editar, recolectar y devolver; el arte no es un atributo de la carta sino de su **presentación**, y meterlo obligaría a un merge JSONB por cada lámina sin dar nada a cambio. Si algún día un override **de usuario** necesitara persistir (p. ej. una lámina elegida a mano), se haría por **MERGE JSONB** (`COALESCE(tags,'{}') || $N::jsonb`), **jamás** por reemplazo total (ADR-003), y en un ADR propio.
+
+**D4. Hueco y lámina comparten geometría: `aspect-ratio: 1086 / 1448` como contrato.**
+
+Todo hueco de arte reserva el **mismo** espacio con o sin imagen (`cartas-ui.css:114`). El ratio **no se negocia por superficie**: si una rejilla necesita cartas más grandes, se cambia la densidad (`--sm`/`--md`/`--lg`) o el `minmax()` de la rejilla, **nunca** el ratio. Esta es la cláusula que garantiza **cero salto de layout** al subir los 41 diseños restantes, y por eso el ratio es dato del módulo (`RATIO`) y no una constante repetida en cada CSS.
+
+**D5. Aislamiento atómico: todo el componente cuelga de `.cartas-silo`.**
+
+`.c-card-arte`, `.c-card-img` y sus variantes viven **solo** bajo el selector padre `.cartas-silo` (ADR-004): **cero** selectores sueltos, cero fugas a `:root`, cero `!important`. Una página nueva que pinte cartas importa `cartas-ui.css` y declara el contenedor `.cartas-silo`; no copia el componente.
+
+**D6. Orden de prioridad de los 41 huecos (decisión del operador, queda como recomendación normativa).**
+
+1. **`categoria='mercado'`** (`prod_artesania`, `prod_cafe`, `prod_souvenir`): aparecen en la rejilla del catálogo **que más se ve**.
+2. **`categoria='faccion'`**: las **4 ya están hechas** y son las 4 láminas de consumible actuales.
+3. **`categoria='perfil'`** (7 claves: marcos, vitrina, título, fondo, tema, banda): **identidad visible** en el perfil público.
+4. **`categoria='tienda'`**: la marca **ANCESTRAL ya está cubierta** por la lámina institucional `marca_ancestral.png`.
+5. **`categoria='era'`** (14 claves): colección de **largo recorrido**.
+6. **Bonos y referidos:** menor visibilidad, **últimos**.
+
+El orden es **de visibilidad**, no de dificultad: cada lámina cuesta lo mismo, así que el retorno se maximiza pintando primero lo que más ojos recibe.
+
+### Alternativas consideradas y rechazadas
+
+- **(A) Columna `imagen_url` en `consumibles` + pantalla de subida en el admin.** Rechazada: exige **tres gates** (`@sql-security`/`@data-migration` por la migración, `@backend-dev` por el endpoint, `@admin-dev` por la pantalla) para un dato que cambia **41 veces y nunca en caliente**; además el presupuesto serverless está **8/8 agotado** (no cabe endpoint nuevo, y extender uno existente no evita los otros dos gates), y el GET de `consumibles` en `api/interacciones.js` **ya carga 4 niveles de degradación por columnas**: añadir una quinta columna opcional engorda el camino más caliente del Mercado para servir una ruta estática.
+- **(B) Marco dibujado en CSS con la ilustración sola.** Rechazada por doble motivo: obligaría a **rediseñar las 5 láminas ya producidas** (que llevan el texto horneado) y **duplicaría en HTML** datos que la lámina ya fija, creando dos fuentes de verdad para nombre, tipo, número y XP — justo lo que D1 prohíbe.
+
+### Consecuencias
+
+1. **Subir arte es una operación de repositorio**, no de base de datos: PNG en `assets/cartas/` + entrada en `ARTE` y `EDITORIAL`. Sin migración, sin deploy de API, sin tocar `collectPlace()`/`_placeToAPI()`/`loadForm()` ni el motor genérico de tags.
+2. **Cero impacto en `tags` JSONB:** este ADR no crea categoría ni campo nuevo, así que el registro en `CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS` **no aplica**. Los campos genéricos existentes (`f-price` -> `precio_desde`, `f-capacidad` -> `capacidad`) siguen siendo los únicos y **no se duplican**.
+3. **Las 6 superficies no re-deciden arte:** todas consumen el mismo manifiesto y el mismo componente; una superficie nueva es una línea de `slotHtml()`, no un componente nuevo.
+4. **El placeholder es producto, no un `alt`:** mientras haya 41 huecos, el estado "sin arte" es el estado **mayoritario** y se ve intencional (familia C pergamino / familia M negro-oro), no roto.
+5. **La deuda de arte es medible:** `faltantes()` y `scripts/estado-arte-cartas.js` dan el número exacto sin abrir una sola imagen.
+
+### Deudas
+
+| # | Deuda | Por qué se acepta | Cómo se cerraría |
+|---|---|---|---|
+| **D-1** | **41 láminas pendientes** (5 con arte / 41 pendientes). | El arte es trabajo de diseño externo al repo; el hueco ya reserva el espacio, así que la falta **no rompe** layout ni funcionalidad. | Producir por el orden de D6 y añadir cada PNG a `ARTE`+`EDITORIAL`; `node scripts/estado-arte-cartas.js` debe bajar el contador hasta 0. |
+| **D-2** | **`/cartas/` (maestros, 15,89 MB) sigue en disco y `.gitignore` no lo excluye.** `git ls-files cartas` = **0**, así que no están versionados, pero un `git add .` los subiría. | El operador va a **eliminar** los maestros; añadir la regla es un cambio de una línea que se hace en el mismo pase que el borrado. | Añadir `/cartas/` a `.gitignore` **antes** de borrar los maestros, y mantener `.vercelignore:5` intacta (una sola regla, con barras). |
+| **D-3** | **Sin control automático del ratio en las láminas nuevas.** El ratio se exige por norma (D4) pero ningún script mide 1086x1448 al añadir un PNG. | No hay dependencia de imagen en el repo (ADR-001, vanilla) y el manifiesto no abre ficheros. | Extender `scripts/estado-arte-cartas.js` para leer las dimensiones del PNG (cabecera IHDR, sin dependencias) y fallar si el ratio no es 0,7500. |
+
+### Criterio de verificación (lo ejecuta `@qa-auditor`; este ADR no lo ejecuta)
+
+1. **V1 (D1/D4):** `node scripts/estado-arte-cartas.js` -> `CON ARTE: 5` / `PENDIENTES: 41`, con las **5** claves apuntando a `assets/cartas/*.png`.
+2. **V2 (D4):** las **5** láminas miden **1086x1448** (ratio **0,7500**); `cartas-ui.css` declara `aspect-ratio: 1086 / 1448` **una sola vez** y ningún CSS de superficie lo redefine.
+3. **V3 (D1):** ninguna superficie escribe nombre/tipo/número/XP **encima** de `.c-card-img`; `EDITORIAL` solo alimenta el hueco vacío, los filtros y `faltantes()`.
+4. **V4 (D2):** `Select-String cartas-arte.js -Pattern "fetch|XMLHttpRequest|localStorage"` -> **0** coincidencias (el manifiesto no hace I/O); `arteDe()` respeta el orden explícita -> clave -> `marca:` -> `null`.
+5. **V5 (D5):** `Select-String cartas-ui.css -Pattern "^\s*\.c-card-arte|^\s*\.c-card-img"` -> **0**; todo el componente va prefijado con `.cartas-silo`, sin `!important`.
+6. **V6 (D2, presupuesto):** `(Get-ChildItem api\*.js).Count` = **8** y `Select-String db/migrations/*.sql -Pattern "imagen_url"` -> **0** (cero endpoint y cero columna).
+7. **V7 (D3):** ninguna clave de arte en `CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS`; `collectPlace()`/`_placeToAPI()`/`loadForm()` sin referencias a `CartasArte`.
+8. **V8 (D-2):** `.vercelignore` con **exactamente una** regla `/cartas/` y `git ls-files cartas` = **0**; tras D-2, `.gitignore` contiene `/cartas/`.
+
+### Evidencia (archivo real, 2026-11-01)
+
+- Láminas: **`assets/cartas/`**, 5 PNG a 1086x1448, **2,15 MB** total.
+- Manifiesto: **`cartas-arte.js`** (7.836 B) — `RATIO:17`, `ARTE:23`, `EDITORIAL:35`, `arteDe:88`, `slotHtml:110`, `faltantes:154`, API `:166`.
+- Componente: **`cartas-ui.css:105-179+`** bajo `.cartas-silo` (ADR-004).
+- Consumidores medidos por `grep "CartasArte"`: **`mercado.js`**, **`mi-perfil.html`**, **`perfil.html`** (más el propio módulo).
+- Estado del arte: **`node scripts/estado-arte-cartas.js`** -> `CON ARTE: 5` / `PENDIENTES: 41` / catálogo **45 claves**.
+- Deploy: **`.vercelignore:1-5`** (una sola regla `/cartas/`, comentario de las barras); `git ls-files cartas` = **0**; `.gitignore` **sin** entrada de `cartas` (D-2).
+- Implementación y alcance: **`TASKS.md` TSK-248** (completada en árbol de trabajo, sin commit y sin deploy; registra el inventario de huecos y el smoke de la UI).
+
+### Enlaces (no repiten el argumento; ADR-084 D1)
+
+- **TSK-248**: implementación del manifiesto, el componente, las 5 láminas y los 2 scripts.
+- **ADR-004**: aislamiento atómico de CSS por selector padre (aquí `.cartas-silo`).
+- **ADR-006**: baseline = archivo real; de ahí la numeración, el conteo y las medidas de esta sección.
+- **ADR-003**: Cero Borrado Lógico; aplica si algún día el arte se persiste (MERGE, nunca reemplazo).
+- **ADR-108**: identidad de carta (emisor, rareza, variante); este ADR fija su **arte** y no toca ese modelo.
+- **ADR-002**: mandato ASCII-safe (el manifiesto y el CSS no añaden bytes > 127).
+
+### Estado
+
+**ACEPTADO** (2026-11-01). Normativiza **código ya implementado y certificado en el árbol de trabajo**: `cartas-arte.js`, `cartas-ui.css:105-179+`, las **5** láminas de `assets/cartas/`, las 6 superficies consumidoras y `.vercelignore:1-5`. **Sin commit y sin deploy** en el momento de redactarse. No hay ADR derogado: D1-D6 **acotan** ADR-004 en UI y **completan** ADR-108 en superficie de arte, sin crear endpoint, columna ni campo de `tags` (presupuesto **8/8** intacto). Pendiente: **41 láminas** en el orden de D6 (D-1), **`/cartas/` en `.gitignore` y borrado de maestros** (D-2) y **control de ratio** (D-3). `TASKS.md` y `BLUEPRINT.md` solo **apuntan** a `ADR-112`.

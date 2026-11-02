@@ -1,0 +1,5 @@
+# /cartas/ (con barra inicial Y final) excluye SOLO la carpeta maestra cartas/;
+# sin las barras, el patron tambien casaria con cartas-ui.js y cartas-ui.css de la raiz
+# y romperia la UI de cartas en produccion. Los maestros pesados (~13,9 MB) no deben
+# desplegarse: assets/cartas/ guarda las copias renombradas que si se sirven.
+/cartas/

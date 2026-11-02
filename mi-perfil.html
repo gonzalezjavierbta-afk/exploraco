@@ -1126,6 +1126,9 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
 #pf-museo-cartas .c-museo-thumb{position:relative;width:100%;height:64px;border-radius:6px;overflow:hidden;background:linear-gradient(135deg,rgba(255,74,0,.18),rgba(255,255,255,.04));display:flex;align-items:center;justify-content:center}
 #pf-museo-cartas .c-museo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 #pf-museo-cartas .c-museo-thumb-fb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:2px;color:rgba(255,255,255,.35);text-transform:uppercase}
+/* Con lamina el alto lo manda el aspect-ratio 1086/1448 del hueco de arte
+   (cartas-arte.js): el contenedor deja de recortar y cede su fondo. */
+#pf-museo-cartas .c-museo-thumb--arte{height:auto;display:block;background:none;border-radius:0;overflow:visible}
 #pf-museo-cartas .c-museo-filtros{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
 #pf-museo-cartas .c-museo-f{padding:6px 12px;min-height:34px;border-radius:999px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;background:transparent;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.55);transition:background .15s,color .15s,border-color .15s}
 #pf-museo-cartas .c-museo-f:hover{border-color:rgba(255,74,0,.5);color:var(--gold)}
@@ -8192,8 +8195,30 @@ function v61VariantesPosesion(c) {
   return out;
 }
 /* Silent Fallback (ADR-008): si la imagen falla, se oculta y queda visible el
-   hueco degradado con las iniciales. Nunca un icono roto. */
-function v61Thumb(url, alt) {
+   hueco degradado con las iniciales. Nunca un icono roto.
+   El hueco de arte (cartas-arte.js) manda cuando existe lamina: se anida dentro
+   de .c-museo-thumb para conservar el contenedor que ya usa la vitrina, con el
+   modificador --arte para no heredar los 64px fijos que recortarian la lamina. */
+function v61HayArte(url, clave, marca) {
+  var A = window.CartasArte;
+  if (!A || typeof A.arteDe !== 'function') return false;
+  try { return A.arteDe({ imagenUrl: url, clave: clave, marca: marca }) !== null; }
+  catch (e) { return false; }
+}
+function v61Thumb(url, alt, clave, marca, dens) {
+  if (window.CartasArte && typeof window.CartasArte.slotHtml === 'function') {
+    var slot = '';
+    try {
+      slot = String(window.CartasArte.slotHtml({
+        imagenUrl: url, clave: clave, marca: marca, nombre: alt
+      }) || '');
+    } catch (e) { slot = ''; }
+    if (slot) {
+      return '<div class="c-museo-thumb c-museo-thumb--arte">'
+        + '<div class="c-card' + (dens === 'sm' ? ' c-card--sm' : (dens === 'md' ? ' c-card--md' : '')) + '">'
+        + slot + '</div></div>';
+    }
+  }
   var ini = String(alt || '?').replace(/[^A-Za-z0-9]/g, '').substring(0, 2);
   var html = '<div class="c-museo-thumb"><div class="c-museo-thumb-fb">' + esc(ini || '?') + '</div>';
   if (url) {
@@ -8241,9 +8266,12 @@ function v61RenderVitrina(d, ui, mapa) {
     var cid = String(p.id || p.carta_id || '');
     var cat = mapa[cid] || {};
     var varKey = String(p.variante || 'base').toLowerCase();
+    var vUrl = p.imagen_url || cat.imagen_url;
+    var vNom = p.nombre || cat.nombre || cid;
+    var vArte = v61HayArte(vUrl, cid, cat.marca_nombre);
     html += '<div class="v61-card c-museo-slot ' + ui.claseRareza(p.rareza || cat.rareza, varKey) + '">'
-      + v61Thumb(p.imagen_url || cat.imagen_url, p.nombre || cat.nombre || cid)
-      + '<div class="v61-card-n">' + esc(p.nombre || cat.nombre || cid) + '</div>'
+      + v61Thumb(vUrl, vNom, cid, cat.marca_nombre, 'md')
+      + (vArte ? '' : '<div class="v61-card-n">' + esc(vNom) + '</div>')
       + '<span class="v61-rareza">' + esc(v61VarianteLabel(varKey)) + '</span>'
       + ui.badgeEmisor(cat.emisor_tipo, cat.marca_nombre)
       + '<button type="button" class="v61-btn ghost" onclick="v61RetirarMuseo(\'' + esc(cid) + '\',\'' + esc(varKey) + '\')">Retirar</button>'
@@ -8303,12 +8331,15 @@ function v61RenderAlbum(d, ui) {
       if (k === 'base') baseCant = n;
     });
     var stats = ui.statsTexto(c.stats_json);
+    var aUrl = c.imagen_url;
+    var aNom = c.nombre || id;
+    var aArte = v61HayArte(aUrl, id, c.marca_nombre);
     html += '<div class="v61-card ' + ui.claseRareza(c.rareza, varClase) + '">'
-      + v61Thumb(c.imagen_url, c.nombre || id)
-      + '<div class="v61-card-n">' + esc(c.nombre || id) + '</div>'
-      + '<span class="v61-rareza">' + esc(c.rareza || 'comun') + '</span>'
+      + v61Thumb(aUrl, aNom, id, c.marca_nombre)
+      + (aArte ? '' : '<div class="v61-card-n">' + esc(aNom) + '</div>')
+      + (aArte ? '' : '<span class="v61-rareza">' + esc(c.rareza || 'comun') + '</span>')
       + ui.badgeEmisor(c.emisor_tipo, c.marca_nombre)
-      + (stats ? '<div class="c-museo-stats">' + esc(stats) + '</div>' : '')
+      + ((stats && !aArte) ? '<div class="c-museo-stats">' + esc(stats) + '</div>' : '')
       + '<div class="v61-meta">Tienes <b class="v61-qty">' + total + '</b></div>';
     vars.forEach(function (v) {
       var k = String(v.variante || 'base').toLowerCase();
@@ -9614,6 +9645,7 @@ window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>
   <script src="usuario-session.js"></script>
 <script src="cartas-ui.js"></script>
+<script src="cartas-arte.js"></script>
   <script src="album-comments.js?v=2"></script>
   <script>
   /* Dictado por voz en las descripciones de album. Degradacion total:

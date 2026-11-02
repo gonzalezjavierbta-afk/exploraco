@@ -185,6 +185,10 @@ body{background:#E5E7EB}
 .pf-foto-tag{position:absolute;left:0;right:0;bottom:0;padding:22px 10px 8px;background:linear-gradient(transparent,rgba(0,0,0,.74));color:#fff;line-height:1.25}
 .pf-foto-tag b{display:block;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:14px;letter-spacing:.3px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pf-foto-tag span{color:rgba(255,255,255,.75);font-size:10.5px}
+/* Hueco de arte compartido con el inventario (cartas-arte.js): centrado en la
+   celda del grid. No usa .pf-foto porque su aspect-ratio 1/1 recortaria la
+   lamina 1086x1448; el ancho lo fija .c-card--md del silo. */
+.cartas-silo .pf-carta-arte{display:grid;place-items:center}
 
 /* Clases */
 .pf-clases{display:flex;flex-direction:column;gap:12px}
@@ -345,6 +349,7 @@ body{background:#E5E7EB}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="usuario-session.js"></script>
 <script src="cartas-ui.js"></script>
+<script src="cartas-arte.js"></script>
 <script>
 /* ============================================================
    perfil.html - Museo publico de viajero (ADR-028, WP-3)
@@ -935,6 +940,8 @@ body{background:#E5E7EB}
     var e2 = typeof UI.esc === 'function' ? UI.esc : esc;
     var nombre = (c && c.nombre) ? String(c.nombre) : 'Carta';
     var imagen = (c && c.imagen_url) ? String(c.imagen_url) : '';
+    var clave = (c && c.id) ? String(c.id) : '';
+    var marca = (c && c.marca_nombre) ? String(c.marca_nombre) : '';
     var rareza = typeof UI.claseRareza === 'function' ? UI.claseRareza(c && c.rareza, c && c.variante) : '';
     var badge = typeof UI.badgeEmisor === 'function' ? UI.badgeEmisor(c && c.emisor_tipo, c && c.marca_nombre) : '';
     /* Etiqueta legible de la rareza: diccionario unico en CartasUI.RAREZAS.
@@ -944,15 +951,35 @@ body{background:#E5E7EB}
     var rLabel = (rKey && dic[rKey] && dic[rKey].label) ? String(dic[rKey].label) : rKey;
     var stats = typeof UI.statsTexto === 'function' ? UI.statsTexto(c && c.stats_json) : '';
     var desc = pfRecorte(c && c.descripcion, 110);
+    /* Hueco de arte compartido con el inventario (cartas-arte.js). Sin lamina
+       o sin el modulo cargado se pinta la ficha de siempre: degradacion total. */
+    var A = window.CartasArte;
+    var slot = '';
+    var conArte = false;
+    if (A && typeof A.arteDe === 'function' && typeof A.slotHtml === 'function') {
+      try {
+        conArte = A.arteDe({ imagenUrl: imagen, clave: clave, marca: marca }) !== null;
+        slot = String(A.slotHtml({
+          imagenUrl: imagen, clave: clave, marca: marca, nombre: nombre, xp: null
+        }) || '');
+      } catch (eA) { slot = ''; conArte = false; }
+    }
+    if (!slot) conArte = false;
+    /* Con lamina manda el arte: la lamina ya lleva nombre y numeracion, asi que
+       solo se conservan los datos dinamicos que no puede portar (emisor y
+       descripcion). La clase de rareza del article sigue siendo el color. */
+    var visual = slot
+      ? '<div class="pf-carta-arte"><div class="c-card--md">' + slot + '</div></div>'
+      : '<div class="pf-foto">'
+        +   '<span class="pf-foto-ph">' + pfIcon('card') + '</span>'
+        +   (imagen ? '<img src="' + e2(imagen) + '" alt="' + e2(nombre) + '" loading="lazy" onerror="this.remove()">' : '')
+        + '</div>';
     return '<article class="pf-trofeo' + (rareza ? ' ' + e2(rareza) : '') + '">'
-      + '<div class="pf-foto">'
-      +   '<span class="pf-foto-ph">' + pfIcon('card') + '</span>'
-      +   (imagen ? '<img src="' + e2(imagen) + '" alt="' + e2(nombre) + '" loading="lazy" onerror="this.remove()">' : '')
-      + '</div>'
-      + '<h3 class="pf-trofeo-name">' + e2(nombre) + '</h3>'
-      + (rLabel ? '<div class="pf-trofeo-tier">' + e2(rLabel) + '</div>' : '')
+      + visual
+      + (conArte ? '' : '<h3 class="pf-trofeo-name">' + e2(nombre) + '</h3>')
+      + (conArte ? '' : (rLabel ? '<div class="pf-trofeo-tier">' + e2(rLabel) + '</div>' : ''))
       + '<div class="pf-trofeo-meta">' + badge
-      +   (stats ? '<span>' + pfIcon('chart') + ' ' + e2(stats) + '</span>' : '') + '</div>'
+      +   ((stats && !conArte) ? '<span>' + pfIcon('chart') + ' ' + e2(stats) + '</span>' : '') + '</div>'
       + (desc ? '<p class="pf-trofeo-date" style="margin:0;line-height:1.45">' + e2(desc) + '</p>' : '')
       + '</article>';
   }

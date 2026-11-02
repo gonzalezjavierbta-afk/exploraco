@@ -371,6 +371,17 @@
     try { c = window.CartasUI || null; } catch (e) { c = null; }
     return (c && typeof c === 'object') ? c : null;
   }
+  /* Arte de carta: UNICO punto donde mercado.js toca window.CartasArte
+   * (cartas-arte.js). Devuelve el modulo o null cuando la pagina no lo cargo o
+   * el contrato no responde; en ese caso cada lista cae al texto plano de
+   * siempre: la vista no se rompe y esto no lanza. Hay lamina => el hueco trae
+   * <img>; no hay => placeholder (espacio reservado de arte), nunca un error. */
+  function arteApi() {
+    var a = null;
+    try { a = window.CartasArte || null; } catch (e) { a = null; }
+    if (!a || typeof a.slotHtml !== 'function' || typeof a.arteDe !== 'function') return null;
+    return a;
+  }
   function cRarezaClase(rareza, variante) {
     var c = cartasUI();
     if (c && typeof c.claseRareza === 'function') {
@@ -430,13 +441,26 @@
       && String(o.vendedor_id) === String(miId));
     var clases = cRarezaClase(o.rareza, o.variante);
     var badge = cEmisorBadge(o.emisor_tipo, o.marca_nombre);
-    var img = o.imagen_url
+    /* Precedencia de arte: imagen_url de la fila manda sobre el manifiesto; ya
+     * lo resuelve arteDe. Sin imagen, el manifiesto; sin nada, placeholder. */
+    var api = arteApi();
+    var art = {
+      clave: o.carta_id || o.id,
+      marca: o.marca_nombre,
+      imagenUrl: o.imagen_url,
+      nombre: nombre,
+      xp: o.precio_xp
+    };
+    var ar = api ? { slot: String(api.slotHtml(art) || ''), hay: !!api.arteDe(art) } : null;
+    var img = (!ar && o.imagen_url)
       ? '<img src="' + esc(o.imagen_url) + '" alt="" width="40" height="40" loading="lazy"'
         + ' onerror="this.style.visibility=\'hidden\'"> '
       : '';
-    var h = '<div class="mk-oferta"><div class="mk-of-main">'
+    var h = '<div class="mk-oferta">'
+      + (ar ? '<div class="cartas-silo"><div class="c-card c-card--md">' + ar.slot + '</div></div>' : '')
+      + '<div class="mk-of-main">'
       + '<div class="mk-of-nombre' + (clases ? ' ' + esc(clases) : '') + '">'
-      + img + esc(nombre)
+      + img + (ar ? '' : esc(nombre))
       + (mial ? ' <span class="mk-mia">Tuya</span>' : '') + '</div>'
       + '<div class="mk-of-meta">' + esc(cRarezaLabel(o.rareza))
       + (cEsShiny(o.variante) ? ' \u00b7 Shiny' : '')
@@ -542,7 +566,7 @@
         '#cpanel-mercado .mk-grp-t{display:flex;align-items:center;gap:6px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin:12px 0 8px}',
         '#cpanel-mercado .mk-grp-n{font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;color:rgba(255,255,255,.4)}',
         '#cpanel-mercado .mk-of-otra{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:1px 7px;color:rgba(255,255,255,.6);margin-left:6px}',
-        '#cpanel-mercado .mk-cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}',
+        '#cpanel-mercado .mk-cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}',
         '#cpanel-mercado .mk-cat-c{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 12px}',
         '#cpanel-mercado .mk-cat-n{font-size:12px;font-weight:700;color:#fff}',
         '#cpanel-mercado .mk-cat-meta{font-size:10px;color:rgba(255,255,255,.45);margin-top:3px;line-height:1.5}',
@@ -736,8 +760,20 @@
       ? (' \u00b7 referencia ' + fmt(o.precio_referencia) + ' XP') : '';
     var otra = (!propia && casaId && casaId !== casaDelUsuario())
       ? '<span class="mk-of-otra">otra Casa</span>' : '';
-    var h = '<div class="mk-oferta"><div class="mk-of-main">'
-      + '<div class="mk-of-nombre">' + esc(o.nombre || o.clave || 'Item')
+    var api = arteApi();
+    var art = {
+      clave: o.clave,
+      marca: o.marca_nombre,
+      imagenUrl: o.imagen_url,
+      nombre: o.nombre || o.clave || 'Item',
+      xp: o.precio_unitario
+    };
+    var ar = api ? { slot: String(api.slotHtml(art) || ''), hay: !!api.arteDe(art) } : null;
+    var h = '<div class="mk-oferta">'
+      + (ar ? '<div class="cartas-silo"><div class="c-card c-card--sm">' + ar.slot + '</div></div>' : '')
+      + '<div class="mk-of-main">'
+      + '<div class="mk-of-nombre">'
+      + (ar ? '' : esc(o.nombre || o.clave || 'Item'))
       + (propia ? ' <span class="mk-mia">Tuya</span>' : '') + otra + '</div>'
       + '<div class="mk-of-meta">' + fmt(o.precio_unitario) + ' XP c/u'
       + ' \u00b7 quedan ' + restante + ref + '</div>'
@@ -829,6 +865,9 @@
   }
   function catalogoHtml() {
     var todo = _catalogo || [];
+    /* Un solo guard por render: sin CartasArte la salida es EXACTAMENTE la de
+     * antes (ni silo ni clases de carta, cero bytes anadidos al DOM). */
+    var api = arteApi();
     var nMios = todo.filter(function (c) { return invCant(String(c.clave || '')) > 0; }).length;
     var h = '<div class="mk-sec-t">Catalogo de productos</div>';
     if (!todo.length) return h + '<div class="mk-msg">No se pudo cargar el catalogo de productos.</div>';
@@ -859,7 +898,7 @@
     if (!list.length) {
       return h + '<div class="mk-msg">Ningun producto coincide con ese filtro.</div>';
     }
-    h += '<div class="mk-cat">';
+    h += (api ? '<div class="cartas-silo">' : '') + '<div class="mk-cat">';
     list.forEach(function (c) {
       var clave = String(c.clave || '');
       var cant = invCant(clave);
@@ -890,16 +929,31 @@
         + (comprable ? '' : ' disabled')
         + ' title="' + esc(titulo) + '"'
         + ' onclick="Mercado.comprarCatalogo(\'' + esc(clave) + '\')">Comprar</button>';
-      h += '<div class="mk-cat-c">'
-        + '<div class="mk-cat-n">' + esc(c.nombre || clave) + '</div>'
-        + '<div class="mk-cat-meta">' + esc(clave) + ' \u00b7 ' + esc(precio) + extra
-        + (c.categoria ? (' \u00b7 ' + esc(c.categoria)) : '') + '</div>'
-        + (desc ? '<div class="mk-cat-d">' + esc(desc) + '</div>' : '')
+      var art = {
+        clave: clave,
+        marca: c.marca_nombre,
+        nombre: c.nombre || clave,
+        xp: c.precio_xp
+      };
+      var ar = api ? { slot: String(api.slotHtml(art) || ''), hay: !!api.arteDe(art) } : null;
+      /* Con lamina, nombre/clave/precio/descripcion van HORNEADOS en el PNG:
+       * el HTML solo pinta lo dinamico (tienes/falta/bloqueo/gates + boton).
+       * Sin lamina (placeholder o modulo ausente) se mantiene la ficha entera. */
+      var ficha = '';
+      if (!(ar && ar.hay)) {
+        ficha = '<div class="mk-cat-n">' + esc(c.nombre || clave) + '</div>'
+          + '<div class="mk-cat-meta">' + esc(clave) + ' \u00b7 ' + esc(precio) + extra
+          + (c.categoria ? (' \u00b7 ' + esc(c.categoria)) : '') + '</div>'
+          + (desc ? '<div class="mk-cat-d">' + esc(desc) + '</div>' : '');
+      }
+      h += '<div class="mk-cat-c' + (ar ? ' c-card c-card--lg' : '') + '">'
+        + (ar ? ar.slot : '')
+        + ficha
         + tags
         + '<div class="mk-cat-act">' + btn + '</div>'
         + '</div>';
     });
-    h += '</div>';
+    h += '</div>' + (api ? '</div>' : '');
     h += '<div class="mk-nota">El catalogo se compra directo con XP desde cada producto. '
       + 'Los articulos sin faccion se pueden usar desde cualquier faccion.</div>';
     return h;
@@ -911,8 +965,18 @@
     h += '<div class="mk-ofertas">';
     ofertas.forEach(function (o) {
       var restante = parseInt(o.cantidad_restante, 10) || 0;
-      h += '<div class="mk-oferta"><div class="mk-of-main">'
-        + '<div class="mk-of-nombre">' + esc(o.nombre || o.clave || 'Item')
+      var api = arteApi();
+      var art = {
+        clave: o.clave,
+        marca: o.marca_nombre,
+        nombre: o.nombre || o.clave || 'Item',
+        xp: o.precio_unitario
+      };
+      var ar = api ? { slot: String(api.slotHtml(art) || ''), hay: !!api.arteDe(art) } : null;
+      h += '<div class="mk-oferta">'
+        + (ar ? '<div class="cartas-silo"><div class="c-card c-card--sm">' + ar.slot + '</div></div>' : '')
+        + '<div class="mk-of-main">'
+        + '<div class="mk-of-nombre">' + (ar ? '' : esc(o.nombre || o.clave || 'Item'))
         + ' <span class="mk-mia">' + esc(casaInfo(String(o.casa || '')).nombre) + '</span></div>'
         + '<div class="mk-of-meta">' + fmt(o.precio_unitario) + ' XP c/u \u00b7 ' + restante
         + ' de ' + (parseInt(o.cantidad, 10) || 0) + ' disponibles</div>'

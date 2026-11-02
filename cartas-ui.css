@@ -72,3 +72,269 @@
     box-shadow: 0 0 0 2px rgba(255, 184, 77, .55);
   }
 }
+
+/* =====================================================================
+   CARTA DE ARTE -- hueco reservado + placeholder sin imagenes
+   POR QUE este bloque existe y por que NO pinta texto de la carta:
+
+   1) RATIO FIJO = CERO SALTO DE LAYOUT. El diseno real es una lamina
+      unica de 1086x1448 (3:4 exacto) con el marco y la info de la carta
+      HORNEADOS en el PNG. El hueco lleva aspect-ratio 1086/1448, asi que
+      cuando el JS inyecta el <img> el contenedor ya mide exactamente lo
+      mismo: no hay reflow ni salto de layout (CLS 0).
+   2) HUECO VACIO DE LA MISMA GEOMETRIA. El placeholder repite ratio,
+      borde, radio y sombra del hueco con imagen: ES el espacio reservado,
+      no un estado visual distinto. Por eso no hay dos disenos que
+      mantener sincronizados.
+   3) EL TEXTO VA HORNEADO EN LA LAMINA, NO SE REESCRIBE EN CSS. El CSS
+      solo imita el lenguaje visual (pergamino en la familia C, carbon
+      con filo dorado en la familia M) con degradados. Los badges son
+      metadatos del PLACEHOLDER, no la tipografia de la carta real:
+      jamas se pintan encima de una lamina.
+   4) DENSIDAD DESDE EL PADRE. El ancho lo fija el padre (.c-card--sm /
+      .c-card--md) o la rejilla (.c-card--lg, que NO fija ancho). Cada
+      densidad reajusta --c-arte-fs y los badges se miden en em/clamp
+      sobre esa base: legibles a 88px sin romper la densidad grande.
+   ===================================================================== */
+
+/* --- Densidad del contenedor de carta -------------------------------
+   El ancho ES la densidad. .c-card--lg no fija ancho a proposito:
+   la rejilla .mk-cat debe declarar
+     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+   y el hueco crece con la celda. */
+.cartas-silo .c-card--sm { width: 88px; max-width: 100%; --c-arte-fs: .55rem; }
+.cartas-silo .c-card--md { width: 140px; max-width: 100%; --c-arte-fs: .7rem; }
+.cartas-silo .c-card--lg { max-width: 100%; --c-arte-fs: .9rem; }
+
+/* --- Hueco de arte: marco comun ------------------------------------- */
+.cartas-silo .c-card-arte {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1086 / 1448;
+  overflow: hidden;
+  border: 1px solid rgba(15, 20, 25, .1);
+  border-radius: .5rem;
+  background: #E7E4DB; /* neutral mientras la imagen viaja */
+  box-shadow: 0 1px 2px rgba(15, 20, 25, .18), 0 6px 18px rgba(15, 20, 25, .1);
+  isolation: isolate;
+  transition: box-shadow .18s ease, transform .18s ease;
+}
+
+/* La lamina manda: ocupa el hueco entero y recorta sin deformar. */
+.cartas-silo .c-card-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* --- Placeholder: base compartida por las dos familias -------------- */
+.cartas-silo .c-card-arte--vacia,
+.cartas-silo .c-card-arte--marca {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .3em;
+  padding: 1.15em .7em .85em;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: var(--c-arte-fs, .8rem);
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Marco interior doble: da profundidad de lamina sin imagen. */
+.cartas-silo .c-card-arte--vacia::before,
+.cartas-silo .c-card-arte--marca::before {
+  content: "";
+  position: absolute;
+  inset: .42em;
+  border: 1px solid currentColor;
+  border-radius: .25em;
+  opacity: .3;
+  pointer-events: none;
+}
+
+/* Familia C: pergamino claro, borde marron, tinta oscura. */
+.cartas-silo .c-card-arte--vacia {
+  color: #2B2114;
+  border-color: #6B5233;
+  background: linear-gradient(160deg, #FBF6E9 0%, #F1E5C9 55%, #E2D0AA 100%);
+}
+
+/* Textura de papel: tramado diagonal muy tenue, sin capturar clics. */
+.cartas-silo .c-card-arte--vacia::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(45deg,
+    rgba(107, 82, 51, .05) 0 2px,
+    rgba(107, 82, 51, 0) 2px 4px);
+}
+
+/* Familia M: carbon con filo dorado. Va despues para ganar a la familia
+   C cuando el nodo lleva las dos clases. */
+.cartas-silo .c-card-arte--marca {
+  color: #F6EBCB;
+  border-color: #C9A227;
+  background: linear-gradient(160deg, #232326 0%, #141416 55%, #08080A 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 6px 18px rgba(0, 0, 0, .35);
+}
+
+.cartas-silo .c-card-arte--marca::before {
+  border-color: #C9A227;
+  opacity: .55;
+}
+
+/* Filo dorado: brillo, no textura de papel. */
+.cartas-silo .c-card-arte--marca::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(145deg,
+    rgba(201, 162, 39, .2) 0%,
+    rgba(201, 162, 39, 0) 45%,
+    rgba(255, 255, 255, .05) 100%);
+}
+
+/* --- Badges del placeholder -----------------------------------------
+   Todo en em/clamp sobre --c-arte-fs: el mismo badge sirve a 88px y a
+   190px sin una regla por densidad. Los px de clamp son SUELO/TECHO de
+   legibilidad, no el tamano base. */
+.cartas-silo .c-card-fam {
+  position: absolute;
+  top: .5em;
+  left: .5em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55em;
+  height: 1.55em;
+  border: 1px solid currentColor;
+  border-radius: .28em;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(8px, .8em, 13px);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  opacity: .9;
+}
+
+.cartas-silo .c-card-arte--vacia .c-card-fam {
+  background: rgba(43, 33, 20, .1);
+}
+
+.cartas-silo .c-card-arte--marca .c-card-fam {
+  border-color: #C9A227;
+  background: rgba(201, 162, 39, .16);
+  color: #E8C766;
+}
+
+.cartas-silo .c-card-tipo {
+  position: absolute;
+  top: .55em;
+  right: .5em;
+  max-width: 62%;
+  padding: .12em .45em;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(7px, .58em, 9px);
+  font-weight: 700;
+  letter-spacing: .1em;
+  line-height: 1.25;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: .8;
+}
+
+.cartas-silo .c-card-num {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(7px, .72em, 12px);
+  font-weight: 600;
+  letter-spacing: .08em;
+  line-height: 1.1;
+  opacity: .85;
+}
+
+.cartas-silo .c-card-ph-n {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(8px, 1.05em, 15px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.cartas-silo .c-card-ph-x {
+  font-size: clamp(7px, .68em, 11px);
+  font-weight: 600;
+  letter-spacing: .06em;
+  line-height: 1.1;
+  opacity: .9;
+}
+
+.cartas-silo .c-card-ph-tag {
+  font-size: clamp(6px, .56em, 10px);
+  font-weight: 600;
+  letter-spacing: .12em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  opacity: .55;
+}
+
+/* Hover solo donde existe puntero fino: en tactil no hay estado hover
+   que pueda quedar pegado. */
+@media (hover: hover) and (pointer: fine) {
+  .cartas-silo .c-card-arte:hover {
+    border-color: rgba(201, 162, 39, .6);
+    box-shadow: 0 2px 4px rgba(15, 20, 25, .2), 0 10px 24px rgba(15, 20, 25, .16);
+    transform: translateY(-1px);
+  }
+}
+
+/* --- Movil: nada que dependa de hover, texturas simplificadas ------- */
+@media (max-width: 540px) {
+  .cartas-silo .c-card-arte {
+    transition: none;
+    box-shadow: 0 1px 2px rgba(15, 20, 25, .18);
+  }
+
+  .cartas-silo .c-card-arte--vacia::after,
+  .cartas-silo .c-card-arte--marca::after {
+    display: none;
+  }
+
+  .cartas-silo .c-card-arte--vacia {
+    background: linear-gradient(165deg, #FBF6E9 0%, #EBDCBC 100%);
+  }
+
+  .cartas-silo .c-card-arte--marca {
+    background: linear-gradient(165deg, #222225 0%, #0A0A0C 100%);
+  }
+}
+
+/* --- Accesibilidad: cero transiciones si se pide calma -------------- */
+@media (prefers-reduced-motion: reduce) {
+  .cartas-silo .c-card-arte {
+    transition: none;
+  }
+
+  .cartas-silo .c-card-arte:hover {
+    transform: none;
+  }
+}

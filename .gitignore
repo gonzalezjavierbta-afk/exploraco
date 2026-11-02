@@ -10,3 +10,8 @@ node_modules/
 
 # La plantilla SI se versiona (no debe quedar ignorada)
 !.env.example
+
+# Maestros de arte de cartas (15,89 MB): el operador los elimina, no se versionan.
+# Lo servido vive en assets/cartas/ (ADR-112 D2). La barra es obligatoria para no
+# ignorar cartas-ui.js ni cartas-ui.css.
+/cartas/
