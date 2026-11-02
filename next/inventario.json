@@ -1,0 +1,62 @@
+{
+  "$schemaVersion": 1,
+  "descripcion": "Inventario de rutas migradas a next/ (ADR-114 D6/V11). CERO filas hasta que una ruta tenga paridad P1-P8 verificada. Un bloque no hereda el verde de sus rutas.",
+  "esquema": {
+    "ruta": {
+      "tipo": "string",
+      "obligatorio": true,
+      "descripcion": "Ruta publica servida, con extension, p. ej. \"/sobre.html\"."
+    },
+    "fecha": {
+      "tipo": "string",
+      "obligatorio": true,
+      "formato": "YYYY-MM-DD",
+      "descripcion": "Fecha en que la ruta se declaro migrada."
+    },
+    "P1": { "tipo": "boolean", "obligatorio": true },
+    "P2": { "tipo": "boolean", "obligatorio": true },
+    "P3": { "tipo": "boolean", "obligatorio": true },
+    "P4": { "tipo": "boolean", "obligatorio": true },
+    "P5": { "tipo": "boolean", "obligatorio": true },
+    "P6": { "tipo": "boolean", "obligatorio": true },
+    "P7": { "tipo": "boolean", "obligatorio": true },
+    "P8": { "tipo": "boolean", "obligatorio": true },
+    "turnos": {
+      "tipo": "integer",
+      "obligatorio": true,
+      "minimo": 0,
+      "descripcion": "Turnos consumidos por la migracion de la ruta."
+    },
+    "bloque": {
+      "tipo": "string",
+      "obligatorio": false,
+      "descripcion": "Agrupacion opcional de lectura. No implica promedio ni herencia de estado."
+    },
+    "legacy": {
+      "tipo": "string",
+      "obligatorio": true,
+      "descripcion": "Ruta del HTML MOVIDO, con prefijo legacy/, p. ej. \"legacy/sobre.html\" (ADR-114 D4). No es el archivo de la raiz: la raiz se sirve desde next/ cuando la ruta migra."
+    },
+    "alias_produccion": {
+      "tipo": "string",
+      "obligatorio": true,
+      "descripcion": "UN solo alias de produccion, identico en todas las filas: el que fija el OPERADOR al crear el proyecto Vercel. Nunca se inventa un literal; se registra el valor real del proyecto."
+    }
+  },
+  "camposObligatorios": [
+    "ruta",
+    "fecha",
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "P5",
+    "P6",
+    "P7",
+    "P8",
+    "turnos",
+    "legacy",
+    "alias_produccion"
+  ],
+  "rutas": []
+}
