@@ -79,8 +79,8 @@ for (var i = 0; i < LAMINAS.length; i++) {
 check('window.CartasArte definido', !!Arte);
 check('RATIO expuesto', !!Arte);
 check('RATIO == 1086/1448 (tolerancia 1e-9)', !!Arte && Math.abs(Arte.RATIO - 0.75) <= 1e-9);
-check('ARTE con 5 claves', !!Arte && Object.keys(Arte.ARTE).length === 5);
-check('EDITORIAL con 5 claves', !!Arte && Object.keys(Arte.EDITORIAL).length === 5);
+check('ARTE con 8 claves', !!Arte && Object.keys(Arte.ARTE).length === 8);
+check('EDITORIAL con 8 claves', !!Arte && Object.keys(Arte.EDITORIAL).length === 8);
 
 // --- 4. Resolucion por clave y por marca ------------------------------
 var cat = Arte && Arte.arteDe({ clave: 'consumible_catalejo_explorador' });
@@ -97,6 +97,34 @@ check('arteDe({marca:Ancestral}).archivo == marca_ancestral.png',
 check('arteDe({marca:Ancestral}).familia == M', !!marca && marca.familia === 'M');
 check('arteDe({marca:Ancestral}).tipo == MARCA', !!marca && marca.tipo === 'MARCA');
 check('arteDe(marca directa por clave) resuelve', !!Arte && Arte.arteDe({ clave: 'marca:ancestral' }) !== null);
+
+// --- 4b. SKU de marca: la lamina institucional cubre el catalogo ----------
+// El catalogo identifica el producto por SKU (clave) y el endpoint de
+// consumibles no entrega marca_nombre: sin este mapeo los 3 SKU de Ancestral
+// caian al hueco vacio.
+var skuPocima = Arte && Arte.arteDe({ clave: 'ancestral_pocima_50ml' });
+check('arteDe(ancestral_pocima_50ml).archivo == marca_ancestral.png',
+  !!skuPocima && skuPocima.archivo === 'assets/cartas/marca_ancestral.png');
+check('arteDe(ancestral_pocima_50ml).familia == M', !!skuPocima && skuPocima.familia === 'M');
+check('arteDe(ancestral_pocima_50ml).tipo == MARCA', !!skuPocima && skuPocima.tipo === 'MARCA');
+
+var skuBotella = Arte && Arte.arteDe({ clave: 'ancestral_botella_750ml' });
+check('arteDe(ancestral_botella_750ml) != null', !!skuBotella);
+check('arteDe(ancestral_botella_750ml).archivo == marca_ancestral.png',
+  !!skuBotella && skuBotella.archivo === 'assets/cartas/marca_ancestral.png');
+check('arteDe(ancestral_botella_750ml).familia == M', !!skuBotella && skuBotella.familia === 'M');
+
+var skuFuturo = Arte && Arte.arteDe({ clave: 'ancestral_x_futuro' });
+check('arteDe(SKU futuro) resuelve por prefijo de marca',
+  !!skuFuturo && skuFuturo.archivo === 'assets/cartas/marca_ancestral.png');
+check('arteDe(SKU futuro).familia == M', !!skuFuturo && skuFuturo.familia === 'M');
+
+check('el prefijo no absorbe claves ajenas (consumible_inexistente sigue null)',
+  !!Arte && Arte.arteDe({ clave: 'consumible_inexistente' }) === null);
+
+var skuUrl = Arte && Arte.arteDe({ clave: 'ancestral_pocima_50ml', imagenUrl: 'https://x/y.png' });
+check('imagenUrl gana sobre la lamina de marca del SKU',
+  !!skuUrl && skuUrl.archivo === 'https://x/y.png');
 
 check('arteDe(clave inexistente) === null', !!Arte && Arte.arteDe({ clave: 'consumible_inexistente' }) === null);
 check('arteDe(null) === null', !!Arte && Arte.arteDe(null) === null);
@@ -115,6 +143,14 @@ check('slotHtml con arte declara 1086x1448', !!htmlCon && htmlCon.indexOf('width
 check('slotHtml con arte lleva alt con nombre y XP',
   !!htmlCon && htmlCon.indexOf('alt="Catalejo del Explorador - 120 XP"') !== -1);
 check('slotHtml con arte no marca hueco vacio', !!htmlCon && htmlCon.indexOf('c-card-arte--vacia') === -1);
+
+var htmlSku = Arte && Arte.slotHtml({ clave: 'ancestral_media_375ml', nombre: 'Media 375' });
+check('slotHtml de SKU pinta <img', !!htmlSku && htmlSku.indexOf('<img') !== -1);
+check('slotHtml de SKU no marca hueco vacio', !!htmlSku && htmlSku.indexOf('c-card-arte--vacia') === -1);
+check('slotHtml de SKU usa la lamina de marca',
+  !!htmlSku && htmlSku.indexOf('assets/cartas/marca_ancestral.png') !== -1);
+check('slotHtml de SKU respeta el nombre del producto (no el slug de marca)',
+  !!htmlSku && htmlSku.indexOf('alt="Media 375"') !== -1);
 
 var htmlSin = Arte && Arte.slotHtml({ clave: 'consumible_inexistente', nombre: 'Carta futura', xp: 40 });
 check('slotHtml sin arte pinta c-card-arte--vacia', !!htmlSin && htmlSin.indexOf('c-card-arte--vacia') !== -1);

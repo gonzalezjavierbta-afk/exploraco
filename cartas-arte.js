@@ -25,7 +25,14 @@
     consumible_pluma_creador: 'assets/cartas/consumible_pluma_creador.png',
     consumible_lupa_curador: 'assets/cartas/consumible_lupa_curador.png',
     consumible_lente_artista: 'assets/cartas/consumible_lente_artista.png',
-    'marca:ancestral': 'assets/cartas/marca_ancestral.png'
+    'marca:ancestral': 'assets/cartas/marca_ancestral.png',
+    // Los SKU de marca llegan al catalogo con SU clave de producto y
+    // GET /api/interacciones?tipo=consumibles no entrega marca_nombre, asi que
+    // el manifiesto (estatico por ADR-112) mapea SKU -> lamina de marca aqui:
+    // sin backend nuevo ni migracion.
+    ancestral_pocima_50ml: 'assets/cartas/marca_ancestral.png',
+    ancestral_media_375ml: 'assets/cartas/marca_ancestral.png',
+    ancestral_botella_750ml: 'assets/cartas/marca_ancestral.png'
   };
 
   // EDITORIAL duplica numero/tipo/familia que YA estan horneados dentro del PNG.
@@ -37,7 +44,14 @@
     consumible_pluma_creador: { numero: 2, tipo: 'HERRAMIENTA', familia: 'C' },
     consumible_lupa_curador: { numero: 3, tipo: 'HERRAMIENTA', familia: 'C' },
     consumible_lente_artista: { numero: 4, tipo: 'HERRAMIENTA', familia: 'C' },
-    'marca:ancestral': { numero: 5, tipo: 'MARCA', familia: 'M' }
+    'marca:ancestral': { numero: 5, tipo: 'MARCA', familia: 'M' },
+    // Perfil editorial de la marca repetido por SKU (misma via elegida: entradas
+    // explicitas, no un helper de prefijo) para que el mapa sea legible tal cual
+    // lo consume el inventario de faltantes; los SKU futuros de la marca caen a
+    // 'marca:ancestral' porque claveDe() ya normaliza el prefijo.
+    ancestral_pocima_50ml: { numero: 5, tipo: 'MARCA', familia: 'M' },
+    ancestral_media_375ml: { numero: 5, tipo: 'MARCA', familia: 'M' },
+    ancestral_botella_750ml: { numero: 5, tipo: 'MARCA', familia: 'M' }
   };
 
   var FALLBACK = { numero: null, tipo: 'CARTA', familia: 'C' };
@@ -69,12 +83,34 @@
     return t;
   }
 
-  // claveDe: resuelve la clave de arte por las dos vias del catalogo:
-  // consumible (clave directa) y marca (prefijo marca: + slug del nombre).
+  // PREFIJOS: clave de SKU -> clave de arte de marca. Evita repetir el mapeo
+  // cada vez que se anade un SKU a una marca (hoy Ancestral, 3 SKU). Orden
+  // GLOBAL de resolucion del arte:
+  //   1) imagenUrl explicita (arte subido por el usuario)
+  //   2) clave exacta presente en ARTE
+  //   3) prefijo de marca (ancestral_* -> marca:ancestral)
+  //   4) marca:<slug del nombre comercial>
+  //   5) sin clave -> null (el llamador pinta el hueco)
+  var PREFIJOS = { ancestral_: 'marca:ancestral' };
+
+  function porPrefijo(clave) {
+    if (!clave) return '';
+    var prefijos = Object.keys(PREFIJOS);
+    for (var i = 0; i < prefijos.length; i++) {
+      if (clave.indexOf(prefijos[i]) === 0) return PREFIJOS[prefijos[i]];
+    }
+    return '';
+  }
+
+  // claveDe: resuelve la clave de arte por las vias del catalogo: consumible
+  // (clave directa), SKU de marca (prefijo) y marca (marca: + slug del nombre).
   function claveDe(opts) {
     if (!opts) return '';
     if (opts.clave !== null && opts.clave !== undefined && opts.clave !== '') {
-      return String(opts.clave);
+      var clave = String(opts.clave);
+      if (Object.prototype.hasOwnProperty.call(ARTE, clave)) return clave;
+      var prefijo = porPrefijo(clave);
+      return prefijo || clave;
     }
     if (opts.marca !== null && opts.marca !== undefined && opts.marca !== '') {
       return 'marca:' + slug(opts.marca);
@@ -82,9 +118,9 @@
     return '';
   }
 
-  // arteDe: prioridad explicita -> clave -> marca -> sin arte.
-  // imagenUrl gana porque permite arte subido por el usuario sin tocar el mapa.
-  // Devuelve null si no hay nada: el llamador decide si pinta hueco.
+  // arteDe: aplica el orden de resolucion de claveDe y devuelve null si no hay
+  // arte, para que el llamador decida si pinta hueco. imagenUrl gana siempre
+  // porque permite arte subido por el usuario sin tocar el mapa.
   function arteDe(opts) {
     if (!opts) return null;
     var clave = claveDe(opts);
@@ -110,8 +146,12 @@
   function slotHtml(opts) {
     var o = opts || {};
     var arte = arteDe(o);
+    // El alt/nombre sigue siendo el dato crudo del producto: un SKU prefijado
+    // resuelve a marca:ancestral pero NO debe renombrar la carta.
     var nombre = (o.nombre !== null && o.nombre !== undefined && o.nombre !== '')
-      ? String(o.nombre) : claveDe(o);
+      ? String(o.nombre)
+      : ((o.clave !== null && o.clave !== undefined && o.clave !== '')
+        ? String(o.clave) : claveDe(o));
     var xp = (o.xp !== null && o.xp !== undefined && o.xp !== '') ? String(o.xp) : '';
 
     if (arte) {

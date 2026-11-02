@@ -264,6 +264,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 #pf-coleccion .pf-col-bloque{margin-bottom:20px}
 #pf-coleccion .pf-col-bloque:last-child{margin-bottom:0}
 @media (max-width:600px){#pf-coleccion .pf-col-f{flex:1 1 44%}#pf-coleccion .pf-col-bloque{margin-bottom:16px}}
+/* Mis Cartas con lamina (ADR-112): el ancho de escritorio lo fija el grid que ya
+   existe (.pf-v61 .v61-grid, repeat(auto-fill,minmax(150px,1fr))), asi que aqui
+   solo se acota el movil a 2 columnas: nunca hay scroll horizontal. */
+@media (max-width:540px){#pf-cartas .v61-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* BONO DE BIENVENIDA POR REFERIDO (referidos) */
 .pf-bono{display:none;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(255,74,0,.14),rgba(255,74,0,.04));border:1px solid rgba(255,74,0,.35);border-radius:10px;padding:14px;margin-bottom:14px}
 .pf-bono-ico{font-size:24px;line-height:1}
@@ -7639,14 +7643,12 @@ function renderBilletera(d) {
   var box = document.getElementById('pf-billetera');
   if (!box) return;
   if (!d) { box.innerHTML = ''; return; }
-  var cons = d.consumibles || [];
-  var consHtml = cons.length
-    ? cons.map(function (x) { return '<span class="pf-bil-chip">' + esc(x.slug) + ' x' + esc(String(x.cantidad)) + '</span>'; }).join('')
-    : '<span class="pf-bil-vacio">Sin consumibles todavia</span>';
+  /* Los consumibles ya no se pintan aqui: su sitio es el bloque de consumibles
+     de #pf-coleccion (#pf-inventario). Esta seccion conserva saldos y codigo.
+     La llamada y el endpoint no cambian: mismo coste de red, solo el pintado. */
   box.innerHTML =
       '<div class="pf-bil-card"><div class="pf-bil-k">XP total</div><div class="pf-bil-v">' + esc(String(d.xp_total != null ? d.xp_total : 0)) + '</div></div>'
     + '<div class="pf-bil-card"><div class="pf-bil-k">Monedas CDR</div><div class="pf-bil-v">' + esc(String(d.cdr_saldo != null ? d.cdr_saldo : 0)) + '</div></div>'
-    + '<div class="pf-bil-card pf-bil-wide"><div class="pf-bil-k">Consumibles</div><div class="pf-bil-chips">' + consHtml + '</div></div>'
     + (d.billetera
       ? '<div class="pf-bil-cod">Billetera ' + esc(d.billetera.codigo_publico) + '</div>'
       : '<div class="pf-bil-vacio">Completa tu Pasaporte para activar tu billetera.</div>');
@@ -8099,6 +8101,21 @@ function v61GatesSet(gates) {
   (gates || []).forEach(function (g) { if (g && g.nivel_gate != null) set[String(g.nivel_gate)] = true; });
   return set;
 }
+/* Hueco de arte para "Mis Cartas": unico helper de lamina de esta pagina.
+   Degradacion total (ADR-008): si cartas-arte.js no esta cargado o no hay
+   lamina para la carta, devuelve cadena vacia y el render pinta la ficha de
+   texto de siempre. Nunca lanza. */
+function pfCartaArteSlot(c) {
+  var A = window.CartasArte;
+  if (!A || typeof A.arteDe !== 'function' || typeof A.slotHtml !== 'function') return '';
+  var imagenUrl = (c && c.imagen_url) ? String(c.imagen_url) : '';
+  var clave = (c && c.id) ? String(c.id) : '';
+  var marca = (c && c.marca_nombre) ? String(c.marca_nombre) : '';
+  try {
+    if (A.arteDe({ imagenUrl: imagenUrl, clave: clave, marca: marca }) === null) return '';
+    return String(A.slotHtml({ imagenUrl: imagenUrl, clave: clave, marca: marca, nombre: (c && c.nombre) ? String(c.nombre) : '', xp: null }) || '');
+  } catch (e) { return ''; }
+}
 function cargarCartas(uid) {
   var box = document.getElementById('pf-cartas');
   if (!box || !uid) return;
@@ -8134,21 +8151,43 @@ function cargarCartas(uid) {
       html += '<div class="v61-empty">Aun no tienes cartas. Se obtienen abriendo sobres y en el Mercado de Cartas.</div>';
       box.innerHTML = html; return;
     }
-    html += '<div class="v61-grid">';
+    var ui = v61Ui();
+    /* .cartas-silo es el padre obligatorio del componente de lamina (ADR-004):
+       sin el, el CSS de cartas-ui.css no aplica. Con el modulo ausente no queda
+       dentro ningun nodo .c-*, asi que la ficha de texto se ve igual que hoy. */
+    html += '<div class="cartas-silo cartas-silo--oscuro v61-grid">';
     propias.forEach(function (c) {
       var id = c.id || '';
       var rareza = c.rareza || 'comun';
       var cant = parseInt(c.cantidad, 10) || 0;
       var esGate = (c.nivel_gate != null);
       var esEvento = c.es_evento === true;
+      var acc = '<button type="button" class="v61-btn" onclick="v61PublicarCarta(\'' + esc(id) + '\',' + cant + ')">Publicar en venta</button>';
+      if (esEvento) acc += '<button type="button" class="v61-btn ghost" onclick="v61UsarCartaEvento(\'' + esc(id) + '\')">Usar en evento</button>';
+      if (!esGate || esEvento) acc += '<button type="button" class="v61-btn ghost" onclick="v61IntercambiarCarta(\'' + esc(id) + '\')">Intercambiar (P2P)</button>';
+      var slot = pfCartaArteSlot(c);
+      if (slot) {
+        /* Con lamina manda el arte (ADR-112): nombre, rareza y stats ya van
+           horneados, asi que solo se anade lo que la lamina no puede llevar. */
+        var vs = v61VariantesPosesion(c);
+        var varHtml = (vs.length > 1 || (vs.length === 1 && String(vs[0].variante || 'base').toLowerCase() !== 'base'))
+          ? vs.map(function (v) { return '<span class="v61-chip">' + esc(v61VarianteLabel(v.variante)) + ' x' + (Number(v.cantidad) || 0) + '</span>'; }).join('')
+          : '';
+        html += '<div class="v61-card ' + v61RarezaClase(rareza) + '">'
+          + '<div class="c-card c-card--lg">' + slot + '</div>'
+          + '<div class="v61-meta">Tienes <b class="v61-qty">' + cant + '</b></div>'
+          + varHtml
+          + (ui ? ui.badgeEmisor(c.emisor_tipo, c.marca_nombre) : '')
+          + acc
+          + '</div>';
+        return;
+      }
       html += '<div class="v61-card ' + v61RarezaClase(rareza) + '">'
         + '<div class="v61-card-n">' + esc(c.nombre || id) + '</div>'
         + '<span class="v61-rareza">' + esc(rareza) + (esGate ? (' \u00b7 gate ' + esc(c.nivel_gate)) : '') + '</span>'
         + '<div class="v61-meta">Tienes <b class="v61-qty">' + cant + '</b></div>'
-        + '<button type="button" class="v61-btn" onclick="v61PublicarCarta(\'' + esc(id) + '\',' + cant + ')">Publicar en venta</button>';
-      if (esEvento) html += '<button type="button" class="v61-btn ghost" onclick="v61UsarCartaEvento(\'' + esc(id) + '\')">Usar en evento</button>';
-      if (!esGate || esEvento) html += '<button type="button" class="v61-btn ghost" onclick="v61IntercambiarCarta(\'' + esc(id) + '\')">Intercambiar (P2P)</button>';
-      html += '</div>';
+        + acc
+        + '</div>';
     });
     html += '</div>';
     box.innerHTML = html;
