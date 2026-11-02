@@ -208,6 +208,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* ADR-110: etiqueta de FACCION REQUERIDA del consumible poseido. Informa, no
    filtra ni bloquea. Silo con selector padre unico #pf-inventario (ADR-004). */
 #pf-inventario .inv-fac{display:inline-block;margin-left:8px;font-family:'Outfit',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.62);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:1px 7px}
+/* ADR-112: los consumibles poseidos se pintan como CARTAS. La rejilla y la
+   lamina son las de la coleccion (.pf-v61 .v61-grid + .cartas-silo de
+   cartas-ui.css), asi que aqui solo va lo que la celda necesita. Silo con
+   selector padre unico #pf-inventario (ADR-004): cero fugas globales. El
+   .inv-item suelto de la degradacion conserva su CSS de siempre. */
+#pf-inventario .v61-card .inv-item{flex-wrap:wrap;gap:6px;margin:0}
+#pf-inventario .v61-card .inv-era,#pf-inventario .v61-card .inv-fac{margin-left:0}
+@media (max-width:540px){#pf-inventario .v61-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* ---- TIENDA DE FACCION: consumibles categoria 'faccion' (migracion 057) ----
    Silo atomico (ADR-004): TODO lo nuevo cuelga de .pf-fac, con Reset de silo
    explicito (* y box-sizing); nada suelto en :root. El gate lo decide el MOTOR
@@ -3524,7 +3532,14 @@ function cargarInventario(uid) {
         el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No tienes consumibles.</div>';
         return;
       }
-      el.innerHTML = claves.map(function(k){
+      /* ADR-112: los consumibles poseidos se pintan como CARTAS con la lamina
+         del componente de la propia pagina (cartas-arte.js + cartas-ui.css).
+         La CLAVE del catalogo (consumible_*, ancestral_*) es la que resuelve
+         el arte. Degradacion total (ADR-008): si el modulo no esta cargado,
+         el markup es EXACTAMENTE el de siempre (.inv-item). */
+      var A = window.CartasArte;
+      var hayArte = !!(A && typeof A.slotHtml === 'function' && typeof A.arteDe === 'function');
+      var celdas = claves.map(function(k){
         var item = consumibles[k] || {};
         var qty = parseInt(item.cantidad, 10) || 0;
         var nombre = item.nombre || nombreConsumible(k);
@@ -3534,12 +3549,34 @@ function cargarInventario(uid) {
         /* ADR-110: la faccion requerida es ETIQUETA informativa. Sin el dato
            (o con null) se declara explicitamente 'Cualquier faccion'. */
         var facTag = '<span class="inv-fac">' + esc(pfFacFaccionTxt(item)) + '</span>';
-        return '<div class="inv-item">'
-          + '<div class="inv-qty">x' + qty + '</div>'
-          + '<div class="inv-name">' + esc(nombre) + eraTag + facTag + '</div>'
-          + '<button class="inv-use" onclick="usarConsumible(\'' + esc(k) + '\',this)">Usar</button>'
+        var qtyTag = '<div class="inv-qty">x' + qty + '</div>';
+        var tags = eraTag + facTag;
+        var usarBtn = '<button class="inv-use" onclick="usarConsumible(\'' + esc(k) + '\',this)">Usar</button>';
+        var slot = '';
+        if (hayArte) {
+          try {
+            slot = String(A.slotHtml({ clave: String(k), nombre: String(nombre), xp: null }) || '');
+          } catch (e) { slot = ''; }
+        }
+        if (!slot) {
+          return '<div class="inv-item">'
+            + qtyTag
+            + '<div class="inv-name">' + esc(nombre) + tags + '</div>'
+            + usarBtn
+            + '</div>';
+        }
+        /* Con lamina el nombre va horneado en el PNG (ADR-112) y en el hueco lo
+           escribe el propio placeholder: debajo queda solo lo dinamico que el
+           arte no puede llevar (cantidad, etiquetas y uso). */
+        return '<div class="v61-card">'
+          + '<div class="c-card c-card--lg">' + slot + '</div>'
+          + '<div class="inv-item">' + qtyTag + tags + usarBtn + '</div>'
           + '</div>';
       }).join('');
+      el.innerHTML = hayArte
+        ? ('<div class="pf-v61 cartas-silo cartas-silo--oscuro">'
+          + '<div class="v61-grid">' + celdas + '</div></div>')
+        : celdas;
     })
     .catch(function(){
       el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar el inventario.</div>';
