@@ -276,14 +276,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
    existe (.pf-v61 .v61-grid, repeat(auto-fill,minmax(150px,1fr))), asi que aqui
    solo se acota el movil a 2 columnas: nunca hay scroll horizontal. */
 @media (max-width:540px){#pf-cartas .v61-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-/* BONO DE BIENVENIDA POR REFERIDO (referidos) */
-.pf-bono{display:none;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(255,74,0,.14),rgba(255,74,0,.04));border:1px solid rgba(255,74,0,.35);border-radius:10px;padding:14px;margin-bottom:14px}
-.pf-bono-ico{font-size:24px;line-height:1}
-.pf-bono-txt{flex:1;min-width:0}
-.pf-bono-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff}
-.pf-bono-desc{font-size:11px;color:rgba(255,255,255,.55);line-height:1.4;margin-top:2px}
-.pf-bono-btn{padding:9px 16px;background:var(--gold);border:none;border-radius:6px;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:opacity .15s;white-space:nowrap}
-.pf-bono-btn:hover{opacity:.88}
 /* MIS REGALIAS (regalias pasivas) */
 .pf-reg-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;margin-bottom:6px}
 .pf-reg-item.reclamado{opacity:.55}
@@ -520,84 +512,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-gal-btn{flex:1;border:none;border-radius:6px;background:rgba(255,255,255,.18);color:#fff;font-size:10px;font-weight:700;padding:5px 4px;cursor:pointer}
 .pf-gal-btn.danger{background:rgba(239,68,68,.85)}
 .pf-gal-vacio{color:rgba(255,255,255,.4);font-size:12.5px}
-/* ---- SUMIDEROS DE XP: slots de contenido (ADR-086 / TSK-184) --------------
-   Silo atomico: TODO lo nuevo cuelga de .pf-slots (ADR-004 / Regla de Oro 4).
-   Reset de silo explicito abajo (* y box-sizing) para que nada se herede del
-   exterior. Ninguna regla se declara en la capa global de variables.
-   El precio que se pinta es el del PROXIMO slot (costo_proximo, que calcula el
-   motor), NO costo_base_xp: comprar sube el historial k de ese sumidero y con
-   el sube el siguiente precio, y el usuario tiene que ver esa subida antes de
-   pagar, no despues. El k+1 (costo_siguiente) se pinta DEBAJO de ese precio y
-   deliberadamente pequeno: es informacion secundaria, no una tercera cifra que
-   compita con la principal. Si llega null es que no hay proximo slot, y eso se
-   dice con palabras, nunca con 0 ni con un guion ambiguo. */
-.pf-slots{box-sizing:border-box;width:100%;margin-bottom:28px;display:flex;flex-direction:column;gap:14px}
-.pf-slots *,.pf-slots *::before,.pf-slots *::after{box-sizing:border-box}
-.pf-slots p{margin:0}
-.pf-slots .sl-err{font-size:11.5px;color:#fca5a5;line-height:1.45}
-.pf-slots .sl-vacio{font-size:12.5px;color:rgba(255,255,255,.4)}
-.pf-slots .sl-curva{font-size:11px;line-height:1.55;color:rgba(255,255,255,.5);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:9px 11px}
-.pf-slots .sl-curva code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--gold);word-break:break-word}
-.pf-slots .sl-saldo{display:flex;flex-wrap:wrap;align-items:baseline;gap:7px}
-.pf-slots .sl-saldo-k{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.5)}
-.pf-slots .sl-saldo-v{font-size:19px;font-weight:900;color:#fff}
-.pf-slots .sl-saldo-av{font-size:11px;color:#fcd34d}
-.pf-slots .sl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
-.pf-slots .sl-card{background:linear-gradient(150deg,rgba(255,74,0,.13),rgba(255,255,255,.03));border:1px solid rgba(255,74,0,.32);border-radius:12px;padding:13px;display:flex;flex-direction:column;gap:9px}
-.pf-slots .sl-card.bloqueada{border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.02)}
-.pf-slots .sl-n{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff}
-.pf-slots .sl-topes{display:flex;flex-wrap:wrap;gap:5px}
-.pf-slots .sl-top{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.6);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:2px 8px}
-.pf-slots .sl-top.limite{color:#fca5a5;border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1)}
-.pf-slots .sl-precio{display:flex;flex-direction:column;gap:3px}
-.pf-slots .sl-precio-lbl{font-family:'Barlow Condensed',sans-serif;font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.5)}
-.pf-slots .sl-precio-v{font-size:25px;font-weight:900;color:var(--gold);line-height:1}
-.pf-slots .sl-precio-base{font-size:11px;color:rgba(255,255,255,.4)}
-.pf-slots .sl-bars{display:flex;flex-direction:column;gap:5px}
-.pf-slots .sl-bar{display:flex;align-items:center;gap:7px;font-size:9.5px;color:rgba(255,255,255,.45)}
-.pf-slots .sl-bar span{flex:0 0 38px;text-transform:uppercase;letter-spacing:.5px}
-.pf-slots .sl-bar i{display:block;height:7px;border-radius:999px;min-width:3px}
-.pf-slots .sl-bar.base i{background:rgba(255,255,255,.22)}
-.pf-slots .sl-bar.prox i{background:linear-gradient(90deg,#FF4A00,#f4c66a)}
-.pf-slots .sl-crece{font-size:11.5px;line-height:1.5;color:#fcd34d}
-.pf-slots .sl-crece b{color:#fff}
-.pf-slots .sl-hielo{font-size:11px;line-height:1.5;color:rgba(255,255,255,.5)}
-.pf-slots .sl-hielo b{color:var(--gold)}
-.pf-slots .sl-mios-l{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px}
-.pf-slots .sl-chip{font-size:10.5px;text-transform:none;letter-spacing:0;color:rgba(255,255,255,.7);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:3px 9px}
-.pf-slots .sl-chip.pagado{color:var(--gold);border-color:rgba(255,74,0,.35)}
-.pf-slots .sl-chip.soltado{color:rgba(255,255,255,.35);text-decoration:line-through}
-.pf-slots .sl-cta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:auto}
-.pf-slots .sl-btn{background:var(--gold);color:#0F1419;border:none;border-radius:10px;padding:9px 15px;font-family:Outfit,sans-serif;font-size:12.5px;font-weight:800;cursor:pointer}
-.pf-slots .sl-btn:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.35);cursor:not-allowed}
-.pf-slots .sl-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.pf-slots .sl-motivo{font-size:11px;line-height:1.45;color:#fca5a5}
-.pf-slots .sl-motivo.limite{color:rgba(255,255,255,.45)}
-/* El k+1 va DEBAJO del precio actual y deliberadamente pequeno: es
-   informacion secundaria, no una tercera cifra que compita con la principal
-   (25px gold). El caso null se pinta como frase, nunca como 0 ni como --. */
-.pf-slots .sl-siguiente{font-size:11px;line-height:1.45;color:rgba(255,255,255,.42)}
-.pf-slots .sl-siguiente b{font-size:12.5px;font-weight:800;color:rgba(255,255,255,.62)}
-/* Bloque de enganche. Punteado = hueco declarado, solido = ya hay selector
-   (.con-sel). El rotulo sale del motor, nunca de una lista en el cliente. */
-.pf-slots .sl-ref{font-size:11px;line-height:1.5;color:rgba(255,255,255,.55);background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.16);border-radius:10px;padding:7px 9px}
-.pf-slots .sl-ref b{color:#fff;font-weight:800}
-.pf-slots .sl-motivo-tec{display:block;margin-top:3px;font-size:10.5px;line-height:1.4;color:rgba(255,255,255,.34)}
-/* Selector de enganche. NATIVO y deliberadamente pequeno: el pool real es de 1
-   a 3 recursos, luego un <select> del sistema es lo unico que se justifica y un
-   widget propio seria mas codigo que opciones tiene. El punteado de .sl-ref se
-   vuelve solido cuando YA hay selector: el hueco dejo de existir y la tarjeta lo
-   dice sin tener que decirlo. */
-.pf-slots .sl-ref.con-sel{border-style:solid;border-color:rgba(255,74,0,.3)}
-.pf-slots .sl-pick-lbl{display:block;margin-top:7px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.45)}
-.pf-slots .sl-sel{width:100%;margin-top:4px;padding:7px 28px 7px 10px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:#fff;background:rgba(255,255,255,.05);border:1px solid rgba(255,74,0,.32);border-radius:9px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23f4c66a' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
-.pf-slots .sl-sel:hover{border-color:rgba(255,74,0,.55)}
-.pf-slots .sl-sel:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.pf-slots .sl-sel option{background:#151A20;color:#fff}
-/* Una sola opcion ya esta elegida: se nombra y punto. Un desplegable con una
-   unica entrada es ruido que hace dudar de una eleccion que el usuario no tiene. */
-.pf-slots .sl-auto{display:block;margin-top:4px;font-size:12px;font-weight:700;color:#fff}
-@media (max-width:600px){.pf-slots .sl-precio-v{font-size:21px}.pf-slots .sl-grid{grid-template-columns:1fr}}
 .pf-subida{display:flex;align-items:center;gap:12px;justify-content:space-between;background:linear-gradient(135deg,rgba(255,74,0,.16),rgba(255,255,255,.03));border:1px solid rgba(255,74,0,.4);border-radius:14px;padding:14px 16px;margin-bottom:18px}
 .pf-subida-txt{display:flex;flex-direction:column;gap:2px}
 .pf-subida-txt strong{font-size:15px;color:#fff}
@@ -661,11 +575,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-casa .pf-casa-actual{font-size:11px;font-weight:700;color:#22C55E;padding:6px 0}
 .pf-casa .pf-casa-tag{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:2px 9px;margin-top:8px}
 .pf-casa .pf-casa-dato{font-size:10px;color:rgba(255,255,255,.45);margin-top:4px}
-/* Emprendedor (Mercado, asset compartido mercado.js) */
-.pf-mercado-bar{height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin:8px 0 4px}
-.pf-mercado-fill{height:100%;border-radius:3px;background:var(--gold);transition:width .4s}
-.pf-mkt-btn{display:inline-block;text-decoration:none;padding:8px 16px;background:var(--gold);border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:var(--black)}
-.pf-mkt-btn:hover{opacity:.88}
 /* Mi Museo publico: vista previa (MUSEO) */
 .pf-museo-preview{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:28px}
 .pf-museo-preview .pf-mp-cargando,.pf-museo-preview .pf-mp-vacio,.pf-museo-preview .pf-mp-privado{text-align:center;color:rgba(255,255,255,.45);font-size:12px;padding:16px;line-height:1.6}
@@ -1015,26 +924,26 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .mp-picker-head,.pf-museo-modal-head h3{font-size:22px;font-weight:900;line-height:1.15}
 
 /* --- 2. TITULOS DE TARJETA: 18px / 900 / 1.2 --- */
-.nivel-detail-title,.pf-reg-titulo,.pf-bono-title,.pf-uso-title,.pf-completa .pf-comp-titulo,.pf-origen .pf-org-city,.dm-bandeja .dm-chat-titulo,.tabla-destino .td-send-nombre,.ref-net-title,.facc-name,.pf-v61 .v61-gate-info-t{font-size:18px;font-weight:900;line-height:1.2}
+.nivel-detail-title,.pf-reg-titulo,.pf-uso-title,.pf-completa .pf-comp-titulo,.pf-origen .pf-org-city,.dm-bandeja .dm-chat-titulo,.tabla-destino .td-send-nombre,.ref-net-title,.facc-name,.pf-v61 .v61-gate-info-t{font-size:18px;font-weight:900;line-height:1.2}
 
 /* --- 3. CUERPO Y DESCRIPCIONES: 16px / 1.5 --- */
-.pf-email,.nivel-nombre,.nivel-mis-name,.bg-name,#pf-misiones .mis-nombre,.pf-uso-item,.inv-name,.cromo-name,.dm-bandeja,.dm-bandeja .dm-texto,.dm-bandeja .dm-burbuja,.arbol-clases .arbol-rama-nombre,.pf-datos .pf-dato-val,.pf-pas-val,.pf-bil-vacio,.pf-gal-vacio,.pf-slots .sl-vacio,.pf-completa .pf-comp-feliz,.pf-origen .pf-org-row-name,.pf-museo-msg,.pf-museo-drop,.pf-museo-preview .pf-mp-bio,.verify-banner-txt,#xp-toast{font-size:16px;line-height:1.5}
+.pf-email,.nivel-nombre,.nivel-mis-name,.bg-name,#pf-misiones .mis-nombre,.pf-uso-item,.inv-name,.cromo-name,.dm-bandeja,.dm-bandeja .dm-texto,.dm-bandeja .dm-burbuja,.arbol-clases .arbol-rama-nombre,.pf-datos .pf-dato-val,.pf-pas-val,.pf-bil-vacio,.pf-gal-vacio,.pf-completa .pf-comp-feliz,.pf-origen .pf-org-row-name,.pf-museo-msg,.pf-museo-drop,.pf-museo-preview .pf-mp-bio,.verify-banner-txt,#xp-toast{font-size:16px;line-height:1.5}
 
 /* --- 4. METADATOS, FECHAS, LABELS, AVISOS: 14px / 1.4 --- */
-.pf-level,.pf-stat-l,.nivel-meta,.nivel-detail-lbl,.nivel-detail-empty,.nivel-mis-meta,.nivel-mis-desc,.bg-desc,#pf-misiones .mis-meta,#pf-misiones .mis-desc,#pf-lugares .pf-lugar-msg,.pf-uso-help,.pf-uso-vacio,.pf-museo-line,.pf-bono-desc,.pf-reg-xp,.pf-reg-vacio,.pf-datos .pf-dato-lbl,.pf-pas-ok,.pf-pas-pend,.pf-pas-item,.pf-pas-lbl,.pf-pasaporte .pf-pas-sello-txt,.pf-bil-k,.pf-slots .sl-err,.pf-slots .sl-saldo-k,.pf-slots .sl-saldo-av,.pf-slots .sl-curva,.pf-slots .sl-precio-lbl,.pf-slots .sl-precio-base,.pf-slots .sl-motivo,.pf-slots .sl-motivo-tec,.pf-slots .sl-ref,.pf-slots .sl-crece,.pf-slots .sl-hielo,.pf-subida-txt span,.pf-completa .pf-comp-sub,.pf-completa .pf-comp-cargando,.pf-completa .pf-comp-vacio,.pf-origen .pf-org-lbl,.pf-origen .pf-org-row-desc,.pf-origen .pf-org-row-fx,.pf-origen .pf-org-note,.pf-casa .pf-casa-meta,.pf-casa .pf-casa-nota,.pf-casa .pf-casa-actual,.pf-casa .pf-casa-dato,.pf-museo-preview .pf-mp-cargando,.pf-museo-preview .pf-mp-vacio,.pf-museo-preview .pf-mp-privado,.pf-museo-preview .pf-mp-pie,.pf-museo-preview .pf-mp-stat-l,.pf-cuenta .pf-cta-lbl,.pf-cuenta .pf-switch,.pf-museo-lbl,.pf-museo-check,.pf-museo-hint,.pf-museo-form-msg,.pf-museo-preview .pf-museo-ph,.pf-v61 .v61-note,.pf-v61 .v61-empty,.pf-v61 .v61-meta,.pf-v61 .v61-gate-l,.pf-v61 .v61-row-d,.pf-v61 .v61-row-x,.pf-v61 .v61-gate-info p,.tabla-destino .td-nota,.tabla-destino .td-send-desc,.tabla-destino .td-meta,.tabla-destino .td-total-l,.tabla-destino .td-rango,.tabla-destino .td-fama,.tabla-destino .td-cargando,.tabla-destino .td-vacio,.ref-stat-l,.ref-net-label,.ref-insumo-lbl,.ref-qr-fallback,.ref-empty,.facc-desc,.facc-current,.dm-bandeja .dm-hint,.dm-bandeja .dm-cargando,.dm-bandeja .dm-vacio,.dm-bandeja .dm-hilo-ultimo,.dm-bandeja .dm-aviso,.arbol-clases .arbol-cargando,.arbol-clases .arbol-nota,.arbol-clases .arbol-tab-nombre,.arbol-clases .arbol-bono-txt,.arbol-clases .arbol-rama-meta,.arbol-clases .arbol-tip-ef,.arbol-clases .arbol-tip-req,.ma-rating-texto,[data-ma-voto] .ma-rating-texto,[data-ma-voto] [data-ma-rating-texto]{font-size:14px;line-height:1.4}
+.pf-level,.pf-stat-l,.nivel-meta,.nivel-detail-lbl,.nivel-detail-empty,.nivel-mis-meta,.nivel-mis-desc,.bg-desc,#pf-misiones .mis-meta,#pf-misiones .mis-desc,#pf-lugares .pf-lugar-msg,.pf-uso-help,.pf-uso-vacio,.pf-museo-line,.pf-reg-xp,.pf-reg-vacio,.pf-datos .pf-dato-lbl,.pf-pas-ok,.pf-pas-pend,.pf-pas-item,.pf-pas-lbl,.pf-pasaporte .pf-pas-sello-txt,.pf-bil-k,.pf-subida-txt span,.pf-completa .pf-comp-sub,.pf-completa .pf-comp-cargando,.pf-completa .pf-comp-vacio,.pf-origen .pf-org-lbl,.pf-origen .pf-org-row-desc,.pf-origen .pf-org-row-fx,.pf-origen .pf-org-note,.pf-casa .pf-casa-meta,.pf-casa .pf-casa-nota,.pf-casa .pf-casa-actual,.pf-casa .pf-casa-dato,.pf-museo-preview .pf-mp-cargando,.pf-museo-preview .pf-mp-vacio,.pf-museo-preview .pf-mp-privado,.pf-museo-preview .pf-mp-pie,.pf-museo-preview .pf-mp-stat-l,.pf-cuenta .pf-cta-lbl,.pf-cuenta .pf-switch,.pf-museo-lbl,.pf-museo-check,.pf-museo-hint,.pf-museo-form-msg,.pf-museo-preview .pf-museo-ph,.pf-v61 .v61-note,.pf-v61 .v61-empty,.pf-v61 .v61-meta,.pf-v61 .v61-gate-l,.pf-v61 .v61-row-d,.pf-v61 .v61-row-x,.pf-v61 .v61-gate-info p,.tabla-destino .td-nota,.tabla-destino .td-send-desc,.tabla-destino .td-meta,.tabla-destino .td-total-l,.tabla-destino .td-rango,.tabla-destino .td-fama,.tabla-destino .td-cargando,.tabla-destino .td-vacio,.ref-stat-l,.ref-net-label,.ref-insumo-lbl,.ref-qr-fallback,.ref-empty,.facc-desc,.facc-current,.dm-bandeja .dm-hint,.dm-bandeja .dm-cargando,.dm-bandeja .dm-vacio,.dm-bandeja .dm-hilo-ultimo,.dm-bandeja .dm-aviso,.arbol-clases .arbol-cargando,.arbol-clases .arbol-nota,.arbol-clases .arbol-tab-nombre,.arbol-clases .arbol-bono-txt,.arbol-clases .arbol-rama-meta,.arbol-clases .arbol-tip-ef,.arbol-clases .arbol-tip-req,.ma-rating-texto,[data-ma-voto] .ma-rating-texto,[data-ma-voto] [data-ma-rating-texto]{font-size:14px;line-height:1.4}
 
 /* --- 5. MICROCOPIA, BADGES, CONTADORES: 12px / 500 / 1.3 --- */
-.pf-level-num,.pf-xp-text,.pf-counter,.nav-label,.nav-back,.nivel-era,.nivel-badge,.nivel-caret,.nivel-detail-era,.nivel-detail-range,.nivel-detail-estado,.nivel-cap-chip b,.nivel-cap-chip span,.nivel-mis-xp,#pf-misiones .mis-lock,#pf-misiones .mis-xp,#pf-lugares .pf-lugar-badge,.pf-uso-item .pf-uso-item-n,.pf-uso-cont,.cromo-rareza,.cromo-set,.cromo-qty,.ref-net-xp,.ref-net-pct,.dm-bandeja .dm-hilo-fecha,.dm-bandeja .dm-no-leidos,.dm-bandeja .dm-msg-fecha,.dm-bandeja .dm-contador,.arbol-clases .arbol-tab-mio,.arbol-clases .arbol-prog-txt,.arbol-clases .arbol-estado,.arbol-clases .arbol-fac-chip,.pf-pas-ok-txt,.pf-bil-chip,.pf-bil-cod,.pf-gal-star,.inv-era,.pf-slots .sl-bar,.pf-slots .sl-chip,.pf-slots .sl-mios-l,.pf-slots .sl-top,.pf-slots .sl-pick-lbl,.pf-slots .sl-siguiente,.pf-slots .sl-siguiente b,.pf-slots .sl-curva code,.pf-slots .sl-auto,.pf-completa .pf-comp-xp,.pf-completa .pf-comp-ok,.pf-origen .pf-org-chip,.pf-origen .pf-org-foot,.pf-casa .pf-casa-tag,.pf-museo-preview .pf-mp-badge,.pf-museo-preview .pf-mp-chip,.pf-cuenta .pf-cta-badge,.pf-museo-cont,.pf-museo-badge,#profile .pf-grupo-flecha,#profile .pf-grupo-count,.mp-picker-coords,.pf-v61 .v61-err,.pf-v61 .v61-rareza,.pf-v61 .v61-chip,.pf-v61 .v61-saldo-l,.tabla-destino .td-estado,.tabla-destino .td-nd,.pf-reg-fuente,[data-ma-voto] [data-ma-count],[data-ma-voto] .ma-votos-num{font-size:12px;font-weight:500;line-height:1.3}
+.pf-level-num,.pf-xp-text,.pf-counter,.nav-label,.nav-back,.nivel-era,.nivel-badge,.nivel-caret,.nivel-detail-era,.nivel-detail-range,.nivel-detail-estado,.nivel-cap-chip b,.nivel-cap-chip span,.nivel-mis-xp,#pf-misiones .mis-lock,#pf-misiones .mis-xp,#pf-lugares .pf-lugar-badge,.pf-uso-item .pf-uso-item-n,.pf-uso-cont,.cromo-rareza,.cromo-set,.cromo-qty,.ref-net-xp,.ref-net-pct,.dm-bandeja .dm-hilo-fecha,.dm-bandeja .dm-no-leidos,.dm-bandeja .dm-msg-fecha,.dm-bandeja .dm-contador,.arbol-clases .arbol-tab-mio,.arbol-clases .arbol-prog-txt,.arbol-clases .arbol-estado,.arbol-clases .arbol-fac-chip,.pf-pas-ok-txt,.pf-bil-chip,.pf-bil-cod,.pf-gal-star,.inv-era,.pf-completa .pf-comp-xp,.pf-completa .pf-comp-ok,.pf-origen .pf-org-chip,.pf-origen .pf-org-foot,.pf-casa .pf-casa-tag,.pf-museo-preview .pf-mp-badge,.pf-museo-preview .pf-mp-chip,.pf-cuenta .pf-cta-badge,.pf-museo-cont,.pf-museo-badge,#profile .pf-grupo-flecha,#profile .pf-grupo-count,.mp-picker-coords,.pf-v61 .v61-err,.pf-v61 .v61-rareza,.pf-v61 .v61-chip,.pf-v61 .v61-saldo-l,.tabla-destino .td-estado,.tabla-destino .td-nd,.pf-reg-fuente,[data-ma-voto] [data-ma-count],[data-ma-voto] .ma-votos-num{font-size:12px;font-weight:500;line-height:1.3}
 
 /* --- 6. BOTONES, TABS, CHIPS, ACCIONES: 16px / min-height 44 --- */
-.pf-btn,.pf-uso-btn,.pf-bono-btn,.pf-reg-btn,.pf-gal-btn,.pf-pas-btn,.pf-mkt-btn,.inv-use,.pf-museo-btn,.pf-museo-mini-btn,.pf-museo-move,.mp-album-com-btn,.pf-tab,.pf-datos .pf-dato-btn,.pf-origen .pf-org-btn,.pf-completa .pf-comp-btn,.pf-slots .sl-btn,.pf-subida-btn,.pf-museo-preview .pf-mp-btn,.pf-v61 .v61-btn,#profile .pf-grupo-btn,#pf-lugares .pf-lugar-accion,.arbol-clases .arbol-btn,.dm-bandeja .dm-bloq-btn,.dm-bandeja .dm-volver,.dm-bandeja .dm-enviar,.verify-banner-btn,.ref-copy-btn,.facc-btn,.gate-btn{font-size:16px;min-height:44px}
+.pf-btn,.pf-uso-btn,.pf-reg-btn,.pf-gal-btn,.pf-pas-btn,.inv-use,.pf-museo-btn,.pf-museo-mini-btn,.pf-museo-move,.mp-album-com-btn,.pf-tab,.pf-datos .pf-dato-btn,.pf-origen .pf-org-btn,.pf-completa .pf-comp-btn,.pf-subida-btn,.pf-museo-preview .pf-mp-btn,.pf-v61 .v61-btn,#profile .pf-grupo-btn,#pf-lugares .pf-lugar-accion,.arbol-clases .arbol-btn,.dm-bandeja .dm-bloq-btn,.dm-bandeja .dm-volver,.dm-bandeja .dm-enviar,.verify-banner-btn,.ref-copy-btn,.facc-btn,.gate-btn{font-size:16px;min-height:44px}
 
 /* CTA principal de la pagina (publicar / completar album): 48px de alto tactil */
 .mp-album-com-btn,.pf-completa .pf-comp-btn,.pf-museo-btn{font-size:16px;min-height:48px;line-height:1.2}
 
 /* --- 7. FORMULARIOS: 16px (evita el zoom automatico de iOS) --- */
 #profile input:not([type=checkbox]):not([type=radio]),#profile select,#profile textarea,.pf-museo-preview input:not([type=checkbox]):not([type=radio]),.pf-museo-preview textarea,.dm-bandeja input:not([type=checkbox]):not([type=radio]),.dm-bandeja textarea,.arbol-clases input:not([type=checkbox]):not([type=radio]),.arbol-clases select,.tabla-destino input:not([type=checkbox]):not([type=radio]),[data-ma-voto] input:not([type=checkbox]):not([type=radio]){font-size:16px;min-height:44px;line-height:1.35}
-.pf-uso-input,.pf-museo-input,.ref-input,.pf-v61 .v61-inp,.pf-slots .sl-sel,.arbol-clases .arbol-bono-sel{font-size:16px;min-height:44px}
+.pf-uso-input,.pf-museo-input,.ref-input,.pf-v61 .v61-inp,.arbol-clases .arbol-bono-sel{font-size:16px;min-height:44px}
 
 /* Excepcion por tamano inline en controles: el style= gana al selector base y baja de 16px */
 input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="font-size:13px"],select[style*="font-size:14px"],textarea[style*="font-size:13px"],textarea[style*="font-size:14px"]{font-size:16px!important}
@@ -1189,9 +1098,6 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
     <button type="button" class="pf-tab" role="tab" data-tab="red" aria-selected="false" onclick="pfTab('red')">&#x1F517; Mi Red</button>
     <button type="button" class="pf-tab" role="tab" data-tab="museo" aria-selected="false" onclick="pfTab('museo')">&#x1F3DB;&#xFE0F; Museo</button>
     <button type="button" class="pf-tab" role="tab" data-tab="inventario" aria-selected="false" onclick="pfTab('inventario')">&#x1F392; Coleccion</button>
-    <!-- Pestana Mercado: compra y venta (slots, bono, cartas, emprendedor,
-         moneda). La Coleccion lista solo lo que el usuario POSEE (ADR-110). -->
-    <button type="button" class="pf-tab" role="tab" data-tab="mercado" aria-selected="false" onclick="pfTab('mercado')">&#x1F6D2; Mercado</button>
     <button type="button" class="pf-tab" role="tab" data-tab="mensajes" aria-selected="false" onclick="pfTab('mensajes')">&#x1F4E8; Mensajes</button>
     <button type="button" class="pf-tab" role="tab" data-tab="contratos" aria-selected="false" onclick="pfTab('contratos')">&#x1F4DC; Contratos</button>
     <button type="button" class="pf-tab" role="tab" data-tab="cuenta" aria-selected="false" onclick="pfTab('cuenta')">&#x2699;&#xFE0F; Cuenta</button>
@@ -1271,48 +1177,9 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
        el motor debita xp_gastado_sinks, no xp_total, asi que llamarlo
        "disponible" miente en cuanto el usuario compra un sumidero. Se rotula
        como lo que es. El disponible real (xp_total - xp_gastado_sinks) lo manda
-       el motor en slot_catalogo y se pinta en la seccion de sumideros. -->
+       el motor en slot_catalogo y se pinta en el Mercado de comunidad
+       (comunidad.html#mercado): comprar y vender no vive en este perfil. -->
   <div class="pf-counter" id="pf-xp-balance" data-tab="inventario">0 XP de reputacion</div>
-
-  <!-- MERCADO (pestana propia). La Coleccion lista solo lo que el usuario
-       POSEE (ADR-110): comprar y vender no es coleccion, asi que slots,
-       bono, mercado de cartas, emprendedor y moneda se muestran aqui.
-       Los IDs se MUEVEN, nunca se duplican ni se borran (ADR-003). -->
-  <div id="pf-mercado-zona" data-tab="mercado">
-  <div class="pf-section-title" data-tab="mercado">&#x1F6D2; Mercado</div>
-
-  <!-- SUMIDEROS DE XP (ADR-086 / TSK-184). Vive aqui, y no en otra pagina,
-       porque este es el unico sitio donde el usuario ya ve su XP.
-       El precio de cada slot NO es fijo: es costo(k) = costo_base_xp *
-       (1 + alpha*k)^gamma sobre SU historial en ese sumidero, asi que el
-       modulo pinta el precio del PROXIMO slot, el del SIGUIENTE (k+1) y explica
-       el crecimiento antes de cobrar. Todos esos numeros los calcula el motor:
-       aqui no se calcula la curva. Un sumidero sin soporte de enganche sigue
-       VISIBLE, con su motivo, porque esconderlo seria peor. Todo el CSS nuevo
-       cuelga del silo .pf-slots (ADR-004). -->
-  <div class="pf-section-title" data-tab="mercado">&#x1F6D2; Ampliar tu contenido</div>
-  <div class="pf-slots" id="pf-slots" data-tab="mercado" aria-live="polite"></div>
-  <!-- Bono de bienvenida por referido (tarjeta destacada, oculta por defecto) -->
-  <div class="pf-bono" id="pf-bono" data-tab="mercado" style="display:none"></div>
-
-  <!-- GAMING v6.1 (Fase 4 / T7): cartas coleccionables y su mercado.
-       El mercado de cartas es VENTA, no coleccion: el album del Museo y Mis
-       Cartas viven en la Coleccion (ADR-110) y no se duplican aqui. -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="mercado">&#x1F6D2; Mercado de Cartas</div>
-  <div class="pf-v61" id="pf-cartas-mercado" data-tab="mercado">
-    <div class="v61-empty">Cargando ofertas&#8230;</div>
-  </div>
-
-  <!-- EMPRENDEDOR (Mercado, asset compartido mercado.js) -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="mercado">&#x1F6D2; Emprendedor</div>
-  <div class="pf-mercado" id="pf-mercado" data-tab="mercado"></div>
-
-  <!-- GAMING v6.1 (Fase 4 / T8): moneda secundaria "Condor" (CDR) -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="mercado">&#x1FA99; Mi Moneda (Condor CDR)</div>
-  <div class="pf-v61" id="pf-moneda" data-tab="mercado">
-    <div class="v61-empty">Cargando tu moneda&#8230;</div>
-  </div>
-  </div>
 
   <!-- COLECCION (ADR-110): este tab lista SOLO lo que el usuario POSEE, en
        orden fijo: cartas (album del museo + mis cartas por variante),
@@ -1382,13 +1249,6 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
     <div class="pf-counter" id="pf-regalias-total">0 XP por reclamar</div>
     <div id="pf-regalias-lista"></div>
   </section>
-
-  <!-- MIS CROMOS: el bloque vive en la Coleccion (ADR-110); aqui no queda
-       copia para no duplicar IDs (ADR-003: los IDs se mueven, no se borran). -->
-
-  <!-- MERCADO: slots, bono, mercado de cartas, emprendedor y moneda viven
-       ahora en la zona #pf-mercado-zona (pestana Mercado). Sin copia aqui
-       para no duplicar IDs (ADR-003: los IDs se mueven, no se borran). -->
 
   <!-- MIS ALBUMES (ADR-017) -->
   <div class="pf-section-title" data-tab="museo">&#x1F5BC; Mis Albumes</div>
@@ -2028,7 +1888,6 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
 <script src="dictado-voz.js?v=1"></script>
 <script src="media-embed.js?v=3"></script>
 <script src="media-upload.js"></script>
-<script src="mercado.js?v=3"></script>
 <script>
 /* mi-perfil.html -- Rev 2026-09-18c: acordeon de niveles (ADR-040 T1) */
 /* =============================================================
@@ -2220,11 +2079,7 @@ function renderPerfil() {
      vigente y enlaza al Mercado de Comunidad. */
   pfFacCargar(u.id);
   cargarCromos(u.id);
-  cargarBonoReferido(u.id);
   cargarMisRegalias(u.id);
-  /* Sumideros de XP (ADR-086 / TSK-184): viven junto al XP disponible. */
-  pfSlotsCargar(u.id);
-  if (window.Mercado) Mercado.cargarMi();
 
   /* mis albumes (ADR-017) */
   var btnAlbum = document.getElementById('btn-crear-album');
@@ -2864,7 +2719,7 @@ function activarVocacion(vocId, btn) {
 /* ---- COMPRA DE CONSUMIBLE (POST comprar_consumible) ----
    El catalogo de la tienda se retiro en T5, asi que esta pagina ya no
    invoca comprarConsumible: queda como helper de compra disponible para
-   flujos que lo enganchen (mercado.js, referredos). NO borrar sin grep. */
+   flujos que lo enganchen (referredos). NO borrar sin grep. */
 function comprarConsumible(clave, btn) {
   var u = sesion();
   if(!u) return;
@@ -2902,614 +2757,6 @@ function comprarConsumible(clave, btn) {
     });
 }
 
-/* ---- SUMIDEROS DE XP: slots de contenido (ADR-086 / TSK-184) ----------------
-   El precio NO es fijo. El motor cobra
-     costo(k) = costo_base_xp * (1 + alpha * k) ^ gamma
-   con k = historial del usuario ESE sumidero (slots comprados, activos o no), y
-   comprar sube k. Por eso este modulo:
-     - pinta el precio del PROXIMO slot (costo_proximo, calculado por el motor),
-       nunca costo_base_xp presentado como si fuera el precio;
-     - ensena la curva y el k real del usuario ANTES del boton de pagar;
-     - recuerda que el precio pagado queda congelado en la fila comprada, asi que
-       soltar y recomprar NO vuelve al precio inicial.
-
-   ADR-003: cada tarjeta se crea UNA vez con su esqueleto fijo y se actualiza por
-   id. Cambiar de pestana o refrescar no borra ni un nodo. La unica lista que se
-   reescribe es la de slots ya comprados, que no lleva ids.
-   ADR-002: cero bytes > 127 y cero backticks en este bloque.
-   El disponible NO se calcula aqui: el motor es la unica verdad del saldo.
-   Ningun estado se inventa tampoco: si el motor no manda disponible_xp, no se
-   pinta saldo, porque xp_total NO baja al comprar (ADR-018) y usarlo como
-   saldo seria una cifra que miente en cuanto el usuario compre. */
-var PF_SLOT_CLAVE = /^[a-z0-9_]+$/;
-var pfSlotsCat = null;
-var pfSlotsMios = {};
-var pfSlotsSaldoTras = null;
-/* El enganche elegido por sumidero (ref_id). Lo alimenta pfSlotsElegir() desde
-   la lectura de slot_refs: el mapa guarda el UUID VERBATIM que devuelve el
-   servidor, sin reescribir ni normalizar, porque el motor lo castea a uuid. */
-var pfSlotsRefs = {};
-/* La lista cruda de candidatos y el estado de SU LECTURA, que son tres cosas
-   distintas y no se pueden colapsar en una:
-     cargando -> se esta leyendo. No se sabe si hay 0, y decir 0 seria mentir.
-     fallo    -> la rama es session-gated y no respondio. FAIL-CLOSED.
-     listo    -> la respuesta llego y se puede contar.
-   Sin esta separacion, un fallo de red se veria exactamente igual que "no
-   tienes recursos", que es el falso "comprable" que este bloque arregla. */
-var pfSlotsRefsRaw = null;
-var pfSlotsRefsEstado = 'cargando';
-var pfSlotsRefsError = '';
-
-function pfSlotsNum(v) {
-  if (v === null || v === undefined || v === '') return null;
-  var n = Number(v);
-  return isFinite(n) ? n : null;
-}
-function pfSlotsId(clave, sufijo) {
-  return 'pf-slot-' + (PF_SLOT_CLAVE.test(String(clave)) ? String(clave) : 'x') + '-' + sufijo;
-}
-function pfSlotsTxt(id, texto) {
-  var el = document.getElementById(id);
-  if (el) el.textContent = texto;
-}
-function pfSlotsBar(clave, sufijo, valor, max) {
-  var el = document.getElementById(pfSlotsId(clave, sufijo));
-  if (!el) return;
-  var pct = Math.max(0, Math.min(100, Math.round(((valor || 0) / max) * 100)));
-  el.style.width = pct + '%';
-}
-/* El disponible, en dos niveles y sin inventar nada:
-   1) disponible_xp del catalogo (slot_catalogo): lo calcula el motor en SQL
-      como xp_total - xp_gastado_sinks y ya descuenta lo gastado en sumideros.
-      Si llega como numero, manda.
-   2) disponible_restante que devuelve la compra: tambien del motor.
-   NO se cae a sesion().xp_total como antes: ese numero es reputacion y NO baja
-   al comprar, asi que usarlo como saldo congelaria la cifra para siempre.
-   Si ninguno de los dos llega, no hay saldo que pintar (null). */
-function pfSlotsSaldo() {
-  var d = pfSlotsNum(pfSlotsCat && pfSlotsCat.disponible_xp);
-  if (d !== null) return { valor: d, exacto: true };
-  var t = pfSlotsNum(pfSlotsSaldoTras);
-  if (t !== null) return { valor: t, exacto: true };
-  return { valor: null, exacto: false };
-}
-/* El nombre del campo de enganche lo publica el motor en ref_contrato.campo y
-   NO se escribe aqui ni una vez: se lee de a.ref_contrato. Un sumidero que
-   enganche a otra columna llega bien sin tocar este modulo, que es la misma
-   razon por la que aqui no hay ni una clave de sumidero. */
-function pfSlotsCampo(a) {
-  var rc = (a && a.ref_contrato && typeof a.ref_contrato === 'object') ? a.ref_contrato : null;
-  var c = rc && rc.campo ? String(rc.campo) : '';
-  return /^[a-z_][a-z0-9_]*$/.test(c) ? c : '';
-}
-/* Los recursos que YA tienen un slot activo comprado en este sumidero. La lista
-   de slot_mios trae el mismo campo de enganche, luego el cruce es de dato a
-   dato y no de codigo a codigo. */
-function pfSlotsUsados(clave, campo) {
-  var usados = {};
-  var filas = Array.isArray(pfSlotsMios[clave]) ? pfSlotsMios[clave] : [];
-  for (var i = 0; i < filas.length; i++) {
-    var f = filas[i];
-    if (!f || f.activo !== true) continue;
-    var v = f[campo];
-    if (v !== undefined && v !== null && v !== '') usados[String(v)] = true;
-  }
-  return usados;
-}
-/* Candidatos ELEGIBLES de este sumidero: los que publica la rama de lectura,
-   menos los que ya tienen un slot activo. Sin ese filtro, comprar dos veces
-   sobre el mismo recurso se ofrece en el menu y el motor lo cobra: no es un
-   fallo del servidor, es un selector que no se entero de lo que ya paso. Si el
-   usuario suelta ese slot, vuelve a ser elegible, porque la fila queda con
-   activo = false. */
-function pfSlotsCandidatos(a) {
-  var campo = pfSlotsCampo(a);
-  if (!campo || !pfSlotsRefsRaw) return [];
-  var arr = Array.isArray(pfSlotsRefsRaw[a.clave]) ? pfSlotsRefsRaw[a.clave] : [];
-  var usados = pfSlotsUsados(a.clave, campo);
-  var out = [];
-  for (var i = 0; i < arr.length; i++) {
-    var r = arr[i];
-    if (!r || !r[campo]) continue;
-    if (usados[String(r[campo])]) continue;
-    out.push(r);
-  }
-  return out;
-}
-/* El enganche vigente, y se auto-corrige en cada llamada y en un solo sentido:
-   si lo elegido ya no esta entre los candidatos, cae al primero; si no hay
-   ninguno, se vacia. Es lo que hace que el boton que se ve y el corte que
-   impide la peticion no puedan discrepar, porque los dos leen aqui. */
-function pfSlotsElegido(a) {
-  var campo = pfSlotsCampo(a);
-  var cands = pfSlotsCandidatos(a);
-  var el = pfSlotsRefs[a.clave] ? String(pfSlotsRefs[a.clave]) : '';
-  var sigue = false;
-  for (var i = 0; i < cands.length; i++) {
-    if (String(cands[i][campo]) === el) { sigue = true; break; }
-  }
-  if (!sigue) {
-    if (cands.length) { pfSlotsRefs[a.clave] = String(cands[0][campo]); el = pfSlotsRefs[a.clave]; }
-    else { delete pfSlotsRefs[a.clave]; el = ''; }
-  }
-  return el || null;
-}
-/* La etiqueta legible de un candidato. Dos recursos con el mismo nombre no se
-   distinguen en un menu, asi que se suma la ciudad cuando el motor la manda; no
-   se inventa ningun campo, se lee el que vino. */
-function pfSlotsEtiqueta(r) {
-  var t = (r && r.etiqueta) ? String(r.etiqueta) : 'Sin nombre';
-  return (r && r.ciudad) ? t + ' - ' + String(r.ciudad) : t;
-}
-/* Estado de compra de UN sumidero. Fuente unica de verdad: lo pinta la fila y
-   lo consulta el handler ANTES de tocar la red, de modo que la guarda y lo que
-   se ve son el mismo calculo y no pueden discrepar.
-   Regla dura: aqui NO se enumera ningun sumidero, ni su clave, ni el nombre del
-   campo de enganche. Todo se lee de lo que manda el motor (puede_comprar,
-   ref_contrato.comprable, ref_contrato.motivo_soporte, topes, disponible_xp),
-   luego un sumidero puede volverse comprable sin tocar una linea de aqui, que es
-   justo lo que esta pasando con el enganche a destinos. */
-function pfSlotsEstado(a) {
-  var st = { boton: '', motivo: '', tecnico: '', listo: false, ref: null,
-    etiqueta: '', prox: null, saldo: null, topeH: false, topeA: false,
-    candidatos: [], elegido: null };
-  if (!a || typeof a !== 'object') return st;
-  var rc = (a.ref_contrato && typeof a.ref_contrato === 'object') ? a.ref_contrato : null;
-  var base = pfSlotsNum(a.costo_base_xp);
-  var k = pfSlotsNum(a.k_historico);
-  var ka = pfSlotsNum(a.k_activos);
-  var sMax = pfSlotsNum(a.slot_max);
-  var sMaxA = pfSlotsNum(a.slot_max_activos);
-  st.ref = rc;
-  st.etiqueta = (rc && rc.etiqueta) ? String(rc.etiqueta) : '';
-  st.prox = pfSlotsNum(a.costo_proximo);
-  st.saldo = pfSlotsSaldo();
-  st.base = base;
-  st.k = k;
-  st.ka = ka;
-  st.sMax = sMax;
-  st.sMaxA = sMaxA;
-  /* Sin sesion no hay k, ni topes, ni precio: solo se ofrece entrar. */
-  if (k === null || ka === null || st.prox === null) {
-    st.boton = 'Inicia sesion';
-    st.motivo = 'Entra con tu cuenta para ver cuanto costaria ampliar este sumidero.';
-    return st;
-  }
-  st.topeH = sMax !== null && k >= sMax;
-  st.topeA = sMaxA !== null && ka >= sMaxA;
-  st.alcanza = st.saldo.valor === null || st.saldo.valor >= st.prox;
-  /* Sin soporte el motor RECHAZA la compra. Eso no es un error de la pagina ni
-     un fallo de red: es un sumidero todavia no comprable, y se muestra como tal.
-     El tecnico (motivo_soporte) queda como detalle, nunca como el mensaje. */
-  if (!rc || rc.comprable !== true) {
-    st.boton = 'No comprable todavia';
-    st.motivo = 'Este sumidero todavia no se puede ampliar: falta saber a que se '
-      + 'engancha y el servidor no puede comprobarlo, asi que cobrar por el crearia '
-      + 'una fila que no apunta a nada.';
-    st.tecnico = (rc && rc.motivo_soporte) ? String(rc.motivo_soporte) : '';
-    return st;
-  }
-  if (st.topeH) {
-    st.boton = 'Tope historico alcanzado';
-    st.motivo = 'Llegaste al tope historico de este sumidero.';
-    return st;
-  }
-  if (st.topeA) {
-    st.boton = 'Tope de activos alcanzado';
-    st.motivo = 'Llegaste al tope de slots activos. Suelta uno para seguir.';
-    return st;
-  }
-  if (!st.alcanza) {
-    st.boton = 'XP insuficiente';
-    st.motivo = 'Te faltan ' + fmtXp(st.prox - st.saldo.valor) + ' XP para este slot.';
-    return st;
-  }
-  /* El enganche, en los tres estados que se distinguen a ojo. La etiqueta la
-     pone el motor, asi que el motivo dice el nombre real de lo que falta en vez
-     de un "no disponible" que no ayuda a nadie. En los tres casos el boton queda
-     deshabilitado: un boton que va a fallar al cobrar es peor que no tenerlo. */
-  var etq = st.etiqueta ? st.etiqueta.toLowerCase() : 'el recurso';
-  st.candidatos = pfSlotsCandidatos(a);
-  st.elegido = pfSlotsElegido(a);
-  if (pfSlotsRefsEstado === 'cargando') {
-    st.boton = 'Leyendo ' + etq;
-    st.motivo = 'Estamos mirando que ' + etq + ' tienes para engancharle el slot. Un momento.';
-    return st;
-  }
-  if (pfSlotsRefsEstado === 'fallo') {
-    st.boton = 'No se pudo leer ' + etq;
-    st.motivo = 'No se pudo comprobar que ' + etq + ' tienes, asi que la compra queda cerrada '
-      + 'mientras tanto: sin saber a que se engancha, cobrar seria vender algo que no se puede entregar.';
-    st.tecnico = pfSlotsRefsError;
-    return st;
-  }
-  if (!st.candidatos.length) {
-    st.boton = 'Aun no tienes ' + etq;
-    st.motivo = 'Este slot se engancha a ' + etq + ' y tu cuenta no tiene ninguna activa todavia. '
-      + 'Cuando tengas una, vuelve a esta pestana y aparecera aqui para elegirla.';
-    return st;
-  }
-  st.boton = 'Comprar por ' + fmtXp(st.prox) + ' XP';
-  /* puede_comprar del motor manda sobre cualquier derivacion local: si el
-     servidor dice que no, aqui no se pinta un boton vivo. */
-  st.listo = a.puede_comprar !== false;
-  if (!st.listo) st.motivo = 'El motor todavia no habilita esta compra.';
-  return st;
-}
-function pfSlotsEsqueleto(clave) {
-  return '<div class="sl-card" id="' + pfSlotsId(clave, 'card') + '">'
-    + '<div class="sl-n" id="' + pfSlotsId(clave, 'n') + '"></div>'
-    + '<div class="sl-topes">'
-      + '<span class="sl-top" id="' + pfSlotsId(clave, 'top-h') + '"></span>'
-      + '<span class="sl-top" id="' + pfSlotsId(clave, 'top-a') + '"></span>'
-    + '</div>'
-    + '<div class="sl-precio">'
-      + '<div class="sl-precio-lbl">Lo que pagas ahora</div>'
-      + '<div class="sl-precio-v" id="' + pfSlotsId(clave, 'px') + '"></div>'
-      + '<div class="sl-precio-base" id="' + pfSlotsId(clave, 'base') + '"></div>'
-      + '<div class="sl-siguiente" id="' + pfSlotsId(clave, 'sig') + '"></div>'
-    + '</div>'
-    + '<div class="sl-bars">'
-      + '<div class="sl-bar base"><span>Inicial</span><i id="' + pfSlotsId(clave, 'bar-b') + '"></i></div>'
-      + '<div class="sl-bar prox"><span>Ahora</span><i id="' + pfSlotsId(clave, 'bar-p') + '"></i></div>'
-    + '</div>'
-    + '<div class="sl-crece" id="' + pfSlotsId(clave, 'crece') + '"></div>'
-    + '<div class="sl-hielo" id="' + pfSlotsId(clave, 'hielo') + '"></div>'
-    + '<div class="sl-ref" id="' + pfSlotsId(clave, 'ref') + '"></div>'
-    + '<div class="sl-mios" id="' + pfSlotsId(clave, 'mios') + '"></div>'
-    + '<div class="sl-cta">'
-      + '<button type="button" class="sl-btn" id="' + pfSlotsId(clave, 'btn') + '" data-clave="' + esc(clave) + '">Comprar</button>'
-      + '<span class="sl-motivo" id="' + pfSlotsId(clave, 'motivo') + '"></span>'
-    + '</div>'
-    + '</div>';
-}
-function pfSlotsFila(a) {
-  var clave = a.clave;
-  var st = pfSlotsEstado(a);
-  var base = st.base;
-  var k = st.k;
-  var prox = st.prox;
-
-  pfSlotsTxt(pfSlotsId(clave, 'n'), a.etiqueta || clave);
-
-  var th = document.getElementById(pfSlotsId(clave, 'top-h'));
-  if (th) {
-    th.textContent = st.sMax === null || k === null ? 'Slots: sin tope'
-      : 'Slots: ' + k + ' de ' + st.sMax;
-    th.className = 'sl-top' + (st.topeH ? ' limite' : '');
-  }
-  var ta = document.getElementById(pfSlotsId(clave, 'top-a'));
-  if (ta) {
-    ta.textContent = st.sMaxA === null || st.ka === null ? 'Activos: sin tope'
-      : 'Activos: ' + st.ka + ' de ' + st.sMaxA;
-    ta.className = 'sl-top' + (st.topeA ? ' limite' : '');
-  }
-
-  var topeH = st.topeH;
-  var topeA = st.topeA;
-
-  pfSlotsTxt(pfSlotsId(clave, 'px'), prox === null ? 'Inicia sesion' : fmtXp(prox) + ' XP');
-
-  var baseEl = document.getElementById(pfSlotsId(clave, 'base'));
-  if (baseEl) {
-    baseEl.innerHTML = base === null ? ''
-      : 'Precio inicial <s>' + fmtXp(base) + ' XP</s>'
-        + (k !== null && k > 0 ? ' (ya no es el que pagas)' : ' (este es el que pagas)');
-  }
-
-  /* El k+1, DEBAJO del precio actual y en pequeno (jerarquia: 25px gold el
-     actual, ~12px apagado el siguiente). Los tres casos se distinguen:
-       - undefined -> el catalogo no trae el campo: no se inventa nada.
-       - null      -> el motor dice que k+1 supera slot_max: NO hay proximo, y
-                      se dice con palabras. Nunca 0, NaN ni un "--" ambiguo.
-       - numero    -> el precio real del slot k+1, tal cual lo manda. */
-  var sigEl = document.getElementById(pfSlotsId(clave, 'sig'));
-  if (sigEl) {
-    if (a.costo_siguiente === undefined) sigEl.textContent = '';
-    else {
-      var sig = pfSlotsNum(a.costo_siguiente);
-      sigEl.textContent = sig === null ? 'No hay proximo slot en este sumidero.'
-        : 'El siguiente costara ' + fmtXp(sig) + ' XP.';
-    }
-  }
-
-  var max = Math.max(base || 0, prox || 0) || 1;
-  pfSlotsBar(clave, 'bar-b', base || 0, max);
-  pfSlotsBar(clave, 'bar-p', prox || 0, max);
-
-  /* La explicacion del crecimiento va ANTES del boton: el usuario tiene que ver
-     por que paga mas que el precio inicial antes de confirmar. Los numeros son
-     del motor; aqui solo se hace el porcentaje de comparacion. */
-  var creEl = document.getElementById(pfSlotsId(clave, 'crece'));
-  if (creEl) {
-    creEl.innerHTML = '';
-    if (k === null) {
-      creEl.textContent = 'Entra con sesion para ver cuanto costaria tu proximo slot.';
-    } else if (base !== null && prox !== null && base > 0 && prox > base) {
-      var subida = Math.round(((prox - base) / base) * 100);
-      creEl.innerHTML = 'Este slot <b>ya no cuesta el precio inicial</b>: +' + subida
-        + '% porque tu historial en este sumidero va en <b>k = ' + k + '</b>.';
-    } else if (k > 0) {
-      creEl.innerHTML = 'Historial en este sumidero: <b>k = ' + k + '</b>.';
-    } else {
-      creEl.innerHTML = 'Primer slot en este sumidero (<b>k = 0</b>): pagas el precio inicial.';
-    }
-  }
-
-  var hEl = document.getElementById(pfSlotsId(clave, 'hielo'));
-  if (hEl) {
-    hEl.innerHTML = 'Lo que pagues aqui queda <b>congelado</b> en su fila y no sube despues. '
-      + 'Si sueltas el slot y lo recompras, pagas lo que toque en ese momento, no el precio inicial.';
-  }
-
-/* El enganche: ref_contrato.etiqueta es lo que el usuario tiene que LEER, asi
-     que va como rotulo y el texto lo pone el motor. El bloque PASA a ser el
-     selector de verdad cuando la lista llega: tres formas y ninguna mas, porque
-     el pool real es de 1 a 3. Sin soporte se dice sin nombres de tabla ni de
-     campo, que es jerga tecnica y se queda en el detalle de abajo. */
-  var refEl = document.getElementById(pfSlotsId(clave, 'ref'));
-  if (refEl) {
-    var etq = st.etiqueta ? st.etiqueta.toLowerCase() : 'el recurso';
-    var campo = pfSlotsCampo(a);
-    var selId = pfSlotsId(clave, 'sel');
-    if (!st.ref) {
-      refEl.className = 'sl-ref';
-      refEl.textContent = '';
-    } else if (st.ref.comprable !== true) {
-      refEl.className = 'sl-ref';
-      refEl.innerHTML = 'Este sumidero <b>aun no admite Slots</b>: falta a que se '
-        + 'engancha y el servidor todavia no puede validarlo.';
-    } else if (pfSlotsRefsEstado === 'cargando') {
-      refEl.className = 'sl-ref';
-      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>: revisando cuales tienes.';
-    } else if (pfSlotsRefsEstado === 'fallo') {
-      refEl.className = 'sl-ref';
-      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>: no se pudo revisar cuales tienes, '
-        + 'asi que aqui no se puede ampliar todavia.';
-    } else if (!st.candidatos.length) {
-      refEl.className = 'sl-ref';
-      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>, y ahora mismo no tienes ninguna activa '
-        + 'para engancharle el slot.';
-    } else if (st.candidatos.length === 1) {
-      refEl.className = 'sl-ref con-sel';
-      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>. Ya esta elegida:'
-        + '<span class="sl-auto">' + esc(pfSlotsEtiqueta(st.candidatos[0])) + '</span>';
-    } else {
-      var ops = '';
-      for (var i = 0; i < st.candidatos.length; i++) {
-        var rr = st.candidatos[i];
-        var vv = campo ? String(rr[campo]) : '';
-        ops += '<option value="' + esc(vv) + '"' + (vv === st.elegido ? ' selected' : '') + '>'
-          + esc(pfSlotsEtiqueta(rr)) + '</option>';
-      }
-      refEl.className = 'sl-ref con-sel';
-      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>. Elige de ' + st.candidatos.length + ' tuyos.'
-        + '<label class="sl-pick-lbl" for="' + selId + '">Recurso que se va a destacar</label>'
-        + '<select class="sl-sel" id="' + selId + '" data-clave="' + esc(clave) + '">' + ops + '</select>';
-    }
-  }
-
-  var mEl = document.getElementById(pfSlotsId(clave, 'mios'));
-  if (mEl) {
-    var filas = Array.isArray(pfSlotsMios[clave]) ? pfSlotsMios[clave] : [];
-    var chips = filas.map(function (f) {
-      var pagado = pfSlotsNum(f.costo_pagado);
-      return '<span class="sl-chip ' + (f.activo === true ? 'pagado' : 'soltado') + '">slot '
-        + esc(String(f.slot_index)) + ' - ' + fmtXp(pagado === null ? 0 : pagado) + ' XP</span>';
-    });
-    mEl.innerHTML = '<div class="sl-mios-l">Ya comprados (precio congelado)'
-      + (chips.length ? chips.join('') : '<span class="sl-chip">ninguno todavia</span>') + '</div>';
-  }
-
-  /* El boton se desactiva con disabled Y con la etiqueta que explica por que.
-     El atributo es pintura: la garantia de que no sale una peticion esta en
-     pfSlotsComprar(), que vuelve a calcular este mismo estado y corta. */
-  var btn = document.getElementById(pfSlotsId(clave, 'btn'));
-  if (btn) {
-    btn.disabled = !st.listo;
-    btn.textContent = st.boton;
-  }
-  var motivo = document.getElementById(pfSlotsId(clave, 'motivo'));
-  if (motivo) {
-    motivo.innerHTML = st.motivo ? esc(st.motivo) : '';
-    if (st.tecnico) motivo.innerHTML += '<span class="sl-motivo-tec">' + esc(st.tecnico) + '</span>';
-    motivo.className = 'sl-motivo' + (topeH || topeA ? ' limite' : '');
-  }
-  var card = document.getElementById(pfSlotsId(clave, 'card'));
-  if (card) card.className = 'sl-card' + (st.listo ? '' : ' bloqueada');
-}
-function pfSlotsPintar() {
-  var box = document.getElementById('pf-slots');
-  if (!box) return;
-  var cat = pfSlotsCat;
-  /* Un catalogo de 0 sumideros NO es "no tienes slots": es un fallo de lectura y
-     tiene que verse, no quedarse en blanco. */
-  if (!cat || cat.ok !== true || !Array.isArray(cat.data) || !cat.data.length) {
-    box.innerHTML = '<div class="sl-err">No se pudo leer el catalogo de sumideros. Recarga la pagina.</div>';
-    return;
-  }
-  if (!document.getElementById('pf-slots-grid')) {
-    var curva = cat.curva || {};
-    box.innerHTML = '<div class="sl-curva">'
-      + '<div class="sl-saldo"><span class="sl-saldo-k">Disponible</span>'
-      + '<span class="sl-saldo-v" id="pf-slots-saldo">lo confirma el motor</span>'
-      + '<span class="sl-saldo-av" id="pf-slots-aviso"></span></div>'
-      + (curva.formula ? '<div>Crecimiento del precio: <code>' + esc(curva.formula) + '</code></div>' : '')
-      + (curva.k ? '<div>k = ' + esc(curva.k) + '</div>' : '')
-      + (curva.congelado ? '<div>' + esc(curva.congelado) + '</div>' : '')
-      + '</div><div class="sl-grid" id="pf-slots-grid"></div>';
-    document.getElementById('pf-slots-grid').addEventListener('click', function (ev) {
-      var b = ev.target && ev.target.closest ? ev.target.closest('.sl-btn') : null;
-      if (b) pfSlotsComprar(b.getAttribute('data-clave'));
-    });
-    /* Un solo delegador para todos los desplegables, registrado junto al de los
-       botones y una sola vez: el contenedor no se recrea, luego cada
-       re-render del selector lo sobrevive sin volver a enganchar nada
-       (ADR-003). El <select> se escribe con el UUID del servidor como value,
-       tal cual, porque eso es lo que viaja en el POST. */
-    document.getElementById('pf-slots-grid').addEventListener('change', function (ev) {
-      var s = ev.target && ev.target.closest ? ev.target.closest('select[data-clave]') : null;
-      if (!s) return;
-      pfSlotsRefs[s.getAttribute('data-clave')] = String(s.value || '');
-      /* No se decide aqui si eso habilita el boton: se anota, se repinta la
-         tarjeta entera y lo decide pfSlotsEstado, que es el mismo calculo que
-         usa el corte de compra. Un solo camino para la verdad. */
-      pfSlotsPintar();
-    });
-  }
-  var saldo = pfSlotsSaldo();
-  var saldoEl = document.getElementById('pf-slots-saldo');
-  if (saldoEl) {
-    /* Solo disponible_xp del motor (o el disponible_restante que devuelve la
-       compra). Sin numero no se pinta nada: xp_total NO baja al comprar, asi que
-       usarlo aqui seria un saldo congelado que miente. */
-    saldoEl.textContent = saldo.valor === null
-      ? 'el motor lo confirma al cobrar'
-      : fmtXp(saldo.valor) + ' XP';
-  }
-  var avEl = document.getElementById('pf-slots-aviso');
-  if (avEl) {
-    avEl.textContent = saldo.valor === null
-      ? '(aun no llega del motor)' : '';
-  }
-  cat.data.forEach(function (a) {
-    if (!document.getElementById(pfSlotsId(a.clave, 'card')))
-      document.getElementById('pf-slots-grid').insertAdjacentHTML('beforeend', pfSlotsEsqueleto(a.clave));
-    pfSlotsFila(a);
-  });
-}
-function pfSlotsCargarMios(uid, clave) {
-  return fetchConJwt('/api/interacciones?tipo=slot_mios&usuario_id='
-    + encodeURIComponent(uid) + '&clave=' + encodeURIComponent(clave))
-    .then(function (res) {
-      pfSlotsMios[clave] = (res && res.ok === true && Array.isArray(res.data)) ? res.data : [];
-      return null;
-    })
-    .catch(function () { pfSlotsMios[clave] = []; return null; });
-}
-/* Lectura de los recursos elegibles. La rama es session-gated: sin sesion
-   responde 401 y sin tabla 409, luego este unico manejador cubre los dos.
-   FAIL-CLOSED: si no llega una respuesta con refs, NO se pintan candidatos. Una
-   lista vacia seria indistinguible de "no tienes recursos" y dejaria el boton
-   apuntando a un ref_id que nadie ha visto. */
-function pfSlotsCargarRefs() {
-  pfSlotsRefsEstado = 'cargando';
-  /* Sin usuario_id: la rama lo toma de la sesion, y mandarlo seria abrir la
-     puerta a que el parametro y la sesion discrepen. */
-  return fetchConJwt('/api/interacciones?tipo=slot_refs')
-    .then(function (res) {
-      if (!res || res.ok !== true || !res.refs || typeof res.refs !== 'object') {
-        pfSlotsRefsRaw = null;
-        pfSlotsRefsEstado = 'fallo';
-        pfSlotsRefsError = (res && res.error) ? String(res.error) : '';
-        return null;
-      }
-      pfSlotsRefsRaw = res.refs;
-      pfSlotsRefsError = '';
-      pfSlotsRefsEstado = 'listo';
-      return null;
-    })
-    .catch(function () {
-      pfSlotsRefsRaw = null;
-      pfSlotsRefsEstado = 'fallo';
-      return null;
-    });
-}
-function pfSlotsCargar(uid) {
-  var box = document.getElementById('pf-slots');
-  if (!box || !uid) return;
-  /* Las dos lecturas van en paralelo y la tarjeta se repinta al final, cuando
-     ambas respondieron: pintar el catalogo antes de tener los recursos daria un
-     "comprable" con la lista vacia debajo, que es justo el falso que hay que
-     evitar. La primera pintada, con la lista en curso, ya dice "Leyendo...". */
-  var catP = fetchConJwt('/api/interacciones?tipo=slot_catalogo&usuario_id=' + encodeURIComponent(uid))
-    .then(function (res) {
-      if (!res || res.ok !== true) { pfSlotsCat = null; return null; }
-      pfSlotsCat = res;
-      pfSlotsPintar();
-      var claves = (res.data || []).map(function (a) { return a.clave; });
-      if (!claves.length) return null;
-      return Promise.all(claves.map(function (c) { return pfSlotsCargarMios(uid, c); }));
-    });
-  return Promise.all([catP, pfSlotsCargarRefs()])
-    .then(function () { pfSlotsPintar(); })
-    .catch(function () {});
-}
-function pfSlotsMotivo(codigo, res) {
-  var extra = res && res.costo_requerido !== undefined && res.costo_requerido !== null
-    ? ' (' + fmtXp(pfSlotsNum(res.costo_requerido) || 0) + ' XP)' : '';
-  if (codigo === 'XP_INSUFICIENTE') return 'XP insuficiente' + extra;
-  if (codigo === 'TOPE_HISTORICO') return 'Alcanzaste el tope historico de este sumidero';
-  if (codigo === 'TOPE_ACTIVOS') return 'Alcanzaste el tope de slots activos';
-  if (codigo === 'SINK_INEXISTENTE') return 'Ese slot ya no existe en el catalogo';
-  if (codigo === 'SINK_INACTIVO') return 'Ese slot esta desactivado';
-  /* REF_NO_EXISTE_O_SIN_PERMISOS es el MISMO codigo para inexistente y ajeno a
-     proposito: distinguirlos seria un oraculo para enumerar que recursos tienen
-     otros. Se muestra como un caso unico. */
-  if (codigo === 'REF_NO_EXISTE_O_SIN_PERMISOS')
-    return 'El recurso indicado no existe o no pertenece a tu cuenta';
-  /* El motor puede responder esto si alguien fuerza el POST a mano sin
-     enganche. Se explica igual que en el catalogo. */
-  if (codigo === 'SINK_REFSIN_SOPORTE')
-    return 'Este sumidero todavia no es comprable: falta a que se engancha y el servidor no puede validarlo';
-  /* El texto que ya llega traducido del servidor manda sobre cualquier etiqueta
-     propia: el codigo es para maquinas, el error es para el usuario. */
-  return (res && res.error) ? String(res.error)
-    : (codigo ? 'No se pudo comprar: ' + codigo : 'No se pudo comprar');
-}
-/* El enganche que se envia: el UUID VERBATIM de la respuesta, sin reescribir ni
-   normalizar. El motor lo castea a uuid, luego tocarlo aqui lo rompe. Sin
-   eleccion devuelve null y la compra se corta antes de la red. */
-function pfSlotsRef(clave) {
-  return pfSlotsRefs[clave] || null;
-}
-function pfSlotsComprar(clave) {
-  /* CORTE ANTES DE LA RED. No es una mejora de estilo: un boton que parece
-     apagado pero sigue llamando al servidor es un fallo, porque alguien paga por
-     un slot que el motor va a rechazar o, peor, que no sabe a que engancharse.
-     Se recalcula el estado con la MISMA funcion que pinta la tarjeta, de modo que
-     guarda y pantalla no pueden discrepar, y se sale sin fetch. Se avisa con el
-     motivo real para que el usuario sepa por que no pasa nada. */
-  var fila = null;
-  var lista = (pfSlotsCat && Array.isArray(pfSlotsCat.data)) ? pfSlotsCat.data : [];
-  for (var i = 0; i < lista.length; i++) {
-    if (lista[i] && lista[i].clave === clave) { fila = lista[i]; break; }
-  }
-  var st = pfSlotsEstado(fila);
-  if (!st.listo) {
-    showToast(st.motivo || 'Esta compra no esta disponible todavia.', '#fcd34d');
-    return null;
-  }
-  var btn = document.getElementById(pfSlotsId(clave, 'btn'));
-  var previo = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Comprando...'; }
-  return fetchConJwt('/api/interacciones', {
-    method: 'POST',
-    body: JSON.stringify({ tipo: 'slot_comprar', clave: clave, ref_id: pfSlotsRef(clave) })
-  }).then(function (res) {
-    var u = sesion();
-    if (res && res.ok === true) {
-      var pagado = pfSlotsNum(res.costo_pagado);
-      pfSlotsSaldoTras = pfSlotsNum(res.disponible_restante);
-      showToast('Slot comprado. Precio congelado: '
-        + (pagado === null ? 'confirmado' : fmtXp(pagado) + ' XP'));
-    } else {
-      showToast(pfSlotsMotivo((res && res.error) || '', res), '#ef4444');
-      if (btn) { btn.disabled = false; btn.textContent = previo; }
-    }
-    /* Tras comprar se relee TODO, y el orden importa: primero los slots ya
-       comprados (que es lo que deja de ser elegible el recurso que se acaba de
-       comprar) y despues la lista de recursos, en la misma pasada. Si ese
-       recurso era el ultimo, la tarjeta cae sola al estado "aun no tienes" y el
-       boton queda deshabilitado: no queda un boton vivo apuntando a algo que ya
-       se gasto. */
-    if (u && u.id) { pfSlotsCargar(u.id); cargarInventario(u.id); }
-  }).catch(function () {
-    showToast('Error de conexion', '#ef4444');
-    if (btn) { btn.disabled = false; btn.textContent = previo; }
-  });
-}
-
 /* ---- MI INVENTARIO (Gamificacion v4) ---- */
 /* ADR-110: filtros de la COLECCION. Solo conmutan display de los bloques
    .pf-col-bloque; ningun ID sale del DOM (ADR-003). 'todas' los muestra todos. */
@@ -3528,6 +2775,11 @@ function pfColFiltrar(tipo) {
     bts[i].setAttribute('aria-pressed', String(bts[i].getAttribute('data-col-f') || '') === t ? 'true' : 'false');
   }
 }
+/* Ficha de CONSUMIBLES: v61CartasCache solo contiene CARTAS, asi que la clave
+   del catalogo (consumible_* / ancestral_*) no se resuelve nunca alli. Al pintar
+   la rejilla se guarda aqui, por CLAVE, el objeto que espera CartasUI.abrirFicha,
+   y v61FichaDesde lo consulta cuando data-c-ficha-sup="consumible". */
+var pfInvFicha = {};
 function cargarInventario(uid) {
   var el = document.getElementById('pf-inventario');
   var balance = document.getElementById('pf-xp-balance');
@@ -3539,6 +2791,8 @@ function cargarInventario(uid) {
       var data = (res && res.data) || {};
       if(data.xp_total != null && balance) balance.textContent = fmtXp(data.xp_total) + ' XP de reputacion';
       var consumibles = data.consumibles || {};
+      pfInvFicha = {};
+      pfInvNota = {};
       var claves = Object.keys(consumibles).filter(function(k){
         var item = consumibles[k] || {};
         return (parseInt(item.cantidad, 10) || 0) > 0;
@@ -3567,6 +2821,25 @@ function cargarInventario(uid) {
         var qtyTag = '<div class="inv-qty">x' + qty + '</div>';
         var tags = eraTag + facTag;
         var usarBtn = '<button class="inv-use" onclick="usarConsumible(\'' + esc(k) + '\',this)">Usar</button>';
+        /* Objeto de ficha por CLAVE. descripcion puede no venir todavia (el
+           backend la esta extendiendo): con '' el modulo CartasUI pinta su
+           texto de respaldo, asi que nunca se promete prosa que no exista
+           (ADR-008). imagen_url null: la lamina la resuelve CartasArte. */
+        pfInvFicha[String(k)] = {
+          id: String(k),
+          nombre: String(nombre),
+          descripcion: item.descripcion || '',
+          cantidad: qty,
+          imagen_url: null
+        };
+        var fichaAttrs = v61FichaAttrs(k, 'base', 'consumible');
+        /* Nota de la ficha: solo lo que EXISTE (era / faccion requerida). El
+           objeto de pfInvFicha lleva solo los campos del contrato. */
+        var notaFicha = '';
+        if (item.era_exclusiva) notaFicha = 'Era ' + String(item.era_exclusiva);
+        var facReq = (item.faccion_requerida != null) ? String(item.faccion_requerida).trim() : '';
+        if (facReq) notaFicha += (notaFicha ? ' - ' : '') + pfFacFaccionTxt(item);
+        pfInvNota[String(k)] = notaFicha;
         var slot = '';
         if (hayArte) {
           try {
@@ -3574,7 +2847,7 @@ function cargarInventario(uid) {
           } catch (e) { slot = ''; }
         }
         if (!slot) {
-          return '<div class="inv-item">'
+          return '<div class="inv-item"' + fichaAttrs + '>'
             + qtyTag
             + '<div class="inv-name">' + esc(nombre) + tags + '</div>'
             + usarBtn
@@ -3582,8 +2855,13 @@ function cargarInventario(uid) {
         }
         /* Con lamina el nombre va horneado en el PNG (ADR-112) y en el hueco lo
            escribe el propio placeholder: debajo queda solo lo dinamico que el
-           arte no puede llevar (cantidad, etiquetas y uso). */
-        return '<div class="v61-card">'
+           arte no puede llevar (cantidad, etiquetas y uso).
+           El consumible SI abre ficha: lleva los mismos atributos que una carta
+           de Mis Cartas, pero con data-c-ficha-sup="consumible" para que la
+           resolucion vaya por pfInvFicha (por CLAVE) y no por v61CartasCache.
+           Sin el modulo cargado v61FichaAttrs devuelve '' y el markup queda
+           exactamente como antes (degradacion ADR-008). */
+        return '<div class="v61-card"' + fichaAttrs + '>'
           + '<div class="c-card c-card--lg">' + slot + '</div>'
           + '<div class="inv-item">' + qtyTag + tags + usarBtn + '</div>'
           + '</div>';
@@ -3964,54 +3242,6 @@ function pfFacUsar(clave, btn) {
   });
 }
 
-/* ---- BONO DE BIENVENIDA POR REFERIDO (feature referidos) ----
-   GET tipo=bonus_referido. Solo muestra la tarjeta cuando hay bono
-   pendiente y aun sin reclamar. El selector de opciones NO se
-   reimplementa aqui: lo provee usuario-session.js via
-   window.ExploraCO.mostrarSelectorBonoReferido. Degrada en silencio
-   (tarjeta oculta) si el endpoint falla o la funcion no existe. */
-function cargarBonoReferido(uid) {
-  var box = document.getElementById('pf-bono');
-  if (!box || !uid) return;
-  try {
-    fetchConJwt('/api/interacciones?tipo=bonus_referido&usuario_id=' + encodeURIComponent(uid))
-      .then(function(res){
-        try {
-          if (!(res && res.ok && res.pendiente === true && !res.reclamado_clave)) {
-            box.style.display = 'none';
-            return;
-          }
-          box.innerHTML = '<div class="pf-bono-ico">\uD83C\uDF81</div>'
-            + '<div class="pf-bono-txt">'
-            + '<div class="pf-bono-title">Tienes un bono de bienvenida</div>'
-            + '<div class="pf-bono-desc">Elige uno de los regalos por haber llegado con un referido. Solo puedes reclamarlo una vez.</div>'
-            + '</div>'
-            + '<button type="button" class="pf-bono-btn" onclick="pfElegirBono()">Elegir mi bono</button>';
-          box.style.display = 'flex';
-        } catch (eIn) {
-          console.warn('[mi-perfil] bono_referido render fallo: ' + (eIn && eIn.message));
-          box.style.display = 'none';
-        }
-      })
-      .catch(function(e){
-        console.warn('[mi-perfil] bono_referido no disponible: ' + (e && e.message));
-        box.style.display = 'none';
-      });
-  } catch (e) {
-    console.warn('[mi-perfil] bono_referido error: ' + (e && e.message));
-    box.style.display = 'none';
-  }
-}
-function pfElegirBono() {
-  var u = sesion();
-  if (!u || !u.id) return;
-  if (window.ExploraCO && typeof window.ExploraCO.mostrarSelectorBonoReferido === 'function') {
-    window.ExploraCO.mostrarSelectorBonoReferido({ id: u.id });
-  } else {
-    showToast('El selector de bono aun no esta disponible.', '#ef4444');
-  }
-}
-
 /* ---- MIS REGALIAS (regalias pasivas del autor) ----
    GET tipo=mis_regalias: filas por item + saldo total pendiente.
    Estados vacios discretos (nunca un error crudo). El boton Reclamar
@@ -4077,7 +3307,6 @@ function reclamarRegalias() {
       if (res && res.ok) {
         showToast('Reclamaste ' + fmtXp(Number(res.xp_otorgado) || 0) + ' XP de regalias');
         cargarMisRegalias(u.id);
-        cargarBonoReferido(u.id);
         if (typeof cargarSaldoXp === 'function') cargarSaldoXp();
         else if (typeof cargarPerfil === 'function') cargarPerfil();
         else if (typeof refrescarSesion === 'function') refrescarSesion();
@@ -4208,21 +3437,24 @@ function pfPedirDatoConsumible(clave) {
     }
   });
 }
+/* Devuelve la promesa del uso (true = efecto aplicado). Los llamadores de la
+   rejilla la ignoran, asi que su comportamiento no cambia; el boton de la FICHA
+   la usa para cerrar la ficha y repintar la rejilla sin reimplementar el flujo. */
 function usarConsumible(clave, btn) {
-  pfPedirDatoConsumible(clave).then(function(extra){
-    if (extra === null) return;
-    pfEnviarUsarConsumible(clave, btn, extra);
+  return pfPedirDatoConsumible(clave).then(function(extra){
+    if (extra === null) return false;
+    return pfEnviarUsarConsumible(clave, btn, extra);
   });
 }
 function pfEnviarUsarConsumible(clave, btn, extra) {
   var u = sesion();
-  if(!u) return;
+  if(!u) return Promise.resolve(false);
   btn.disabled = true;
   var origTxt = btn.textContent;
   btn.textContent = 'Usando\u2026';
   var body = { usuario_id: u.id, clave: clave };
   Object.keys(extra || {}).forEach(function(k){ body[k] = extra[k]; });
-  fetch('/api/interacciones?tipo=usar_consumible', {
+  return fetch('/api/interacciones?tipo=usar_consumible', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(body)
@@ -4232,16 +3464,18 @@ function pfEnviarUsarConsumible(clave, btn, extra) {
       if(res.ok) {
         showToast('Efecto aplicado: ' + formatearEfecto(res.efecto, clave));
         refrescarSesion();
-      } else {
-        showToast(res.error || 'No se pudo usar', '#ef4444');
-        btn.disabled = false;
-        btn.textContent = origTxt;
+        return true;
       }
+      showToast(res.error || 'No se pudo usar', '#ef4444');
+      btn.disabled = false;
+      btn.textContent = origTxt;
+      return false;
     })
     .catch(function(){
       showToast('Error de conexion', '#ef4444');
       btn.disabled = false;
       btn.textContent = origTxt;
+      return false;
     });
 }
 
@@ -7361,7 +6595,7 @@ function showToast(msg,color){
    La pestana activa vive en el hash (#clase, #museo...) y por defecto
    es PERFIL.
    ADR-085: tabla_destino es la unica pestana con data-nivel-requerido. */
-var PF_TABS = ['perfil','clase','red','museo','inventario','mercado','mensajes','contratos','cuenta','tabla_destino','marca'];
+var PF_TABS = ['perfil','clase','red','museo','inventario','mensajes','contratos','cuenta','tabla_destino','marca'];
 var PF_TAB_ACTIVO = 'perfil';
 var PF_TAB_SEGURA = 'perfil';
 function pfTabDesdeHash() {
@@ -7459,8 +6693,6 @@ function pfTab(tab) {
   if (tab === 'museo' && u && u.id) { cargarMuseoPreview(u.id); museoRefrescar(); }
   /* Coleccion (ADR-110): solo lo que el usuario POSEE. */
   if (tab === 'inventario' && u && u.id) { v61InstalarFichaDeleg(); cargarInventario(u.id); pfFacCargar(u.id); cargarCromos(u.id); cargarMisRegalias(u.id); cargarCartas(u.id); cargarMuseoCartas(); }
-  /* Mercado: compra y venta (slots, bono, cartas en venta, emprendedor, moneda). */
-  if (tab === 'mercado' && u && u.id) { pfSlotsCargar(u.id); cargarBonoReferido(u.id); if (window.Mercado) Mercado.cargarMi(); cargarMercadoCartas(); cargarMoneda(u.id); }
   if (tab === 'mensajes' && u && u.id) cargarMensajes(u.id);
   if (tab === 'contratos' && u && u.id) cargarContratos(u.id);
   if (tab === 'cuenta' && u) renderCuentaPanel();
@@ -8247,6 +7479,9 @@ function cargarCartas(uid) {
     });
     html += '</div>';
     box.innerHTML = html;
+    /* Las cartas ya estan en el DOM: la delegacion se instala aqui y no solo
+       desde pfTab, para que entrar directo por #inventario tambien abra ficha. */
+    v61InstalarFichaDeleg();
   }).catch(function () { box.innerHTML = '<div class="v61-err">No se pudieron cargar tus cartas.</div>'; });
 }
 /* ---- Album del Museo (Fase 5): vitrina de huecos + album completo ----------
@@ -8467,6 +7702,10 @@ function v61RenderMuseo(d, ui) {
   d = d || {};
   v61RenderVitrina(d, ui, v61MuseoMapa(d));
   v61RenderAlbum(d, ui);
+  /* La vitrina y el album tambien pintan cartas con data-c-ficha-abrir, asi que
+     la delegacion se reinstala tras el render (idempotente: el guard impide
+     listeners duplicados). */
+  v61InstalarFichaDeleg();
 }
 /* Carga del bloque. Sin argumento reutiliza la cache del GET ya hecho por
    cargarCartas(); si no hay cache ni peticion en vuelo, pide los datos. */
@@ -8559,13 +7798,59 @@ function v61FichaAcciones(c, variante, superficie) {
   }
   return html;
 }
+/* ---- Ficha de CONSUMIBLE (superficie "consumible") -----------------------
+   El objeto que recibe abrirFicha es el MISMO que se guardo en pfInvFicha al
+   pintar la rejilla, asi que ficha y rejilla no pueden discrepar. La nota sale
+   de pfInvNota (era / faccion) porque el objeto de la ficha solo lleva los
+   campos del contrato. Sin pfInvFicha[clave] se devuelve false: no se inventa
+   una ficha vacia. */
+var pfInvNota = {};
+function v61FichaConsumibleDesde(el) {
+  var clave = String(el.getAttribute('data-carta-id') || '');
+  var c = clave ? pfInvFicha[clave] : null;
+  if (!c) return false;
+  var qty = parseInt(c.cantidad, 10) || 0;
+  var opciones = {
+    contexto: 'coleccion',
+    cantidad: qty,
+    nota: (clave && pfInvNota[clave]) ? pfInvNota[clave] : '',
+    /* El boton vive DENTRO de la ficha: 'this' ya es el boton de la ficha y
+       v61UsarConsumibleFicha se encarga del cierre. La logica de uso NO se
+       duplica: se delega en usarConsumible. */
+    acciones: '<button type="button" class="v61-btn" onclick="v61UsarConsumibleFicha(\''
+      + esc(clave) + '\',this)">Usar</button>'
+  };
+  try { window.CartasUI.abrirFicha(c, opciones); return true; }
+  catch (e) { return false; }
+}
+/* Usar desde la FICHA: misma logica de siempre (usarConsumible). Solo si el
+   efecto se aplico se cierra la ficha y se repinta la rejilla: dejarla abierta
+   mostraria la cantidad anterior. */
+function v61UsarConsumibleFicha(clave, btn) {
+  var p = usarConsumible(clave, btn);
+  if (!p || typeof p.then !== 'function') return;
+  p.then(function (ok) {
+    if (ok === false) return;
+    var u = sesion();
+    try {
+      if (window.CartasUI && typeof window.CartasUI.cerrarFicha === 'function') {
+        window.CartasUI.cerrarFicha();
+      }
+    } catch (e) {}
+    if (u && u.id) cargarInventario(u.id);
+  }).catch(function () {});
+}
 function v61FichaDesde(el) {
   if (!el || typeof el.getAttribute !== 'function') return false;
   if (!v61FichaActiva()) return false;
-  var c = v61CartaPorId(el.getAttribute('data-carta-id'));
-  if (!c) return false;
   var varKey = el.getAttribute('data-carta-var') || 'base';
   var sup = String(el.getAttribute('data-c-ficha-sup') || 'coleccion').toLowerCase();
+  /* Superficie nueva "consumible": la clave del catalogo (consumible_* /
+     ancestral_*) NO vive en v61CartasCache, se resuelve en pfInvFicha. Es una
+     via mas dentro de la MISMA resolucion, no una segunda funcion de ficha. */
+  if (sup === 'consumible') return v61FichaConsumibleDesde(el);
+  var c = v61CartaPorId(el.getAttribute('data-carta-id'));
+  if (!c) return false;
   var opciones = {
     contexto: (sup === 'coleccion') ? 'coleccion' : 'album',
     acciones: v61FichaAcciones(c, varKey, sup)
@@ -8593,12 +7878,24 @@ function v61FichaDeleg(ev) {
   if (esTecla && typeof ev.preventDefault === 'function') ev.preventDefault();
   v61FichaDesde(cont);
 }
+/* IDEMPOTENTE y REINTENTABLE (bug del clic muerto en la Coleccion):
+   - si el modulo CartasUI aun no esta, devuelve false SIN escribir el guard,
+     asi el siguiente intento (otro render, el hash, la carga tardia del
+     script) si instala. Antes se marcaba y el intento temprano se perdia;
+   - el guard data-c-ficha-deleg="1" se escribe SOLO cuando los listeners
+     existen de verdad;
+   - removeEventListener antes de addEventListener: dos escuchas de la misma
+     funcion sobre el mismo host serian un bug latente (doble ficha). */
 function v61InstalarFichaDeleg() {
   if (!v61FichaActiva()) return false;
   var host = document.getElementById('pf-coleccion');
-  if (!host || host.getAttribute('data-c-ficha-deleg') === '1') return false;
+  if (!host) return false;
+  if (host.getAttribute('data-c-ficha-deleg') === '1') return true;
+  ['click', 'keydown'].forEach(function (tipo) {
+    host.removeEventListener(tipo, v61FichaDeleg, false);
+    host.addEventListener(tipo, v61FichaDeleg, false);
+  });
   host.setAttribute('data-c-ficha-deleg', '1');
-  ['click', 'keydown'].forEach(function (tipo) { host.addEventListener(tipo, v61FichaDeleg, false); });
   return true;
 }
 function v61MuseoRefrescar() {
@@ -8708,7 +8005,7 @@ function v61PublicarCarta(cartaId, cantMax, variante) {
     if (res && res.ok) {
       showToast('Carta publicada en venta');
       var u = sesion();
-      if (u) { cargarCartas(u.id); cargarMercadoCartas(); }
+      if (u) cargarCartas(u.id);
       return;
     }
     showToast(v61Msg(res), '#ef4444');
@@ -8741,144 +8038,6 @@ function v61IntercambiarCarta(cartaId) {
     else if (res && res.error === 'CARTA_DE_GATE_NO_INTERCAMBIABLE') m = 'Las cartas de gate no se intercambian';
     else if (res && res.error === 'SIN_COPIA') m = 'No tienes copias de esa carta';
     else if (res && res.error === 'RECEPTOR_NO_ENCONTRADO') m = 'No encontramos a ese viajero';
-    else if (res) m = v61Msg(res);
-    showToast(m, '#ef4444');
-  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
-}
-
-/* ---- Mercado de Cartas (GET cartas_ofertas + POST carta_*) ---- */
-function cargarMercadoCartas() {
-  var box = document.getElementById('pf-cartas-mercado');
-  if (!box) return;
-  box.innerHTML = '<div class="v61-empty">Cargando ofertas\u2026</div>';
-  var u = sesion();
-  var uid = u ? String(u.id) : '';
-  v61Get('/api/interacciones?tipo=cartas_ofertas').then(function (res) {
-    if (!res.ok) { box.innerHTML = '<div class="v61-err">' + esc(v61Msg(res)) + '</div>'; return; }
-    var ofertas = res.data || [];
-    if (!ofertas.length) { box.innerHTML = '<div class="v61-empty">No hay ofertas de cartas por ahora.</div>'; return; }
-    var html = '';
-    ofertas.forEach(function (o) {
-      var mia = uid && String(o.vendedor_id) === uid;
-      var rest = parseInt(o.cantidad_restante, 10) || 0;
-      html += '<div class="v61-row">'
-        + '<div class="v61-row-n">' + esc(o.carta_nombre || o.carta_id) + ' <span class="v61-rareza">' + esc(o.rareza || '') + '</span></div>'
-        + '<div class="v61-row-d">' + esc(o.vendedor_nombre || 'Viajero') + (mia ? ' (tu oferta)' : '') + '</div>'
-        + '<div class="v61-row-x">' + fmtXp(o.precio_xp) + ' XP \u00b7 ' + rest + ' disp.</div>';
-      if (mia) html += '<button type="button" class="v61-btn ghost" onclick="v61CancelarOferta(\'' + esc(o.id) + '\')">Cancelar oferta</button>';
-      else html += '<button type="button" class="v61-btn" onclick="v61ComprarCarta(\'' + esc(o.id) + '\',' + rest + ')">Comprar</button>';
-      html += '</div>';
-    });
-    box.innerHTML = html;
-  }).catch(function () { box.innerHTML = '<div class="v61-err">No se pudo cargar el mercado.</div>'; });
-}
-function v61ComprarCarta(ofertaId, max) {
-  var cant = prompt('Cuantas cartas quieres comprar? (disponibles ' + (max || 1) + ')', '1');
-  if (cant === null) return;
-  var c = parseInt(cant, 10);
-  if (!isFinite(c) || c < 1) { showToast('Cantidad invalida', '#ef4444'); return; }
-  v61Post({ tipo: 'carta_comprar', oferta_id: ofertaId, cantidad: c }).then(function (res) {
-    if (res && res.ok) {
-      showToast('Compra realizada');
-      var u = sesion();
-      if (u && res.data && res.data.xp_total_nuevo != null) {
-        u.xp_total = res.data.xp_total_nuevo;
-        try { localStorage.setItem('exploraco_user', JSON.stringify(u)); } catch (e) {}
-      }
-      if (u) { cargarCartas(u.id); cargarMoneda(u.id); }
-      cargarMercadoCartas();
-      if (typeof refrescarSesion === 'function') refrescarSesion();
-      return;
-    }
-    var m = 'No se pudo comprar';
-    if (res && res.error === 'PUNTOS_INSUFICIENTES') m = 'XP insuficiente';
-    else if (res && res.error === 'OFERTA_NO_DISPONIBLE') m = 'La oferta ya no esta disponible';
-    else if (res && res.error === 'CANTIDAD_INSUFICIENTE') m = 'No hay tantas cartas disponibles';
-    else if (res && res.error === 'AUTOCOMPRA_PROHIBIDA') m = 'No puedes comprar tu propia oferta';
-    else if (res) m = v61Msg(res);
-    showToast(m, '#ef4444');
-  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
-}
-function v61CancelarOferta(ofertaId) {
-  if (!window.confirm('Cancelar esta oferta? Las cartas vuelven a tu inventario.')) return;
-  v61Post({ tipo: 'carta_cancelar', oferta_id: ofertaId }).then(function (res) {
-    if (res && res.ok) {
-      showToast('Oferta cancelada');
-      var u = sesion(); if (u) cargarCartas(u.id);
-      cargarMercadoCartas();
-      return;
-    }
-    showToast(v61Msg(res), '#ef4444');
-  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
-}
-
-/* ---- Mi Moneda Condor (GET moneda_saldo/moneda_mercado + POST moneda_orden) ---- */
-function cargarMoneda(uid) {
-  var box = document.getElementById('pf-moneda');
-  if (!box || !uid) return;
-  var fn = v61Helper('monedaSaldo');
-  if (!fn) { box.innerHTML = '<div class="v61-empty">Moneda no disponible.</div>'; return; }
-  box.innerHTML = '<div class="v61-empty">Cargando tu moneda\u2026</div>';
-  fn(uid).then(function (res) {
-    var html = '';
-    if (res && res.ok && res.data) {
-      var d = res.data;
-      html += '<div class="v61-form"><div class="v61-saldo-l">Saldo ' + esc(d.moneda || 'CDR') + '</div>'
-        + '<div class="v61-saldo">' + fmtXp(d.saldo) + '</div>'
-        + (d.cuadra === false ? '<div class="v61-meta">Verificando saldo\u2026</div>' : '')
-        + '</div>';
-    } else {
-      html += '<div class="v61-err">' + esc(v61Msg(res)) + '</div>';
-    }
-    html += '<div class="v61-form">'
-      + '<div class="v61-card-n">Nueva orden</div>'
-      + '<div class="v61-meta">Vender entrega CDR en custodia; comprar inmoviliza XP hasta el cruce.</div>'
-      + '<select id="v61-moo-tipo" class="v61-inp"><option value="venta">Vender CDR por XP</option><option value="compra">Comprar CDR con XP</option></select>'
-      + '<input id="v61-moo-cant" type="number" min="0.01" step="0.01" class="v61-inp" placeholder="Cantidad de CDR">'
-      + '<input id="v61-moo-precio" type="number" min="0.01" step="0.01" class="v61-inp" placeholder="Precio XP por CDR">'
-      + '<div class="v61-actions"><button type="button" class="v61-btn" onclick="v61CrearOrdenMoneda()">Crear orden</button></div>'
-      + '</div>';
-    html += '<div class="v61-card-n" style="margin-top:6px">Libro de ordenes</div>';
-    html += '<div id="v61-moo-libro"><div class="v61-empty">Cargando libro\u2026</div></div>';
-    box.innerHTML = html;
-    v61CargarLibroMoneda();
-  }).catch(function () { box.innerHTML = '<div class="v61-err">No se pudo cargar tu moneda.</div>'; });
-}
-function v61CargarLibroMoneda() {
-  var cont = document.getElementById('v61-moo-libro');
-  if (!cont) return;
-  v61Get('/api/interacciones?tipo=moneda_mercado').then(function (res) {
-    if (!res.ok) { cont.innerHTML = '<div class="v61-err">' + esc(v61Msg(res)) + '</div>'; return; }
-    var libro = res.data || [];
-    if (!libro.length) { cont.innerHTML = '<div class="v61-empty">No hay ordenes abiertas.</div>'; return; }
-    var html = '';
-    libro.forEach(function (o) {
-      var venta = o.tipo_orden === 'venta';
-      html += '<div class="v61-row">'
-        + '<div class="v61-row-n">' + (venta ? 'Venta' : 'Compra') + ' \u00b7 ' + esc(o.titular_nombre || 'Viajero') + '</div>'
-        + '<div class="v61-row-x">' + fmtXp(o.cantidad_restante) + ' CDR @ ' + fmtXp(o.precio_xp) + ' XP</div>'
-        + '</div>';
-    });
-    cont.innerHTML = html;
-  }).catch(function () { cont.innerHTML = '<div class="v61-err">No se pudo cargar el libro.</div>'; });
-}
-function v61CrearOrdenMoneda() {
-  var tipo = (document.getElementById('v61-moo-tipo') || {}).value || 'venta';
-  var cant = parseFloat((document.getElementById('v61-moo-cant') || {}).value);
-  var precio = parseFloat((document.getElementById('v61-moo-precio') || {}).value);
-  if (!isFinite(cant) || cant <= 0) { showToast('Cantidad invalida', '#ef4444'); return; }
-  if (!isFinite(precio) || precio <= 0) { showToast('Precio invalido', '#ef4444'); return; }
-  v61Post({ tipo: 'moneda_orden', tipo_orden: tipo, cantidad: cant, precio_xp: precio }).then(function (res) {
-    if (res && res.ok) {
-      var cruzada = !!(res.raw && res.raw.match);
-      showToast(cruzada ? 'Orden creada y cruzada con una orden existente' : 'Orden creada');
-      var u = sesion(); if (u) cargarMoneda(u.id);
-      if (typeof refrescarSesion === 'function') refrescarSesion();
-      return;
-    }
-    var m = 'No se pudo crear la orden';
-    if (res && res.error === 'SALDO_CDR_INSUFICIENTE') m = 'Saldo CDR insuficiente';
-    else if (res && res.error === 'XP_INSUFICIENTE') m = 'XP insuficiente';
     else if (res) m = v61Msg(res);
     showToast(m, '#ef4444');
   }).catch(function () { showToast('Error de conexion', '#ef4444'); });
@@ -9846,6 +9005,17 @@ else if (PF_TAB_ACTIVO === 'marca') {
   /* Deep-link a #marca: pfTab no pasa en la carga inicial, se pide aqui. */
   var _mmSesion = sesion();
   if (_mmSesion && _mmSesion.id) { mmInit(); cargarMarcaPanel(_mmSesion.id); }
+}
+else if (PF_TAB_ACTIVO === 'inventario') {
+  /* Arranque directo en la Coleccion (#inventario): pfTab NO pasa en la carga
+     inicial, asi que sin esto no habia delegacion de clic y las cartas no
+     abrian ficha. cartas-ui.js se carga DESPUES de este script, por lo que el
+     primer intento puede devolver false sin ensuciar el guard (reintentable);
+     el segundo se ata a 'load' para cuando el modulo ya existe. */
+  v61InstalarFichaDeleg();
+  if (document.readyState !== 'complete') {
+    window.addEventListener('load', function () { v61InstalarFichaDeleg(); });
+  }
 }
 window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>

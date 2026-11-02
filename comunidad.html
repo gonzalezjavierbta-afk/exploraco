@@ -844,6 +844,102 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
    ===================================================================== */
 .cm-v61 .cv-row-n[role="button"]{cursor:pointer;-webkit-tap-highlight-color:transparent;text-decoration:underline dotted;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:rgba(232,199,102,.55)}
 .cm-v61 .cv-row-n[role="button"]:focus-visible{outline:2px solid #E8C766;outline-offset:2px;border-radius:3px}
+/* =====================================================================
+   SILO .pf-slots (sumideros de XP / slots de contenido) + .pf-bono
+   MUDADO DESDE mi-perfil.html (single source): aqui vive el unico dueno
+   del CSS, del markup (#pf-slots / #pf-bono) y del JS (pfSlots*,
+   cargarBonoReferido, pfElegirBono). En mi-perfil.html ya no queda copia.
+   Se conserva el prefijo .pf- porque el silo por clase ya aisla (ADR-004)
+   y renombrarlo a cm-* rompe la trazabilidad con el ADR del traslado.
+   ADR-004: todo cuelga de .pf-slots / .pf-bono con su reset de silo; no se
+   declara ningun selector suelto en :root ni en la capa global.
+   ===================================================================== */
+/* BONO DE BIENVENIDA POR REFERIDO (referidos) */
+.pf-bono{display:none;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(255,74,0,.14),rgba(255,74,0,.04));border:1px solid rgba(255,74,0,.35);border-radius:10px;padding:14px;margin-bottom:14px}
+.pf-bono-ico{font-size:24px;line-height:1}
+.pf-bono-txt{flex:1;min-width:0}
+.pf-bono-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff}
+.pf-bono-desc{font-size:11px;color:rgba(255,255,255,.55);line-height:1.4;margin-top:2px}
+.pf-bono-btn{padding:9px 16px;background:var(--gold);border:none;border-radius:6px;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:opacity .15s;white-space:nowrap}
+.pf-bono-btn:hover{opacity:.88}
+/* ---- SUMIDEROS DE XP: slots de contenido (ADR-086 / TSK-184) --------------
+   Silo atomico: TODO lo nuevo cuelga de .pf-slots (ADR-004 / Regla de Oro 4).
+   Reset de silo explicito abajo (* y box-sizing) para que nada se herede del
+   exterior. Ninguna regla se declara en la capa global de variables.
+   El precio que se pinta es el del PROXIMO slot (costo_proximo, que calcula el
+   motor), NO costo_base_xp: comprar sube el historial k de ese sumidero y con
+   el sube el siguiente precio, y el usuario tiene que ver esa subida antes de
+   pagar, no despues. El k+1 (costo_siguiente) se pinta DEBAJO de ese precio y
+   deliberadamente pequeno: es informacion secundaria, no una tercera cifra que
+   compita con la principal. Si llega null es que no hay proximo slot, y eso se
+   dice con palabras, nunca con 0 ni con un guion ambiguo. */
+.pf-slots{box-sizing:border-box;width:100%;margin-bottom:28px;display:flex;flex-direction:column;gap:14px}
+.pf-slots *,.pf-slots *::before,.pf-slots *::after{box-sizing:border-box}
+.pf-slots p{margin:0}
+.pf-slots .sl-err{font-size:11.5px;color:#fca5a5;line-height:1.45}
+.pf-slots .sl-vacio{font-size:12.5px;color:rgba(255,255,255,.4)}
+.pf-slots .sl-curva{font-size:11px;line-height:1.55;color:rgba(255,255,255,.5);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:9px 11px}
+.pf-slots .sl-curva code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--gold);word-break:break-word}
+.pf-slots .sl-saldo{display:flex;flex-wrap:wrap;align-items:baseline;gap:7px}
+.pf-slots .sl-saldo-k{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.5)}
+.pf-slots .sl-saldo-v{font-size:19px;font-weight:900;color:#fff}
+.pf-slots .sl-saldo-av{font-size:11px;color:#fcd34d}
+.pf-slots .sl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.pf-slots .sl-card{background:linear-gradient(150deg,rgba(255,74,0,.13),rgba(255,255,255,.03));border:1px solid rgba(255,74,0,.32);border-radius:12px;padding:13px;display:flex;flex-direction:column;gap:9px}
+.pf-slots .sl-card.bloqueada{border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.02)}
+.pf-slots .sl-n{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff}
+.pf-slots .sl-topes{display:flex;flex-wrap:wrap;gap:5px}
+.pf-slots .sl-top{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.6);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:2px 8px}
+.pf-slots .sl-top.limite{color:#fca5a5;border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1)}
+.pf-slots .sl-precio{display:flex;flex-direction:column;gap:3px}
+.pf-slots .sl-precio-lbl{font-family:'Barlow Condensed',sans-serif;font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.5)}
+.pf-slots .sl-precio-v{font-size:25px;font-weight:900;color:var(--gold);line-height:1}
+.pf-slots .sl-precio-base{font-size:11px;color:rgba(255,255,255,.4)}
+.pf-slots .sl-bars{display:flex;flex-direction:column;gap:5px}
+.pf-slots .sl-bar{display:flex;align-items:center;gap:7px;font-size:9.5px;color:rgba(255,255,255,.45)}
+.pf-slots .sl-bar span{flex:0 0 38px;text-transform:uppercase;letter-spacing:.5px}
+.pf-slots .sl-bar i{display:block;height:7px;border-radius:999px;min-width:3px}
+.pf-slots .sl-bar.base i{background:rgba(255,255,255,.22)}
+.pf-slots .sl-bar.prox i{background:linear-gradient(90deg,#FF4A00,#f4c66a)}
+.pf-slots .sl-crece{font-size:11.5px;line-height:1.5;color:#fcd34d}
+.pf-slots .sl-crece b{color:#fff}
+.pf-slots .sl-hielo{font-size:11px;line-height:1.5;color:rgba(255,255,255,.5)}
+.pf-slots .sl-hielo b{color:var(--gold)}
+.pf-slots .sl-mios-l{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px}
+.pf-slots .sl-chip{font-size:10.5px;text-transform:none;letter-spacing:0;color:rgba(255,255,255,.7);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:3px 9px}
+.pf-slots .sl-chip.pagado{color:var(--gold);border-color:rgba(255,74,0,.35)}
+.pf-slots .sl-chip.soltado{color:rgba(255,255,255,.35);text-decoration:line-through}
+.pf-slots .sl-cta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:auto}
+.pf-slots .sl-btn{background:var(--gold);color:#0F1419;border:none;border-radius:10px;padding:9px 15px;font-family:Outfit,sans-serif;font-size:12.5px;font-weight:800;cursor:pointer}
+.pf-slots .sl-btn:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.35);cursor:not-allowed}
+.pf-slots .sl-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.pf-slots .sl-motivo{font-size:11px;line-height:1.45;color:#fca5a5}
+.pf-slots .sl-motivo.limite{color:rgba(255,255,255,.45)}
+/* El k+1 va DEBAJO del precio actual y deliberadamente pequeno: es
+   informacion secundaria, no una tercera cifra que compita con la principal
+   (25px gold). El caso null se pinta como frase, nunca como 0 ni como --. */
+.pf-slots .sl-siguiente{font-size:11px;line-height:1.45;color:rgba(255,255,255,.42)}
+.pf-slots .sl-siguiente b{font-size:12.5px;font-weight:800;color:rgba(255,255,255,.62)}
+/* Bloque de enganche. Punteado = hueco declarado, solido = ya hay selector
+   (.con-sel). El rotulo sale del motor, nunca de una lista en el cliente. */
+.pf-slots .sl-ref{font-size:11px;line-height:1.5;color:rgba(255,255,255,.55);background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.16);border-radius:10px;padding:7px 9px}
+.pf-slots .sl-ref b{color:#fff;font-weight:800}
+.pf-slots .sl-motivo-tec{display:block;margin-top:3px;font-size:10.5px;line-height:1.4;color:rgba(255,255,255,.34)}
+/* Selector de enganche. NATIVO y deliberadamente pequeno: el pool real es de 1
+   a 3 recursos, luego un <select> del sistema es lo unico que se justifica y un
+   widget propio seria mas codigo que opciones tiene. El punteado de .sl-ref se
+   vuelve solido cuando YA hay selector: el hueco dejo de existir y la tarjeta lo
+   dice sin tener que decirlo. */
+.pf-slots .sl-ref.con-sel{border-style:solid;border-color:rgba(255,74,0,.3)}
+.pf-slots .sl-pick-lbl{display:block;margin-top:7px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.45)}
+.pf-slots .sl-sel{width:100%;margin-top:4px;padding:7px 28px 7px 10px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:#fff;background:rgba(255,255,255,.05);border:1px solid rgba(255,74,0,.32);border-radius:9px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23f4c66a' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.pf-slots .sl-sel:hover{border-color:rgba(255,74,0,.55)}
+.pf-slots .sl-sel:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.pf-slots .sl-sel option{background:#151A20;color:#fff}
+/* Una sola opcion ya esta elegida: se nombra y punto. Un desplegable con una
+   unica entrada es ruido que hace dudar de una eleccion que el usuario no tiene. */
+.pf-slots .sl-auto{display:block;margin-top:4px;font-size:12px;font-weight:700;color:#fff}
+@media (max-width:600px){.pf-slots .sl-precio-v{font-size:21px}.pf-slots .sl-grid{grid-template-columns:1fr}}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -1108,6 +1204,17 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     <!-- MERCADO DE EMPRENDEDORES (asset compartido mercado.js) + cartas/moneda v6.1 -->
     <div role="tabpanel" class="cpanel" id="cpanel-mercado">
       <div id="mercado-cuerpo"></div>
+
+      <!-- SLOTS DE CONTENIDO + BONO DE REFERIDO (mudados desde mi-perfil.html,
+           single source: alli ya no queda copia). Se conservan los ids
+           #pf-slots / #pf-bono y el silo .pf-slots / .pf-bono. El titulo reusa
+           .cv-sec-t, que vive bajo .cm-v61, asi que el grupo lleva su propio
+           .cm-v61 (no declara reglas propias: solo da ambito a .cv-*). -->
+      <div class="cm-v61">
+        <div class="cv-sec-t">&#x1F6D2; Ampliar tu contenido</div>
+        <div class="pf-slots" id="pf-slots" aria-live="polite"></div>
+        <div class="pf-bono" id="pf-bono" style="display:none"></div>
+      </div>
 
       <!-- GAMING v6.1 (Fase 4 / T7): mercado de cartas -->
       <div class="cm-v61">
@@ -4237,6 +4344,38 @@ function cmAplicarGateNivel() {
   }
 }
 
+/* ---- GUARD DE VISITA AL MERCADO ----
+   showCommTab('mercado') tambien se invoca desde abrirMercadoDesdeHash(), y
+   este ultimo se relanza en cada window.onExploraCOUpdate: cuatro peticiones
+   por refresco de sesion aunque el usuario no cambie de seccion.
+   El guard evita relanzar los cuatro cargadores de entrada
+   (Mercado.cargar, cargarCartasComm, cargarMonedaComm, cmSlotsEntrar)
+   mientras la visita siga viva. Estado en variable de modulo (NO atributo
+   del DOM) y reset determinista al cambiar a otra seccion, para que al
+   volver al mercado si se recargue (ofertas nuevas).
+   La clave es el id de sesion: si cambia (login/logout/otro usuario) se
+   recarga una vez, sin reabrir el bucle en cada update.
+   No intercepta los repintados de flujo (post-compra llaman a su cargador
+   directamente). ASCII-safe (ADR-002). */
+var CM_MERCADO_VISITA = null; /* null = sin visita | '' = visitado sin sesion | id = visitado con esa sesion */
+function cmMercadoClave() {
+  var u = sesion();
+  return (u && u.id) ? String(u.id) : '';
+}
+function cmMercadoResetVisita() { CM_MERCADO_VISITA = null; }
+function cmMercadoRepintar() {
+  if(window.Mercado) window.Mercado.cargar();
+  cargarCartasComm();
+  cargarMonedaComm();
+  cmSlotsEntrar();
+}
+function cmMercadoEntrar() {
+  var clave = cmMercadoClave();
+  if(CM_MERCADO_VISITA !== null && CM_MERCADO_VISITA === clave) return;
+  CM_MERCADO_VISITA = clave;
+  cmMercadoRepintar();
+}
+
 /* ---- TAB SWITCHING ---- */
 function showCommTab(tab) {
   // Re-sincroniza el gate ANTES de decidir: este es el unico momento que
@@ -4266,11 +4405,12 @@ function showCommTab(tab) {
     if(tab === 'av') initAudiovisual();
     if(tab === 'pandillas'){ renderPandillas(); cargarParcheTesoreria(); }
     if(tab === 'wayfarer') initActivoOculto();
-    if(tab === 'mercado'){ if(window.Mercado) Mercado.cargar(); cargarCartasComm(); cargarMonedaComm(); }
+    if(tab === 'mercado') cmMercadoEntrar();
     if(tab === 'gobernanza') cargarGobernanza();
     if(tab === 'contratos') cargarContratosComm();
     if(tab === 'marcas') cargarMarcas();
   }
+  if(tab !== 'mercado') cmMercadoResetVisita();
   if(tab !== 'chat') stopChatPoll();
 }
 
@@ -4684,6 +4824,713 @@ function cmFichaWire(box) {
   });
 }
 
+/* ---- SUMIDEROS DE XP (slots de contenido) + BONO DE REFERIDO --------------
+   TRASLADO (single source): este bloque se MUDO desde mi-perfil.html junto con
+   su CSS (.pf-slots / .pf-bono) y su markup (#pf-slots / #pf-bono, dentro de
+   #cpanel-mercado). En mi-perfil.html ya NO queda copia: el unico dueno es
+   comunidad.html. Se conservan los ids y los nombres de funcion (pfSlots*,
+   cargarBonoReferido, pfElegirBono) tal cual, porque renombrarlos a cm-*
+   rompe la trazabilidad con el ADR del traslado.
+   Dependencias adaptadas al runtime de comunidad (mapeo exacto: alli no
+   existen). Se nombran por lo que hacen, no por su identificador del perfil,
+   para que el codigo portado no arrastre ni una referencia a funciones que
+   aqui no existen:
+     aviso temporal       -> cmSlotToast (delega en showXPToastComm)
+     lectura con JWT      -> cmGet(url) para GET (contrato {ok,data,raw}) y
+                             postComAPIJWT(body) para POST (JSON crudo, con
+                             reintento de 401 SESION_REQUERIDA)
+     relectura de inventario -> no existe en comunidad: tras comprar se relee
+                             con pfSlotsCargar() y NO se llama a
+                             cargarCartasComm(), porque un slot no altera el
+                             mercado de cartas
+   fmtXp, esc y sesion YA existen en comunidad con el mismo nombre: se reusan,
+   no se redefinen. Endpoints existentes, sin backend nuevo:
+   GET tipo=slot_catalogo|slot_mios|slot_refs|bonus_referido, POST slot_comprar.
+   ASCII-safe (ADR-002). --------------------------------------------------- */
+var PF_SLOT_CLAVE = /^[a-z0-9_]+$/;
+var pfSlotsCat = null;
+var pfSlotsMios = {};
+var pfSlotsSaldoTras = null;
+/* El enganche elegido por sumidero (ref_id). Lo alimenta el <select> de la
+   tarjeta: el mapa guarda el UUID VERBATIM que devuelve el servidor, sin
+   reescribir ni normalizar, porque el motor lo castea a uuid. */
+var pfSlotsRefs = {};
+/* La lista cruda de candidatos y el estado de SU LECTURA, que son tres cosas
+   distintas y no se pueden colapsar en una:
+     cargando -> se esta leyendo. No se sabe si hay 0, y decir 0 seria mentir.
+     fallo    -> la rama es session-gated y no respondio. FAIL-CLOSED.
+     listo    -> la respuesta llego y se puede contar.
+   Sin esta separacion, un fallo de red se veria exactamente igual que "no
+   tienes recursos", que es el falso "comprable" que este bloque arregla. */
+var pfSlotsRefsRaw = null;
+var pfSlotsRefsEstado = 'cargando';
+var pfSlotsRefsError = '';
+
+/* Toast del bloque. El aviso de comunidad (#xp-toast-comm) tiene fondo fijo y
+   no acepta color de fondo, luego el color se usa como acento del borde: mismo
+   aviso, sin duplicar el toast existente. */
+function cmSlotToast(msg, color) {
+  var t = document.getElementById('xp-toast-comm');
+  if (t) t.style.borderColor = color || 'rgba(255,74,0,.3)';
+  showXPToastComm(msg);
+}
+
+function pfSlotsNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = Number(v);
+  return isFinite(n) ? n : null;
+}
+function pfSlotsId(clave, sufijo) {
+  return 'pf-slot-' + (PF_SLOT_CLAVE.test(String(clave)) ? String(clave) : 'x') + '-' + sufijo;
+}
+function pfSlotsTxt(id, texto) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = texto;
+}
+function pfSlotsBar(clave, sufijo, valor, max) {
+  var el = document.getElementById(pfSlotsId(clave, sufijo));
+  if (!el) return;
+  var pct = Math.max(0, Math.min(100, Math.round(((valor || 0) / max) * 100)));
+  el.style.width = pct + '%';
+}
+/* El disponible, en dos niveles y sin inventar nada:
+   1) disponible_xp del catalogo (slot_catalogo): lo calcula el motor en SQL
+      como xp_total - xp_gastado_sinks y ya descuenta lo gastado en sumideros.
+      Si llega como numero, manda.
+   2) disponible_restante que devuelve la compra: tambien del motor.
+   NO se cae a sesion().xp_total como antes: ese numero es reputacion y NO baja
+   al comprar, asi que usarlo como saldo congelaria la cifra para siempre.
+   Si ninguno de los dos llega, no hay saldo que pintar (null). */
+function pfSlotsSaldo() {
+  var d = pfSlotsNum(pfSlotsCat && pfSlotsCat.disponible_xp);
+  if (d !== null) return { valor: d, exacto: true };
+  var t = pfSlotsNum(pfSlotsSaldoTras);
+  if (t !== null) return { valor: t, exacto: true };
+  return { valor: null, exacto: false };
+}
+/* El nombre del campo de enganche lo publica el motor en ref_contrato.campo y
+   NO se escribe aqui ni una vez: se lee de a.ref_contrato. Un sumidero que
+   enganche a otra columna llega bien sin tocar este modulo, que es la misma
+   razon por la que aqui no hay ni una clave de sumidero. */
+function pfSlotsCampo(a) {
+  var rc = (a && a.ref_contrato && typeof a.ref_contrato === 'object') ? a.ref_contrato : null;
+  var c = rc && rc.campo ? String(rc.campo) : '';
+  return /^[a-z_][a-z0-9_]*$/.test(c) ? c : '';
+}
+/* Los recursos que YA tienen un slot activo comprado en este sumidero. La lista
+   de slot_mios trae el mismo campo de enganche, luego el cruce es de dato a
+   dato y no de codigo a codigo. */
+function pfSlotsUsados(clave, campo) {
+  var usados = {};
+  var filas = Array.isArray(pfSlotsMios[clave]) ? pfSlotsMios[clave] : [];
+  for (var i = 0; i < filas.length; i++) {
+    var f = filas[i];
+    if (!f || f.activo !== true) continue;
+    var v = f[campo];
+    if (v !== undefined && v !== null && v !== '') usados[String(v)] = true;
+  }
+  return usados;
+}
+/* Candidatos ELEGIBLES de este sumidero: los que publica la rama de lectura,
+   menos los que ya tienen un slot activo. Sin ese filtro, comprar dos veces
+   sobre el mismo recurso se ofrece en el menu y el motor lo cobra: no es un
+   fallo del servidor, es un selector que no se entero de lo que ya paso. Si el
+   usuario suelta ese slot, vuelve a ser elegible, porque la fila queda con
+   activo = false. */
+function pfSlotsCandidatos(a) {
+  var campo = pfSlotsCampo(a);
+  if (!campo || !pfSlotsRefsRaw) return [];
+  var arr = Array.isArray(pfSlotsRefsRaw[a.clave]) ? pfSlotsRefsRaw[a.clave] : [];
+  var usados = pfSlotsUsados(a.clave, campo);
+  var out = [];
+  for (var i = 0; i < arr.length; i++) {
+    var r = arr[i];
+    if (!r || !r[campo]) continue;
+    if (usados[String(r[campo])]) continue;
+    out.push(r);
+  }
+  return out;
+}
+/* El enganche vigente, y se auto-corrige en cada llamada y en un solo sentido:
+   si lo elegido ya no esta entre los candidatos, cae al primero; si no hay
+   ninguno, se vacia. Es lo que hace que el boton que se ve y el corte que
+   impide la peticion no puedan discrepar, porque los dos leen aqui. */
+function pfSlotsElegido(a) {
+  var campo = pfSlotsCampo(a);
+  var cands = pfSlotsCandidatos(a);
+  var el = pfSlotsRefs[a.clave] ? String(pfSlotsRefs[a.clave]) : '';
+  var sigue = false;
+  for (var i = 0; i < cands.length; i++) {
+    if (String(cands[i][campo]) === el) { sigue = true; break; }
+  }
+  if (!sigue) {
+    if (cands.length) { pfSlotsRefs[a.clave] = String(cands[0][campo]); el = pfSlotsRefs[a.clave]; }
+    else { delete pfSlotsRefs[a.clave]; el = ''; }
+  }
+  return el || null;
+}
+/* La etiqueta legible de un candidato. Dos recursos con el mismo nombre no se
+   distinguen en un menu, asi que se suma la ciudad cuando el motor la manda; no
+   se inventa ningun campo, se lee el que vino. */
+function pfSlotsEtiqueta(r) {
+  var t = (r && r.etiqueta) ? String(r.etiqueta) : 'Sin nombre';
+  return (r && r.ciudad) ? t + ' - ' + String(r.ciudad) : t;
+}
+/* Estado de compra de UN sumidero. Fuente unica de verdad: lo pinta la fila y
+   lo consulta el handler ANTES de tocar la red, de modo que la guarda y lo que
+   se ve son el mismo calculo y no pueden discrepar.
+   Regla dura: aqui NO se enumera ningun sumidero, ni su clave, ni el nombre del
+   campo de enganche. Todo se lee de lo que manda el motor (puede_comprar,
+   ref_contrato.comprable, ref_contrato.motivo_soporte, topes, disponible_xp),
+   luego un sumidero puede volverse comprable sin tocar una linea de aqui, que es
+   justo lo que esta pasando con el enganche a destinos. */
+function pfSlotsEstado(a) {
+  var st = { boton: '', motivo: '', tecnico: '', listo: false, ref: null,
+    etiqueta: '', prox: null, saldo: null, topeH: false, topeA: false,
+    candidatos: [], elegido: null };
+  if (!a || typeof a !== 'object') return st;
+  var rc = (a.ref_contrato && typeof a.ref_contrato === 'object') ? a.ref_contrato : null;
+  var base = pfSlotsNum(a.costo_base_xp);
+  var k = pfSlotsNum(a.k_historico);
+  var ka = pfSlotsNum(a.k_activos);
+  var sMax = pfSlotsNum(a.slot_max);
+  var sMaxA = pfSlotsNum(a.slot_max_activos);
+  st.ref = rc;
+  st.etiqueta = (rc && rc.etiqueta) ? String(rc.etiqueta) : '';
+  st.prox = pfSlotsNum(a.costo_proximo);
+  st.saldo = pfSlotsSaldo();
+  st.base = base;
+  st.k = k;
+  st.ka = ka;
+  st.sMax = sMax;
+  st.sMaxA = sMaxA;
+  /* Sin sesion no hay k, ni topes, ni precio: solo se ofrece entrar. */
+  if (k === null || ka === null || st.prox === null) {
+    st.boton = 'Inicia sesion';
+    st.motivo = 'Entra con tu cuenta para ver cuanto costaria ampliar este sumidero.';
+    return st;
+  }
+  st.topeH = sMax !== null && k >= sMax;
+  st.topeA = sMaxA !== null && ka >= sMaxA;
+  st.alcanza = st.saldo.valor === null || st.saldo.valor >= st.prox;
+  /* Sin soporte el motor RECHAZA la compra. Eso no es un error de la pagina ni
+     un fallo de red: es un sumidero todavia no comprable, y se muestra como tal.
+     El tecnico (motivo_soporte) queda como detalle, nunca como el mensaje. */
+  if (!rc || rc.comprable !== true) {
+    st.boton = 'No comprable todavia';
+    st.motivo = 'Este sumidero todavia no se puede ampliar: falta saber a que se '
+      + 'engancha y el servidor no puede comprobarlo, asi que cobrar por el crearia '
+      + 'una fila que no apunta a nada.';
+    st.tecnico = (rc && rc.motivo_soporte) ? String(rc.motivo_soporte) : '';
+    return st;
+  }
+  if (st.topeH) {
+    st.boton = 'Tope historico alcanzado';
+    st.motivo = 'Llegaste al tope historico de este sumidero.';
+    return st;
+  }
+  if (st.topeA) {
+    st.boton = 'Tope de activos alcanzado';
+    st.motivo = 'Llegaste al tope de slots activos. Suelta uno para seguir.';
+    return st;
+  }
+  if (!st.alcanza) {
+    st.boton = 'XP insuficiente';
+    st.motivo = 'Te faltan ' + fmtXp(st.prox - st.saldo.valor) + ' XP para este slot.';
+    return st;
+  }
+  /* El enganche, en los tres estados que se distinguen a ojo. La etiqueta la
+     pone el motor, asi que el motivo dice el nombre real de lo que falta en vez
+     de un "no disponible" que no ayuda a nadie. En los tres casos el boton queda
+     deshabilitado: un boton que va a fallar al cobrar es peor que no tenerlo. */
+  var etq = st.etiqueta ? st.etiqueta.toLowerCase() : 'el recurso';
+  st.candidatos = pfSlotsCandidatos(a);
+  st.elegido = pfSlotsElegido(a);
+  if (pfSlotsRefsEstado === 'cargando') {
+    st.boton = 'Leyendo ' + etq;
+    st.motivo = 'Estamos mirando que ' + etq + ' tienes para engancharle el slot. Un momento.';
+    return st;
+  }
+  if (pfSlotsRefsEstado === 'fallo') {
+    st.boton = 'No se pudo leer ' + etq;
+    st.motivo = 'No se pudo comprobar que ' + etq + ' tienes, asi que la compra queda cerrada '
+      + 'mientras tanto: sin saber a que se engancha, cobrar seria vender algo que no se puede entregar.';
+    st.tecnico = pfSlotsRefsError;
+    return st;
+  }
+  if (!st.candidatos.length) {
+    st.boton = 'Aun no tienes ' + etq;
+    st.motivo = 'Este slot se engancha a ' + etq + ' y tu cuenta no tiene ninguna activa todavia. '
+      + 'Cuando tengas una, vuelve a esta pestana y aparecera aqui para elegirla.';
+    return st;
+  }
+  st.boton = 'Comprar por ' + fmtXp(st.prox) + ' XP';
+  /* puede_comprar del motor manda sobre cualquier derivacion local: si el
+     servidor dice que no, aqui no se pinta un boton vivo. */
+  st.listo = a.puede_comprar !== false;
+  if (!st.listo) st.motivo = 'El motor todavia no habilita esta compra.';
+  return st;
+}
+function pfSlotsEsqueleto(clave) {
+  return '<div class="sl-card" id="' + pfSlotsId(clave, 'card') + '">'
+    + '<div class="sl-n" id="' + pfSlotsId(clave, 'n') + '"></div>'
+    + '<div class="sl-topes">'
+      + '<span class="sl-top" id="' + pfSlotsId(clave, 'top-h') + '"></span>'
+      + '<span class="sl-top" id="' + pfSlotsId(clave, 'top-a') + '"></span>'
+    + '</div>'
+    + '<div class="sl-precio">'
+      + '<div class="sl-precio-lbl">Lo que pagas ahora</div>'
+      + '<div class="sl-precio-v" id="' + pfSlotsId(clave, 'px') + '"></div>'
+      + '<div class="sl-precio-base" id="' + pfSlotsId(clave, 'base') + '"></div>'
+      + '<div class="sl-siguiente" id="' + pfSlotsId(clave, 'sig') + '"></div>'
+    + '</div>'
+    + '<div class="sl-bars">'
+      + '<div class="sl-bar base"><span>Inicial</span><i id="' + pfSlotsId(clave, 'bar-b') + '"></i></div>'
+      + '<div class="sl-bar prox"><span>Ahora</span><i id="' + pfSlotsId(clave, 'bar-p') + '"></i></div>'
+    + '</div>'
+    + '<div class="sl-crece" id="' + pfSlotsId(clave, 'crece') + '"></div>'
+    + '<div class="sl-hielo" id="' + pfSlotsId(clave, 'hielo') + '"></div>'
+    + '<div class="sl-ref" id="' + pfSlotsId(clave, 'ref') + '"></div>'
+    + '<div class="sl-mios" id="' + pfSlotsId(clave, 'mios') + '"></div>'
+    + '<div class="sl-cta">'
+      + '<button type="button" class="sl-btn" id="' + pfSlotsId(clave, 'btn') + '" data-clave="' + esc(clave) + '">Comprar</button>'
+      + '<span class="sl-motivo" id="' + pfSlotsId(clave, 'motivo') + '"></span>'
+    + '</div>'
+    + '</div>';
+}
+function pfSlotsFila(a) {
+  var clave = a.clave;
+  var st = pfSlotsEstado(a);
+  var base = st.base;
+  var k = st.k;
+  var prox = st.prox;
+
+  pfSlotsTxt(pfSlotsId(clave, 'n'), a.etiqueta || clave);
+
+  var th = document.getElementById(pfSlotsId(clave, 'top-h'));
+  if (th) {
+    th.textContent = st.sMax === null || k === null ? 'Slots: sin tope'
+      : 'Slots: ' + k + ' de ' + st.sMax;
+    th.className = 'sl-top' + (st.topeH ? ' limite' : '');
+  }
+  var ta = document.getElementById(pfSlotsId(clave, 'top-a'));
+  if (ta) {
+    ta.textContent = st.sMaxA === null || st.ka === null ? 'Activos: sin tope'
+      : 'Activos: ' + st.ka + ' de ' + st.sMaxA;
+    ta.className = 'sl-top' + (st.topeA ? ' limite' : '');
+  }
+
+  var topeH = st.topeH;
+  var topeA = st.topeA;
+
+  pfSlotsTxt(pfSlotsId(clave, 'px'), prox === null ? 'Inicia sesion' : fmtXp(prox) + ' XP');
+
+  var baseEl = document.getElementById(pfSlotsId(clave, 'base'));
+  if (baseEl) {
+    baseEl.innerHTML = base === null ? ''
+      : 'Precio inicial <s>' + fmtXp(base) + ' XP</s>'
+        + (k !== null && k > 0 ? ' (ya no es el que pagas)' : ' (este es el que pagas)');
+  }
+
+  /* El k+1, DEBAJO del precio actual y en pequeno (jerarquia: 25px gold el
+     actual, ~12px apagado el siguiente). Los tres casos se distinguen:
+       - undefined -> el catalogo no trae el campo: no se inventa nada.
+       - null      -> el motor dice que k+1 supera slot_max: NO hay proximo, y
+                      se dice con palabras. Nunca 0, NaN ni un "--" ambiguo.
+       - numero    -> el precio real del slot k+1, tal cual lo manda. */
+  var sigEl = document.getElementById(pfSlotsId(clave, 'sig'));
+  if (sigEl) {
+    if (a.costo_siguiente === undefined) sigEl.textContent = '';
+    else {
+      var sig = pfSlotsNum(a.costo_siguiente);
+      sigEl.textContent = sig === null ? 'No hay proximo slot en este sumidero.'
+        : 'El siguiente costara ' + fmtXp(sig) + ' XP.';
+    }
+  }
+
+  var max = Math.max(base || 0, prox || 0) || 1;
+  pfSlotsBar(clave, 'bar-b', base || 0, max);
+  pfSlotsBar(clave, 'bar-p', prox || 0, max);
+
+  /* La explicacion del crecimiento va ANTES del boton: el usuario tiene que ver
+     por que paga mas que el precio inicial antes de confirmar. Los numeros son
+     del motor; aqui solo se hace el porcentaje de comparacion. */
+  var creEl = document.getElementById(pfSlotsId(clave, 'crece'));
+  if (creEl) {
+    creEl.innerHTML = '';
+    if (k === null) {
+      creEl.textContent = 'Entra con sesion para ver cuanto costaria tu proximo slot.';
+    } else if (base !== null && prox !== null && base > 0 && prox > base) {
+      var subida = Math.round(((prox - base) / base) * 100);
+      creEl.innerHTML = 'Este slot <b>ya no cuesta el precio inicial</b>: +' + subida
+        + '% porque tu historial en este sumidero va en <b>k = ' + k + '</b>.';
+    } else if (k > 0) {
+      creEl.innerHTML = 'Historial en este sumidero: <b>k = ' + k + '</b>.';
+    } else {
+      creEl.innerHTML = 'Primer slot en este sumidero (<b>k = 0</b>): pagas el precio inicial.';
+    }
+  }
+
+  var hEl = document.getElementById(pfSlotsId(clave, 'hielo'));
+  if (hEl) {
+    hEl.innerHTML = 'Lo que pagues aqui queda <b>congelado</b> en su fila y no sube despues. '
+      + 'Si sueltas el slot y lo recompras, pagas lo que toque en ese momento, no el precio inicial.';
+  }
+
+/* El enganche: ref_contrato.etiqueta es lo que el usuario tiene que LEER, asi
+     que va como rotulo y el texto lo pone el motor. El bloque PASA a ser el
+     selector de verdad cuando la lista llega: tres formas y ninguna mas, porque
+     el pool real es de 1 a 3. Sin soporte se dice sin nombres de tabla ni de
+     campo, que es jerga tecnica y se queda en el detalle de abajo. */
+  var refEl = document.getElementById(pfSlotsId(clave, 'ref'));
+  if (refEl) {
+    var etq = st.etiqueta ? st.etiqueta.toLowerCase() : 'el recurso';
+    var campo = pfSlotsCampo(a);
+    var selId = pfSlotsId(clave, 'sel');
+    if (!st.ref) {
+      refEl.className = 'sl-ref';
+      refEl.textContent = '';
+    } else if (st.ref.comprable !== true) {
+      refEl.className = 'sl-ref';
+      refEl.innerHTML = 'Este sumidero <b>aun no admite Slots</b>: falta a que se '
+        + 'engancha y el servidor todavia no puede validarlo.';
+    } else if (pfSlotsRefsEstado === 'cargando') {
+      refEl.className = 'sl-ref';
+      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>: revisando cuales tienes.';
+    } else if (pfSlotsRefsEstado === 'fallo') {
+      refEl.className = 'sl-ref';
+      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>: no se pudo revisar cuales tienes, '
+        + 'asi que aqui no se puede ampliar todavia.';
+    } else if (!st.candidatos.length) {
+      refEl.className = 'sl-ref';
+      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>, y ahora mismo no tienes ninguna activa '
+        + 'para engancharle el slot.';
+    } else if (st.candidatos.length === 1) {
+      refEl.className = 'sl-ref con-sel';
+      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>. Ya esta elegida:'
+        + '<span class="sl-auto">' + esc(pfSlotsEtiqueta(st.candidatos[0])) + '</span>';
+    } else {
+      var ops = '';
+      for (var i = 0; i < st.candidatos.length; i++) {
+        var rr = st.candidatos[i];
+        var vv = campo ? String(rr[campo]) : '';
+        ops += '<option value="' + esc(vv) + '"' + (vv === st.elegido ? ' selected' : '') + '>'
+          + esc(pfSlotsEtiqueta(rr)) + '</option>';
+      }
+      refEl.className = 'sl-ref con-sel';
+      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>. Elige de ' + st.candidatos.length + ' tuyos.'
+        + '<label class="sl-pick-lbl" for="' + selId + '">Recurso que se va a destacar</label>'
+        + '<select class="sl-sel" id="' + selId + '" data-clave="' + esc(clave) + '">' + ops + '</select>';
+    }
+  }
+
+  var mEl = document.getElementById(pfSlotsId(clave, 'mios'));
+  if (mEl) {
+    var filas = Array.isArray(pfSlotsMios[clave]) ? pfSlotsMios[clave] : [];
+    var chips = filas.map(function (f) {
+      var pagado = pfSlotsNum(f.costo_pagado);
+      return '<span class="sl-chip ' + (f.activo === true ? 'pagado' : 'soltado') + '">slot '
+        + esc(String(f.slot_index)) + ' - ' + fmtXp(pagado === null ? 0 : pagado) + ' XP</span>';
+    });
+    mEl.innerHTML = '<div class="sl-mios-l">Ya comprados (precio congelado)'
+      + (chips.length ? chips.join('') : '<span class="sl-chip">ninguno todavia</span>') + '</div>';
+  }
+
+  /* El boton se desactiva con disabled Y con la etiqueta que explica por que.
+     El atributo es pintura: la garantia de que no sale una peticion esta en
+     pfSlotsComprar(), que vuelve a calcular este mismo estado y corta. */
+  var btn = document.getElementById(pfSlotsId(clave, 'btn'));
+  if (btn) {
+    btn.disabled = !st.listo;
+    btn.textContent = st.boton;
+  }
+  var motivo = document.getElementById(pfSlotsId(clave, 'motivo'));
+  if (motivo) {
+    motivo.innerHTML = st.motivo ? esc(st.motivo) : '';
+    if (st.tecnico) motivo.innerHTML += '<span class="sl-motivo-tec">' + esc(st.tecnico) + '</span>';
+    motivo.className = 'sl-motivo' + (topeH || topeA ? ' limite' : '');
+  }
+  var card = document.getElementById(pfSlotsId(clave, 'card'));
+  if (card) card.className = 'sl-card' + (st.listo ? '' : ' bloqueada');
+}
+function pfSlotsPintar() {
+  var box = document.getElementById('pf-slots');
+  if (!box) return;
+  var cat = pfSlotsCat;
+  /* Un catalogo de 0 sumideros NO es "no tienes slots": es un fallo de lectura y
+     tiene que verse, no quedarse en blanco. */
+  if (!cat || cat.ok !== true || !Array.isArray(cat.data) || !cat.data.length) {
+    box.innerHTML = '<div class="sl-err">No se pudo leer el catalogo de sumideros. Recarga la pagina.</div>';
+    return;
+  }
+  if (!document.getElementById('pf-slots-grid')) {
+    var curva = cat.curva || {};
+    box.innerHTML = '<div class="sl-curva">'
+      + '<div class="sl-saldo"><span class="sl-saldo-k">Disponible</span>'
+      + '<span class="sl-saldo-v" id="pf-slots-saldo">lo confirma el motor</span>'
+      + '<span class="sl-saldo-av" id="pf-slots-aviso"></span></div>'
+      + (curva.formula ? '<div>Crecimiento del precio: <code>' + esc(curva.formula) + '</code></div>' : '')
+      + (curva.k ? '<div>k = ' + esc(curva.k) + '</div>' : '')
+      + (curva.congelado ? '<div>' + esc(curva.congelado) + '</div>' : '')
+      + '</div><div class="sl-grid" id="pf-slots-grid"></div>';
+    document.getElementById('pf-slots-grid').addEventListener('click', function (ev) {
+      var b = ev.target && ev.target.closest ? ev.target.closest('.sl-btn') : null;
+      if (b) pfSlotsComprar(b.getAttribute('data-clave'));
+    });
+    /* Un solo delegador para todos los desplegables, registrado junto al de los
+       botones y una sola vez: el contenedor no se recrea, luego cada
+       re-render del selector lo sobrevive sin volver a enganchar nada
+       (ADR-003). El <select> se escribe con el UUID del servidor como value,
+       tal cual, porque eso es lo que viaja en el POST. */
+    document.getElementById('pf-slots-grid').addEventListener('change', function (ev) {
+      var s = ev.target && ev.target.closest ? ev.target.closest('select[data-clave]') : null;
+      if (!s) return;
+      pfSlotsRefs[s.getAttribute('data-clave')] = String(s.value || '');
+      /* No se decide aqui si eso habilita el boton: se anota, se repinta la
+         tarjeta entera y lo decide pfSlotsEstado, que es el mismo calculo que
+         usa el corte de compra. Un solo camino para la verdad. */
+      pfSlotsPintar();
+    });
+  }
+  var saldo = pfSlotsSaldo();
+  var saldoEl = document.getElementById('pf-slots-saldo');
+  if (saldoEl) {
+    /* Solo disponible_xp del motor (o el disponible_restante que devuelve la
+       compra). Sin numero no se pinta nada: xp_total NO baja al comprar, asi que
+       usarlo aqui seria un saldo congelado que miente. */
+    saldoEl.textContent = saldo.valor === null
+      ? 'el motor lo confirma al cobrar'
+      : fmtXp(saldo.valor) + ' XP';
+  }
+  var avEl = document.getElementById('pf-slots-aviso');
+  if (avEl) {
+    avEl.textContent = saldo.valor === null
+      ? '(aun no llega del motor)' : '';
+  }
+  cat.data.forEach(function (a) {
+    if (!document.getElementById(pfSlotsId(a.clave, 'card')))
+      document.getElementById('pf-slots-grid').insertAdjacentHTML('beforeend', pfSlotsEsqueleto(a.clave));
+    pfSlotsFila(a);
+  });
+}
+function pfSlotsCargarMios(uid, clave) {
+  return cmGet('/api/interacciones?tipo=slot_mios&usuario_id='
+    + encodeURIComponent(uid) + '&clave=' + encodeURIComponent(clave))
+    .then(function (res) {
+      pfSlotsMios[clave] = (res && res.ok === true && Array.isArray(res.data)) ? res.data : [];
+      return null;
+    })
+    .catch(function () { pfSlotsMios[clave] = []; return null; });
+}
+/* Lectura de los recursos elegibles. La rama es session-gated: sin sesion
+   responde 401 y sin tabla 409, luego este unico manejador cubre los dos.
+   FAIL-CLOSED: si no llega una respuesta con refs, NO se pintan candidatos. Una
+   lista vacia seria indistinguible de "no tienes recursos" y dejaria el boton
+   apuntando a un ref_id que nadie ha visto.
+   El campo refs viaja en la RAIZ de la respuesta, no en .data: cmGet solo
+   normaliza {ok,data}, luego aqui se lee de res.raw. */
+function pfSlotsCargarRefs() {
+  pfSlotsRefsEstado = 'cargando';
+  /* Sin usuario_id: la rama lo toma de la sesion, y mandarlo seria abrir la
+     puerta a que el parametro y la sesion discrepen. */
+  return cmGet('/api/interacciones?tipo=slot_refs')
+    .then(function (res) {
+      var raw = (res && res.raw) || {};
+      if (!res || res.ok !== true || !raw.refs || typeof raw.refs !== 'object') {
+        pfSlotsRefsRaw = null;
+        pfSlotsRefsEstado = 'fallo';
+        pfSlotsRefsError = raw.error ? String(raw.error)
+          : ((res && res.error) ? String(res.error) : '');
+        return null;
+      }
+      pfSlotsRefsRaw = raw.refs;
+      pfSlotsRefsError = '';
+      pfSlotsRefsEstado = 'listo';
+      return null;
+    })
+    .catch(function () {
+      pfSlotsRefsRaw = null;
+      pfSlotsRefsEstado = 'fallo';
+      return null;
+    });
+}
+function pfSlotsCargar(uid) {
+  var box = document.getElementById('pf-slots');
+  if (!box || !uid) return;
+  /* Las dos lecturas van en paralelo y la tarjeta se repinta al final, cuando
+     ambas respondieron: pintar el catalogo antes de tener los recursos daria un
+     "comprable" con la lista vacia debajo, que es justo el falso que hay que
+     evitar. La primera pintada, con la lista en curso, ya dice "Leyendo...".
+     curva y disponible_xp viajan en la RAIZ de slot_catalogo: cmGet normaliza
+     {ok,data} y el resto se toma de res.raw. */
+  var catP = cmGet('/api/interacciones?tipo=slot_catalogo&usuario_id=' + encodeURIComponent(uid))
+    .then(function (res) {
+      if (!res || res.ok !== true) { pfSlotsCat = null; return null; }
+      var raw = (res && res.raw) || {};
+      pfSlotsCat = { ok: true, data: res.data, curva: raw.curva || {}, disponible_xp: raw.disponible_xp };
+      pfSlotsPintar();
+      var claves = (res.data || []).map(function (a) { return a.clave; });
+      if (!claves.length) return null;
+      return Promise.all(claves.map(function (c) { return pfSlotsCargarMios(uid, c); }));
+    });
+  return Promise.all([catP, pfSlotsCargarRefs()])
+    .then(function () { pfSlotsPintar(); })
+    .catch(function () {});
+}
+function pfSlotsMotivo(codigo, res) {
+  var extra = res && res.costo_requerido !== undefined && res.costo_requerido !== null
+    ? ' (' + fmtXp(pfSlotsNum(res.costo_requerido) || 0) + ' XP)' : '';
+  if (codigo === 'XP_INSUFICIENTE') return 'XP insuficiente' + extra;
+  if (codigo === 'TOPE_HISTORICO') return 'Alcanzaste el tope historico de este sumidero';
+  if (codigo === 'TOPE_ACTIVOS') return 'Alcanzaste el tope de slots activos';
+  if (codigo === 'SINK_INEXISTENTE') return 'Ese slot ya no existe en el catalogo';
+  if (codigo === 'SINK_INACTIVO') return 'Ese slot esta desactivado';
+  /* REF_NO_EXISTE_O_SIN_PERMISOS es el MISMO codigo para inexistente y ajeno a
+     proposito: distinguirlos seria un oraculo para enumerar que recursos tienen
+     otros. Se muestra como un caso unico. */
+  if (codigo === 'REF_NO_EXISTE_O_SIN_PERMISOS')
+    return 'El recurso indicado no existe o no pertenece a tu cuenta';
+  /* El motor puede responder esto si alguien fuerza el POST a mano sin
+     enganche. Se explica igual que en el catalogo. */
+  if (codigo === 'SINK_REFSIN_SOPORTE')
+    return 'Este sumidero todavia no es comprable: falta a que se engancha y el servidor no puede validarlo';
+  /* El texto que ya llega traducido del servidor manda sobre cualquier etiqueta
+     propia: el codigo es para maquinas, el error es para el usuario. */
+  return (res && res.error) ? String(res.error)
+    : (codigo ? 'No se pudo comprar: ' + codigo : 'No se pudo comprar');
+}
+/* El enganche que se envia: el UUID VERBATIM de la respuesta, sin reescribir ni
+   normalizar. El motor lo castea a uuid, luego tocarlo aqui lo rompe. Sin
+   eleccion devuelve null y la compra se corta antes de la red. */
+function pfSlotsRef(clave) {
+  return pfSlotsRefs[clave] || null;
+}
+function pfSlotsComprar(clave) {
+  /* CORTE ANTES DE LA RED. No es una mejora de estilo: un boton que parece
+     apagado pero sigue llamando al servidor es un fallo, porque alguien paga por
+     un slot que el motor va a rechazar o, peor, que no sabe a que engancharse.
+     Se recalcula el estado con la MISMA funcion que pinta la tarjeta, de modo que
+     guarda y pantalla no pueden discrepar, y se sale sin fetch. Se avisa con el
+     motivo real para que el usuario sepa por que no pasa nada. */
+  var fila = null;
+  var lista = (pfSlotsCat && Array.isArray(pfSlotsCat.data)) ? pfSlotsCat.data : [];
+  for (var i = 0; i < lista.length; i++) {
+    if (lista[i] && lista[i].clave === clave) { fila = lista[i]; break; }
+  }
+  var st = pfSlotsEstado(fila);
+  if (!st.listo) {
+    cmSlotToast(st.motivo || 'Esta compra no esta disponible todavia.', '#fcd34d');
+    return null;
+  }
+  var btn = document.getElementById(pfSlotsId(clave, 'btn'));
+  var previo = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Comprando...'; }
+  return postComAPIJWT({ tipo: 'slot_comprar', clave: clave, ref_id: pfSlotsRef(clave) })
+  .then(function (res) {
+    res = res || {};
+    var u = sesion();
+    if (res.ok === true) {
+      var pagado = pfSlotsNum(res.costo_pagado);
+      pfSlotsSaldoTras = pfSlotsNum(res.disponible_restante);
+      cmSlotToast('Slot comprado. Precio congelado: '
+        + (pagado === null ? 'confirmado' : fmtXp(pagado) + ' XP'));
+    } else {
+      cmSlotToast(pfSlotsMotivo(res.error || '', res), '#ef4444');
+      if (btn) { btn.disabled = false; btn.textContent = previo; }
+    }
+    /* Tras comprar se relee TODO, y el orden importa: primero los slots ya
+       comprados (que es lo que deja de ser elegible el recurso que se acaba de
+       comprar) y despues la lista de recursos, en la misma pasada. Si ese
+       recurso era el ultimo, la tarjeta cae sola al estado "aun no tienes" y el
+       boton queda deshabilitado: no queda un boton vivo apuntando a algo que ya
+       se gasto.
+       la relectura de inventario del perfil NO existe en comunidad y por eso no
+       se referencia; cargarCartasComm() tampoco se llama, porque un slot no
+       altera el mercado de cartas. pfSlotsCargar ya relee saldo, k y slots. */
+    if (u && u.id) pfSlotsCargar(u.id);
+  }).catch(function () {
+    cmSlotToast('Error de conexion', '#ef4444');
+    if (btn) { btn.disabled = false; btn.textContent = previo; }
+  });
+}
+
+/* ---- BONO DE BIENVENIDA POR REFERIDO (feature referidos, mudado del perfil) --
+   GET tipo=bonus_referido. Solo muestra la tarjeta cuando hay bono
+   pendiente y aun sin reclamar. El selector de opciones NO se
+   reimplementa aqui: lo provee usuario-session.js via
+   window.ExploraCO.mostrarSelectorBonoReferido. Degrada en silencio
+   (tarjeta oculta) si el endpoint falla o la funcion no existe.
+   pendiente y reclamado_clave viajan en la RAIZ: se leen de res.raw. */
+function cargarBonoReferido(uid) {
+  var box = document.getElementById('pf-bono');
+  if (!box || !uid) return;
+  try {
+    cmGet('/api/interacciones?tipo=bonus_referido&usuario_id=' + encodeURIComponent(uid))
+      .then(function(res){
+        try {
+          var raw = (res && res.raw) || {};
+          if (!(res && res.ok === true && raw.pendiente === true && !raw.reclamado_clave)) {
+            box.style.display = 'none';
+            return;
+          }
+          box.innerHTML = '<div class="pf-bono-ico">\uD83C\uDF81</div>'
+            + '<div class="pf-bono-txt">'
+            + '<div class="pf-bono-title">Tienes un bono de bienvenida</div>'
+            + '<div class="pf-bono-desc">Elige uno de los regalos por haber llegado con un referido. Solo puedes reclamarlo una vez.</div>'
+            + '</div>'
+            + '<button type="button" class="pf-bono-btn" onclick="pfElegirBono()">Elegir mi bono</button>';
+          box.style.display = 'flex';
+        } catch (eIn) {
+          console.warn('[comunidad] bono_referido render fallo: ' + (eIn && eIn.message));
+          box.style.display = 'none';
+        }
+      })
+      .catch(function(e){
+        console.warn('[comunidad] bono_referido no disponible: ' + (e && e.message));
+        box.style.display = 'none';
+      });
+  } catch (e) {
+    console.warn('[comunidad] bono_referido error: ' + (e && e.message));
+    box.style.display = 'none';
+  }
+}
+function pfElegirBono() {
+  var u = sesion();
+  if (!u || !u.id) return;
+  if (window.ExploraCO && typeof window.ExploraCO.mostrarSelectorBonoReferido === 'function') {
+    window.ExploraCO.mostrarSelectorBonoReferido({ id: u.id });
+  } else {
+    cmSlotToast('El selector de bono aun no esta disponible.', '#ef4444');
+  }
+}
+
+/* Entrada al mercado: carga los dos bloques con GUARD DE IDEMPOTENCIA por
+   visita. El host (#cpanel-mercado) guarda en data-cm-slots-uid el id ya
+   cargado, de modo que re-entrar en la pestana o repetir el hash no relanza
+   las cuatro lecturas, pero un cambio de usuario SI las relanza.
+   Sin sesion no se toca la red: los dos bloques quedan en su estado vacio y el
+   marcador se borra para que el alta vuelva a cargar. */
+function cmSlotsVacio() {
+  var box = document.getElementById('pf-slots');
+  if (box) box.innerHTML = '<div class="sl-vacio">Inicia sesion para ver que slots '
+    + 'de contenido puedes ampliar con tu XP.</div>';
+  var bono = document.getElementById('pf-bono');
+  if (bono) { bono.innerHTML = ''; bono.style.display = 'none'; }
+  var host = document.getElementById('cpanel-mercado');
+  if (host) host.removeAttribute('data-cm-slots-uid');
+}
+function cmSlotsEntrar() {
+  var host = document.getElementById('cpanel-mercado');
+  if (!host) return;
+  var u = sesion();
+  var id = (u && u.id) ? String(u.id) : '';
+  if (!id) { cmSlotsVacio(); return; }
+  if (host.getAttribute('data-cm-slots-uid') === id) return;
+  host.setAttribute('data-cm-slots-uid', id);
+  pfSlotsCargar(id);
+  cargarBonoReferido(id);
+}
+
 /* ---- MERCADO DE CARTAS + moneda (dentro del tab Mercado) ---- */
 function cargarCartasComm() {
   var box = document.getElementById('cm-cartas');
@@ -5006,7 +5853,12 @@ function cmParcheTithe() {
 /* ---- INIT ---- */
 function abrirMercadoDesdeHash() {
   try {
-    if (String(window.location.hash || '').replace('#','').toLowerCase() === 'mercado') showCommTab('mercado');
+    if (String(window.location.hash || '').replace('#','').toLowerCase() === 'mercado') {
+      /* showCommTab('mercado') -> cmMercadoEntrar() ya cubre los cuatro
+         cargadores, incluida cmSlotsEntrar. Llamarla aparte duplicaba la
+         invocacion por cada onExploraCOUpdate. */
+      showCommTab('mercado');
+    }
   } catch (e) {}
 }
 window.onExploraCOUpdate = function() {

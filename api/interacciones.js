@@ -9974,20 +9974,28 @@ module.exports = async function handler(req, res) {
         // Degradacion en dos niveles: sin 035 cae al SELECT sin era pero
         // conserva los nombres publicos (nunca regresa a la clave cruda).
         var invCatalogo = await sql(
-          'SELECT clave, nombre, era_exclusiva FROM consumibles WHERE activo=true',
+          'SELECT clave, nombre, descripcion, era_exclusiva FROM consumibles WHERE activo=true',
           []
         ).catch(function(){ return null; });
         if (!invCatalogo) {
           invCatalogo = await sql(
-            'SELECT clave, nombre FROM consumibles WHERE activo=true',
+            'SELECT clave, nombre, descripcion FROM consumibles WHERE activo=true',
             []
-          ).catch(function(){ return []; });
+          ).catch(function(){ return null; });
+          if (!invCatalogo) {
+            invCatalogo = await sql(
+              'SELECT clave, nombre FROM consumibles WHERE activo=true',
+              []
+            ).catch(function(){ return []; });
+          }
         }
         var invNombres = {};
         var invEras = {};
+        var invDescs = {};
         invCatalogo.forEach(function(c) {
           invNombres[c.clave] = c.nombre;
           invEras[c.clave] = c.era_exclusiva || null;
+          invDescs[c.clave] = c.descripcion || null;
         });
         var inventarioCons = {};
         Object.keys(invCrudo).forEach(function(clave) {
@@ -9995,6 +10003,7 @@ module.exports = async function handler(req, res) {
             cantidad: parseInt(invCrudo[clave], 10) || 0,
             nombre: invNombres[clave] || clave,
             era_exclusiva: invEras[clave] || null,
+            descripcion: invDescs[clave] || null,
           };
         });
         // Stock por clave de consumibles (migracion 057, solo LECTURA: la
