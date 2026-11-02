@@ -834,16 +834,21 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
   .feed-post-actions .btn-filtro-feed,.feed-post-actions .av-act{min-height:40px;font-size:12px;padding:6px 10px}
 }
 /* =====================================================================
-   AFORDANCE PULSABLE DEL NOMBRE DE CARTA EN #cm-cartas
-   El nombre .cv-row-n recibe role="button" tabindex="0" data-cficha desde
-   el JS (inventario y ofertas). Aqui SOLO el aviso visual de que se puede
-   pulsar: cursor, foco dorado y un punteado sutil. NO es un enlace: sin
-   azul ni subrayado solido. Tipografia y tamano heredan de L502.
+   AFORDANCE PULSABLE DE LA FILA DE CARTA EN #cm-cartas
+   Ahora el disparador es la FILA COMPLETA (mismo comportamiento que la
+   tarjeta del perfil): el .cv-row lleva desde el JS role="button"
+   tabindex="0" data-cficha data-carta-id aria-label, en inventario y en
+   ofertas. El nombre .cv-row-n queda como texto normal, sin atributos.
+   Aqui SOLO el aviso visual: cursor, foco dorado y un punteado sutil en
+   el nombre. NO es un enlace: sin azul ni subrayado solido. Tipografia,
+   tamano y padding heredan de L501/L502.
    El dorado es #E8C766 y no var(--gold): --gold es el naranja de marca y
    este trazo debe hablar el mismo idioma que la ficha (.c-ficha).
    ===================================================================== */
-.cm-v61 .cv-row-n[role="button"]{cursor:pointer;-webkit-tap-highlight-color:transparent;text-decoration:underline dotted;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:rgba(232,199,102,.55)}
-.cm-v61 .cv-row-n[role="button"]:focus-visible{outline:2px solid #E8C766;outline-offset:2px;border-radius:3px}
+.cm-v61 .cv-row[role="button"]{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.cm-v61 .cv-row[role="button"]:hover{background:rgba(232,199,102,.05)}
+.cm-v61 .cv-row[role="button"] .cv-row-n{text-decoration:underline dotted;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:rgba(232,199,102,.55)}
+.cm-v61 .cv-row[role="button"]:focus-visible{outline:2px solid #E8C766;outline-offset:-2px;border-radius:3px}
 /* =====================================================================
    SILO .pf-slots (sumideros de XP / slots de contenido) + .pf-bono
    MUDADO DESDE mi-perfil.html (single source): aqui vive el unico dueno
@@ -1312,7 +1317,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 <script src="mymapa.js?v=9"></script>
 <script src="cartas-ui.js?v=2"></script>
 <script src="cartas-arte.js"></script>
-<script src="mercado.js?v=3"></script>
+<script src="mercado.js?v=4"></script>
 <script>
 /* =============================================================
    COMUNIDAD LATAWEL — hub de interaccion social
@@ -4788,16 +4793,31 @@ function cmAccionContrato(accion, id) {
 }
 
 /* ---- Ficha compartida de carta (cartas-ui.js) en el mercado ---- */
-/* Registro por render: la fila guarda el indice, nunca el objeto entero. */
+/* Registro por render: cada fila guarda el indice de su item + el id de la
+   carta. El registro se REEMPLAZA en bloque al pintar (nunca se acumula),
+   asi que un second render no deja indices viejos vivos. */
 var cmFichaReg = [];
 function cmFichaDisp() {
   return !!(window.CartasUI && typeof window.CartasUI.abrirFicha === 'function');
 }
+/* Resuelve el item de una fila: por indice y, si el indice no concuerda con
+   data-carta-id (registro recargado), por clave de carta. */
+function cmFichaItem(node) {
+  var idx = parseInt(node.getAttribute('data-cficha'), 10);
+  var key = node.getAttribute('data-carta-id') || '';
+  var item = (!isNaN(idx) && idx >= 0) ? cmFichaReg[idx] : null;
+  if (item && (!key || String((item.carta && item.carta.id) || '') === key)) return item;
+  if (!key) return item || null;
+  for (var i = 0; i < cmFichaReg.length; i++) {
+    var it = cmFichaReg[i];
+    if (it && it.carta && String(it.carta.id == null ? '' : it.carta.id) === key) return it;
+  }
+  return null;
+}
 function cmFichaAbrir(node) {
   var ui = window.CartasUI;
-  if (!ui || typeof ui.abrirFicha !== 'function' || !node) return;
-  var idx = parseInt(node.getAttribute('data-cficha'), 10);
-  var item = cmFichaReg[idx];
+  if (!ui || typeof ui.abrirFicha !== 'function' || !node || !node.getAttribute) return;
+  var item = cmFichaItem(node);
   if (!item) return;
   if (typeof ui.fichaAbierta === 'function' && ui.fichaAbierta()) ui.cerrarFicha();
   ui.abrirFicha(item.carta, item.opciones);
@@ -4810,17 +4830,23 @@ function cmFichaWire(box) {
     if (!t || !t.closest) return;
     /* Los botones y enlaces de la fila conservan su comportamiento. */
     if (t.closest('button, a')) return;
-    var n = t.closest('.cv-row-n[data-cficha]');
-    if (n) cmFichaAbrir(n);
+    var row = t.closest('.cv-row[data-cficha]');
+    if (row) cmFichaAbrir(row);
   });
   box.addEventListener('keydown', function(ev){
-    if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
+    var k = ev.key;
+    if (k !== 'Enter' && k !== ' ' && k !== 'Spacebar') return;
     var t = ev.target;
     if (!t || !t.closest) return;
-    var n = t.closest('.cv-row-n[data-cficha]');
-    if (!n || n !== t) return;
+    /* Enter en un boton anidado dispara el boton, no la ficha. */
+    if (t.closest('button, a')) return;
+    /* Solo la fila con foco abre (row === t): Espacio fuera de la fila
+       conserva su scroll nativo porque no hay preventDefault. */
+    var row = t.closest('.cv-row[data-cficha]');
+    if (!row || row !== t) return;
     ev.preventDefault();
-    cmFichaAbrir(n);
+    if (ev.repeat) return;
+    cmFichaAbrir(row);
   });
 }
 
@@ -5535,7 +5561,10 @@ function cmSlotsEntrar() {
 function cargarCartasComm() {
   var box = document.getElementById('cm-cartas');
   if (!box) return;
+  /* Registro atomico por render: se construye en local y se publica junto
+     con el innerHTML, para que ningun indice viejo sobreviva a un repintado. */
   cmFichaReg = [];
+  var reg = [];
   var u = sesion();
   if (!u) { box.innerHTML = '<div class="cv-gate"><div class="cv-gate-t">Inicia sesion para el mercado de cartas.</div><button type="button" class="cv-btn" onclick="loginGate()">Iniciar sesion</button></div>'; return; }
   box.innerHTML = '<div class="cv-empty">Cargando cartas\u2026</div>';
@@ -5555,10 +5584,10 @@ function cargarCartasComm() {
         var acc = '<button type="button" class="cv-btn" onclick="cmCartaPublicar(\'' + esc(id) + '\',' + cant + ')">Publicar</button>';
         if (!esGate || esEvento) acc += '<button type="button" class="cv-btn ghost" onclick="cmCartaIntercambiar(\'' + esc(id) + '\')">Intercambiar</button>';
         if (esEvento) acc += '<button type="button" class="cv-btn ghost" onclick="cmCartaEvento(\'' + esc(id) + '\')">Usar en evento</button>';
-        var nAttr = '';
+        var rowAttr = '';
         if (cmFichaDisp()) {
-          var iMis = cmFichaReg.length;
-          cmFichaReg.push({
+          var iMis = reg.length;
+          reg.push({
             carta: {
               id: id, nombre: c.nombre || id, rareza: c.rareza, descripcion: c.descripcion,
               stats_json: c.stats_json, set_slug: c.set_slug, imagen_url: c.imagen_url,
@@ -5567,10 +5596,12 @@ function cargarCartasComm() {
             },
             opciones: { contexto: 'coleccion', cantidad: cant, acciones: acc }
           });
-          nAttr = ' role="button" tabindex="0" data-cficha="' + iMis + '"';
+          rowAttr = ' role="button" tabindex="0" data-cficha="' + iMis + '"'
+            + ' data-carta-id="' + esc(id) + '"'
+            + ' aria-label="Abrir ficha de ' + esc(c.nombre || id) + '"';
         }
-        html += '<div class="cv-row">'
-          + '<div class="cv-row-n"' + nAttr + '>' + esc(c.nombre || id) + ' <span class="cv-chipst">' + esc(c.rareza || '') + '</span></div>'
+        html += '<div class="cv-row"' + rowAttr + '>'
+          + '<div class="cv-row-n">' + esc(c.nombre || id) + ' <span class="cv-chipst">' + esc(c.rareza || '') + '</span></div>'
           + '<div class="cv-row-x">x' + cant + '</div>'
           + acc
           + '</div>';
@@ -5587,10 +5618,10 @@ function cargarCartasComm() {
         var accOf = mia
           ? '<button type="button" class="cv-btn ghost" onclick="cmCartaCancelar(\'' + esc(o.id) + '\')">Cancelar oferta</button>'
           : '<button type="button" class="cv-btn" onclick="cmCartaComprar(\'' + esc(o.id) + '\',' + rest + ')">Comprar</button>';
-        var nAttrOf = '';
+        var rowAttrOf = '';
         if (cmFichaDisp()) {
-          var iOf = cmFichaReg.length;
-          cmFichaReg.push({
+          var iOf = reg.length;
+          reg.push({
             carta: {
               id: o.carta_id, nombre: o.carta_nombre || o.carta_id, rareza: o.rareza,
               descripcion: o.descripcion, stats_json: o.stats_json, imagen_url: o.imagen_url
@@ -5600,16 +5631,19 @@ function cargarCartasComm() {
               nota: 'Vendedor: ' + (o.vendedor_nombre || 'Viajero'), acciones: accOf
             }
           });
-          nAttrOf = ' role="button" tabindex="0" data-cficha="' + iOf + '"';
+          rowAttrOf = ' role="button" tabindex="0" data-cficha="' + iOf + '"'
+            + ' data-carta-id="' + esc(o.carta_id) + '"'
+            + ' aria-label="Abrir ficha de ' + esc(o.carta_nombre || o.carta_id) + '"';
         }
-        html += '<div class="cv-row">'
-          + '<div class="cv-row-n"' + nAttrOf + '>' + esc(o.carta_nombre || o.carta_id) + ' <span class="cv-chipst">' + esc(o.rareza || '') + '</span></div>'
+        html += '<div class="cv-row"' + rowAttrOf + '>'
+          + '<div class="cv-row-n">' + esc(o.carta_nombre || o.carta_id) + ' <span class="cv-chipst">' + esc(o.rareza || '') + '</span></div>'
           + '<div class="cv-row-d">' + esc(o.vendedor_nombre || 'Viajero') + (mia ? ' (tu oferta)' : '') + '</div>'
           + '<div class="cv-row-x">' + fmtXp(o.precio_xp) + ' XP \u00b7 ' + rest + ' disp.</div>'
           + accOf
           + '</div>';
       });
     }
+    cmFichaReg = reg;
     box.innerHTML = html;
     cmFichaWire(box);
   }).catch(function(){ box.innerHTML = '<div class="cv-err">No se pudo cargar el mercado de cartas.</div>'; });

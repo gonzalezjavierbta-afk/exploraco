@@ -863,11 +863,58 @@
     }
     return h;
   }
+  /* ---- Ficha ampliada del catalogo (cartas-ui.js) ----------------------
+   * ADR-008: si la pagina no cargo cartas-ui.js (o no expone abrirFicha) el
+   * HTML del catalogo queda EXACTAMENTE como antes: cero bytes anadidos, ni
+   * data-* ni role/tabindex. El registro vive POR RENDER y el nodo guarda el
+   * INDICE, nunca el objeto: el catalogo se repinta y un objeto viejo no se
+   * reutiliza. Un UNICO listener delegado en #mercado-cuerpo abre la ficha. */
+  var _fichaCat = [];
+  var WIRE_FICHA = 'data-mkficha-wire';
+  function fichaDisp() {
+    var ui = cartasUI();
+    return !!(ui && typeof ui.abrirFicha === 'function');
+  }
+  /* Carta que espera CartasUI.abrirFicha. La descripcion va INTEGRA (la
+   * tarjeta la recorta a 110 para pintar; la ficha es el texto editorial). */
+  function fichaCatCarta(c) {
+    var clave = String(c.clave || '');
+    var carta = {
+      id: clave,
+      nombre: c.nombre || clave,
+      descripcion: String(c.descripcion || ''),
+      categoria: c.categoria
+    };
+    if (c.rareza !== null && c.rareza !== undefined) carta.rareza = c.rareza;
+    /* La lamina de la ficha usa la MISMA marca que la de la tarjeta. */
+    if (c.marca_nombre) carta.marca_nombre = c.marca_nombre;
+    return carta;
+  }
+  /* Opciones de ficha: contexto 'mercado' (etiqueta Disponible + precio).
+   * 'cantidad' solo si el inventario trae ese item; 'precio' solo si hay
+   * precio_xp (si es nulo la ficha omite la linea); 'nota' con categoria y/o
+   * faccion exigida. */
+  function fichaCatOpciones(c, acciones) {
+    var o = { contexto: 'mercado', acciones: acciones };
+    var clave = String(c.clave || '');
+    if (_inv && Object.prototype.hasOwnProperty.call(_inv, clave)) {
+      o.cantidad = invCant(clave);
+    }
+    if (c.precio_xp !== null && c.precio_xp !== undefined) {
+      o.precio = fmt(c.precio_xp) + ' XP';
+    }
+    var nota = String(c.categoria || '').trim();
+    var fac = String(c.faccion_requerida || '').trim();
+    if (fac) nota += (nota ? ' - ' : '') + 'Faccion: ' + nombreFaccion(fac);
+    if (nota) o.nota = nota;
+    return o;
+  }
   function catalogoHtml() {
     var todo = _catalogo || [];
     /* Un solo guard por render: sin CartasArte la salida es EXACTAMENTE la de
      * antes (ni silo ni clases de carta, cero bytes anadidos al DOM). */
     var api = arteApi();
+    _fichaCat = [];
     var nMios = todo.filter(function (c) { return invCant(String(c.clave || '')) > 0; }).length;
     var h = '<div class="mk-sec-t">Catalogo de productos</div>';
     if (!todo.length) return h + '<div class="mk-msg">No se pudo cargar el catalogo de productos.</div>';
@@ -936,6 +983,15 @@
         xp: c.precio_xp
       };
       var ar = api ? { slot: String(api.slotHtml(art) || ''), hay: !!api.arteDe(art) } : null;
+      /* Ficha ampliada: se registra SIEMPRE que cartas-ui.js este disponible,
+       * con o sin lamina (el clic no compra, informa). El boton de la ficha es
+       * el MISMO markup (mismos guards: bloqueado/sinPrecio => disabled). */
+      var fichaOn = fichaDisp();
+      var idxFicha = -1;
+      if (fichaOn) {
+        idxFicha = _fichaCat.length;
+        _fichaCat.push({ carta: fichaCatCarta(c), opciones: fichaCatOpciones(c, btn) });
+      }
       /* Con lamina, nombre/clave/precio/descripcion van HORNEADOS en el PNG:
        * el HTML solo pinta lo dinamico (tienes/falta/bloqueo/gates + boton).
        * Sin lamina (placeholder o modulo ausente) se mantiene la ficha entera. */
@@ -946,7 +1002,11 @@
           + (c.categoria ? (' \u00b7 ' + esc(c.categoria)) : '') + '</div>'
           + (desc ? '<div class="mk-cat-d">' + esc(desc) + '</div>' : '');
       }
-      h += '<div class="mk-cat-c' + (ar ? ' c-card c-card--lg' : '') + '">'
+      h += '<div class="mk-cat-c' + (ar ? ' c-card c-card--lg' : '') + '"'
+        + (fichaOn
+          ? (' data-mkficha="' + idxFicha + '" role="button" tabindex="0" style="cursor:pointer"')
+          : '')
+        + '>'
         + (ar ? ar.slot : '')
         + ficha
         + tags
@@ -957,6 +1017,45 @@
     h += '<div class="mk-nota">El catalogo se compra directo con XP desde cada producto. '
       + 'Los articulos sin faccion se pueden usar desde cualquier faccion.</div>';
     return h;
+  }
+  /* Abre la ficha registrada para el nodo pulsado. Nunca lanza (ADR-008). */
+  function fichaCatAbrir(node) {
+    var ui = cartasUI();
+    if (!ui || typeof ui.abrirFicha !== 'function' || !node) return;
+    var idx = parseInt(node.getAttribute('data-mkficha'), 10);
+    if (!isFinite(idx) || idx < 0) return;
+    var it = _fichaCat[idx];
+    if (!it) return;
+    try { ui.abrirFicha(it.carta, it.opciones); } catch (e) {}
+  }
+  /* Delegacion: UN listener de clic y UNO de teclado por host. Idempotente por
+   * atributo en el PROPIO host: renderComunidad solo reescribe innerHTML, asi
+   * que el host persiste y no se duplica; si el host se recrea, el nodo nuevo
+   * no trae el atributo y el listener se reinstala. */
+  function wireFichas(host) {
+    if (!host || typeof host.addEventListener !== 'function') return;
+    if (!fichaDisp()) return;
+    if (host.getAttribute && host.getAttribute(WIRE_FICHA) === '1') return;
+    host.setAttribute(WIRE_FICHA, '1');
+    host.addEventListener('click', function (ev) {
+      var t = ev && ev.target;
+      if (!t || !t.closest) return;
+      /* El boton Comprar y cualquier enlace conservan su propio clic. */
+      if (t.closest('button, a')) return;
+      var n = t.closest('.mk-cat-c[data-mkficha]');
+      if (n) fichaCatAbrir(n);
+    });
+    host.addEventListener('keydown', function (ev) {
+      if (!ev) return;
+      if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var n = t.closest('.mk-cat-c[data-mkficha]');
+      /* Solo el contenedor enfocado: nunca un hijo ni otra tecla. */
+      if (!n || n !== t) return;
+      if (ev.preventDefault) ev.preventDefault();
+      fichaCatAbrir(n);
+    });
   }
   function misOfertasHtml() {
     var ofertas = (_mi && _mi.ofertas) || [];
@@ -1009,6 +1108,7 @@
     html += catalogoHtml();
     html += cartasHtml(u.id);
     el.innerHTML = html;
+    wireFichas(el);
   }
   function cargar() {
     var el = document.getElementById('mercado-cuerpo');
