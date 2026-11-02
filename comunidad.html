@@ -4819,35 +4819,56 @@ function cmFichaAbrir(node) {
   if (!ui || typeof ui.abrirFicha !== 'function' || !node || !node.getAttribute) return;
   var item = cmFichaItem(node);
   if (!item) return;
-  if (typeof ui.fichaAbierta === 'function' && ui.fichaAbierta()) ui.cerrarFicha();
-  ui.abrirFicha(item.carta, item.opciones);
+  /* El cierre previo es opcional: se comprueba que exista ANTES de llamarlo
+     (un CartasUI que solo exponga abrirFicha, o que cargue a medias, no debe
+     tumbar el listener de la delegacion). */
+  try {
+    if (typeof ui.fichaAbierta === 'function' && ui.fichaAbierta()
+      && typeof ui.cerrarFicha === 'function') ui.cerrarFicha();
+  } catch (e1) {}
+  /* Silent Fallback (ADR-008): si el modulo falla al pintar, la ficha no abre
+     pero la excepcion no sube al listener y el resto de la delegacion (botones,
+     enlaces y filas siguientes) sigue viva. Sin logging ruidoso ni avisos. */
+  try { ui.abrirFicha(item.carta, item.opciones); } catch (e2) {}
 }
+/* Handlers con nombre propio: permiten el removeEventListener previo, que es
+   lo que hace la instalacion idempotente de verdad (no solo por atributo). */
+function cmFichaTap(ev) {
+  var t = ev.target;
+  if (!t || !t.closest) return;
+  /* Los botones y enlaces de la fila conservan su comportamiento. */
+  if (t.closest('button, a')) return;
+  var row = t.closest('.cv-row[data-cficha]');
+  if (row) cmFichaAbrir(row);
+}
+function cmFichaKey(ev) {
+  var k = ev.key;
+  if (k !== 'Enter' && k !== ' ' && k !== 'Spacebar') return;
+  var t = ev.target;
+  if (!t || !t.closest) return;
+  /* Enter en un boton anidado dispara el boton, no la ficha. */
+  if (t.closest('button, a')) return;
+  /* Solo la fila con foco abre (row === t): Espacio fuera de la fila
+     conserva su scroll nativo porque no hay preventDefault. */
+  var row = t.closest('.cv-row[data-cficha]');
+  if (!row || row !== t) return;
+  ev.preventDefault();
+  if (ev.repeat) return;
+  cmFichaAbrir(row);
+}
+/* El guard data-cficha-wire se escribe SOLO despues de instalar los listeners.
+   Si el primer render llega antes de que exista CartasUI, cmFichaDisp() es
+   falsa, no se instala nada y el atributo NO se marca: el siguiente intento
+   (o el siguiente render) si puede instalar. Mismo patron que
+   v61InstalarFichaDeleg en mi-perfil.html. */
 function cmFichaWire(box) {
-  if (!box || !cmFichaDisp() || box.getAttribute('data-cficha-wire') === '1') return;
+  if (!box || !cmFichaDisp()) return;
+  if (box.getAttribute('data-cficha-wire') === '1') return;
+  box.removeEventListener('click', cmFichaTap, false);
+  box.addEventListener('click', cmFichaTap, false);
+  box.removeEventListener('keydown', cmFichaKey, false);
+  box.addEventListener('keydown', cmFichaKey, false);
   box.setAttribute('data-cficha-wire', '1');
-  box.addEventListener('click', function(ev){
-    var t = ev.target;
-    if (!t || !t.closest) return;
-    /* Los botones y enlaces de la fila conservan su comportamiento. */
-    if (t.closest('button, a')) return;
-    var row = t.closest('.cv-row[data-cficha]');
-    if (row) cmFichaAbrir(row);
-  });
-  box.addEventListener('keydown', function(ev){
-    var k = ev.key;
-    if (k !== 'Enter' && k !== ' ' && k !== 'Spacebar') return;
-    var t = ev.target;
-    if (!t || !t.closest) return;
-    /* Enter en un boton anidado dispara el boton, no la ficha. */
-    if (t.closest('button, a')) return;
-    /* Solo la fila con foco abre (row === t): Espacio fuera de la fila
-       conserva su scroll nativo porque no hay preventDefault. */
-    var row = t.closest('.cv-row[data-cficha]');
-    if (!row || row !== t) return;
-    ev.preventDefault();
-    if (ev.repeat) return;
-    cmFichaAbrir(row);
-  });
 }
 
 /* ---- SUMIDEROS DE XP (slots de contenido) + BONO DE REFERIDO --------------

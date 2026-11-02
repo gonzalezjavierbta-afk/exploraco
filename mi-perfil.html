@@ -2837,7 +2837,15 @@ function cargarInventario(uid) {
            objeto de pfInvFicha lleva solo los campos del contrato. */
         var notaFicha = '';
         if (item.era_exclusiva) notaFicha = 'Era ' + String(item.era_exclusiva);
-        var facReq = (item.faccion_requerida != null) ? String(item.faccion_requerida).trim() : '';
+        /* faccion_requerida llega en el payload de tipo=inventario con el mismo
+           nombre que en el catalogo. Se normaliza antes de usarla: null, cadena
+           vacia, 'null' y 'undefined' son AUSENCIA, no texto, para que la nota
+           nunca imprima la palabra null. Con dato se traduce con
+           pfFacFaccionTxt (FACCION_META) y, si el codigo no esta en el mapa, se
+           pinta tal cual: no se inventa una faccion. */
+        var facReq = (item.faccion_requerida != null)
+          ? String(item.faccion_requerida).trim() : '';
+        if (/^(null|undefined)$/i.test(facReq)) facReq = '';
         if (facReq) notaFicha += (notaFicha ? ' - ' : '') + pfFacFaccionTxt(item);
         pfInvNota[String(k)] = notaFicha;
         var slot = '';
@@ -2846,10 +2854,14 @@ function cargarInventario(uid) {
             slot = String(A.slotHtml({ clave: String(k), nombre: String(nombre), xp: null }) || '');
           } catch (e) { slot = ''; }
         }
+        /* Interactivo anidado (hallazgo del Escudo GOLD): el disparador de la
+           ficha NUNCA envuelve un <button>. Sin lamina los atributos van en el
+           NOMBRE (.inv-name) y no en .inv-item, de modo que el boton Usar y la
+           cantidad quedan FUERA del nodo con role="button". */
         if (!slot) {
-          return '<div class="inv-item"' + fichaAttrs + '>'
+          return '<div class="inv-item">'
             + qtyTag
-            + '<div class="inv-name">' + esc(nombre) + tags + '</div>'
+            + '<div class="inv-name"' + fichaAttrs + '>' + esc(nombre) + tags + '</div>'
             + usarBtn
             + '</div>';
         }
@@ -2859,10 +2871,13 @@ function cargarInventario(uid) {
            El consumible SI abre ficha: lleva los mismos atributos que una carta
            de Mis Cartas, pero con data-c-ficha-sup="consumible" para que la
            resolucion vaya por pfInvFicha (por CLAVE) y no por v61CartasCache.
+           Los atributos van SOLO en el contenedor de la lamina (.c-card): el
+           nodo con role="button" contiene el arte y nada mas, asi que el boton
+           Usar y las etiquetas quedan fuera (interactivo anidado prohibido).
            Sin el modulo cargado v61FichaAttrs devuelve '' y el markup queda
            exactamente como antes (degradacion ADR-008). */
-        return '<div class="v61-card"' + fichaAttrs + '>'
-          + '<div class="c-card c-card--lg">' + slot + '</div>'
+        return '<div class="v61-card">'
+          + '<div class="c-card c-card--lg"' + fichaAttrs + '>' + slot + '</div>'
           + '<div class="inv-item">' + qtyTag + tags + usarBtn + '</div>'
           + '</div>';
       }).join('');

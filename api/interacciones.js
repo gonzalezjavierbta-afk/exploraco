@@ -9974,7 +9974,7 @@ module.exports = async function handler(req, res) {
         // Degradacion en dos niveles: sin 035 cae al SELECT sin era pero
         // conserva los nombres publicos (nunca regresa a la clave cruda).
         var invCatalogo = await sql(
-          'SELECT clave, nombre, descripcion, era_exclusiva FROM consumibles WHERE activo=true',
+          'SELECT clave, nombre, descripcion, era_exclusiva, faccion_requerida FROM consumibles WHERE activo=true',
           []
         ).catch(function(){ return null; });
         if (!invCatalogo) {
@@ -9989,13 +9989,17 @@ module.exports = async function handler(req, res) {
             ).catch(function(){ return []; });
           }
         }
+        // Nivel 1: descripcion, era_exclusiva y faccion_requerida. Nivel 2: descripcion sin era_exclusiva y a proposito sin
+        // faccion_requerida (esquemas pre-057). Nivel 3: rescate con clave y nombre; el cliente degrada (ADR-008).
         var invNombres = {};
         var invEras = {};
         var invDescs = {};
+        var invFacs = {};
         invCatalogo.forEach(function(c) {
           invNombres[c.clave] = c.nombre;
           invEras[c.clave] = c.era_exclusiva || null;
           invDescs[c.clave] = c.descripcion || null;
+          invFacs[c.clave] = c.faccion_requerida || null;
         });
         var inventarioCons = {};
         Object.keys(invCrudo).forEach(function(clave) {
@@ -10004,6 +10008,7 @@ module.exports = async function handler(req, res) {
             nombre: invNombres[clave] || clave,
             era_exclusiva: invEras[clave] || null,
             descripcion: invDescs[clave] || null,
+            faccion_requerida: invFacs[clave] || null,
           };
         });
         // Stock por clave de consumibles (migracion 057, solo LECTURA: la
