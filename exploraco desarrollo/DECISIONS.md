@@ -12271,3 +12271,200 @@ El orden es **de visibilidad**, no de dificultad: cada lámina cuesta lo mismo, 
 ### Estado
 
 **ACEPTADO** (2026-11-01). Normativiza **código ya implementado y certificado en el árbol de trabajo**: `cartas-arte.js`, `cartas-ui.css:105-179+`, las **5** láminas de `assets/cartas/`, las 6 superficies consumidoras y `.vercelignore:1-5`. **Sin commit y sin deploy** en el momento de redactarse. No hay ADR derogado: D1-D6 **acotan** ADR-004 en UI y **completan** ADR-108 en superficie de arte, sin crear endpoint, columna ni campo de `tags` (presupuesto **8/8** intacto). Pendiente: **41 láminas** en el orden de D6 (D-1), **`/cartas/` en `.gitignore` y borrado de maestros** (D-2) y **control de ratio** (D-3). `TASKS.md` y `BLUEPRINT.md` solo **apuntan** a `ADR-112`.
+
+---
+
+## ADR-113: La ficha de carta (popup de detalle) es UN componente compartido de `CartasUI` (`abrirFicha`/`cerrarFicha`), con host unico creado bajo demanda en `document.body`, silo CSS propio `.c-ficha` y superficie de ACCIONES inyectada por cada pagina; el modulo NO duplica logica de negocio ni hace fetch propio [NO deroga ninguna premisa de ADR previos; **extiende** la Regla de No-Duplicidad de `cartas-ui.js:3-6` al detalle de carta, **acota** ADR-004 con un segundo silo, y **no toca** el modelo de emisor/rareza/variante de ADR-108 ni el arte de ADR-112; cero endpoint, cero columna, cero campo de `tags`]
+
+**ID:** ADR-113
+**Fecha:** 2026-11-01
+**Autor:** `@architect` (Chief Architect, AI-DOS) en funcion **normativa y de diseno**. Gate de riesgo `@architect` **CONSUMIDO**: el operador confirmo explicitamente en sesion ("GATE CONFIRMADO") que esta tarea se redacta como ADR nuevo.
+**Estado:** **Aceptado e IMPLEMENTADO en el arbol de trabajo** (2026-11-01; sin commit y sin deploy). El contrato se redacto **antes** del codigo (caso inverso a ADR-112, donde el codigo precedio al ADR) y el **revisor arquitectonico emitio APRUEBA CONDICIONADA**: las **5 condiciones C1-C5** estan aplicadas en el codigo y **corregidas en esta seccion** (C1: la deuda de arte del mercado era **falsa** y se elimina; C2: lamina por `CartasArte.slotHtml`; C3: contrato de presentacion por contexto; C4: agrupamiento de selectores fuera del silo; C5: exclusion del propio disparador en el guard de delegacion). Verificado el 2026-11-01 contra el archivo real (ADR-006): `cartas-ui.js` (22.837 bytes) expone `abrirFicha` (`:503`), `cerrarFicha` (`:537`) y `fichaAbierta` (`:562`) en `window.CartasUI` (`:578-580`), y `cartas-ui.css` (19.621 bytes) aporta el silo `.c-ficha`. **Unico pendiente:** verificacion visual en navegador de las 5 superficies cableadas (V11).
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-112`** (linea 12160); **no existia ningun `ADR-113`**. Conteo de encabezados `^## ADR-` antes de esta seccion: **111**, con **112** como maximo y un unico hueco historico (`ADR-005`, nunca redactado). La cabecera del fichero **no tiene indice/TOC** (solo el parrafo de proposito), asi que **no hay entrada que insertar**.
+**Estilo:** seccion redactada en **ASCII estricto** (ADR-002, sin tildes ni bytes > 127) para que el contrato que se copia al codigo sea **byte-estable** de ida y vuelta.
+
+### Problema
+
+Cuatro superficies ya pintan cartas con **el mismo dato y cinco presentaciones distintas**, y ninguna ofrece el detalle:
+
+1. `mi-perfil.html` -> "Mis Cartas" (`cargarCartas`, `8156-8232`), vitrina del museo (`v61RenderVitrina`, `8322-8358`) y album (`v61RenderAlbum`, `8377-8443`).
+2. `perfil.html` -> vitrina publica de solo lectura (`pfCarta`, `938-1000`).
+3. `comunidad.html` -> mercado de cartas (`cmCartas`, `4648-4686`), con **filas** `.cv-row` para "Mis cartas" y "Ofertas en venta".
+
+Hoy el usuario ve **nombre + rareza + lamina**; el resto del dato que la API **ya devuelve** (`descripcion`, `stats_json`, `set_slug`, `emisor_tipo`, `marca_nombre`, `nivel_gate`, `es_evento`, `fusionable`, `es_canjeable_qr`, `variantes[]`, `cantidad_restante`, `precio_xp`) **no se puede leer en ningun sitio de la UI**. La presion natural es escribir cuatro popups, uno por superficie, y esa respuesta produce **cuatro productos**: cuatro formas de escribir la rareza, cuatro bloques "como funciona" que se contradicen, cuatro implementaciones de Esc/backdrop/foco (una de ellas se olvida) y cuatro sitios donde arreglar el mismo bug.
+
+Segundo problema, ya escrito en el modulo: `cartas-ui.js:3-6` declara la **Regla de No-Duplicidad** ("las vistas que pintan cartas consumen ESTE fichero. Nadie reimplementa etiquetas, colores ni badges por su cuenta"). Un popup con nombre, rareza, variante y badge de emisor **es** esa regla; si no se dice explicitamente, la regla se leera como "solo etiquetas de tarjeta" y cada vista escribira su detalle.
+
+### Datos medidos (2026-11-01, contra el archivo real; ADR-006)
+
+Medicion del **diagnostico previo** a la implementacion: los tamanos y numeros de linea de `cartas-ui.js`/`cartas-ui.css` cambiaron al implementar (ver `Estado`), y el reparto de datos por superficie ya quedo **extendido** (punto 4).
+
+1. **`cartas-ui.js` (8 KB)**, IIFE de navegador, vanilla puro: cabecera de No-Duplicidad en `:3-6`, `Expone: window.CartasUI` en `:9`, asignacion en **`:188`** con `EMISORES`, `RAREZAS`, `VARIANTES`, `claseRareza`, `badgeEmisor`, `esc`, `statsTexto`, `urlMuseo`, `fetchMuseo`, `TOPE_MUSEO` (`:189-198`), cierre IIFE `:201`. **No hay funcion de detalle ni de modal.**
+2. **`cartas-ui.css` (10,3 KB)**: **39** selectores anclados a `.cartas-silo` (ADR-004). Define `.c-card`, `.c-card--sm|md|lg`, `.c-card-arte`, `.c-card-img`, badge de emisor y shiny. **Ningun** selector de popup/ficha.
+3. **`cartas-arte.js` (9,8 KB)**: `arteDe()`, `slotHtml()`, `faltantes()`; ratio **1086/1448** como contrato (ADR-112 D4). La lamina es **completa** y la UI **no escribe texto encima** (ADR-112 D1).
+4. **Datos disponibles por superficie (ramas GET existentes, sin endpoint nuevo):** `cartas_mias` en `api/usuarios.js:996-1013` (id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, emisor_tipo, marca_nombre, descripcion, stats_json, es_canjeable_qr, fusionable, `variantes[]` con `{variante,cantidad,en_museo,orden_museo,activa}`); `museo_cartas` en `api/usuarios.js:1165-1174` (id, nombre, rareza, set_slug, imagen_url, descripcion, emisor_tipo, marca_nombre, stats_json, variante); `cartas_mias` de mercado en `comunidad.html:4648-4686` (id, nombre, rareza, cantidad, nivel_gate, es_evento) y `cartas_ofertas` en `api/interacciones.js:7116-7122`, que devuelve **`carta_id, carta_nombre, rareza, precio_xp, cantidad_restante, imagen_url, set_slug, nivel_gate, es_evento, emisor_tipo, marca_nombre, descripcion, stats_json`** (mas `vendedor_nombre`/`vendedor_id`): los **13** campos que la ficha necesita, **incluido el arte**. La extension de esa rama (sumar `descripcion` y `stats_json`) fue el unico cambio de backend de la tanda y **no crea endpoint** (presupuesto 8/8).
+5. **Cache ya existente en `mi-perfil.html`:** `v61CartasCache` y helper `v61CartaPorId` (`:8467`). La ficha puede abrir **sin red** desde memoria.
+6. **Patron modal vigente en la pagina:** `.pf-museo-modal` / `.mp-picker-modal` (`mi-perfil.html:726-770`), `position:fixed; inset:0`, backdrop `rgba`, clase `.open` para `display:flex`. Es el patron visual a **respetar**, no el host a reutilizar (viven dentro del DOM de la pagina y de otro silo).
+7. **Navegacion de la pagina:** **10** pestanas en `PF_TABS` (`:7349`), visibilidad por `data-tab` (`pfAplicarTab`, `:7415`). Un host dentro de un `[data-tab]` **heredaria** su `display:none` al cambiar de pestana y cerraria la ficha sola: motivo tecnico, no estetico, para colgar el host de `document.body`.
+8. **Presupuesto Vercel 8/8 intacto:** este ADR no crea endpoint, tabla ni columna. `(Get-ChildItem api\*.js).Count` = **8**.
+
+### Decision
+
+**D1. Una sola implementacion: `CartasUI.abrirFicha` / `CartasUI.cerrarFicha` (Regla de No-Duplicidad).**
+
+El detalle de carta vive **solo** en `cartas-ui.js` (logica y markup) + `cartas-ui.css` (estilos), y se publica en `window.CartasUI` junto al resto de la API (`cartas-ui.js:188-198`). **Prohibido** implementar un popup de carta en `mi-perfil.html`, `perfil.html`, `comunidad.html`, `mercado.js` o cualquier `.html`/`.js` de superficie. Una superficie nueva que pinte cartas **llama** a `abrirFicha()`; no copia el componente. Norma derivada: si una superficie necesita una etiqueta o un badge nuevos, se anaden al modulo compartido, nunca a la pagina.
+
+**D2. API cerrada y superficial: tres funciones y un objeto de opciones.**
+
+```
+CartasUI.abrirFicha(carta, opciones)   -> void
+CartasUI.cerrarFicha()                 -> void (idempotente)
+CartasUI.fichaAbierta()                -> boolean (lectura de estado)
+opciones = {
+  contexto:         'coleccion' | 'album' | 'vitrina-publica' | 'mercado',
+  acciones:         string (HTML ya armado por la pagina) | '',
+  cantidad:         number | string (opcional; si falta se lee de la carta),
+  etiquetaCantidad: string (opcional; sobreescribe la etiqueta del contexto)
+}
+```
+
+`fichaAbierta()` se anadio al implementar (`cartas-ui.js:562`, expuesta en `:578-580`) porque el mercado **reabre** la ficha de otra fila y necesita cerrar antes sin apilar hosts. `opciones.titulo` **no se implemento**: el encabezado accesible sale de `carta.nombre` (D7).
+
+Reglas duras de la firma:
+
+- `carta` es el **objeto ya recibido por la superficie** (fila de la rama GET, o entrada de `v61CartasCache`). El modulo **no** recibe un `id` y **no** resuelve: no hay `abrirFichaPorId`.
+- `contexto` solo cambia **etiquetas y estado vacio de acciones** (p. ej. "Cantidad en tu coleccion" en `coleccion`/`album`, "En su museo" en `vitrina-publica`, "Disponible" en `mercado`), **nunca** logica de negocio ni reglas de visibilidad de un dato.
+- `acciones` es **HTML de confianza escrito por la pagina**; el modulo lo inyecta tal cual en `#c-ficha-acciones`. Aunque el HTML sea de la pagina, **todo dato de servidor interpolado en ese string lo escapa la pagina** con `CartasUI.esc()` antes de concatenar.
+- `abrirFicha` es **sincrona** y **reentrante**: si se llama con la ficha abierta, **reemplaza** el contenido (no apila dos hosts ni dos backdrops).
+- `cerrarFicha` **no** destruye nodos (ADR-003): oculta y limpia la accion inyectada.
+
+**D3. Host unico creado bajo demanda en `document.body`, jamas dentro de `.cartas-silo`.**
+
+El host (`div#c-ficha-host` con clase `.c-ficha`) se crea **la primera vez** que se abre una ficha, se agrega a `document.body` y **se reutiliza** en todas las aperturas posteriores. Motivos medidos, no esteticos: (i) `.cartas-silo` **recorta** la lamina (`overflow`) y la ficha debe salir del flujo y cubrir el viewport; (ii) dentro de un `[data-tab]` de las 10 pestanas de `mi-perfil.html` (`PF_TABS:7349`, `pfAplicarTab:7415`) la ficha **desapareceria** al cambiar de pestana sin cerrarse; (iii) un host por superficie multiplicaria por cuatro la deuda de accesibilidad.
+
+**D4. Silo CSS propio: `.c-ficha` como unico padre (ADR-004).**
+
+Los estilos de la ficha viven en `cartas-ui.css` bajo el padre unico **`.c-ficha`**: **cero** selectores sueltos, **cero** fugas a `:root`, **cero** `!important`, **cero** `html`/`body` como selector de estilo (el bloqueo de scroll de D7 se aplica y retira por `classList`, no por regla global persistente). El host **no** lleva `.cartas-silo` ni reutiliza sus reglas de rejilla. La ficha **no** redefine `.c-card*`; usa `CartasArte.slotHtml()` a densidad `lg` y respeta el ratio **1086/1448** (ADR-112 D4).
+
+**Reutilizar sin mas las clases del silo NO funciona, y el implementador no puede suponerlo.** `.c-badge-emisor`, `.c-shiny` y la variable `--c-arte-fs` nacieron **ancladas a `.cartas-silo`** (`cartas-ui.css:13-16`, `:26-27`, `:34-35`, `:48-49`, `:69-70`; `--c-arte-fs` en `:111-113`), y el host de la ficha vive en `document.body`, **fuera** del silo: copiar el markup del badge sin mas dejaria el badge **sin estilo**. Por eso el componente **agrupa selectores** (mismo bloque, dos padres: `.cartas-silo X, .c-ficha X`) en lugar de duplicar reglas, medido en `cartas-ui.css` `:13-18` (reset del componente), `:26-27` y `:34-35` (shiny), `:48-49` y `:69-70` (badge de emisor). El **tamano de lamina lo declara `.c-ficha`**, no el silo: `.c-ficha .c-card--lg { width:100%; --c-arte-fs: 1.05rem }` (`:114`, frente a `.9rem` del silo en `:113`) y `.c-ficha .c-card-arte { aspect-ratio: 1086/1448 }` (`:117-122`). El affordance de apertura `[data-c-ficha-abrir]` (`:651-686`) tambien se acota a `.cartas-silo`.
+
+**D5. Contrato de presentacion (las cinco lineas que el implementador NO puede renegociar).**
+
+1. **Lamina grande primero:** `CartasArte.slotHtml()` en densidad `lg` con el ratio `1086/1448`. **La ficha del mercado resuelve la lamina con `CartasArte.slotHtml({clave: carta_id, imagenUrl: imagen_url})`** (la rama `cartas_ofertas` devuelve **los dos** campos, ver "Datos medidos" 4), asi que **el hueco solo aparece cuando de verdad no hay arte** (`cartas-ui.js:420-421`). La lamina es completa: **no** se escribe nombre/tipo/XP encima (ADR-112 D1).
+2. **Identidad en una sola linea de lectura:** nombre, rareza via `claseRareza()`, variante via `VARIANTES`, cantidad, set (`set_slug`), emisor/marca via `badgeEmisor()` + `marca_nombre`. **La cantidad se etiqueta por CONTEXTO, no por dato** (`FICHA_ETIQ_CANTIDAD`, `cartas-ui.js:216-219`): `coleccion` y `album` -> **"Cantidad en tu coleccion"**; `vitrina-publica` -> **"En su museo"**; `mercado` -> **"Disponible"** con `cantidad_restante`. **Prohibido "tienes" fuera de `coleccion`/`album`**: ni el visitante de una vitrina ni el comprador del mercado poseen la carta. `precio_xp` se pinta **solo** en `mercado` y **su linea se omite si es nula** (`cartas-ui.js:389-394`).
+3. **Descripcion integra del catalogo:** `descripcion` se pinta **completa**, sin truncar, sin "ver mas", sin reescribir.
+4. **Bloque "Como funciona" GENERADO, nunca redactado a mano:** se compone de los numeros de `stats_json` (`bonus_xp_pct`, `capacidad_gate`) mas las reglas del catalogo presentes en el dato (`nivel_gate`, `es_evento`, `fusionable` = 4 base -> 1 shiny, `es_canjeable_qr`) y "como se obtiene" derivado de `set_slug`/`emisor_tipo`. Cada linea se emite **solo si su campo existe y es del tipo esperado**.
+5. **Degradacion honesta y sin huecos (ADR-008):** campo ausente = linea **omitida**; `descripcion` nula = **estado explicito** ("Este catalogo todavia no tiene descripcion editorial"), **nunca** un bloque vacio, **nunca** texto inventado, **nunca** un placeholder tipo "null"/"-" visible al usuario.
+
+**D6. La superficie de ACCIONES la inyecta la pagina; el modulo NO duplica logica de negocio.**
+
+El modulo renderiza un unico contenedor `#c-ficha-acciones` (salvo en `vitrina-publica`, ver abajo) y **no conoce** ningun boton: no sabe vender, fusionar, exhibir ni comprar. Cada pagina pasa `acciones` reutilizando **sus funciones ya existentes** y engancha sus listeners **despues** de `abrirFicha()`, por delegacion sobre `#c-ficha-acciones` (un solo listener por pagina, registrado una vez). Mapa de reutilizacion (cerrado, no inventar acciones nuevas):
+
+| Contexto | Superficie | Acciones desde funciones existentes |
+|---|---|---|
+| `coleccion` | `mi-perfil.html` "Mis Cartas" | `v61PublicarCarta`, `v61ExhibirCarta`, `v61FusionarCarta`, `v61VenderCarta`, `v61UsarCartaEvento` |
+| `album` | `mi-perfil.html` album | `v61ExhibirCarta`, `v61RetirarMuseo` |
+| `vitrina-publica` | `perfil.html` | `''` (cero acciones; solo lectura por definicion) |
+| `mercado` | `comunidad.html` | `cmCartaComprar`, `cmCartaCancelar` |
+
+**En `vitrina-publica` el contenedor de acciones NO se renderiza** (`cartas-ui.js:435-439`, la guarda es del **modulo**, no de la pagina): el visitante no puede comprar, exhibir ni fusionar, y un contenedor vacio seria la promesa visual de una accion inexistente. Aunque la pagina pase `acciones`, el modulo lo ignora en ese contexto.
+
+Regla derivada: si una accion requiere un `fetch`, el `fetch` es de la **pagina** (o de su rama GET ya existente). El modulo **no** hace peticiones de escritura y **no** emite eventos de negocio.
+
+**D7. Accesibilidad y teclado: un solo contrato para las cuatro superficies.**
+
+- Markup: `role="dialog"`, `aria-modal="true"`, `aria-labelledby="c-ficha-tit"`; el titulo accesible sale de `carta.nombre` (fallback literal "Carta"). **Cierre visible, no solo por teclado:** la X del encabezado (`cartas-ui.js:425`) **mas** un boton de texto **"Cerrar"** (`:440`), ademas de **Esc** y del **backdrop**. Cuatro vias, ninguna oculta: un usuario de raton o de lector de pantalla que no descubra el gesto de teclado tiene un boton que se lee.
+- Teclado: **Esc** cierra; **click en backdrop** cierra (solo si el target **es** el backdrop, no un hijo); foco inicial **dentro** de la ficha (boton cerrar); `Tab`/`Shift+Tab` **no** salen de la ficha (trampa de foco minima sobre los focusables del host, sin libreria).
+- Foco de retorno: al abrir se guarda `document.activeElement` y `cerrarFicha()` devuelve el foco a **ese** nodo si sigue en el documento (si no, al `body`). Es el punto que ninguna de las cuatro implementaciones por separado habria hecho igual.
+- Scroll: el host abierto bloquea el scroll del `body` (clase en `document.documentElement`), y el cierre **siempre** la retira (cerrar por Esc, por backdrop y por `cerrarFicha()` pasan por la misma ruta de limpieza).
+
+**D8. Reglas duras de codigo (no negociables en la revision).**
+
+1. **Vanilla puro** (ADR-001): IIFE, sin frameworks, sin build, sin dependencias; mismo patron que `cartas-ui.js:1-201`.
+2. **ASCII-safe** (ADR-002): **cero** bytes > 127 en `cartas-ui.js` y en `cartas-ui.css`; textos con tilde por escape `\uXXXX` **simple**; **cero backticks** (ni template literals, ni `String.raw`). Concatenacion con `+`.
+3. **Todo dato de servidor pasa por `CartasUI.esc()` antes de entrar en `innerHTML`** (`nombre`, `descripcion`, `set_slug`, `marca_nombre`, `vendedor_nombre`, `emisor_tipo`, claves de `stats_json`). No se construye markup de ficha con `insertAdjacentHTML` sobre datos crudos.
+4. **IDs con prefijo `c-ficha-`** y solo los declarados: `c-ficha` (host unico, `FICHA_ID` en `cartas-ui.js:205`, asignado en `:514`), `c-ficha-tit` y `c-ficha-acciones`; el cierre se delega por **atributo** `data-c-ficha-cerrar` (backdrop `:423` y X `:425`), mas la clase `.c-ficha-cerrar` del boton de texto (`:440`). Prohibido reutilizar IDs de pagina (`pf-*`, `v61-*`, `cm-*`, `mp-*`).
+5. **Delegacion sin secuestro:** el listener de apertura de cada superficie ignora el evento cuando `event.target.closest('button, a, input, select, label, textarea, [data-no-ficha]')` no es `null`. Un click en un boton de accion **nunca** abre la ficha (y un click en el boton de cerrar **nunca** la reabre). **La exclusion no puede ser absoluta:** si el disparador (`[data-c-ficha-abrir]`, `.cv-row-n[data-cficha]`, `[data-pf-carta]`) es **el propio** `<button>`/`<a>`, el guard debe comparar primero el nodo encontrado con el contenedor disparador y **no descartar** el evento por venir de un control nativo. Hoy la premisa se cumple **por construccion**, no por suerte: las tres superficies marcan `role="button"` + `tabindex="0"` sobre `div`/`article` (`mi-perfil.html:8507-8510`, `perfil.html:1042`, `comunidad.html:838-846` y `:4726`), nunca sobre controles nativos, asi que `closest('button, a')` no devuelve el disparador. Lo verifica **V10**.
+6. **Cero borrado del DOM** (ADR-003): cerrar **oculta**, no elimina el host ni el contenido.
+7. **Cero `tags`:** este ADR **no** crea campo, no registra nada en `CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS` y no obliga a tocar `collectPlace()`/`_placeToAPI()`/`loadForm()`. Si algun dia la ficha necesitara persistir algo por usuario, sera **MERGE JSONB** (`COALESCE(tags,'{}') || $N::jsonb`) en un ADR propio (ADR-003).
+
+### Contrato de datos (entrada del componente)
+
+| Campo | Tipo | Origen | Obligatorio | Degradacion si falta |
+|---|---|---|---|---|
+| `id` | int/uuid | rama GET | si | no se abre la ficha (log defensivo) |
+| `nombre` | string | rama GET | si | titulo generico "Carta" |
+| `rareza` | enum | rama GET | si | sin clase de rareza, sin badge |
+| `variante` / `variantes[]` | enum / array | rama GET | no | linea de variante omitida |
+| `cantidad` | int | rama GET / cache | no | linea de cantidad omitida |
+| `set_slug` | string | rama GET | no | linea de set omitida |
+| `emisor_tipo` / `marca_nombre` | enum / string | rama GET | no | sin badge de emisor |
+| `imagen_url` | string | rama GET | no | hueco con geometria de lamina (ADR-112 D4) |
+| `descripcion` | string \| null | rama GET | no | estado explicito de D5.5 |
+| `stats_json` | objeto \| null | rama GET | no | bloque "Como funciona" reducido a reglas de catalogo |
+| `nivel_gate`, `es_evento`, `fusionable`, `es_canjeable_qr` | int/bool | rama GET | no | linea correspondiente omitida |
+| `precio_xp`, `cantidad_restante`, `vendedor_nombre`, `vendedor_id` | int/string | `cartas_ofertas` | no | solo contexto `mercado`; si faltan, se omiten |
+
+Ejemplo **ilustrativo** de `stats_json` (no es un dato medido; el render **lee la clave si existe** y no supone valores): `{"bonus_xp_pct": 10, "capacidad_gate": 2}`. Cualquier valor no numerico se degrada a omitir la linea, nunca a imprimir el crudo.
+
+**Impacto en render y backend: UNA extension de rama existente, cero endpoint.** Cero endpoint nuevo (presupuesto **8/8**), cero migracion, cero columna, cero clave de `tags`. La rama `cartas_ofertas` de `api/interacciones.js:7116-7122` se **extendio** para devolver `descripcion` y `stats_json` junto al `imagen_url` que **ya** traia; no hay dependencia externa: el dato del mercado esta **completo** y la ficha abre con lamina.
+
+### Alternativas consideradas y rechazadas
+
+- **(A) Un popup por superficie (cuatro implementaciones).** Rechazada por la Regla de No-Duplicidad del propio modulo (`cartas-ui.js:3-6`) y por costo medible: cuatro sitios para Esc/backdrop/foco/scroll, cuatro textos de "como funciona" que derivan, y cuatro bugs por superficie en cada cambio de catalogo. Es el defecto que este ADR existe para evitar.
+- **(B) Reutilizar `.pf-museo-modal` / `.mp-picker-modal` de `mi-perfil.html:726-770` como host del detalle.** Rechazada por tres motivos: esos nodos viven **dentro** del DOM de la pagina (no sirven a `perfil.html` ni a `comunidad.html`), su CSS pertenece a otro silo (ADR-004, fuga de prefijos `pf-`/`mp-` a un componente de cartas) y estan atados a `pfAplicarTab` (`:7415`), lo que haria desaparecer la ficha al cambiar de pestana.
+- **(C) Colgar el host del propio `.cartas-silo`.** Rechazada: el silo recorta la lamina (`overflow`) y la ficha debe cubrir el viewport; ademas heredaria reglas de rejilla que no aplican a un dialogo.
+- **(D) Endpoint de detalle (`?tipo=carta_detalle`) o `fetch` desde el modulo por id.** Rechazada doblemente: presupuesto serverless **8/8** agotado (no cabe endpoint; extender uno existente no evita el coste ni el gate `@backend-dev`), y el dato **ya esta en memoria** (`v61CartasCache` / `v61CartaPorId`, `mi-perfil.html:8467`). Un `fetch` en el modulo anadiria latencia al abrir, estado de carga y un segundo camino de verdad para los mismos campos.
+- **(E) Que el modulo reciba `id` y resuelva internamente el objeto.** Rechazada: obliga al modulo a conocer caches de pagina (acoplamiento inverso al que la No-Duplicidad busca) y rompe el caso `mercado`, donde la oferta no trae el objeto completo de la carta.
+- **(F) Que el modulo reciba callbacks (`onComprar`, `onVender`) en `opciones`.** Rechazada por ahora: multiplica la superficie de la API y empuja logica de negocio al componente. La inyeccion de HTML + delegacion de la pagina (D6) da el mismo resultado con una API de tres campos. Si mas adelante se necesita estado reactivo dentro de la ficha (p. ej. deshabilitar "Comprar" tras la compra), se resuelve en un ADR propio **sin** mover el negocio al modulo.
+- **(G) Deep-link de carta (`#carta=<id>`).** Rechazada en este ADR (fuera de alcance, no prohibida): cambia el modelo de navegacion de una pagina de **10 pestanas** (`PF_TABS:7349`) y exige contrato de URL e historial. Queda como deuda D-3.
+
+### Consecuencias
+
+1. **Cuatro superficies, un componente.** Una superficie nueva que pinte cartas es **una llamada** a `abrirFicha(carta, {contexto, acciones, titulo})` mas un listener delegado; no un componente nuevo.
+2. **Cero impacto en backend, esquema y `tags`:** presupuesto **8/8** intacto; `CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS` **no aplica** y los campos genericos existentes (`f-price` -> `precio_desde`, `f-capacidad` -> `capacidad`) siguen sin duplicarse.
+3. **Apertura instantanea:** al no haber `fetch`, la ficha abre desde la cache ya cargada; no hay spinner ni estado de error de red que disenar.
+4. **Accesibilidad uniforme:** cuatro superficies heredan el mismo comportamiento de Esc, foco, backdrop y scroll, y se arregla **una** vez.
+5. **`perfil.html` gana detalle sin ganar acciones:** `contexto: 'vitrina-publica'` con `acciones: ''` es el estado honesto; el usuario ve el dato completo y **no** un boton de compra que no puede usar (expectativa gestionada por diseno, no por error).
+6. **Mercado conserva su forma de fila:** `.cv-row` (no lamina) sigue siendo el listado; la lamina grande aparece **solo** en la ficha. No se rehace la rejilla del mercado.
+7. **Coste de mantenimiento del catalogo:** anadir una clave de `stats_json` nueva es un cambio **del bloque generico**, no de cuatro paginas.
+
+### Deudas
+
+| # | Deuda | Por que se acepta | Como se cerraria |
+|---|---|---|---|
+| **D-2** | **`stats_json` heterogeneo:** no hay lista cerrada de claves, asi que el bloque "Como funciona" se genera por **presencia** y dos cartas pueden mostrar lineas distintas. | Se prefiere no inventar un esquema que el catalogo no garantiza; omitir es honesto, suponer no. | Declarar la lista cerrada de claves de `stats_json` (ADR de modelo de carta) y validarla en el alta del catalogo. |
+| **D-3** | **Sin permalink de carta:** no se puede enlazar "esta carta" ni recargar con la ficha abierta. | Exige contrato de URL e historial sobre una pagina de 10 pestanas (`PF_TABS:7349`); no es necesario para leer el detalle. | ADR propio con `#carta=<id>` + reapertura al cargar, midiendo `pfAplicarTab`. |
+| **D-4** | **Acciones incompletas por contexto:** `vitrina-publica` no ofrece ninguna accion y `album` no ofrece vender. | Es correcto por permisos de negocio actuales; anadir acciones exige flujo nuevo (regalar/intercambiar), no UI. | ADR de intercambio/regalo si el producto lo pide. |
+
+La numeracion **arranca en D-2 a proposito**: `D-2`..`D-4` son referencias estables ya citadas fuera de este ADR y **no se renumeran**.
+
+### Criterio de verificacion (lo ejecuta `@qa-auditor`; este ADR no lo ejecuta)
+
+1. **V1 (D8.1):** `node --check cartas-ui.js` -> exit **0**.
+2. **V2 (D8.2, ASCII):** `Select-String -Path cartas-ui.js,cartas-ui.css -Pattern "[^\x00-\x7F]"` -> **0** coincidencias.
+3. **V3 (D8.2, backticks):** `(Select-String -Path cartas-ui.js -Pattern ([char]96) | Measure-Object).Count` -> **0**.
+4. **V4 (D1):** `Select-String -Path *.html,*.js -Pattern "abrirFicha"` -> el modulo (`cartas-ui.js`) **mas** llamadas de superficie; **0** definiciones de ficha fuera de `cartas-ui.js` (ninguna pagina declara su propio popup de carta).
+5. **V5 (D3):** `(Select-String -Path cartas-ui.js -Pattern "document.body" | Measure-Object).Count` **> 0** y **un unico** `document.body.appendChild` del host; `FICHA_ID` se declara **una sola vez** (`:205`) y se asigna al host **una sola vez** (`host.id = FICHA_ID`, `:514`).
+6. **V6 (D4 + C4):** `Select-String -Path cartas-ui.css -Pattern "\.c-ficha"` -> **solo** `cartas-ui.css`; `Select-String -Path cartas-ui.css -Pattern "!important|^:root|^(html|body)\b"` -> **0**; **agrupamiento medido**: todo selector de `.c-shiny`/`.c-badge-emisor` aparece **o** bajo `.cartas-silo` **o** en la forma agrupada `.cartas-silo X,` + `.c-ficha X` (medido en `:13-18`, `:26-27`, `:34-35`, `:48-49`, `:69-70`), y **0** reglas de badge/shiny que solo declaren `.c-ficha` sin su pareja `.cartas-silo`; **tamano declarado en la ficha**: `.c-ficha .c-card--lg` y `.c-ficha .c-card-arte` existen con `--c-arte-fs: 1.05rem` (`:114`) y `aspect-ratio: 1086/1448` (`:117-122`), comprobable con `Select-String -Path cartas-ui.css -Pattern "\.c-ficha \.c-card--lg|\.c-ficha \.c-card-arte"` -> **2**.
+7. **V7 (D7):** `Select-String -Path cartas-ui.js -Pattern 'role="dialog"|aria-modal|aria-labelledby'` -> **1** linea con los **3** atributos en el mismo nodo (`:424`) y `aria-labelledby` apuntando al id real `c-ficha-tit`; `Escape` presente en el listener de teclado; **boton "Cerrar" textual** presente (`:440`) ademas de la X (`:425`).
+8. **V8 (D8.3):** `Select-String -Path cartas-ui.js -Pattern "innerHTML"` -> toda interpolacion de servidor precedida por `esc(`; **0** usos de dato crudo en el markup de la ficha.
+9. **V9 (D8.7, presupuesto):** `(Get-ChildItem api\*.js).Count` = **8**; **0** migraciones nuevas; `CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS` sin claves de ficha.
+10. **V10 (D8.5 + C5, guard de delegacion):** `Select-String -Path mi-perfil.html,perfil.html,comunidad.html -Pattern "closest\('button"` -> **una** guarda por superficie; y `Select-String -Path mi-perfil.html,perfil.html,comunidad.html -Pattern "<button[^>]*data-c-ficha-abrir|<a[^>]*data-c-ficha-abrir|<button[^>]*data-cficha|<button[^>]*data-pf-carta"` -> **0** hoy (ningun disparador es control nativo). Si algun dia aparece **1**, el guard debe **excluir al propio disparador** antes de descartar el evento; un guard que ignore todo `button`/`a` sin comparar con el disparador **falla** esta verificacion.
+11. **V11 (C1/C2/D5, visual y pendiente):** apertura real en navegador de las **5** superficies cableadas (`#pf-cartas`, `#pf-museo-cartas`, `#pf-museo-album` en `mi-perfil.html`; vitrina publica de `perfil.html`; `#cm-cartas` de `comunidad.html`, en las dos filas "Mis cartas" y "Ofertas en venta"), con 3 criterios: (i) **la ficha del mercado abre con lamina** (`carta_id` + `imagen_url`), no con hueco; (ii) la cantidad se etiqueta **por contexto** y en `vitrina-publica` **no** hay contenedor de acciones; (iii) Esc, backdrop y el boton "Cerrar" cierran igual. **No la puede dar el codigo**: es la unica deuda viva y se abre como TSK.
+
+### Enlaces (no repiten el argumento; ADR-084 D1)
+
+- **ADR-001**: vanilla puro; de ahi la IIFE y la ausencia de framework en el componente.
+- **ADR-002**: mandato ASCII-safe + cero backticks en `cartas-ui.js`; y el estilo de esta misma seccion.
+- **ADR-003**: Cero Borrado Logico; cerrar oculta, no elimina, y cualquier persistencia futura es MERGE JSONB.
+- **ADR-004**: aislamiento atomico; segundo silo `.c-ficha` frente al `.cartas-silo` de las tarjetas.
+- **ADR-008**: degradacion silenciosa/estado honesto por campo ausente; es el criterio de D5.5.
+- **ADR-084**: D1 (argumento una sola vez, aqui) y D3/D5 (higiene de lectura del fichero grande: ADR localizado con `Select-String` y leido por seccion).
+- **ADR-108**: identidad de carta (emisor, rareza, variante); la ficha **consume** ese modelo y no lo redefine.
+- **ADR-110**: el mercado de cartas y el tab Coleccion son el origen del contexto `mercado`; la ficha no crea compra nueva, reutiliza `cmCartaComprar`/`cmCartaCancelar`.
+- **ADR-112**: lamina completa, ratio `1086/1448` y hueco con la misma geometria; la ficha usa `CartasArte.slotHtml()` sin escribir texto encima del arte.
+
+### Estado
+
+**ACEPTADO E IMPLEMENTADO EN ARBOL DE TRABAJO** (2026-11-01; **sin commit y sin deploy**). Aceptado como **contrato de diseno** y luego **corregido en el mismo dia** por la revision del revisor arquitectonico (**APRUEBA CONDICIONADA**, condiciones **C1-C5** ya aplicadas al codigo y a esta seccion). No deroga ningun ADR: **extiende** la Regla de No-Duplicidad de `cartas-ui.js:3-6` al detalle de carta, **acota** ADR-004 con un segundo silo (`.c-ficha`), **consume** ADR-108 y ADR-112 y **reutiliza** ADR-110 sin tocar negocio. Hecho: `abrirFicha`/`cerrarFicha`/`fichaAbierta` en `cartas-ui.js` (`:503`, `:537`, `:562`, expuestas en `:578-580`), silo y agrupamiento de selectores en `cartas-ui.css`, **5 superficies cableadas** (3 en `mi-perfil.html`, vitrina publica de `perfil.html`, 2 filas del mercado en `comunidad.html`) y `descripcion` + `stats_json` en la rama `cartas_ofertas` (`api/interacciones.js:7116-7122`). **Sin endpoint nuevo** (presupuesto **8/8**), sin columna y sin campo de `tags`. **Pendiente:** la verificacion **visual** de las 5 superficies (V11) y el commit/deploy; las deudas vivas son **D-2**..**D-4**. `TASKS.md` **TSK-249** y `NEXT.md` **apuntan** a `ADR-113`; `BLUEPRINT.md` **no se toca** en este pase (es un componente de UI, no un cambio estructural).

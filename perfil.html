@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=Outfit:wght@400;500;600;700&family=Geist:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="cartas-ui.css"/>
+<link rel="stylesheet" href="cartas-ui.css?v=2"/>
 <style>
 /* ============================================================
    perfil.html - Museo publico de viajero (ADR-028, WP-3)
@@ -348,7 +348,7 @@ body{background:#E5E7EB}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="usuario-session.js"></script>
-<script src="cartas-ui.js"></script>
+<script src="cartas-ui.js?v=2"></script>
 <script src="cartas-arte.js"></script>
 <script>
 /* ============================================================
@@ -935,7 +935,68 @@ body{background:#E5E7EB}
       + pfEmpty('Abriendo la vitrina', 'Las cartas equipadas de este viajero cargaran en un momento.')
       + '</div>', 'cartas-silo', 'pf-museo-publico-cartas');
   }
-  function pfCarta(c) {
+  /* ---- Ficha compartida en la vitrina publica (SOLO LECTURA) ----
+     El visitante no posee la carta, asi que abrirFicha se llama SIN
+     opciones.acciones: el modulo la pinta en modo lectura y la etiqueta de
+     cantidad pasa a "En su museo" por contexto. Feature-detect obligatorio
+     (ADR-008): si cartas-ui.js no cargo, el HTML de la carta queda
+     EXACTAMENTE como antes (sin role, sin tabindex, sin data-pf-carta) y no
+     se instala delegacion alguna. */
+  var pfCartasVitrina = [];
+  function pfCartasFichaLista() {
+    var UI = window.CartasUI;
+    return !!(UI && typeof UI.abrirFicha === 'function');
+  }
+  function pfCartaFicha(c) {
+    if (!pfCartasFichaLista()) return false;
+    try { window.CartasUI.abrirFicha(c, { contexto: 'vitrina-publica' }); }
+    catch (eF) { return false; }
+    return true;
+  }
+  function pfCartaDesde(el) {
+    if (!el || typeof el.getAttribute !== 'function') return null;
+    var i = parseInt(el.getAttribute('data-pf-carta'), 10);
+    if (!isFinite(i) || i < 0) return null;
+    return pfCartasVitrina[i] || null;
+  }
+  /* Botones y enlaces conservan su comportamiento: no secuestramos clics. */
+  function pfCartaIgnorar(t) {
+    if (!t || typeof t.closest !== 'function') return true;
+    return !!(t.closest('button') || t.closest('a'));
+  }
+  function pfCartasClic(e) {
+    var t = e && e.target ? e.target : null;
+    if (pfCartaIgnorar(t)) return;
+    var art = t.closest('[data-pf-carta]');
+    if (!art) return;
+    var c = pfCartaDesde(art);
+    if (c) pfCartaFicha(c);
+  }
+  /* Enter y Espacio abren la ficha. preventDefault SOLO en esas dos teclas,
+     para no bloquear el scroll de la pagina con el resto. */
+  function pfCartasTecla(e) {
+    if (!e) return;
+    var k = e.key ? String(e.key) : '';
+    var abre = (k === 'Enter' || k === ' ' || k === 'Spacebar' || e.keyCode === 13 || e.keyCode === 32);
+    if (!abre) return;
+    var t = e.target;
+    if (pfCartaIgnorar(t)) return;
+    var art = t.closest('[data-pf-carta]');
+    if (!art) return;
+    if (e.preventDefault) e.preventDefault();
+    var c = pfCartaDesde(art);
+    if (c) pfCartaFicha(c);
+  }
+  /* Delegacion instalada UNA sola vez sobre el host persistente de la sala. */
+  function pfCartasDelegar(host) {
+    if (!host || typeof host.getAttribute !== 'function') return;
+    if (!pfCartasFichaLista()) return;
+    if (host.getAttribute('data-pf-deleg') === '1') return;
+    host.setAttribute('data-pf-deleg', '1');
+    host.addEventListener('click', pfCartasClic);
+    host.addEventListener('keydown', pfCartasTecla);
+  }
+  function pfCarta(c, idx) {
     var UI = window.CartasUI || {};
     var e2 = typeof UI.esc === 'function' ? UI.esc : esc;
     var nombre = (c && c.nombre) ? String(c.nombre) : 'Carta';
@@ -974,7 +1035,13 @@ body{background:#E5E7EB}
         +   '<span class="pf-foto-ph">' + pfIcon('card') + '</span>'
         +   (imagen ? '<img src="' + e2(imagen) + '" alt="' + e2(nombre) + '" loading="lazy" onerror="this.remove()">' : '')
         + '</div>';
-    return '<article class="pf-trofeo' + (rareza ? ' ' + e2(rareza) : '') + '">'
+    /* Con el modulo cargado la carta es un control alcanzable por teclado;
+       sin el, el markup original se queda intacto (ADR-008). */
+    var fichaOn = pfCartasFichaLista();
+    var a11y = fichaOn
+      ? ' role="button" tabindex="0" data-pf-carta="' + String(isFinite(idx) ? idx : 0) + '"'
+      : '';
+    return '<article class="pf-trofeo' + (rareza ? ' ' + e2(rareza) : '') + '"' + a11y + '>'
       + visual
       + (conArte ? '' : '<h3 class="pf-trofeo-name">' + e2(nombre) + '</h3>')
       + (conArte ? '' : (rLabel ? '<div class="pf-trofeo-tier">' + e2(rLabel) + '</div>' : ''))
@@ -1005,7 +1072,9 @@ body{background:#E5E7EB}
       if (!isFinite(tope) || tope <= 0) tope = 0;
       pfCartasContador(sec2, (cartas.length && tope) ? (cartas.length + ' / ' + tope) : '');
       if (!cartas.length) { host2.innerHTML = pfCartasVacio(); return; }
+      pfCartasVitrina = cartas;
       host2.innerHTML = '<div class="pf-grid pf-grid--album">' + cartas.map(pfCarta).join('') + '</div>';
+      pfCartasDelegar(host2);
     });
   }
   /* ---- Pintado y acciones ---- */

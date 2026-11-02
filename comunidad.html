@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="mapa-cultural.css?v=11">
 <link rel="stylesheet" href="dictado-voz.css?v=1">
-<link rel="stylesheet" href="cartas-ui.css">
+<link rel="stylesheet" href="cartas-ui.css?v=2">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -833,6 +833,17 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 @media (max-width:768px){
   .feed-post-actions .btn-filtro-feed,.feed-post-actions .av-act{min-height:40px;font-size:12px;padding:6px 10px}
 }
+/* =====================================================================
+   AFORDANCE PULSABLE DEL NOMBRE DE CARTA EN #cm-cartas
+   El nombre .cv-row-n recibe role="button" tabindex="0" data-cficha desde
+   el JS (inventario y ofertas). Aqui SOLO el aviso visual de que se puede
+   pulsar: cursor, foco dorado y un punteado sutil. NO es un enlace: sin
+   azul ni subrayado solido. Tipografia y tamano heredan de L502.
+   El dorado es #E8C766 y no var(--gold): --gold es el naranja de marca y
+   este trazo debe hablar el mismo idioma que la ficha (.c-ficha).
+   ===================================================================== */
+.cm-v61 .cv-row-n[role="button"]{cursor:pointer;-webkit-tap-highlight-color:transparent;text-decoration:underline dotted;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:rgba(232,199,102,.55)}
+.cm-v61 .cv-row-n[role="button"]:focus-visible{outline:2px solid #E8C766;outline-offset:2px;border-radius:3px}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -1192,7 +1203,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 <script src="media-actions.js"></script>
 <script src="dictado-voz.js?v=1"></script>
 <script src="mymapa.js?v=9"></script>
-<script src="cartas-ui.js"></script>
+<script src="cartas-ui.js?v=2"></script>
 <script src="cartas-arte.js"></script>
 <script src="mercado.js?v=3"></script>
 <script>
@@ -4636,10 +4647,48 @@ function cmAccionContrato(accion, id) {
   }});
 }
 
+/* ---- Ficha compartida de carta (cartas-ui.js) en el mercado ---- */
+/* Registro por render: la fila guarda el indice, nunca el objeto entero. */
+var cmFichaReg = [];
+function cmFichaDisp() {
+  return !!(window.CartasUI && typeof window.CartasUI.abrirFicha === 'function');
+}
+function cmFichaAbrir(node) {
+  var ui = window.CartasUI;
+  if (!ui || typeof ui.abrirFicha !== 'function' || !node) return;
+  var idx = parseInt(node.getAttribute('data-cficha'), 10);
+  var item = cmFichaReg[idx];
+  if (!item) return;
+  if (typeof ui.fichaAbierta === 'function' && ui.fichaAbierta()) ui.cerrarFicha();
+  ui.abrirFicha(item.carta, item.opciones);
+}
+function cmFichaWire(box) {
+  if (!box || !cmFichaDisp() || box.getAttribute('data-cficha-wire') === '1') return;
+  box.setAttribute('data-cficha-wire', '1');
+  box.addEventListener('click', function(ev){
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    /* Los botones y enlaces de la fila conservan su comportamiento. */
+    if (t.closest('button, a')) return;
+    var n = t.closest('.cv-row-n[data-cficha]');
+    if (n) cmFichaAbrir(n);
+  });
+  box.addEventListener('keydown', function(ev){
+    if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var n = t.closest('.cv-row-n[data-cficha]');
+    if (!n || n !== t) return;
+    ev.preventDefault();
+    cmFichaAbrir(n);
+  });
+}
+
 /* ---- MERCADO DE CARTAS + moneda (dentro del tab Mercado) ---- */
 function cargarCartasComm() {
   var box = document.getElementById('cm-cartas');
   if (!box) return;
+  cmFichaReg = [];
   var u = sesion();
   if (!u) { box.innerHTML = '<div class="cv-gate"><div class="cv-gate-t">Inicia sesion para el mercado de cartas.</div><button type="button" class="cv-btn" onclick="loginGate()">Iniciar sesion</button></div>'; return; }
   box.innerHTML = '<div class="cv-empty">Cargando cartas\u2026</div>';
@@ -4656,13 +4705,28 @@ function cargarCartasComm() {
       else propias.forEach(function(c){
         var id = c.id || '', esGate = (c.nivel_gate != null), esEvento = c.es_evento === true;
         var cant = parseInt(c.cantidad, 10) || 0;
+        var acc = '<button type="button" class="cv-btn" onclick="cmCartaPublicar(\'' + esc(id) + '\',' + cant + ')">Publicar</button>';
+        if (!esGate || esEvento) acc += '<button type="button" class="cv-btn ghost" onclick="cmCartaIntercambiar(\'' + esc(id) + '\')">Intercambiar</button>';
+        if (esEvento) acc += '<button type="button" class="cv-btn ghost" onclick="cmCartaEvento(\'' + esc(id) + '\')">Usar en evento</button>';
+        var nAttr = '';
+        if (cmFichaDisp()) {
+          var iMis = cmFichaReg.length;
+          cmFichaReg.push({
+            carta: {
+              id: id, nombre: c.nombre || id, rareza: c.rareza, descripcion: c.descripcion,
+              stats_json: c.stats_json, set_slug: c.set_slug, imagen_url: c.imagen_url,
+              emisor_tipo: c.emisor_tipo, marca_nombre: c.marca_nombre, nivel_gate: c.nivel_gate,
+              es_evento: esEvento, fusionable: c.fusionable, es_canjeable_qr: c.es_canjeable_qr
+            },
+            opciones: { contexto: 'coleccion', cantidad: cant, acciones: acc }
+          });
+          nAttr = ' role="button" tabindex="0" data-cficha="' + iMis + '"';
+        }
         html += '<div class="cv-row">'
-          + '<div class="cv-row-n">' + esc(c.nombre || id) + ' <span class="cv-chipst">' + esc(c.rareza || '') + '</span></div>'
+          + '<div class="cv-row-n"' + nAttr + '>' + esc(c.nombre || id) + ' <span class="cv-chipst">' + esc(c.rareza || '') + '</span></div>'
           + '<div class="cv-row-x">x' + cant + '</div>'
-          + '<button type="button" class="cv-btn" onclick="cmCartaPublicar(\'' + esc(id) + '\',' + cant + ')">Publicar</button>';
-        if (!esGate || esEvento) html += '<button type="button" class="cv-btn ghost" onclick="cmCartaIntercambiar(\'' + esc(id) + '\')">Intercambiar</button>';
-        if (esEvento) html += '<button type="button" class="cv-btn ghost" onclick="cmCartaEvento(\'' + esc(id) + '\')">Usar en evento</button>';
-        html += '</div>';
+          + acc
+          + '</div>';
       });
     }
     html += '<div class="cv-sec-t">Ofertas en venta</div>';
@@ -4673,16 +4737,34 @@ function cargarCartasComm() {
       else list.forEach(function(o){
         var mia = String(o.vendedor_id) === String(u.id);
         var rest = parseInt(o.cantidad_restante, 10) || 0;
+        var accOf = mia
+          ? '<button type="button" class="cv-btn ghost" onclick="cmCartaCancelar(\'' + esc(o.id) + '\')">Cancelar oferta</button>'
+          : '<button type="button" class="cv-btn" onclick="cmCartaComprar(\'' + esc(o.id) + '\',' + rest + ')">Comprar</button>';
+        var nAttrOf = '';
+        if (cmFichaDisp()) {
+          var iOf = cmFichaReg.length;
+          cmFichaReg.push({
+            carta: {
+              id: o.carta_id, nombre: o.carta_nombre || o.carta_id, rareza: o.rareza,
+              descripcion: o.descripcion, stats_json: o.stats_json, imagen_url: o.imagen_url
+            },
+            opciones: {
+              contexto: 'mercado', cantidad: rest, precio: o.precio_xp,
+              nota: 'Vendedor: ' + (o.vendedor_nombre || 'Viajero'), acciones: accOf
+            }
+          });
+          nAttrOf = ' role="button" tabindex="0" data-cficha="' + iOf + '"';
+        }
         html += '<div class="cv-row">'
-          + '<div class="cv-row-n">' + esc(o.carta_nombre || o.carta_id) + ' <span class="cv-chipst">' + esc(o.rareza || '') + '</span></div>'
+          + '<div class="cv-row-n"' + nAttrOf + '>' + esc(o.carta_nombre || o.carta_id) + ' <span class="cv-chipst">' + esc(o.rareza || '') + '</span></div>'
           + '<div class="cv-row-d">' + esc(o.vendedor_nombre || 'Viajero') + (mia ? ' (tu oferta)' : '') + '</div>'
-          + '<div class="cv-row-x">' + fmtXp(o.precio_xp) + ' XP \u00b7 ' + rest + ' disp.</div>';
-        if (mia) html += '<button type="button" class="cv-btn ghost" onclick="cmCartaCancelar(\'' + esc(o.id) + '\')">Cancelar oferta</button>';
-        else html += '<button type="button" class="cv-btn" onclick="cmCartaComprar(\'' + esc(o.id) + '\',' + rest + ')">Comprar</button>';
-        html += '</div>';
+          + '<div class="cv-row-x">' + fmtXp(o.precio_xp) + ' XP \u00b7 ' + rest + ' disp.</div>'
+          + accOf
+          + '</div>';
       });
     }
     box.innerHTML = html;
+    cmFichaWire(box);
   }).catch(function(){ box.innerHTML = '<div class="cv-err">No se pudo cargar el mercado de cartas.</div>'; });
 }
 function cmCartaPublicar(cartaId, cantMax) {

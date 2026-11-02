@@ -14,7 +14,7 @@
 <!-- T7 (ADR-039): Leaflet para el map-picker de localizacion del Museo -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="dictado-voz.css?v=1"/>
-<link rel="stylesheet" href="cartas-ui.css"/>
+<link rel="stylesheet" href="cartas-ui.css?v=2"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -1189,6 +1189,9 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
     <button type="button" class="pf-tab" role="tab" data-tab="red" aria-selected="false" onclick="pfTab('red')">&#x1F517; Mi Red</button>
     <button type="button" class="pf-tab" role="tab" data-tab="museo" aria-selected="false" onclick="pfTab('museo')">&#x1F3DB;&#xFE0F; Museo</button>
     <button type="button" class="pf-tab" role="tab" data-tab="inventario" aria-selected="false" onclick="pfTab('inventario')">&#x1F392; Coleccion</button>
+    <!-- Pestana Mercado: compra y venta (slots, bono, cartas, emprendedor,
+         moneda). La Coleccion lista solo lo que el usuario POSEE (ADR-110). -->
+    <button type="button" class="pf-tab" role="tab" data-tab="mercado" aria-selected="false" onclick="pfTab('mercado')">&#x1F6D2; Mercado</button>
     <button type="button" class="pf-tab" role="tab" data-tab="mensajes" aria-selected="false" onclick="pfTab('mensajes')">&#x1F4E8; Mensajes</button>
     <button type="button" class="pf-tab" role="tab" data-tab="contratos" aria-selected="false" onclick="pfTab('contratos')">&#x1F4DC; Contratos</button>
     <button type="button" class="pf-tab" role="tab" data-tab="cuenta" aria-selected="false" onclick="pfTab('cuenta')">&#x2699;&#xFE0F; Cuenta</button>
@@ -1271,6 +1274,13 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
        el motor en slot_catalogo y se pinta en la seccion de sumideros. -->
   <div class="pf-counter" id="pf-xp-balance" data-tab="inventario">0 XP de reputacion</div>
 
+  <!-- MERCADO (pestana propia). La Coleccion lista solo lo que el usuario
+       POSEE (ADR-110): comprar y vender no es coleccion, asi que slots,
+       bono, mercado de cartas, emprendedor y moneda se muestran aqui.
+       Los IDs se MUEVEN, nunca se duplican ni se borran (ADR-003). -->
+  <div id="pf-mercado-zona" data-tab="mercado">
+  <div class="pf-section-title" data-tab="mercado">&#x1F6D2; Mercado</div>
+
   <!-- SUMIDEROS DE XP (ADR-086 / TSK-184). Vive aqui, y no en otra pagina,
        porque este es el unico sitio donde el usuario ya ve su XP.
        El precio de cada slot NO es fijo: es costo(k) = costo_base_xp *
@@ -1280,10 +1290,29 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
        aqui no se calcula la curva. Un sumidero sin soporte de enganche sigue
        VISIBLE, con su motivo, porque esconderlo seria peor. Todo el CSS nuevo
        cuelga del silo .pf-slots (ADR-004). -->
-  <div class="pf-section-title" data-tab="inventario">&#x1F6D2; Ampliar tu contenido</div>
-  <div class="pf-slots" id="pf-slots" data-tab="inventario" aria-live="polite"></div>
+  <div class="pf-section-title" data-tab="mercado">&#x1F6D2; Ampliar tu contenido</div>
+  <div class="pf-slots" id="pf-slots" data-tab="mercado" aria-live="polite"></div>
   <!-- Bono de bienvenida por referido (tarjeta destacada, oculta por defecto) -->
-  <div class="pf-bono" id="pf-bono" data-tab="inventario" style="display:none"></div>
+  <div class="pf-bono" id="pf-bono" data-tab="mercado" style="display:none"></div>
+
+  <!-- GAMING v6.1 (Fase 4 / T7): cartas coleccionables y su mercado.
+       El mercado de cartas es VENTA, no coleccion: el album del Museo y Mis
+       Cartas viven en la Coleccion (ADR-110) y no se duplican aqui. -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="mercado">&#x1F6D2; Mercado de Cartas</div>
+  <div class="pf-v61" id="pf-cartas-mercado" data-tab="mercado">
+    <div class="v61-empty">Cargando ofertas&#8230;</div>
+  </div>
+
+  <!-- EMPRENDEDOR (Mercado, asset compartido mercado.js) -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="mercado">&#x1F6D2; Emprendedor</div>
+  <div class="pf-mercado" id="pf-mercado" data-tab="mercado"></div>
+
+  <!-- GAMING v6.1 (Fase 4 / T8): moneda secundaria "Condor" (CDR) -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="mercado">&#x1FA99; Mi Moneda (Condor CDR)</div>
+  <div class="pf-v61" id="pf-moneda" data-tab="mercado">
+    <div class="v61-empty">Cargando tu moneda&#8230;</div>
+  </div>
+  </div>
 
   <!-- COLECCION (ADR-110): este tab lista SOLO lo que el usuario POSEE, en
        orden fijo: cartas (album del museo + mis cartas por variante),
@@ -1357,23 +1386,9 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
   <!-- MIS CROMOS: el bloque vive en la Coleccion (ADR-110); aqui no queda
        copia para no duplicar IDs (ADR-003: los IDs se mueven, no se borran). -->
 
-  <!-- EMPRENDEDOR (Mercado, asset compartido mercado.js) -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F6D2; Emprendedor</div>
-  <div class="pf-mercado" id="pf-mercado" data-tab="inventario"></div>
-
-  <!-- GAMING v6.1 (Fase 4 / T7): cartas coleccionables y su mercado -->
-  <!-- Album del Museo y Mis Cartas viven en la Coleccion (ADR-110); no se
-       duplican aqui. El mercado de cartas es venta, no coleccion. -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F6D2; Mercado de Cartas</div>
-  <div class="pf-v61" id="pf-cartas-mercado" data-tab="inventario">
-    <div class="v61-empty">Cargando ofertas&#8230;</div>
-  </div>
-
-  <!-- GAMING v6.1 (Fase 4 / T8): moneda secundaria "Condor" (CDR) -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1FA99; Mi Moneda (Condor CDR)</div>
-  <div class="pf-v61" id="pf-moneda" data-tab="inventario">
-    <div class="v61-empty">Cargando tu moneda&#8230;</div>
-  </div>
+  <!-- MERCADO: slots, bono, mercado de cartas, emprendedor y moneda viven
+       ahora en la zona #pf-mercado-zona (pestana Mercado). Sin copia aqui
+       para no duplicar IDs (ADR-003: los IDs se mueven, no se borran). -->
 
   <!-- MIS ALBUMES (ADR-017) -->
   <div class="pf-section-title" data-tab="museo">&#x1F5BC; Mis Albumes</div>
@@ -7346,7 +7361,7 @@ function showToast(msg,color){
    La pestana activa vive en el hash (#clase, #museo...) y por defecto
    es PERFIL.
    ADR-085: tabla_destino es la unica pestana con data-nivel-requerido. */
-var PF_TABS = ['perfil','clase','red','museo','inventario','mensajes','contratos','cuenta','tabla_destino','marca'];
+var PF_TABS = ['perfil','clase','red','museo','inventario','mercado','mensajes','contratos','cuenta','tabla_destino','marca'];
 var PF_TAB_ACTIVO = 'perfil';
 var PF_TAB_SEGURA = 'perfil';
 function pfTabDesdeHash() {
@@ -7442,7 +7457,10 @@ function pfTab(tab) {
   if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
   if (tab === 'museo' && u && u.id) { cargarMuseoPreview(u.id); museoRefrescar(); }
-  if (tab === 'inventario' && u && u.id) { cargarInventario(u.id); pfFacCargar(u.id); pfSlotsCargar(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); cargarCartas(u.id); cargarMuseoCartas(); cargarMercadoCartas(); cargarMoneda(u.id); }
+  /* Coleccion (ADR-110): solo lo que el usuario POSEE. */
+  if (tab === 'inventario' && u && u.id) { v61InstalarFichaDeleg(); cargarInventario(u.id); pfFacCargar(u.id); cargarCromos(u.id); cargarMisRegalias(u.id); cargarCartas(u.id); cargarMuseoCartas(); }
+  /* Mercado: compra y venta (slots, bono, cartas en venta, emprendedor, moneda). */
+  if (tab === 'mercado' && u && u.id) { pfSlotsCargar(u.id); cargarBonoReferido(u.id); if (window.Mercado) Mercado.cargarMi(); cargarMercadoCartas(); cargarMoneda(u.id); }
   if (tab === 'mensajes' && u && u.id) cargarMensajes(u.id);
   if (tab === 'contratos' && u && u.id) cargarContratos(u.id);
   if (tab === 'cuenta' && u) renderCuentaPanel();
@@ -8199,6 +8217,7 @@ function cargarCartas(uid) {
       var cant = parseInt(c.cantidad, 10) || 0;
       var esGate = (c.nivel_gate != null);
       var esEvento = c.es_evento === true;
+      var vFicha = String((v61VariantesPosesion(c)[0] || {}).variante || 'base').toLowerCase();
       var acc = '<button type="button" class="v61-btn" onclick="v61PublicarCarta(\'' + esc(id) + '\',' + cant + ')">Publicar en venta</button>';
       if (esEvento) acc += '<button type="button" class="v61-btn ghost" onclick="v61UsarCartaEvento(\'' + esc(id) + '\')">Usar en evento</button>';
       if (!esGate || esEvento) acc += '<button type="button" class="v61-btn ghost" onclick="v61IntercambiarCarta(\'' + esc(id) + '\')">Intercambiar (P2P)</button>';
@@ -8210,7 +8229,7 @@ function cargarCartas(uid) {
         var varHtml = (vs.length > 1 || (vs.length === 1 && String(vs[0].variante || 'base').toLowerCase() !== 'base'))
           ? vs.map(function (v) { return '<span class="v61-chip">' + esc(v61VarianteLabel(v.variante)) + ' x' + (Number(v.cantidad) || 0) + '</span>'; }).join('')
           : '';
-        html += '<div class="v61-card ' + v61RarezaClase(rareza) + '">'
+        html += '<div class="v61-card ' + v61RarezaClase(rareza) + '"' + v61FichaAttrs(id, vFicha, 'coleccion') + '>'
           + '<div class="c-card c-card--lg">' + slot + '</div>'
           + '<div class="v61-meta">Tienes <b class="v61-qty">' + cant + '</b></div>'
           + varHtml
@@ -8219,7 +8238,7 @@ function cargarCartas(uid) {
           + '</div>';
         return;
       }
-      html += '<div class="v61-card ' + v61RarezaClase(rareza) + '">'
+      html += '<div class="v61-card ' + v61RarezaClase(rareza) + '"' + v61FichaAttrs(id, vFicha, 'coleccion') + '>'
         + '<div class="v61-card-n">' + esc(c.nombre || id) + '</div>'
         + '<span class="v61-rareza">' + esc(rareza) + (esGate ? (' \u00b7 gate ' + esc(c.nivel_gate)) : '') + '</span>'
         + '<div class="v61-meta">Tienes <b class="v61-qty">' + cant + '</b></div>'
@@ -8345,7 +8364,7 @@ function v61RenderVitrina(d, ui, mapa) {
     var vUrl = p.imagen_url || cat.imagen_url;
     var vNom = p.nombre || cat.nombre || cid;
     var vArte = v61HayArte(vUrl, cid, cat.marca_nombre);
-    html += '<div class="v61-card c-museo-slot ' + ui.claseRareza(p.rareza || cat.rareza, varKey) + '">'
+    html += '<div class="v61-card c-museo-slot ' + ui.claseRareza(p.rareza || cat.rareza, varKey) + '"' + v61FichaAttrs(cid, varKey, 'vitrina') + '>'
       + v61Thumb(vUrl, vNom, cid, cat.marca_nombre, 'md')
       + (vArte ? '' : '<div class="v61-card-n">' + esc(vNom) + '</div>')
       + '<span class="v61-rareza">' + esc(v61VarianteLabel(varKey)) + '</span>'
@@ -8410,7 +8429,7 @@ function v61RenderAlbum(d, ui) {
     var aUrl = c.imagen_url;
     var aNom = c.nombre || id;
     var aArte = v61HayArte(aUrl, id, c.marca_nombre);
-    html += '<div class="v61-card ' + ui.claseRareza(c.rareza, varClase) + '">'
+    html += '<div class="v61-card ' + ui.claseRareza(c.rareza, varClase) + '"' + v61FichaAttrs(id, varClase, 'album') + '>'
       + v61Thumb(aUrl, aNom, id, c.marca_nombre)
       + (aArte ? '' : '<div class="v61-card-n">' + esc(aNom) + '</div>')
       + (aArte ? '' : '<span class="v61-rareza">' + esc(c.rareza || 'comun') + '</span>')
@@ -8470,6 +8489,117 @@ function v61CartaPorId(cartaId) {
     if (c && String(c.id) === String(cartaId)) out = c;
   });
   return out;
+}
+/* ---- Ficha compartida de carta (cartas-ui.js) -------------------------------
+   Una sola delegacion de clic/teclado instalada en #pf-coleccion cubre las
+   TRES superficies: Mis Cartas, vitrina del museo y album. Feature-detect
+   (ADR-008): sin window.CartasUI.abrirFicha no se marca ningun contenedor, no
+   se instala nada y el HTML generado queda exactamente como hoy. */
+function v61FichaActiva() {
+  var ui = window.CartasUI;
+  return !!(ui && typeof ui.abrirFicha === 'function');
+}
+/* Devuelve '' cuando el modulo no esta: asi el markup no cambia ni un byte. */
+function v61FichaAttrs(cartaId, variante, superficie) {
+  if (!v61FichaActiva()) return '';
+  var id = String(cartaId || '');
+  if (!id) return '';
+  return ' data-c-ficha-abrir="1" data-carta-id="' + esc(id) + '"'
+    + ' data-carta-var="' + esc(String(variante || 'base').toLowerCase()) + '"'
+    + ' data-c-ficha-sup="' + esc(String(superficie || 'coleccion')) + '"'
+    + ' role="button" tabindex="0"';
+}
+function v61FichaVariante(c, varKey) {
+  var k = String(varKey || 'base').toLowerCase();
+  var out = null;
+  ((c && c.variantes) || []).forEach(function (v) {
+    if (v && String(v.variante || 'base').toLowerCase() === k) out = v;
+  });
+  return out;
+}
+function v61FichaTotal(c) {
+  var t = 0;
+  ((c && c.variantes) || []).forEach(function (v) { t += Number(v && v.cantidad) || 0; });
+  return t;
+}
+/* Acciones de la ficha: reutilizan las funciones ya existentes y respetan las
+   MISMAS condiciones que el markup de cada superficie. */
+function v61FichaAcciones(c, variante, superficie) {
+  if (!c) return '';
+  var id = String(c.id || '');
+  if (!id) return '';
+  var eid = esc(id);
+  var ek = esc(String(variante || 'base').toLowerCase());
+  var html = '';
+  if (superficie === 'vitrina') {
+    return '<button type="button" class="v61-btn ghost" onclick="v61RetirarMuseo(\'' + eid + '\',\'' + ek + '\')">Retirar</button>';
+  }
+  if (superficie === 'album') {
+    var va = v61FichaVariante(c, ek);
+    html += (va && va.en_museo === true)
+      ? '<button type="button" class="v61-btn ghost" onclick="v61RetirarMuseo(\'' + eid + '\',\'' + ek + '\')">Retirar</button>'
+      : '<button type="button" class="v61-btn" onclick="v61ExhibirCarta(\'' + eid + '\',\'' + ek + '\')">Exhibir</button>';
+    var baseCant = 0;
+    ((c.variantes) || []).forEach(function (v) {
+      if (v && String(v.variante || 'base').toLowerCase() === 'base') baseCant += Number(v.cantidad) || 0;
+    });
+    if (c.fusionable === true && baseCant >= 4) {
+      html += '<button type="button" class="v61-btn ghost" onclick="v61FusionarCarta(\'' + eid + '\')">Fusionar duplicados</button>';
+    }
+    html += '<button type="button" class="v61-btn" onclick="v61VenderCarta(\'' + eid + '\',' + v61FichaTotal(c) + ')">Poner a la venta</button>';
+    return html;
+  }
+  var cant = parseInt(c.cantidad, 10) || 0;
+  html += '<button type="button" class="v61-btn" onclick="v61PublicarCarta(\'' + eid + '\',' + cant + ')">Publicar en venta</button>';
+  if (c.es_evento === true) {
+    html += '<button type="button" class="v61-btn ghost" onclick="v61UsarCartaEvento(\'' + eid + '\')">Usar en evento</button>';
+  }
+  if (c.nivel_gate == null || c.es_evento === true) {
+    html += '<button type="button" class="v61-btn ghost" onclick="v61IntercambiarCarta(\'' + eid + '\')">Intercambiar (P2P)</button>';
+  }
+  return html;
+}
+function v61FichaDesde(el) {
+  if (!el || typeof el.getAttribute !== 'function') return false;
+  if (!v61FichaActiva()) return false;
+  var c = v61CartaPorId(el.getAttribute('data-carta-id'));
+  if (!c) return false;
+  var varKey = el.getAttribute('data-carta-var') || 'base';
+  var sup = String(el.getAttribute('data-c-ficha-sup') || 'coleccion').toLowerCase();
+  var opciones = {
+    contexto: (sup === 'coleccion') ? 'coleccion' : 'album',
+    acciones: v61FichaAcciones(c, varKey, sup)
+  };
+  if (sup === 'coleccion') opciones.cantidad = parseInt(c.cantidad, 10) || 0;
+  else if (sup === 'album') opciones.cantidad = v61FichaTotal(c);
+  try { window.CartasUI.abrirFicha(c, opciones); return true; }
+  catch (e) { return false; }
+}
+/* Un unico handler para click y keydown: los botones y enlaces de dentro
+   (Publicar / Exhibir / Retirar / Fusionar / Vender / Usar) siguen mandando. */
+function v61FichaDeleg(ev) {
+  if (!ev) return;
+  var esTecla = (ev.type === 'keydown');
+  if (esTecla) {
+    var k = String(ev.key || '');
+    var code = Number(ev.keyCode) || 0;
+    if (!(k === 'Enter' || code === 13 || k === ' ' || k === 'Spacebar' || code === 32)) return;
+  }
+  var t = ev.target;
+  if (!t || typeof t.closest !== 'function') return;
+  if (t.closest('button') || t.closest('a')) return;
+  var cont = t.closest('[data-c-ficha-abrir]');
+  if (!cont) return;
+  if (esTecla && typeof ev.preventDefault === 'function') ev.preventDefault();
+  v61FichaDesde(cont);
+}
+function v61InstalarFichaDeleg() {
+  if (!v61FichaActiva()) return false;
+  var host = document.getElementById('pf-coleccion');
+  if (!host || host.getAttribute('data-c-ficha-deleg') === '1') return false;
+  host.setAttribute('data-c-ficha-deleg', '1');
+  ['click', 'keydown'].forEach(function (tipo) { host.addEventListener(tipo, v61FichaDeleg, false); });
+  return true;
 }
 function v61MuseoRefrescar() {
   cargarMuseoCartas();
@@ -9720,7 +9850,7 @@ else if (PF_TAB_ACTIVO === 'marca') {
 window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>
   <script src="usuario-session.js"></script>
-<script src="cartas-ui.js"></script>
+<script src="cartas-ui.js?v=2"></script>
 <script src="cartas-arte.js"></script>
   <script src="album-comments.js?v=2"></script>
   <script>

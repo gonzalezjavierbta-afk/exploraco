@@ -13,7 +13,9 @@
 .cartas-silo .c-shiny,
 .cartas-silo .c-badge-emisor,
 .cartas-silo .c-shiny *,
-.cartas-silo .c-badge-emisor * {
+.cartas-silo .c-badge-emisor *,
+.c-ficha,
+.c-ficha * {
   box-sizing: border-box;
 }
 
@@ -21,14 +23,16 @@
    Brillo dorado en el borde + halo suave. El color de rareza sigue
    mandando por el borde superior que ya aplica el CSS del perfil; aqui
    solo se anade el anillo exterior para no competir con el. */
-.cartas-silo .c-shiny {
+.cartas-silo .c-shiny,
+.c-ficha .c-shiny {
   border-color: #FFB84D;
   box-shadow: 0 0 0 2px rgba(255, 184, 77, .55), 0 0 14px rgba(255, 184, 77, .35);
   position: relative;
 }
 
 /* Reflejo diagonal muy tenue, sin capturar clics. */
-.cartas-silo .c-shiny::after {
+.cartas-silo .c-shiny::after,
+.c-ficha .c-shiny::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -41,7 +45,8 @@
 }
 
 /* --- Badge de emisor ------------------------------------------------ */
-.cartas-silo .c-badge-emisor {
+.cartas-silo .c-badge-emisor,
+.c-ficha .c-badge-emisor {
   display: inline-flex;
   align-items: center;
   gap: .3em;
@@ -61,7 +66,8 @@
 }
 
 /* Sobre fondos oscuros el badge invierte su tinta. */
-.cartas-silo.cartas-silo--oscuro .c-badge-emisor {
+.cartas-silo.cartas-silo--oscuro .c-badge-emisor,
+.c-ficha .c-badge-emisor {
   border-color: rgba(255, 255, 255, .18);
   background: rgba(255, 255, 255, .1);
 }
@@ -105,9 +111,11 @@
 .cartas-silo .c-card--sm { width: 88px; max-width: 100%; --c-arte-fs: .55rem; }
 .cartas-silo .c-card--md { width: 140px; max-width: 100%; --c-arte-fs: .7rem; }
 .cartas-silo .c-card--lg { max-width: 100%; --c-arte-fs: .9rem; }
+.c-ficha .c-card--lg { width: 100%; max-width: 100%; --c-arte-fs: 1.05rem; }
 
 /* --- Hueco de arte: marco comun ------------------------------------- */
-.cartas-silo .c-card-arte {
+.cartas-silo .c-card-arte,
+.c-ficha .c-card-arte {
   position: relative;
   display: block;
   width: 100%;
@@ -122,7 +130,8 @@
 }
 
 /* La lamina manda: ocupa el hueco entero y recorta sin deformar. */
-.cartas-silo .c-card-img {
+.cartas-silo .c-card-img,
+.c-ficha .c-card-img {
   display: block;
   width: 100%;
   height: 100%;
@@ -131,7 +140,9 @@
 
 /* --- Placeholder: base compartida por las dos familias -------------- */
 .cartas-silo .c-card-arte--vacia,
-.cartas-silo .c-card-arte--marca {
+.cartas-silo .c-card-arte--marca,
+.c-ficha .c-card-arte--vacia,
+.c-ficha .c-card-arte--marca {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -160,7 +171,8 @@
 }
 
 /* Familia C: pergamino claro, borde marron, tinta oscura. */
-.cartas-silo .c-card-arte--vacia {
+.cartas-silo .c-card-arte--vacia,
+.c-ficha .c-card-arte--vacia {
   color: #2B2114;
   border-color: #6B5233;
   background: linear-gradient(160deg, #FBF6E9 0%, #F1E5C9 55%, #E2D0AA 100%);
@@ -179,7 +191,8 @@
 
 /* Familia M: carbon con filo dorado. Va despues para ganar a la familia
    C cuando el nodo lleva las dos clases. */
-.cartas-silo .c-card-arte--marca {
+.cartas-silo .c-card-arte--marca,
+.c-ficha .c-card-arte--marca {
   color: #F6EBCB;
   border-color: #C9A227;
   background: linear-gradient(160deg, #232326 0%, #141416 55%, #08080A 100%);
@@ -336,5 +349,342 @@
 
   .cartas-silo .c-card-arte:hover {
     transform: none;
+  }
+}
+
+
+/* =====================================================================
+   FICHA DE CARTA -- modal compartido (host .c-ficha en document.body)
+   POR QUE vive fuera del silo .cartas-silo: el host se crea bajo demanda en
+   <body>, sin padre silo, asi que el badge, la variante shiny y el hueco
+   de arte se AGRUPARON en sus reglas de origen (arriba) en vez de
+   copiarse. Aqui solo vive lo que es exclusivo de la ficha.
+   Reglas de esta caja:
+     1) La lamina manda (ADR-112): columna propia de lectura, ratio
+        1086/1448 heredado, cero texto encima del PNG.
+     2) Fondo SOLIDO: el texto tiene que leerse sobre cualquier pagina.
+     3) z-index 1500 > 1300/1400 de los modales de mi-perfil.
+     4) Cero bytes > 127.
+   ===================================================================== */
+
+/* --- Host: mismo patron de apertura que .pf-museo-modal ------------ */
+.c-ficha {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.c-ficha.open { display: flex; }
+
+/* --- Backdrop: velo + desenfoque ligero, sin capturar el foco ------ */
+.c-ficha .c-ficha-bd {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 8, 10, .72);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+/* --- Caja: scroll propio, fondo solido, sin fuga del scroll al body - */
+.c-ficha .c-ficha-box {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  gap: 22px;
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  padding: 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #2A2E33;
+  border-radius: 14px;
+  background: #14171A;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .6);
+  color: #EDEAE3;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+/* --- Lamina: ancho de lectura fijo, nunca recortada ---------------- */
+.c-ficha .c-ficha-arte {
+  flex: 0 0 auto;
+  width: min(100%, 320px);
+  align-self: flex-start;
+}
+
+/* Ratio correcto: la lamina entra entera y el fondo del hueco rellena. */
+.c-ficha .c-ficha-arte .c-card-img { object-fit: contain; }
+
+/* Hueco sin lamina: reserva la geometria exacta 1086x1448 (ADR-112),
+   asi la ficha no salta de alto al abrirse sin arte. */
+.c-ficha .c-ficha-arte-hueco {
+  aspect-ratio: 1086 / 1448;
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+
+/* --- Columna de informacion ---------------------------------------- */
+.c-ficha .c-ficha-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.c-ficha .c-ficha-n {
+  margin: 0;
+  padding-right: 40px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(22px, 4vw, 30px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: .01em;
+  text-transform: uppercase;
+  color: #F6F2E8;
+  overflow-wrap: anywhere;
+}
+
+/* --- Aspa de cierre: esquina, 44px de blanco tactil ---------------- */
+.c-ficha .c-ficha-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #A3AAB2;
+  font-family: inherit;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+
+.c-ficha .c-ficha-x:hover {
+  background: rgba(255, 255, 255, .08);
+  color: #F6F2E8;
+}
+
+/* --- Chips de rareza / variante / set ------------------------------ */
+.c-ficha .c-ficha-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.c-ficha .c-ficha-tags > * { max-width: 100%; }
+
+/* Chip: pildora dorada translucida, texto corto y sin desbordar. */
+.c-ficha .c-ficha-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border: 1px solid rgba(232, 199, 102, .42);
+  border-radius: 999px;
+  background: rgba(232, 199, 102, .10);
+  color: #E8C766;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.c-ficha .c-ficha-qty {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #E8C766;
+}
+
+/* Secundario: 7:1 sobre #14171A, por encima del 4.5:1 exigido. */
+.c-ficha .c-ficha-desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #A3AAB2;
+  overflow-wrap: anywhere;
+}
+
+/* --- Caja de reglas: filo dorado, lectura corta -------------------- */
+.c-ficha .c-ficha-cf {
+  padding: 10px 12px;
+  border: 1px solid #2A2E33;
+  border-left: 2px solid #C9A227;
+  border-radius: 8px;
+  background: #1A1E22;
+}
+
+.c-ficha .c-ficha-cf-t {
+  margin: 0 0 6px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #C9A227;
+}
+
+.c-ficha .c-ficha-cf-l {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #A3AAB2;
+}
+
+.c-ficha .c-ficha-cf-l li { margin: 0 0 4px; }
+.c-ficha .c-ficha-cf-l li:last-child { margin-bottom: 0; }
+
+/* --- Acciones: mismo peso visual, area tactil suficiente ----------- */
+.c-ficha .c-ficha-acc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.c-ficha .c-ficha-acc > * {
+  flex: 1 1 auto;
+  min-height: 40px;
+  transition: background-color .15s ease, color .15s ease;
+}
+
+.c-ficha .c-ficha-cerrar {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid #C9A227;
+  border-radius: 999px;
+  background: transparent;
+  color: #E8C766;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+
+.c-ficha .c-ficha-cerrar:hover {
+  background: #C9A227;
+  color: #14171A;
+}
+
+/* --- Foco visible dorado en todos los controles -------------------- */
+.c-ficha .c-ficha-x:focus-visible,
+.c-ficha .c-ficha-cerrar:focus-visible,
+.c-ficha .c-ficha-acc > *:focus-visible {
+  outline: 2px solid #E8C766;
+  outline-offset: 2px;
+}
+
+/* --- Movil: una columna, lamina centrada, Cerrar a ancho completo --- */
+@media (max-width: 540px) {
+  .c-ficha { padding: 8px; }
+
+  .c-ficha .c-ficha-box {
+    flex-direction: column;
+    gap: 14px;
+    max-height: 90vh;
+    padding: 18px 16px;
+  }
+
+  .c-ficha .c-ficha-arte {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .c-ficha .c-ficha-n { padding-right: 44px; }
+
+  .c-ficha .c-ficha-x {
+    top: 6px;
+    right: 6px;
+  }
+
+  .c-ficha .c-ficha-cerrar {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* --- Accesibilidad: cero animacion si se pide calma ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  .c-ficha .c-ficha-x,
+  .c-ficha .c-ficha-cerrar,
+  .c-ficha .c-ficha-acc > * {
+    transition: none;
+  }
+}
+
+
+/* =====================================================================
+   AFORDANCE "ESTO SE PUEDE PULSAR" -- disparadores de la ficha compartida
+   POR QUE aqui y no en cada pagina: el disparador NO lleva clase nueva, se
+   marca con data-c-ficha-abrir="1" en el contenedor de la carta dentro del
+   silo (mi-perfil.html, perfil.html), asi que una sola regla cubre todas
+   las paginas. Todo cuelga de .cartas-silo (ADR-004), nada suelto.
+   Nada de sombras nuevas: solo cursor, realce leve y 1px de desplazamiento.
+   ===================================================================== */
+.cartas-silo [data-c-ficha-abrir] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .15s ease, filter .15s ease;
+}
+
+/* Hover solo donde existe puntero fino: en tactil el estado puede quedar
+   pegado. Mismo criterio que .cartas-silo .c-card-arte (ver arriba). */
+@media (hover: hover) and (pointer: fine) {
+  .cartas-silo [data-c-ficha-abrir]:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+  }
+}
+
+/* Foco visible: mismo dorado y mismo trazo que los controles de .c-ficha. */
+.cartas-silo [data-c-ficha-abrir]:focus-visible {
+  outline: 2px solid #E8C766;
+  outline-offset: 2px;
+}
+
+/* Pulsado: el realce se apaga, la carta no "salta" bajo el dedo. */
+.cartas-silo [data-c-ficha-abrir]:active {
+  transform: none;
+}
+
+/* Accesibilidad: cero animacion si se pide calma. */
+@media (prefers-reduced-motion: reduce) {
+  .cartas-silo [data-c-ficha-abrir],
+  .cartas-silo [data-c-ficha-abrir]:hover,
+  .cartas-silo [data-c-ficha-abrir]:active {
+    transform: none;
+    transition: none;
   }
 }
