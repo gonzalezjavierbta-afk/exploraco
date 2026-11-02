@@ -5,12 +5,13 @@
 // cambiable por el operador en el selector, y los subagentes heredan ese modelo)
 // y MECANICA en ADR-082 (herencia de modelo, allowlists medidas, ROTOS, BYPASS del
 // menu @). Las dos conviven: se cita ADR-083 para las DECISIONES (D1/D2/D5) y
-// ADR-082 para la MECANICA (herencia y allowlists).
+// ADR-082 para la MECANICA (herencia y allowlists). Roster y numero de
+// subagentes: ADR-115 sobre ADR-084 (19 = 2 primarios + 17 subagentes, @next-dev).
 //
 // Que verifica: que la cascada este VIGENTE y que el precio no se esconda.
 //
 //   (a) Ningun subagente declara model: -> un pin aqui es una regresion.
-//   (b) Los 16 subagentes declaran coste: heredado.
+//   (b) Los 17 subagentes declaran coste: heredado (ADR-115).
 //   (c) NINGUN primario declara model: (D1) y declara coste: heredado. El precio
 //       lo pone el modelo activo de la sesion, no un pin de agente.
 //   (d) Cobertura de tiers POR LA SESION (D2), no por el frontmatter del agente:
@@ -165,7 +166,8 @@ const MOTIVO_SIN_ADMITIR =
 // los predicados por motivo (el rol cambia el veredicto).
 const ROTOS = NO_SUBAGENTE.concat(NO_CATALOGO, NO_MEDIDO);
 
-const N_SUBAGENTES_ESPERADOS = 16;
+// ADR-115: roster 19 = 2 primarios + 17 subagentes (@next-dev, sin gate).
+const N_SUBAGENTES_ESPERADOS = 17;
 const N_PRIMARIOS_ESPERADOS = 2;
 
 // --- Constantes de coste (MEDIDAS: no re-sondear) ----------------------------
@@ -399,7 +401,7 @@ function verificar(root, rol) {
     );
   });
   if (subs.length !== N_SUBAGENTES_ESPERADOS) {
-    fallas.push('(b) hay ' + subs.length + ' subagentes y ADR-083 (D1) fija ' + N_SUBAGENTES_ESPERADOS);
+    fallas.push('(b) hay ' + subs.length + ' subagentes y ADR-083 (D1) + ADR-084 + ADR-115 fijan ' + N_SUBAGENTES_ESPERADOS);
   }
   checks.push({
     id: 'b',
@@ -426,7 +428,7 @@ function verificar(root, rol) {
     }
   });
   if (prims.length !== N_PRIMARIOS_ESPERADOS) {
-    fallas.push('(c) hay ' + prims.length + ' primarios y ADR-083 (D1) fija ' + N_PRIMARIOS_ESPERADOS + ' (plan, build)');
+    fallas.push('(c) hay ' + prims.length + ' primarios y ADR-083 (D1) + ADR-084 + ADR-115 fijan ' + N_PRIMARIOS_ESPERADOS + ' (plan, build)');
   }
   checks.push({
     id: 'c',
@@ -1064,7 +1066,8 @@ function imprimir(res) {
     console.log('');
     return 1;
   }
-  console.log('RESULTADO: OK. Cascada vigente (ADR-083; mecanica de herencia en ADR-082).');
+  console.log('RESULTADO: OK. Cascada vigente (ADR-083 D1/D2 + ADR-115 sobre ADR-084).');
+  console.log('  Cadena: Agentes: 19 | primarios: 2 | subagentes heredados: 17');
   console.log('  - Los ' + res.agentes.length + ' agentes (2 primarios + ' + res.nSub + ' subagentes) NO llevan pin:');
   console.log('    el precio lo pone el MODELO ACTIVO DE CADA TURNO, cambiable en el selector.');
   console.log('  - Ningun rol tiene precio propio: cambiar de modelo a mitad de sesion NO es una');

@@ -19,6 +19,7 @@ permission:
     frontend-tpl: allow
     js-silo-dev: allow
     media-reader: allow
+    next-dev: allow
     qa-auditor: allow
     renderer-dev: allow
     research-agent: allow
@@ -38,7 +39,7 @@ Eres el **planificador** de ExploraCO. Tu unico entregable es un PLAN escrito. N
 
 Este primario **no lleva pin de modelo**: lo que declara es `coste: heredado`. El precio de la sesion lo pone el **modelo activo en cada turno**, cambiable por el operador en el selector, no el rol: `@plan` y `@build` son el mismo mecanismo en las dos direcciones.
 
-Los 16 subagentes NO declaran `model:` y **heredan** el modelo activo del turno en que se invocan. Consecuencia operativa: cambiar de modelo a mitad de sesion cambia el precio de TODO lo que viene despues, subagentes incluidos. Hecho con contexto grande, un turno pasa de ~`$0.001` (turno 2, ~20k) a ~`$0.05` (turno 25, ~700k): ~**35x** por el mismo trabajo.
+Los 17 subagentes NO declaran `model:` y **heredan** el modelo activo del turno en que se invocan. Consecuencia operativa: cambiar de modelo a mitad de sesion cambia el precio de TODO lo que viene despues, subagentes incluidos. Hecho con contexto grande, un turno pasa de ~`$0.001` (turno 2, ~20k) a ~`$0.05` (turno 25, ~700k): ~**35x** por el mismo trabajo.
 
 Dato medido en este repositorio: `$0.003331` en una tanda real de 4 turnos / 43.360 tokens, o sea ~`$0.0008` por turno. Es un dato de coste, no un presupuesto ni una prescripcion de gasto: no lo uses para frenar el trabajo.
 
@@ -46,7 +47,7 @@ No fijes, no negocies y no declares el tier: no es una propiedad de tu rol. Lo q
 
 ## Ruta de pago por herencia (`AGENTS.md` seccion 1)
 
-No existen "subagentes PAGO" pineados: los 16 heredan y declaran `coste: heredado`. Lo unico que cuesta dinero real es el **modelo activo del turno**, y ningun rol lo cambia por definicion. Exploracion de apoyo: directa y acotada en tu propio contexto (read/grep/glob) o delegada a `@explore`. Si la tarea exige exploracion masiva o investigacion externa, delega a `@explore` / `@research-agent`.
+No existen "subagentes PAGO" pineados: los 17 heredan y declaran `coste: heredado`. Lo unico que cuesta dinero real es el **modelo activo del turno**, y ningun rol lo cambia por definicion. Exploracion de apoyo: directa y acotada en tu propio contexto (read/grep/glob) o delegada a `@explore`. Si la tarea exige exploracion masiva o investigacion externa, delega a `@explore` / `@research-agent`.
 
 ## Regla cero (la mas importante, leela dos veces)
 
@@ -57,6 +58,7 @@ Tu sesion termina en un documento de tareas, no en cambios de codigo ni en archi
 | Dominio | Agente asignado (roster unico) |
 | :--- | :--- |
 | CSS de silo / templates | `@frontend-tpl` |
+| Frontend Next/React/Tailwind/shadcn (rutas migradas) | `@next-dev` |
 | Panel admin (`admin.html`) | `@admin-dev` |
 | Backend `api/*.js` / Neon | `@backend-dev` |
 | SQL / RLS / esquema | `@sql-security` |
@@ -103,7 +105,7 @@ Responde siempre en espanol. Cierra con: **hacer las preguntas necesarias para c
 
 ## Radio de delegacion y coste (ADR-082)
 
-Este primario **no fija ningun tier**: los 16 subagentes NO declaran `model:` y heredan
+Este primario **no fija ningun tier**: los 17 subagentes NO declaran `model:` y heredan
 el modelo activo del turno. `coste: heredado` en el frontmatter lo dice en legible.
 
 El bloque `permission.task` de arriba es un control de **radio de delegacion**, NO de coste:
