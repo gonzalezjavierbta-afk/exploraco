@@ -58,6 +58,14 @@
 .mc-root .mpa-media-pin-album{border-radius:9px;border-style:solid;border-color:#fff3d6;box-shadow:0 3px 10px rgba(217,119,6,.55)}
 /* Item individual de video: se mantiene REDONDO (solo tinte rojo). */
 .mc-root .mpa-media-pin-video{border-style:solid;border-color:#ff8a80;box-shadow:0 3px 10px rgba(231,76,60,.55)}
+/* ADR-116 D5.8: miniatura dentro del pin. El motor emite inline el tamano,
+   la forma circular, el overflow y el flex; aqui solo va el recorte de la
+   imagen, el emoji de fallback y el estado foto. Contrato UNICO: el mismo
+   bloque existe en el inline de index.html bajo #mapa-map-container. */
+.mc-root .mpa-media-pin-img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
+.mc-root .mpa-media-pin-ico{font-size:15px;line-height:1;align-items:center;justify-content:center}
+.mc-root .mpa-media-pin-foto{border-color:#fff}
+.mc-root .mpa-media-pin-foto:hover{border-color:var(--gold)}
 
 /* ---- Cluster de medios (ADR-116 D5.8) ------------------------- */
 /* Contrato UNICO de clases: los mismos nombres, estados y tamanos

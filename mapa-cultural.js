@@ -1,6 +1,6 @@
 /* =============================================================
    mapa-cultural.js -- Motor compartido del Mapa Cultural LATAWEL
-   Version 1.6.0. IIFE, ASCII-safe estricto, sin backticks.
+   Version 1.7.0. IIFE, ASCII-safe estricto, sin backticks.
 
    Porta a un modulo reusable el motor del mapa de index.html
    (pines, clustering por proximidad, capa multimedia y drawer
@@ -29,6 +29,21 @@ create(opts)  -> instancia (multi-instancia por pagina)
         onFilterChange, getState, getMap, openDrawer,
         closeDrawer, geolocate, resetColombia, fitBounds,
         setUserPos, clearUserPos, getUserPos }
+
+   1.7.0
+     - Pin de FOTO y ALBUM con miniatura: si el item trae imagen usable se
+       pinta un pin circular de 40x40 con la foto recortada (border-radius
+       50% + overflow hidden, sin gota ni rotate, que girarian el recorte),
+       el borde y la sombra del pin del CSS y el emoji de tipo oculto como
+       respaldo ADR-008 (onerror). Sin URL usable, o en video/audio, el pin
+       sigue EXACTAMENTE como antes: emoji 34x34 y mismos colores.
+     - Nuevo helper interno mediaThumbURL(item): URL de miniatura UNICA con
+       prioridad media_miniatura -> media_url -> ''. Devuelve '' siempre en
+       video y audio (son enlaces externos, no ficheros) y descarta '',
+       'null', 'undefined' y about:blank. mediaThumbOk sigue siendo la unica
+       validacion y el helper la reutiliza.
+     - El cluster de medios y las filas de su popup usan el mismo helper, asi
+       que tambien prefieren media_miniatura. Markup y tamanos sin cambios.
 
    1.6.0
      - Modo UNION de la capa de medios (ADR-116), OPT-IN con la opcion
@@ -230,7 +245,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 (function () {
   'use strict';
 
-  var VERSION = '1.6.0';
+  var VERSION = '1.7.0';
 
   // Paleta de pines por categoria (paridad con index-api-connector.js
   // y refreshMapaMarkers de index.html).
@@ -1361,6 +1376,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       });
     }
 
+    // Fallback ADR-008 del pin con miniatura: si la foto no carga se oculta la
+    // img y aparece el emoji de tipo, que va justo detras como hermano
+    // siguiente. Mismo patron que MEDIA_CLUSTER_ONERROR.
+    var MEDIA_PIN_ONERROR = 'this.style.display=\'none\';this.nextSibling.style.display=\'\';';
+
     function mediaIcon(item) {
       var tipo = item.media_type || 'foto';
       var esDestino = (item.origen === 'destino');
@@ -1378,6 +1398,24 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         + (esDestino ? ' mpa-media-pin-dest' : '')
         + (esAlbum ? ' mpa-media-pin-album' : '')
         + (!esAlbum && !esDestino && tipo === 'video' ? ' mpa-media-pin-video' : '');
+      // v1.7.0: foto y album con miniatura usable pintan la imagen recortada en
+      // circulo (40x40). El borde (2.5px) y la sombra siguen viniendo del CSS
+      // del pin, y el estado mpa-media-pin-foto es el gancho para ajustarlos.
+      // La forma de gota NO se usa aqui: su rotate(-45deg) giraria el recorte.
+      var thumb = mediaThumbURL(item);
+      if (thumb) {
+        return L.divIcon({
+          html: '<div class="' + cls + ' mpa-media-pin-foto" style="width:40px;height:40px;'
+            + 'box-sizing:border-box;border-radius:50%;overflow:hidden;background:' + color + ';'
+            + 'display:flex;align-items:center;justify-content:center">'
+            + '<img class="mpa-media-pin-img" src="' + esc(thumb) + '" alt="" loading="lazy"'
+            + ' style="width:100%;height:100%;object-fit:cover;display:block"'
+            + ' onerror="' + MEDIA_PIN_ONERROR + '">'
+            + '<span class="mpa-media-pin-ico" style="display:none">' + ico + '</span>'
+            + '</div>',
+          iconSize: [40, 40], iconAnchor: [20, 20], className: ''
+        });
+      }
       return L.divIcon({
         html: '<div class="' + cls + '" style="background:' + color + '">' + ico + '</div>',
         iconSize: [34, 34], iconAnchor: [17, 17], className: ''
@@ -1408,13 +1446,29 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     }
 
     // Miniatura SOLO para foto y album con URL usable. Descarta '', 'null' y
-    // 'undefined', que en el contrato de datos son ausentes.
+    // 'undefined', que en el contrato de datos son ausentes, y el placeholder
+    // 'about:blank', que falla igual que una URL muerta.
     function mediaThumbOk(item) {
       var tipo = mediaTipoClase(item);
       if (tipo !== 'foto' && tipo !== 'album') return false;
       var u = item && item.media_url;
       if (typeof u !== 'string') return false;
-      return !mediaVacio(u);
+      if (mediaVacio(u)) return false;
+      return u.replace(/^\s+|\s+$/g, '').toLowerCase() !== 'about:blank';
+    }
+
+    // URL de miniatura UNICA (pin, cluster y filas del popup): prefiere
+    // media_miniatura, cae a media_url y devuelve '' si no hay imagen usable.
+    // Reutiliza mediaThumbOk para no duplicar la validacion: se le pasa un
+    // sondeo con la candidata en media_url. Video y audio devuelven '' SIEMPRE
+    // porque son enlaces externos (YouTube/Spotify) y como <img> son un 404.
+    function mediaThumbURL(item) {
+      if (!item) return '';
+      var mini = item.media_miniatura;
+      var full = item.media_url;
+      if (mediaThumbOk({ media_type: item.media_type, origen: item.origen, media_url: mini })) return mini;
+      if (mediaThumbOk({ media_type: item.media_type, origen: item.origen, media_url: full })) return full;
+      return '';
     }
 
     // Fallback ADR-008: si la miniatura falla se oculta la img y se muestra el
@@ -1439,8 +1493,9 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       else cls += ' mc-media-cluster-foto';
       var ico = mediaTipoEmoji(rep);
       var inner;
-      if (mediaThumbOk(rep)) {
-        inner = '<img class="mc-media-cluster-thumb" src="' + esc(rep.media_url) + '" alt="" loading="lazy"'
+      var thumbUrl = mediaThumbURL(rep);
+      if (thumbUrl) {
+        inner = '<img class="mc-media-cluster-thumb" src="' + esc(thumbUrl) + '" alt="" loading="lazy"'
           + ' onerror="' + MEDIA_CLUSTER_ONERROR + '">'
           + '<span class="mc-media-cluster-ico" style="display:none">' + ico + '</span>';
       } else {
@@ -1488,8 +1543,9 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         var it = ms[i];
         var ico = mediaTipoEmoji(it);
         var thumb;
-        if (mediaThumbOk(it)) {
-          thumb = '<img class="mc-media-cluster-row-thumb" src="' + esc(it.media_url) + '" alt="" loading="lazy"'
+        var thumbUrlRow = mediaThumbURL(it);
+        if (thumbUrlRow) {
+          thumb = '<img class="mc-media-cluster-row-thumb" src="' + esc(thumbUrlRow) + '" alt="" loading="lazy"'
             + ' onerror="' + MEDIA_CLUSTER_ONERROR + '">'
             + '<span class="mc-media-cluster-ico" style="display:none">' + ico + '</span>';
         } else {

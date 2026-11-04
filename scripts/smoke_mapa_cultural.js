@@ -1,4 +1,4 @@
-// Smoke de mapa-cultural.js. Version cubierta: 1.6.0 (ADR-116).
+// Smoke de mapa-cultural.js. Version cubierta: 1.7.0 (ADR-116).
 // Cubre DOS rutas del motor, y conviven a proposito en este archivo:
 //  - la instancia LEGACY (sin la opcion mediaUnion, default false): es la
 //    regresion historica del mapa de comunidad.html/index.html y NO se
@@ -55,9 +55,14 @@ check('API: window.MapaCultural expuesto', !!MC);
 // (mediaUnion), cuarta categoria aditiva mediaAlbumes, mergeMedia, la
 // importancia y el clustering propio de media con sus topes de pintado, la
 // etiqueta unica getMediaLabel y el snapshot de 7 claves.
-// Si el motor vuelve a 1.5.0 (o salta a otra version), el smoke debe
+// 1.7.0 es un bump FUNCIONAL del pin: la foto y el album con miniatura usable
+// (helper interno mediaThumbURL) pintan un pin circular de 40x40 con la imagen
+// recortada y el emoji oculto como respaldo ADR-008; sin URL usable, o en
+// video/audio (enlaces externos), el pin sigue en emoji 34x34. El cluster y
+// las filas del popup usan el mismo helper para preferir media_miniatura.
+// Si el motor vuelve a 1.6.0 (o salta a otra version), el smoke debe
 // detectar la regresion.
-check('API: version 1.6.0', MC && MC.version === '1.6.0');
+check('API: version 1.7.0', MC && MC.version === '1.7.0');
 ['create', 'init', 'refresh', 'setPlaces', 'setMedia', 'setMediaEnabled',
  'setMediaTypes', 'getMap', 'getState', 'openDrawer', 'closeDrawer', 'normalizePlace',
  'normalizeMedia', 'esc', 'starHtml', 'photoPlaceholderHTML', 'haversineKm',
@@ -1902,6 +1907,158 @@ uniInst.setMediaVista('albumes');
 check('red: setMedia/setMediaTypes/setMediaAlbumes/setMediaVista no disparan peticiones',
   (netCalls.fetch + netCalls.xhr) === redAntes);
 check('red: ninguna operacion del smoke (ni las restauraciones) hizo fetch',
+  netCalls.fetch === 0 && netCalls.xhr === 0);
+
+// =====================================================================
+// (39) v1.7.0 - MINIATURA DEL PIN DE MEDIA (URL via camino publico)
+// mediaThumbURL() y mediaIcon() son INTERNOS: la facade NO los publica, asi
+// que la cobertura va por el unico camino publico que los ejecuta,
+// setMedia() -> renderMedia() -> L.divIcon. El stub de L2 guarda el objeto de
+// opciones del icono (html, iconSize, iconAnchor), que es su contrato
+// observable. Un item por render y todos en coordenadas propias: la rejilla de
+// clustering es de 40 px y el stub proyecta 100000 px por grado, asi que
+// 0.01 grados son 1000 px y cada item cae en su celda.
+// =====================================================================
+function iconoPinMedia() {
+  for (var ip = L2._icons.length - 1; ip >= 0; ip--) {
+    var oi = L2._icons[ip];
+    if (oi && String(oi.html || '').indexOf('mpa-media-pin') !== -1) return oi;
+  }
+  return null;
+}
+groups.length = 0;
+var thumbInst = MC2.create({ map: 'mm-personal-map', mediaFilter: false, mediaUnion: true });
+thumbInst.setMediaEnabled(true);
+thumbInst.setMediaTypes({ foto: true, video: true, audio: true });
+thumbInst.setMediaAlbumes(true);
+function pinDe(item) {
+  L2._icons.length = 0;
+  thumbInst.setMedia([item]);
+  return iconoPinMedia();
+}
+function htmlDe(ico) { return ico ? String(ico.html || '') : ''; }
+
+var pinMini = { origen: 'destino', origen_id: 'th-1', media_type: 'foto',
+  media_miniatura: 'https://img.test/mini-a.jpg', media_url: 'https://img.test/full-a.jpg',
+  lat: 4.61, lng: -74.11 };
+var icoMini = pinDe(pinMini);
+var htmlMini = htmlDe(icoMini);
+check('v1.7.0 pin: con miniatura y media_url distintas gana media_miniatura',
+  htmlMini.indexOf('src="https://img.test/mini-a.jpg"') !== -1
+  && htmlMini.indexOf('full-a.jpg') === -1);
+
+var pinFull = { origen: 'destino', origen_id: 'th-2', media_type: 'foto',
+  media_url: 'https://img.test/solo-full.jpg', lat: 4.62, lng: -74.12 };
+var icoFull = pinDe(pinFull);
+var htmlFull = htmlDe(icoFull);
+check('v1.7.0 pin: foto solo con media_url la usa como miniatura',
+  htmlFull.indexOf('src="https://img.test/solo-full.jpg"') !== -1);
+
+var pinMiniNula = { origen: 'destino', origen_id: 'th-3', media_type: 'foto',
+  media_miniatura: 'null', media_url: 'https://img.test/fallback-a.jpg',
+  lat: 4.63, lng: -74.13 };
+var htmlMiniNula = htmlDe(pinDe(pinMiniNula));
+check('v1.7.0 pin: una miniatura "null" NO gana y cae a media_url',
+  htmlMiniNula.indexOf('src="https://img.test/fallback-a.jpg"') !== -1
+  && htmlMiniNula.indexOf('mini') === -1);
+
+var pinNulo = { origen: 'destino', origen_id: 'th-4', media_type: 'foto',
+  media_url: 'null', lat: 4.64, lng: -74.14 };
+var icoNulo = pinDe(pinNulo);
+var htmlNulo = htmlDe(icoNulo);
+check('v1.7.0 pin: media_url con el string "null" no genera <img>',
+  htmlNulo.length > 0 && htmlNulo.indexOf('<img') === -1);
+
+var pinVideo = { origen: 'album', origen_id: 'th-v', media_type: 'video',
+  media_url: 'https://www.youtube.com/watch?v=abc123', lat: 4.65, lng: -74.15 };
+var htmlVideo = htmlDe(pinDe(pinVideo));
+check('v1.7.0 pin: un video de YouTube nunca se pinta como <img>',
+  htmlVideo.length > 0 && htmlVideo.indexOf('<img') === -1);
+
+var pinAudio = { origen: 'album', origen_id: 'th-a', media_type: 'audio',
+  media_url: 'https://open.spotify.com/track/xyz789', lat: 4.66, lng: -74.16 };
+var htmlAudio = htmlDe(pinDe(pinAudio));
+check('v1.7.0 pin: un audio de Spotify nunca se pinta como <img>',
+  htmlAudio.length > 0 && htmlAudio.indexOf('<img') === -1);
+
+var pinAlbum = { origen: 'destino_album', origen_id: 'th-alb', media_type: 'album',
+  media_miniatura: 'https://img.test/alb-mini.jpg', media_url: 'https://img.test/alb-full.jpg',
+  lat: 4.67, lng: -74.17 };
+var icoAlbum = pinDe(pinAlbum);
+var htmlAlbum = htmlDe(icoAlbum);
+check('v1.7.0 pin: album con portada pinta <img> con su miniatura',
+  htmlAlbum.indexOf('<img') !== -1 && htmlAlbum.indexOf('src="https://img.test/alb-mini.jpg"') !== -1);
+check('v1.7.0 pin: el album con miniatura conserva mpa-media-pin-album',
+  htmlAlbum.indexOf('mpa-media-pin-album') !== -1
+  && htmlAlbum.indexOf('mpa-media-pin-foto') !== -1);
+
+// =====================================================================
+// (40) v1.7.0 - FALLBACK ADR-008 EN EL PIN CON IMAGEN
+// Solo se comprueba PRESENCIA: el onerror no se ejecuta (es codigo del
+// navegador). El emoji de respaldo va oculto justo detras de la imagen, que es
+// lo que el handler muestra al fallar la carga.
+// =====================================================================
+check('v1.7.0 fallback ADR-008: el pin con imagen lleva un onerror no vacio',
+  /onerror="[^"]+"/.test(htmlMini));
+check('v1.7.0 fallback ADR-008: el emoji de respaldo va en mpa-media-pin-ico oculto',
+  /class="mpa-media-pin-ico" style="display:none"/.test(htmlMini));
+check('v1.7.0 fallback ADR-008: el pin sin imagen no arrastra span de respaldo',
+  htmlNulo.indexOf('mpa-media-pin-ico') === -1);
+
+// =====================================================================
+// (41) v1.7.0 - TAMANO Y ANCLA: 40x40 centrado con miniatura, 34x34 sin ella
+// =====================================================================
+check('v1.7.0 tamano: foto con miniatura -> iconSize 40x40',
+  !!icoMini && !!icoMini.iconSize && icoMini.iconSize[0] === 40 && icoMini.iconSize[1] === 40);
+check('v1.7.0 ancla: foto con miniatura -> ancla centrada (20,20)',
+  !!icoMini && !!icoMini.iconAnchor && icoMini.iconAnchor[0] === 20 && icoMini.iconAnchor[1] === 20);
+check('v1.7.0 tamano: album con miniatura -> 40x40 con ancla (20,20)',
+  !!icoAlbum && icoAlbum.iconSize[0] === 40 && icoAlbum.iconSize[1] === 40
+  && icoAlbum.iconAnchor[0] === 20 && icoAlbum.iconAnchor[1] === 20);
+check('v1.7.0 tamano: foto sin miniatura -> iconSize 34x34',
+  !!icoNulo && !!icoNulo.iconSize && icoNulo.iconSize[0] === 34 && icoNulo.iconSize[1] === 34);
+check('v1.7.0 ancla: foto sin miniatura -> ancla (17,17)',
+  !!icoNulo && !!icoNulo.iconAnchor && icoNulo.iconAnchor[0] === 17 && icoNulo.iconAnchor[1] === 17);
+check('v1.7.0 tamano: el pin con miniatura es mayor que el pin base (40 > 34)',
+  icoMini.iconSize[0] > icoNulo.iconSize[0] && icoMini.iconAnchor[0] === icoMini.iconSize[0] / 2);
+
+// =====================================================================
+// (42) v1.7.0 - CLUSTER ALINEADO CON LA MISMA MINIATURA
+// mediaClusterIcon() tampoco es publica, pero el cluster se pinta por el
+// camino publico (2 items en la MISMA celda -> paintMediaCluster), asi que la
+// comprobacion se hace sobre el icono que llega al stub, sin tocar internals.
+// rep = el de mayor importancia (votos 9 > 1).
+// =====================================================================
+groups.length = 0;
+var clusInst = MC2.create({ map: 'mm-personal-map', mediaFilter: false, mediaUnion: true });
+var clusLayer = groups[groups.length - 1];
+clusInst.setMediaEnabled(true);
+clusInst.setMediaTypes({ foto: true, video: false, audio: false });
+clusInst.setMediaAlbumes(false);
+L2._icons.length = 0;
+clusInst.setMedia([
+  { origen: 'album', origen_id: 'cl-1', media_type: 'foto',
+    media_miniatura: 'https://img.test/cl-rep.jpg', media_url: 'https://img.test/cl-rep-full.jpg',
+    votos: 9, lat: 4.7, lng: -74.2 },
+  { origen: 'album', origen_id: 'cl-2', media_type: 'foto',
+    media_miniatura: 'https://img.test/cl-sec.jpg', media_url: 'https://img.test/cl-sec-full.jpg',
+    votos: 1, lat: 4.7, lng: -74.2 }
+]);
+check('v1.7.0 cluster: dos fotos en la misma celda -> 1 marcador de cluster',
+  clusLayer.__added.length === 1);
+var icoCluster = L2._icons.length ? L2._icons[L2._icons.length - 1] : null;
+var htmlCluster = String((icoCluster && icoCluster.html) || '');
+check('v1.7.0 cluster: la miniatura del cluster sale de media_miniatura del representante',
+  htmlCluster.indexOf('mc-media-cluster-thumb') !== -1
+  && htmlCluster.indexOf('src="https://img.test/cl-rep.jpg"') !== -1);
+check('v1.7.0 cluster: no usa la media_url del rep ni la miniatura del secundario',
+  htmlCluster.indexOf('cl-rep-full.jpg') === -1 && htmlCluster.indexOf('cl-sec') === -1);
+check('v1.7.0 cluster: conserva la clase de tipo y el contador del grupo',
+  htmlCluster.indexOf('mc-media-cluster-foto') !== -1
+  && htmlCluster.indexOf('mc-media-cluster-num">2<') !== -1);
+
+// El pintado con miniatura (39)-(42) tampoco puede hacer red.
+check('red: el pin con miniatura ni el cluster disparan peticiones',
   netCalls.fetch === 0 && netCalls.xhr === 0);
 
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');

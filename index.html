@@ -631,6 +631,14 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .mpa-media-pin-album{border-radius:9px;border-style:solid;border-color:#fff3d6;box-shadow:0 3px 10px rgba(217,119,6,.55)}
 /* Item individual de video: se mantiene REDONDO (solo tinte rojo). */
 .mpa-media-pin-video{border-style:solid;border-color:#ff8a80;box-shadow:0 3px 10px rgba(231,76,60,.55)}
+/* ADR-116 D5.8: miniatura dentro del pin. El motor emite inline el tamano,
+   la forma circular, el overflow y el flex; aqui solo va el recorte de la
+   imagen, el emoji de fallback y el estado foto. Contrato UNICO: el mismo
+   bloque existe en mapa-cultural.css bajo .mc-root. */
+#mapa-map-container .mpa-media-pin-img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
+#mapa-map-container .mpa-media-pin-ico{font-size:15px;line-height:1;align-items:center;justify-content:center}
+#mapa-map-container .mpa-media-pin-foto{border-color:#fff}
+#mapa-map-container .mpa-media-pin-foto:hover{border-color:var(--gold)}
 
 /* ADR-116 D5.8: cluster de medios. Contrato UNICO de clases con el bloque
    de mapa-cultural.css (mismos nombres, mismos estados, mismos tamanos).
@@ -1065,7 +1073,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <script src="agenda-shared.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=3"></script>
-<script src="mapa-cultural.js?v=18"></script>
+<script src="mapa-cultural.js?v=19"></script>
 <script src="mapa-fullscreen.js?v=1"></script>
 <style>
 /* ec-welcome overlay: onboarding de primer acceso. Prefijo wl- exclusivo. */
