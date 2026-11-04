@@ -255,9 +255,14 @@ check('D4: comunidad.html cablea el tab Mercado',
   readSrc('comunidad.html').indexOf('cpanel-mercado') !== -1
   && readSrc('comunidad.html').indexOf("showCommTab('mercado')") !== -1);
 
-check('D5: mi-perfil.html integra el Emprendedor',
-  readSrc('mi-perfil.html').indexOf('Emprendedor') !== -1
-  && readSrc('mi-perfil.html').indexOf('mercado') !== -1);
+// D5 reapuntado 2026-11-04: la tarjeta "Emprendedor" del perfil se retiro a
+// proposito en e40e457 (decision del operador); el Mercado vive en
+// comunidad.html#mercado y el perfil solo enlaza. Se mide ese enlace vivo
+// desde el host real de inventario, no la cadena retirada.
+check('D5: mi-perfil.html enlaza al Mercado desde el inventario',
+  readSrc('mi-perfil.html').indexOf('Ir al Mercado') !== -1
+  && readSrc('mi-perfil.html').indexOf('comunidad.html#mercado') !== -1
+  && readSrc('mi-perfil.html').indexOf('pf-inventario') !== -1);
 
 // ======================================================================
 // E) RAMAS DEL HANDLER (mocks)
