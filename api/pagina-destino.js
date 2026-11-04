@@ -2032,8 +2032,8 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // miniaturas) y su CTA a galeria.html. El modulo "Fotos de viajeros"
   // (#fp-grid, #fp-info, #fp-upload) y su JS cliente (loadFotos/subirFoto/
   // votarFoto) se retiraron de la ficha; el ancla invisible #fotos se
-  // conserva por compatibilidad de enlaces. La seccion sigue emitiendose
-  // siempre.
+  // conserva por compatibilidad de enlaces. La seccion se emite solo si
+  // hay al menos un media (gate BUG-130, ver nota al final del bloque).
   //
   // Ranking UNICO mezclado por votos DESC (curadas + comunidad): la de
   // mayor puntaje es la foto grande destacada (galBig) y las siguientes
@@ -2042,19 +2042,20 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // ranking de votos/recientes). La subpagina /galeria.html conserva sus
   // DOS rankings separados y NO se toca aqui.
   //
-  // Nota de gate: galAll SIEMPRE trae al menos el hero (fallback Unsplash
-  // en buildHTML), por lo que "galAll.length > 0" es trivialmente
+  // Nota de gate (BUG-130): galAll SIEMPRE trae al menos el hero (fallback
+  // Unsplash en buildHTML), por lo que "galAll.length > 0" es trivialmente
   // verdadero. Excepcion: una fila con tags.sin_foto_hero y sin foto propia
-  // no tiene hero, asi que galAll puede venir vacio; los gates de abajo ya
-  // usan length > 1 / length, por lo que degradan sin emitir nada. El bloque
-  // usa > 1 (gate historico), que cumple "solo si galAll.length > 0" y evita
-  // una grilla con una sola foto.
+  // no tiene hero, asi que galAll puede venir vacio. El gate historico del
+  // CUERPO era "length > 1" mientras la SECCION se emitia siempre: con una
+  // sola foto quedaba cabecera + cuerpo vacio. Ahora el cuerpo se pinta
+  // desde 1 media y la seccion solo se emite si hay al menos una (0 fotos
+  // -> sin seccion, sin cabecera huerfana y sin consumir nextNum()).
   var GAL_THUMBS_MAX = 12;
   // ADR-036: el ranking unico por votos (curadas + comunidad, con la
   // precedencia de dedupe curada > comunidad) ya se calculo en mediaRank
   // y lo comparte el hero. Aqui solo se reutiliza.
   var galMerge = mediaRank;
-  var hayGaleriaCurada = galMerge.length > 1;
+  var hayGaleria = galMerge.length > 0;
   var galBig = galMerge.length ? galMerge[0].url : '';
   var galThumbsList = galMerge.slice(1, 1 + GAL_THUMBS_MAX).map(function(x){ return x.url; });
   // GAL_FOTOS (emitido en el script de la pagina): la grande + las
@@ -2093,30 +2094,44 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     return null;
   }
   var galMainItem = galMerge[0] || null;
-  var galCuradaHTML = hayGaleriaCurada
+  // BUG-130: con UNA sola foto el cuerpo quedaba vacio (el gate historico
+  // era length > 1) mientras la cabecera si se emitia. El item grande se
+  // pinta desde 1 media; las piezas opcionales solo si aportan:
+  // gal-thumbs con 0 items seria un contenedor vacio y el CTA "Ver todas"
+  // no tiene sentido cuando existe una sola foto.
+  var galMainHTML = hayGaleria
     ? '<div class="gal-main"'
       + mediaRatingAttrs(galMainItem)
       + ' onclick="irAFotoGaleria(GAL_FOTOS[0])">'
       + fotoImg(galBig, '', false, fotoAlt(galBig, d.nombre))
       + creditoHTML(galBig)
       + '</div>'
-      + '<div class="gal-thumbs">'+galThumbsList.map(function(u,i){ return '<div class="gal-i"'
+    : '';
+  var galThumbsHTML = galThumbsList.length
+    ? '<div class="gal-thumbs">'+galThumbsList.map(function(u,i){ return '<div class="gal-i"'
         + mediaRatingAttrs(mediaRankByUrl(u))
         + ' onclick="irAFotoGaleria(GAL_FOTOS['+(i+1)+'])">'
         + fotoImg(u, '', false, fotoAlt(u, d.nombre))
         + creditoHTML(u)
         + '</div>'; }).join('')+'</div>'
-      + btnGaleriaAmpliada
     : '';
-  var secGaleria = '<section class="ssec bwarm" id="galeria">'
-    // Ancla legacy invisible #fotos (defensa barata): hoy no hay deep-links
-    // reales, pero evita romper cualquier enlace historico al modulo de
-    // viajeros retirado por TSK-111 / CAMBIO 7A.
-    + '<span id="fotos" style="position:absolute;left:-9999px"></span>'
-    + '<div class="sin">'
-    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galeria de fotos</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + galCuradaHTML
-    + '</div></section>';
+  var galBodyHTML = hayGaleria
+    ? galMainHTML + galThumbsHTML + (galMerge.length > 1 ? btnGaleriaAmpliada : '')
+    : '';
+  // 0 fotos: no se emite la seccion (ni cabecera huerfana ni numero de
+  // seccion consumido). El subnav ya filtra por has:!!secGaleria y el
+  // ensamblado de hostal ignora los modulos con cadena vacia.
+  var secGaleria = hayGaleria
+    ? '<section class="ssec bwarm" id="galeria">'
+      // Ancla legacy invisible #fotos (defensa barata): hoy no hay deep-links
+      // reales, pero evita romper cualquier enlace historico al modulo de
+      // viajeros retirado por TSK-111 / CAMBIO 7A.
+      + '<span id="fotos" style="position:absolute;left:-9999px"></span>'
+      + '<div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galeria de fotos</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + galBodyHTML
+      + '</div></section>'
+    : '';
 
   // El overlay #lb y su JS inline se eliminaron: las fotos de la ficha y
   // del hero ahora hacen deep-link al visor completo de /galeria.html.

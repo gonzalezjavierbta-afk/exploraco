@@ -30,18 +30,25 @@
 //     --todas recorre cualquier ficha/ficha-*.json del directorio. Con
 //     --fichas=slug1,slug2 acota el lote.
 //   - Solo lectura de red: HEAD, no descarga binarios.
+//   - Comprueba ademas el CREDITO de autor/licencia (BUG-139): una ficha con
+//     fotos de Wikimedia que no declare credito ni en TAGS.creditos_fotos ni
+//     en el caption ("... - Foto: autor / lic") se reporta como WARN. Ese
+//     chequeo es local (no usa red) y NO cambia el exit code: el exit code
+//     sigue midiendo solo las fotos PASS. Para convertirlo en fallo, usar
+//     --credito-fail.
 //   - Escribe ficha/_informe-fotos.json con url_real por archivo.
 //   - Salida en ASCII-safe (ADR-002).
 //
 // Uso:
 //   node scripts/ejecucion/verificar-fotos-fichas.js [--todas]
 //        [--fichas=slug1,slug2] [--ancho=1280] [--pausa=300]
-//        [--intentos=3] [--limite=1]
+//        [--intentos=3] [--limite=1] [--credito-fail]
 //   node scripts/ejecucion/verificar-fotos-fichas.js --probar="File:X.jpg"
 //        (control negativo: una sola URL ad-hoc, no escribe informe)
 //
 // Exit code 0 = todas las fichas del lote tienen al menos 1 foto PASS.
-// Exit code 1 = alguna ficha sin ninguna foto PASS (o error de entrada).
+// Exit code 1 = alguna ficha sin ninguna foto PASS (o error de entrada), o
+//               alguna ficha sin credito cuando se pasa --credito-fail.
 // ASCII-safe: 0 bytes > 127.
 
 var fs = require('fs');
@@ -133,6 +140,35 @@ function wikiTitles(ficha) {
     });
   });
   return out;
+}
+
+// CREDITO DE AUTOR/LICENCIA (BUG-139). Misma cascada que el motor
+// (api/pagina-destino.js:961-969), pero evaluada sobre la ficha, sin red:
+//   1) TAGS.creditos_fotos[] con autor o licencia no vacios
+//   2) campos autor/licencia del propio item de FOTOS_SUGERIDAS
+//   3) caption compuesto "<texto> - Foto: autor / licencia"
+// Devuelve { declarado, fuente } para que el informe lo registre.
+function creditoDeclarado(ficha) {
+  var tags = (ficha && ficha.TAGS) || {};
+  var lista = tags.creditos_fotos;
+  if (Array.isArray(lista)) {
+    var conDato = lista.filter(function (c) {
+      return c && (String(c.autor || '').trim() || String(c.licencia || '').trim());
+    });
+    if (conDato.length) return { declarado: true, fuente: 'creditos_fotos' };
+  }
+  var fotos = (ficha && ficha.FOTOS_SUGERIDAS) || [];
+  var conAutor = fotos.filter(function (f) {
+    return f && (String(f.autor || '').trim() || String(f.licencia || '').trim());
+  });
+  if (conAutor.length) return { declarado: true, fuente: 'item_autor_licencia' };
+  // "Foto: " precedido de comilla, guion o espacio: evita falsos positivos
+  // con identificadores tipo publicarSinFoto: o etiquetas FOTOS:.
+  var conCaption = fotos.filter(function (f) {
+    return f && /(?:^|['"\s-])Foto:\s/.test(String(f.caption || ''));
+  });
+  if (conCaption.length) return { declarado: true, fuente: 'caption' };
+  return { declarado: false, fuente: '' };
 }
 
 function sleep(ms) {
@@ -276,6 +312,7 @@ async function modoProbar(nombres, opts) {
 
 async function main() {
   var opts = leerOpciones();
+  var creditoFail = process.argv.indexOf('--credito-fail') !== -1;
 
   if (!fs.existsSync(FICHA_DIR)) {
     console.error('[FAIL] no existe el directorio ficha/');
@@ -284,6 +321,55 @@ async function main() {
 
   var probar = argAll('probar');
   if (probar.length) return modoProbar(probar, opts);
+
+  // Auditoria local del credito: no hace HEAD, no escribe el informe. Sirve
+  // para medir el hueco de atribucion (BUG-139) sin red y sin pisar
+  // ficha/_informe-fotos.json.
+  if (process.argv.indexOf('--solo-credito') !== -1) {
+    var audit = listFichas();
+    var sin = 0;
+    var con = 0;
+    var sinFotos = 0;
+    var malas = 0;
+    var porFuente = {};
+    audit.forEach(function (f) {
+      var ficha;
+      try {
+        ficha = JSON.parse(fs.readFileSync(f.archivo, 'utf8'));
+      } catch (e) {
+        malas++;
+        console.log('ERROR ' + f.slug + ' (JSON invalido: ' + e.message + ')');
+        return;
+      }
+      var tieneFotos = (ficha.FOTOS_SUGERIDAS || []).length > 0;
+      var cred = creditoDeclarado(ficha);
+      if (!tieneFotos) {
+        sinFotos++;
+        console.log('n/a   ' + f.slug + ' (sin fotos)');
+        return;
+      }
+      if (cred.declarado) {
+        con++;
+        porFuente[cred.fuente] = (porFuente[cred.fuente] || 0) + 1;
+        console.log('OK    ' + f.slug + ' (' + cred.fuente + ')');
+      } else {
+        sin++;
+        console.log('WARN  ' + f.slug + ' (sin credito ni en creditos_fotos ni en caption)');
+      }
+    });
+    console.log('---');
+    console.log('fichas: ' + audit.length + ' | con fotos ' + (con + sin) +
+      ' -> con credito ' + con + ', sin credito ' + sin +
+      ' | sin fotos ' + sinFotos + ' | JSON invalido ' + malas);
+    var fuentes = Object.keys(porFuente).sort();
+    console.log('fuentes: ' + (fuentes.length
+      ? fuentes.map(function (k) { return k + '=' + porFuente[k]; }).join(' ')
+      : 'ninguna'));
+    var falloC = creditoFail && sin > 0;
+    console.log(falloC ? '[FAIL] --credito-fail: hay fichas sin credito' : '[WARN] medicion local, exit code 0');
+    process.exitCode = falloC ? 1 : 0;
+    return;
+  }
 
   var fichas = listFichas();
   if (!fichas.length) {
@@ -310,6 +396,7 @@ async function main() {
     fotos_fail: 0,
     fichas_pass: 0,
     fichas_fail: 0,
+    fichas_sin_credito: 0,
     fichas: []
   };
 
@@ -361,6 +448,13 @@ async function main() {
     var pass = fotosOk > 0;
     var passEstricto = total > 0 && cnt.PASS === total;
 
+    // Credito (local, sin red). Solo se exige cuando la ficha trae fotos de
+    // Wikimedia; una ficha sin fotos no puede tener hueco de atribucion.
+    var cred = creditoDeclarado(ficha);
+    var tieneFotosWiki = total > 0;
+    var sinCredito = tieneFotosWiki && !cred.declarado;
+    if (sinCredito) report.fichas_sin_credito++;
+
     report.total_archivos += total;
     report.total_fotos += fotos.length;
     report.archivos_pass += cnt.PASS;
@@ -384,12 +478,15 @@ async function main() {
       archivos_404: cnt['404_inexistente'],
       archivos_429: cnt['429_politica'],
       archivos_otro: cnt.otro,
+      credito_declarado: cred.declarado,
+      credito_fuente: cred.fuente,
       fotos: fotos
     });
 
     console.log((pass ? 'PASS ' : 'FAIL ') + f.slug + ' | fotos ' + fotosOk + '/' + fotos.length +
       ' | archivos 200=' + cnt.PASS + ' 404=' + cnt['404_inexistente'] +
       ' 429=' + cnt['429_politica'] + ' otro=' + cnt.otro +
+      ' | credito ' + (cred.declarado ? (cred.fuente || 'si') : (tieneFotosWiki ? 'AUSENTE (WARN)' : 'n/a')) +
       (passEstricto ? '' : ' | ' + (detalleFallo(heads) || 'sin datos')));
   }
 
@@ -404,9 +501,15 @@ async function main() {
     ' | sin PASS ' + report.fotos_fail);
   console.log('fichas: PASS ' + report.fichas_pass + '/' + report.total_fichas +
     ' | FAIL ' + report.fichas_fail);
+  var conCredito = report.total_fichas - report.fichas_sin_credito;
+  console.log('credito: declarado ' + conCredito + '/' + report.total_fichas +
+    ' | sin credito ' + report.fichas_sin_credito +
+    (creditoFail ? ' (--credito-fail: FAIL)' : ' (WARN, no afecta el exit code)'));
   console.log('informe: ' + path.relative(ROOT, REPORT_FILE).replace(/\\/g, '/'));
 
-  process.exitCode = report.fichas_fail === 0 ? 0 : 1;
+  var fallo = report.fichas_fail > 0;
+  if (creditoFail && report.fichas_sin_credito > 0) fallo = true;
+  process.exitCode = fallo ? 1 : 0;
 }
 
 main().catch(function (e) {
