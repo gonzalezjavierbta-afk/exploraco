@@ -6801,5 +6801,26 @@ El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 evento
 
 **Enlaces (no argumentos; ADR-084 D1).** **ADR-114** (migracion, P1-P8 y derogacion acotada de ADR-001) | **ADR-115** (roster de 19 y guard) | **ADR-001** (vanilla JS: derogado **solo** por ruta aceptada) | **ADR-010** (presupuesto 8/8) | **ADR-002** (ASCII-safe) | **ADR-006** (baseline = archivo real) | **AGENTS.md** §0/§1/§2.
 
+## TSK-251 - Capa unificada de medios del mapa cultural (ADR-116): una sola capa que fusiona las DOS variantes del mismo endpoint, albumes como flag aditivo y clustering por proximidad con representante por importancia - 2026-11-03 - COMPLETADA EN ARBOL DE TRABAJO (verificada y certificada); commit y despliegue PENDIENTES DEL OPERADOR
+
+**Estado: COMPLETADA / CERTIFICADA EN ARBOL DE TRABAJO -- 2026-11-03** (pase documental unico R2 de la tanda). Certificada por **@qa-auditor** con **V1-V10 en verde**. **El argumento de la decision vive SOLO en ADR-116 (ADR-084 D1):** aqui solo el relevo. El defecto de raiz queda registrado como **BUG-146**.
+
+**Problema real (reportado por el operador).** En el mapa cultural, elegir **Albumes** cambiaba el **DATASET** que se pedia al endpoint (`&vista=albumes`, que en produccion devuelve **3 filas**) en vez de **filtrar**, y los chips de tipo **alternaban** en lugar de **sumar**; resultado: "se veian albumes y no el resto de medios". Los **30** videos y **5** audios existian en la variante normal (**345** filas: foto **310** / video **30** / audio **5**) pero quedaban **fuera** de la vista de album.
+
+**Entregado (alcance REAL ejecutado en esta tanda).**
+
+1. **Capa unica:** los hosts piden las **dos variantes del MISMO endpoint** y **fusionan en cliente** con `MapaCultural.mergeMedia`. **Cero backend:** `api/interacciones.js` **sin cambios**, **cero migraciones**, **8/8** funciones serverless intactas.
+2. **Albumes como flag aditivo** (`mediaAlbumes`) y **filtros aditivos**, con **primer clic que enciende solo esa categoria**; etiqueta unica `getMediaLabel()` (**"Ninguno"** con la capa apagada). **Snapshot de 7 claves.**
+3. **Clustering de medios** por proximidad con **representante por importancia** (`votos + 2*rating_promedio + 0.5*min(fotos_count,20)`), **miniatura del representante** (**icono de tipo** en video/audio, que son enlaces YouTube/Spotify) y **popup de lista** en zoom **17** o **coordenadas identicas**. **Topes: 600 items / 300 marcadores.**
+4. **Archivos:** `mapa-cultural.js` (**1.6.0**), `mapa-cultural.css` (**v12**), `index.html` (**v18** motor + **v8** connector, item "Media" **retirado**, `mediaUnion: true`), `index-api-connector.js` (**v8**), `mymapa.js` (**v10**), `comunidad.html` (**v18/v12/v10**; `loadMultimediaMapa` **delega** en `MyMap.refrescarMedia`, **115** lineas retiradas) y `scripts/smoke_mapa_cultural.js`.
+
+**Verificacion medida.** `node scripts/smoke_mapa_cultural.js` -> **343 PASS / 0 FAIL**; `npm run smoke:mapas` -> **367 PASS / 0 FAIL**; `node --check` en los **tres** JS; **ASCII** y **balance de divs** limpios; `api/interacciones.js` **sin cambios**. Certificado por **@qa-auditor** con **V1-V10** en verde.
+
+**Git / despliegue.** **SIN commit y SIN deploy** al cierre de este pase: lo implementado vive en el **working tree**. Hasta el commit + despliegue **no se afirma que produccion corra esta tanda**, y **BUG-146** queda **CERRADO EN CODIGO / PENDIENTE DE DEPLOY**.
+
+**Deudas y pendientes de la tanda (detalle operativo en NEXT.md; no se repite aqui).** (a) **[MEDIA] Cobertura automatizada del fail-soft de la SEGUNDA peticion** en `index-api-connector.js`: el smoke del motor **no carga el connector** (deuda declarada en **ADR-116 V5.iv**). (b) **[BAJA] Aserto directo del tope de 600 items pintados** (hoy se comprueba **indirectamente**: 601 en estado y 300 marcadores). (c) **[BAJA] CSS huerfano** `.av-marker-icon` / `.av-popup*` en `comunidad.html` tras retirar la capa propia de medios, **sin impacto visual**. (d) **[MEDIA, DECISION DE PRODUCTO] `mediaOnePinPerDestino` en el home** sigue en **`true`**: los medios de `origen='destino'` se reducen a **un pin por destino** y el cluster del home se alimenta sobre todo de los **45** items de album; ponerlo a **`false`** en `INDEX_MC_OPTS` **no esta decidido**. (e) **[MEDIA] Regresion permanente del host:** el harness temporal de `mymapa.js` (**17/17 PASS**) vivia en **`%TEMP%`** y **no se commiteo**; sin smoke propio enganchado a `smoke:mapas`. (f) **[LIMITE CONOCIDO, FUERA DE ALCANCE]** los videos/audios del mapa son **enlaces externos** (**29+1 YouTube**; **4 Spotify + 1 YouTube**), no ficheros, y el drawer actual usa `<audio src>`, luego **no los reproduce**.
+
+**Enlaces (no argumentos; ADR-084 D1).** **ADR-116** (capa unificada de medios) | **ADR-045** (mapa cultural compartido) y **ADR-047** + ENMIENDA 1 (drawer) | **ADR-001** (vanilla JS) | **ADR-002** (ASCII-safe) | **ADR-003** (cero borrado logico) | **ADR-006** (baseline = archivo real) | **ADR-010** (presupuesto 8/8) | tareas previas del mismo modulo: **TSK-143**, **TSK-146**, **TSK-246**.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

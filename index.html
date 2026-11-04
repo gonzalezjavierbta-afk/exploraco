@@ -643,6 +643,28 @@ textarea.wrinp{resize:vertical;min-height:88px}
 /* Item individual de video: se mantiene REDONDO (solo tinte rojo). */
 .mpa-media-pin-video{border-style:solid;border-color:#ff8a80;box-shadow:0 3px 10px rgba(231,76,60,.55)}
 
+/* ADR-116 D5.8: cluster de medios. Contrato UNICO de clases con el bloque
+   de mapa-cultural.css (mismos nombres, mismos estados, mismos tamanos).
+   index.html no enlaza esa hoja, y sus selectores viven bajo .mc-root, asi
+   que el home replica el bloque aqui con el contenedor del mapa como silo. */
+#mapa-map-container .mc-media-cluster{position:relative;width:44px;height:44px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0D1520;border:2.5px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.5);cursor:pointer;transition:transform .14s,box-shadow .14s}
+#mapa-map-container .mc-media-cluster:hover{transform:scale(1.08);box-shadow:0 6px 18px rgba(0,0,0,.62);z-index:1000}
+#mapa-map-container .mc-media-cluster-s{width:44px;height:44px}
+#mapa-map-container .mc-media-cluster-m{width:52px;height:52px}
+#mapa-map-container .mc-media-cluster-l{width:60px;height:60px}
+#mapa-map-container .mc-media-cluster-foto{border-color:#fff}
+#mapa-map-container .mc-media-cluster-video{border-color:#ff8a80}
+#mapa-map-container .mc-media-cluster-audio{border-color:#8fd3ff}
+#mapa-map-container .mc-media-cluster-album{border-color:#fff3d6;box-shadow:0 4px 14px rgba(217,119,6,.55)}
+#mapa-map-container .mc-media-cluster-thumb{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
+#mapa-map-container .mc-media-cluster-ico{font-size:18px;line-height:1;color:#F5E6D0}
+#mapa-map-container .mc-media-cluster-num{position:absolute;right:10%;bottom:10%;min-width:17px;height:17px;padding:0 3px;border-radius:9px;background:var(--gold);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;line-height:15px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.55)}
+#mapa-map-container .mc-media-cluster-pop{max-height:260px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;margin:-2px -4px}
+#mapa-map-container .mc-media-cluster-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;border-radius:4px;transition:background .12s}
+#mapa-map-container .mc-media-cluster-row:hover{background:rgba(255,74,0,.16)}
+#mapa-map-container .mc-media-cluster-row-thumb{width:34px;height:34px;flex-shrink:0;object-fit:cover;border-radius:6px;background:rgba(255,255,255,.08)}
+#mapa-map-container .mc-media-cluster-row-txt{display:flex;flex-direction:column;min-width:0;font-size:11px;line-height:1.25;color:#F5E6D0}
+
 /* -- MAPA | DRAWER LATERAL -- */
 .mapa-drawer{position:fixed;inset:0;z-index:1200;visibility:hidden;pointer-events:none}
 .mapa-drawer.open{visibility:visible;pointer-events:auto}
@@ -1054,7 +1076,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <script src="agenda-shared.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=3"></script>
-<script src="mapa-cultural.js?v=17"></script>
+<script src="mapa-cultural.js?v=18"></script>
 <script src="mapa-fullscreen.js?v=1"></script>
 <style>
 /* ec-welcome overlay: onboarding de primer acceso. Prefijo wl- exclusivo. */
@@ -1279,7 +1301,6 @@ textarea.wrinp{resize:vertical;min-height:88px}
         <div class="mf-drop">
           <button type="button" class="mf-drop-btn mf-drop-main" data-mf-switch="media" aria-pressed="false" aria-label="Medios"><span class="mf-drop-ic" aria-hidden="true">&#x1F4F8;</span><span class="mf-drop-label" data-mf-label="med">Medios</span></button><button type="button" class="mf-drop-btn mf-drop-caret" data-mf-toggle="med" aria-expanded="false" aria-controls="mf-panel-med" aria-label="Menu de medios"><span class="mf-caret" aria-hidden="true">&#9662;</span></button>
           <div class="mf-panel" id="mf-panel-med" data-mf-panel="med" hidden>
-            <button type="button" class="mf-item" data-media="all">&#x1F4F8; Media</button>
             <button type="button" class="mf-item" data-media="foto">&#x1F4F7; Fotos</button>
             <button type="button" class="mf-item" data-media="video">&#x1F4FC; Videos</button>
             <button type="button" class="mf-item" data-media="audio">&#x1F3A7; Audios</button>
@@ -2782,6 +2803,8 @@ var INDEX_MC_OPTS = {
   // Raiz extra donde el motor busca [data-mf-label] y [data-mf-rating-out].
   filterRoot: '.mapa-filters',
   mediaEnabled: false,
+  // ADR-116: capa unificada (dos variantes fusionadas por el connector); en este modo mediaVista se ignora.
+  mediaUnion: true,
   // Preferencia de filtros del home (mapa-cultural.js v1.4.0): la guarda y
   // restaura el motor, el host no la reimplementa.
   persistKey: 'mapa_filtros_home_v1',
@@ -2931,6 +2954,15 @@ function mfSyncPress() {
     var on = mcMapa.isFilterOn(bs[i].getAttribute('data-mf-switch'));
     bs[i].setAttribute('aria-pressed', on ? 'true' : 'false');
   }
+  // ADR-116 D3/D4: en modo union el item "albumes" es categoria de primera
+  // clase; su marca sigue el estado del motor, no el ultimo clic del host.
+  if(typeof mcMapa.getState === 'function'){
+    var st = mcMapa.getState() || {};
+    if(st.mediaUnion === true){
+      var al = bar.querySelector('[data-media="albumes"]');
+      if(al) al.classList.toggle('on', st.mediaAlbumes === true);
+    }
+  }
 }
 
 // Item de alcance propio (toggle, no radio). El motor es el dueo del estado:
@@ -3001,17 +3033,8 @@ function mfSyncLabels(snap) {
   else if(cat !== 'all' && window.MapaCultural) {
     try { dir = window.MapaCultural.mdCatLabel(cat) || cat; } catch(e){ dir = cat; }
   }
-  var med = 'Todos';
-  if(s.mediaEnabled) {
-    if(s.mediaVista === 'albumes') med = '\u00c1lbumes';
-    else {
-      var t = s.mediaTypes || {};
-      var n = (t.foto?1:0) + (t.video?1:0) + (t.audio?1:0);
-      med = (n !== 1) ? 'Todo' : (t.foto ? 'Fotos' : (t.video ? 'Videos' : 'Audios'));
-    }
-  }
-  // El alcance propio se refleja en la etiqueta "med" (escape \u00ed).
-  if(s.mediaSoloMio) med = (med === 'Todos') ? 'S\u00f3lo m\u00edo' : ('M\u00edo \u00b7 ' + med);
+  // ADR-116 D6: la etiqueta la calcula el MOTOR; el host no la deriva.
+  var med = (mcMapa && typeof mcMapa.getMediaLabel === 'function') ? mcMapa.getMediaLabel() : 'Ninguno';
   var punt = mfRatingText(s.ratingMin || 0);
   mfWriteText('[data-mf-label="dir"]', dir);
   mfWriteText('[data-mf-label="med"]', med);
@@ -4835,7 +4858,7 @@ function submitBlog() {
 <button id="btt-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba"
   style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:2px solid var(--gold);color:var(--gold);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.4)">↑</button>
 
-  <script src="index-api-connector.js?v=7"></script>
+  <script src="index-api-connector.js?v=8"></script>
   <script src="usuario-session.js"></script>
   <script src="album-comments.js?v=2"></script>
 <script>

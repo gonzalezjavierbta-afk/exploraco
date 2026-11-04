@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="mapa-cultural.css?v=11">
+<link rel="stylesheet" href="mapa-cultural.css?v=12">
 <link rel="stylesheet" href="dictado-voz.css?v=1">
 <link rel="stylesheet" href="cartas-ui.css?v=2">
 <style>
@@ -1134,7 +1134,6 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
           <div class="mf-drop" id="mm-personal-media">
             <button type="button" class="mf-drop-btn mf-drop-main" data-mf-switch="media" aria-pressed="false" aria-label="Medios: filtrar fotos, videos, audio y albumes"><span class="mf-drop-ic" aria-hidden="true">&#x1F4F7;</span><span class="mf-drop-label" data-mf-label="med">Medios</span></button><button type="button" class="mf-drop-btn mf-drop-caret" data-mf-toggle="med" aria-expanded="false" aria-controls="mf-panel-med" aria-label="Menu de medios"><span class="mf-caret" aria-hidden="true">&#9662;</span></button>
             <div class="mf-panel" id="mf-panel-med" data-mf-panel="med" hidden>
-              <button type="button" class="mf-item" data-media="all">Todos</button>
               <button type="button" class="mf-item" data-media="foto">&#x1F4F7; Fotos</button>
               <button type="button" class="mf-item" data-media="video">&#x25B6; Videos</button>
               <button type="button" class="mf-item" data-media="audio">&#x266B; Audio</button>
@@ -1311,10 +1310,10 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=3"></script>
-<script src="mapa-cultural.js?v=17"></script>
+<script src="mapa-cultural.js?v=18"></script>
 <script src="media-actions.js"></script>
 <script src="dictado-voz.js?v=1"></script>
-<script src="mymapa.js?v=9"></script>
+<script src="mymapa.js?v=10"></script>
 <script src="cartas-ui.js?v=2"></script>
 <script src="cartas-arte.js"></script>
 <script src="mercado.js?v=4"></script>
@@ -2677,17 +2676,12 @@ function setRankingVista(v) {
   else cargarParchesRanking();
 }
 
-/* ---- MAPA AUDIOVISUAL (ADR-017, P9/P10) ---- */
+/* ---- MAPA AUDIOVISUAL (ADR-017, P9/P10; ADR-116 D7) ---- */
 var _avMap = null;
-var _avMarkers = null;
-var _avData = [];
-/* Estado heredado del fetch de degradacion (loadMultimediaMapa): con el
-   mapa unificado el filtro por tipo y la vista de albumes los lleva el
-   motor compartido (items [data-media] del panel), asi que aqui solo
-   queda el estado inicial que usa el camino de reserva. */
-var _avTiposActivos = { foto: true, video: true, audio: true };
-/* Vista del mapa AV: 'sueltos' (multimedia individual) o 'albumes' (grupos). */
-var _avVista = 'sueltos';
+/* Capa de medios de comunidad con UNA sola fuente: MyMap.refrescarMedia()
+   -> motor compartido (mapa-cultural.js). loadMultimediaMapa() solo delega;
+   no queda aqui estado propio de datos ni de pintado de medios, y por tanto
+   tampoco filtro local de tipos ni vista local de albumes. */
 
 function initAudiovisualMap() {
   if (_avMap) return;
@@ -2736,13 +2730,10 @@ function initAudiovisualMap() {
       maxZoom: 18
     }).addTo(_avMap);
   }
-  if (typeof L.markerClusterGroup === 'function') {
-    _avMarkers = L.markerClusterGroup();
-    _avMap.addLayer(_avMarkers);
-  } else {
-    _avMarkers = L.layerGroup();
-    _avMap.addLayer(_avMarkers);
-  }
+  /* ADR-116 D7: sin capa de medios propia. Esta rama solo se alcanza si
+     MyMap no inicializo el contenedor; el contenedor se deja vivo y se
+     delega en el motor (que avisa por consola si no hay fuente), sin
+     pintar medios desde comunidad. */
   loadMultimediaMapa();
 }
 
@@ -2976,38 +2967,19 @@ if (document.readyState === 'loading') {
 }
 
 function loadMultimediaMapa() {
-  /* T3: con el mapa unificado NO hay segundo fetch ni segunda capa de pines.
-     mymapa.js carga la MISMA fuente (/api/interacciones?tipo=multimedia_mapa,
-     con scope=mio si hay sesion) y la pinta en la capa del motor
-     compartido; este fetch queda solo como degradacion si el modulo no
-     esta disponible. */
-  if (window.MyMap && typeof window.MyMap.refrescarMedia === 'function' && window.MyMap.getMap()) {
-    window.MyMap.refrescarMedia();
+  /* ADR-116 D7: fuente unica. La capa de medios (dataset default + albumes,
+     fusion, filtros y clustering) la pinta el motor compartido a traves de
+     MyMap.refrescarMedia(). Sin rama de degradacion que pinte: si MyMap o
+     refrescarMedia no estan, se avisa por consola y se sale. */
+  if (window.MyMap && typeof window.MyMap.refrescarMedia === 'function') {
+    try {
+      window.MyMap.refrescarMedia();
+    } catch (e) {
+      console.warn('[comunidad] refrescarMedia:', e && e.message);
+    }
     return;
   }
-  // Sin tipos activos: no se dispara fetch con lista vacia; se deja la
-  // capa visible y sin pines (mismo estado visual que un filtro sin
-  // resultados del backend -- comportamiento heredado respetado).
-  if (_avVista !== 'albumes' && !_avTiposActivos.foto && !_avTiposActivos.video && !_avTiposActivos.audio) {
-    _avData = [];
-    if (_avMarkers) _avMarkers.clearLayers();
-    return;
-  }
-  var params = '/api/interacciones?tipo=multimedia_mapa';
-  if (_avVista === 'albumes') {
-    params += '&vista=albumes';
-  } else {
-    var csv = ['foto','video','audio'].filter(function(t){ return _avTiposActivos[t]; }).join(',');
-    if (csv) params += '&tipo_media=' + csv;
-  }
-  fetch(params)
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
-      if (!data.ok) return;
-      _avData = data.data || [];
-      renderAudiovisualMarkers();
-    })
-    .catch(function(e) { console.error('[mapa-audio]', e); });
+  console.warn('[comunidad] MyMap no disponible: capa de medios sin fuente');
 }
 
 /* avEmbedUrl: wrapper FINO. Toda la logica de embed vive en
@@ -3093,70 +3065,6 @@ function avMediaHTML(item, large) {
       + '<audio controls src="' + url + '" style="width:100%;' + (large ? 'max-width:100%' : 'max-width:200px') + ';display:block;margin:0 auto" preload="none">Tu navegador no soporta audio.</audio>';
   }
   return '<div style="font-size:10px;color:#999;padding:6px">Tipo no soportado</div>';
-}
-function renderAudiovisualMarkers() {
-  if (!_avMarkers) return;
-  _avMarkers.clearLayers();
-  _avData.forEach(function(item) {
-    if (!item.lat || !item.lng) return;
-    var icon;
-    if (item.origen === 'album_grupo' || item.origen === 'destino_album') {
-      icon = getAlbumIcon();
-    } else {
-      icon = getMediaIcon(item.media_type);
-    }
-    var autorNom = item.usuario_nombre || item.autor_nombre || '';
-    var autorHTML = autorNom
-      ? (item.usuario_id
-          ? '<a class="av-popup-link" href="/mi-perfil.html?id=' + esc(item.usuario_id) + '" title="Ver perfil">' + esc(autorNom) + '</a>'
-          : esc(autorNom))
-      : '';
-    var popupHtml = '<div class="av-popup">'
-      + avMediaHTML(avItemMedio(item))
-      + '<div class="av-popup-title">' + esc(item.media_title || item.album_titulo || '') + '</div>'
-      + '<div class="av-popup-meta">'
-      + '<span class="av-popup-type">' + esc(item.media_type) + '</span>'
-      + (autorHTML ? '<span>por ' + autorHTML + '</span>' : '')
-      /* Popup de mapa: superficie minima, solo lectura (escala + calidad). */
-      + (item.votos > 0 ? '<span>&#x2B50; ' + item.votos + avRatingText(item) + '</span>' : '')
-      + '</div>';
-    if (item.origen === 'album' || item.origen === 'album_grupo') {
-      popupHtml += '<div style="margin-top:6px"><a class="av-popup-link" href="#" onclick="abrirAlbumModal(\'' + esc(item.origen_id) + '\');return false">Ver album &#x2192;</a></div>';
-    } else if (item.origen_id) {
-      popupHtml += '<div style="margin-top:6px"><a class="av-popup-link" href="/' + esc(item.origen_id) + '.html">Ver destino &#x2192;</a></div>';
-    }
-    popupHtml += '</div>';
-    var marker = L.marker([item.lat, item.lng], { icon: icon });
-    marker.bindPopup(popupHtml, { maxWidth: 250 });
-    _avMarkers.addLayer(marker);
-  });
-}
-
-function getMediaIcon(type) {
-  var colors = { foto: '#FF4A00', video: '#e74c3c', audio: '#9b59b6' };
-  var icons = { foto: '\uD83D\uDCF7', video: '\u25B6', audio: '\u266B' };
-  return L.divIcon({
-    className: 'av-marker-icon',
-    html: '<div style="background:' + (colors[type] || colors.foto)
-      + ';color:#fff;border-radius:50%;width:32px;height:32px;'
-      + 'display:flex;align-items:center;justify-content:center;'
-      + 'font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.3)">'
-      + (icons[type] || icons.foto) + '</div>',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  });
-}
-
-function getAlbumIcon() {
-  return L.divIcon({
-    className: 'av-marker-icon av-marker-album',
-    html: '<div style="background:#d97706;color:#fff;border-radius:6px;width:32px;height:32px;'
-      + 'display:flex;align-items:center;justify-content:center;'
-      + 'font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.3)">'
-      + '\uD83D\uDCDA</div>',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  });
 }
 
 function abrirAlbumModal(albumId) {

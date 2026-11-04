@@ -27,6 +27,10 @@
    desplegable "Medios" de la pagina (#mm-personal-media): el motor
    engancha sus items [data-media] (incluida la vista de albumes) y este
    modulo solo aporta los datos, avisado por onMediaVistaChange.
+
+   ADR-116: capa UNIFICADA de medios (mediaUnion), chips sin "Todo"
+   (Fotos/Videos/Audios/Albumes/Solo mio), fusion de las dos variantes
+   con el helper del motor y repintado por zoom SIN red.
    ============================================================= */
 (function () {
   'use strict';
@@ -58,15 +62,21 @@
   // mapa-cultural.js (window.MapaCultural). Reemplaza el Leaflet propio.
   var mc = null;
 
-  // Cache del fetch unico de multimedia_mapa (endpoint existente) y bandera
-  // de carga. La VISTA de la capa y el alcance propio NO viven aqui: los lleva
-  // el motor compartido (window.MapaCultural), unica fuente de verdad y, con
-  // persistKey, persistidos. Solo se apunta de que VISTA se cargo la cache,
-  // porque la query de la vista de albumes es distinta y la cache de 'sueltos'
-  // no le sirve.
-  var MEDIA_CACHE = null;       // items ya cargados (null = hay que pedir)
-  var MEDIA_CACHE_VISTA = null; // vista ('sueltos'|'albumes') de esa cache
+  // Cache del fetch de multimedia_mapa (endpoint existente) y bandera de
+  // carga. La VISTA de la capa, mediaAlbumes y el alcance propio NO viven
+  // aqui: los lleva el motor compartido (window.MapaCultural), unica fuente
+  // de verdad y, con persistKey, persistidos. La cache solo apunta la FIRMA
+  // del dataset que contiene (modo union/legacy + alcance propio): en modo
+  // union el dataset es unico y la vista de album deja de identificarlo.
+  var MEDIA_CACHE = null;        // items ya cargados (null = hay que pedir)
+  var MEDIA_CLAVE = null;        // firma del dataset de esa cache
+  var MEDIA_CON_ALBUMES = false; // la cache se construyo con la variante pedida
   var MEDIA_CARGANDO = false;
+  // ADR-116: este host enciende el modo union del motor (dos variantes del
+  // mismo endpoint, fusion con SU helper). Si el motor desplegado no expone
+  // mergeMedia, el modo queda inerte: se pinta solo la variante default.
+  var UNION_PEDIDO = true;
+  var UNION_AVISO = false;
   // Clave de preferencia PROPIA de este mapa: el home y comunidad son mapas de
   // escalas distintas, asi que el filtro no debe pegarse entre los dos.
   var PERSIST_KEY = 'mapa_filtros_comunidad_v1';
@@ -208,6 +218,10 @@
     return (s.mediaEnabled ? '1' : '0')
       + (t.foto ? 'f' : '') + (t.video ? 'v' : '') + (t.audio ? 'a' : '')
       + '|' + String(s.mediaVista || '')
+      // ADR-116: albumes es una CATEGORIA mas en modo union, asi que su
+      // cambio tiene que contar como decision (y dispara la reposicion de la
+      // variante si la cache se construyo sin ella).
+      + '|' + (s.mediaAlbumes === false ? 'a0' : 'a1')
       + '|' + (s.mediaSoloMio ? 'm' : '');
   }
 
@@ -251,6 +265,11 @@
       // son mapas de escalas distintas (el filtro no debe pegarse entre ellos).
       persistKey: PERSIST_KEY,
       mediaFilter: S.unificado ? false : filterMisMapa,
+      // ADR-116: capa UNIFICADA. Con mediaUnion el motor pide DOS variantes
+      // del MISMO endpoint (default + vista=albumes) y fusiona con SU helper;
+      // este host no reimplementa la clave de identidad. Opt-in: si el motor
+      // desplegado no lo soporta, queda inerte y manda la ruta legacy.
+      mediaUnion: UNION_PEDIDO,
       // Barra de categorias que aporta comunidad.html. Se pasa el ELEMENTO
       // (no un string) para no depender del parseo de selector: el motor
       // engancha los clicks de [data-cat] y permite filtrar/ocultar pines.
@@ -276,13 +295,20 @@
         if (firma === MEDIA_FIRMA) return;
         MEDIA_FIRMA = firma;
         if (!MEDIA_PROG) MEDIA_TOCADO = true;
+        // ADR-116 D3.1: si albumes pasa a encendido y la cache se construyo
+        // sin esa variante (chip apagado en la carga), hay que pedirla. En el
+        // resto de cambios NO se hace red: el motor repinta su copia.
+        if (!MEDIA_PROG) reponerAlbumes();
       },
       // El motor decide la vista (item [data-media="albumes"]) y aqui cambia
       // la query del fetch de esta pagina, que sigue siendo su unico
       // escritor de la capa multimedia. No hay estado paralelo de vista: se
       // lee del motor (vistaMotor) cuando hace falta armar la query.
       onMediaVistaChange: function () {
-        MEDIA_CACHE = null;
+        // Modo union: mediaVista se IGNORA y el dataset es unico, asi que no
+        // hay nada que volver a pedir; se repinta desde cache (cero red).
+        // Ruta legacy: la vista SI cambia la query y la cache se invalida.
+        if (!(mc && modoUnion(mc))) MEDIA_CACHE = null;
         sincronizarToggleMedia();
         recargarMedia();
       },
@@ -426,33 +452,149 @@
   }
 
   // Aplica la lista final al motor y libera el flag de carga en un solo
-  // sitio (exito, fallo propio o ausencia de sesion). La vista se anota AQUI,
-  // con los datos que se guardan, no al pedir: si una respuesta llega
-  // tarde (el usuario cambio de vista durante el vuelo) la cache sigue
-  // describiendo lo que contiene y por eso no se sirve como si fuera de la
-  // vista pedida.
-  function aplicarMedia(lista, vista) {
+  // sitio (exito, fallo propio o ausencia de sesion). La CLAVE del dataset se
+  // anota AQUI, con los datos que se guardan, no al pedir: si una respuesta
+  // llega tarde (el usuario cambio de alcance durante el vuelo) la cache sigue
+  // describiendo lo que contiene y no se sirve como si fuera otra cosa.
+  function aplicarMedia(lista, clave, conAlbumes) {
     MEDIA_CARGANDO = false;
     MEDIA_CACHE = lista || [];
-    MEDIA_CACHE_VISTA = (vista === 'albumes') ? 'albumes' : 'sueltos';
+    MEDIA_CLAVE = clave;
+    MEDIA_CON_ALBUMES = !!conAlbumes;
     var mm = ensureMC();
     if (mm) mm.setMedia(MEDIA_CACHE);
     medirMediaActiva();
     if (mm && typeof mm.refresh === 'function') mm.refresh();
   }
 
-  // Capa de media: fetch publico + (con sesion) fetch scope=mio firmado
-  // con Authorization: Bearer. La VISTA sale del MOTOR, no de un flag propio:
-  // sin ella la query nunca lleva &vista=albumes y las filas album_grupo no
-  // llegan nunca. La cache es por vista (la de 'sueltos' no sirve para
-  // 'albumes'). scope=mio exige sesion (400 SESION_REQUERIDA sin header) y el
-  // uuid del dueno se deriva de ella. Si el fetch propio falla, se conserva
-  // la lista publica sin romper.
+  // Hay sesion utilizable: el alcance propio y el merge scope=mio la exigen.
+  function haySesion() {
+    var u = usuario();
+    return !!(u && u.id);
+  }
+
+  // Modo union del motor (ADR-116 D3): el dataset es UNO y los albumes son un
+  // flag. Sin mergeMedia no hay union: se pinta solo la variante default, con
+  // aviso, porque una clave de identidad local haria divergir las dos capas.
+  function modoUnion(m) {
+    if (!m) return false;
+    if (typeof m.getMediaUnion === 'function') {
+      try { return m.getMediaUnion() === true; } catch (e) { logWarn('getMediaUnion', e); }
+    }
+    return UNION_PEDIDO && typeof m.mergeMedia === 'function';
+  }
+
+  // Chip de albumes LEIDO del motor (mediaAlbumes, default true).
+  function albumesMotor(m) {
+    if (m && typeof m.getMediaAlbumes === 'function') {
+      try { return m.getMediaAlbumes() !== false; } catch (e) { logWarn('getMediaAlbumes', e); }
+    }
+    return true;
+  }
+
+  // Alcance propio ("Solo mio") LEIDO del motor. Sin sesion el motor no deja
+  // activarlo (gate de ADR-021/ADR-031): aqui solo se refleja.
+  function alcancePropio(m) {
+    if (!m || !haySesion()) return false;
+    if (typeof m.getMediaSoloMio === 'function') {
+      try { return m.getMediaSoloMio() === true; } catch (e) { logWarn('getMediaSoloMio', e); }
+    }
+    var es = (typeof m.getState === 'function') ? m.getState() : null;
+    return !!(es && es.mediaSoloMio === true);
+  }
+
+  // Clave de la cache: MODO (union / vista legacy) + ALCANCE propio. La vista
+  // de album NO entra: en modo union el dataset es unico, y una clave nueva
+  // nunca puede servir una respuesta de la vista vieja.
+  function claveMedia(m) {
+    var alc = alcancePropio(m) ? 'p' : (haySesion() ? 'm' : 'x');
+    if (modoUnion(m)) return 'u|' + alc;
+    return 'l|' + vistaMotor() + '|' + alc;
+  }
+
+  function urlMedia(vistaAlb, propio) {
+    var q = api() + '/api/interacciones?tipo=multimedia_mapa';
+    if (propio) q += '&scope=mio';
+    if (vistaAlb) q += '&vista=albumes';
+    return q;
+  }
+
+  // Una variante de la capa. alcance='propia' pide SOLO scope=mio (chip "Solo
+  // mio"): UNA peticion con header de sesion. alcance='todo' pide la publica y,
+  // solo en la ruta legacy (extraPropia), le fusiona la propia marcada _propia,
+  // que es el contrato que consume filterMisMapa. En modo union no se anade esa
+  // segunda peticion: el alcance propio ya es mediaSoloMio y la capa cuesta
+  // exactamente dos viajes. No captura errores: el fail-soft de cada variante
+  // lo decide quien llama.
+  function pedirVariante(vistaAlb, alcance, extraPropia) {
+    if (alcance === 'propia') {
+      return fetch(urlMedia(vistaAlb, true), { headers: authHeaders() })
+        .then(leerJson)
+        .then(function (d) {
+          var propios = (d && d.ok && d.data) ? d.data : [];
+          propios.forEach(function (it) { if (it) it._propia = true; });
+          return propios;
+        });
+    }
+    return fetch(urlMedia(vistaAlb, false))
+      .then(leerJson)
+      .then(function (d) {
+        var publicos = (d && d.ok && d.data) ? d.data : [];
+        if (!extraPropia || !haySesion()) return publicos;
+        return pedirVariante(vistaAlb, 'propia', false)
+          .then(function (propios) { return mergeMediaPropia(publicos, propios); })
+          .catch(function (e) { logWarn('media propia', e); return publicos; });
+      });
+  }
+
+  // Fusion por el HELPER DEL MOTOR (ADR-116 D3.2/D3.3): el host NO reimplementa
+  // la clave de identidad. Sin helper se pinta la variante default: dos claves
+  // distintas es la forma mas segura de que las dos capas divergan.
+  function fusionarVariantes(m, primarias, secundarias) {
+    var base = primarias || [];
+    if (!secundarias || !secundarias.length) return base;
+    if (m && typeof m.mergeMedia === 'function') {
+      try { return m.mergeMedia(base, secundarias) || base; }
+      catch (e) { logWarn('mergeMedia', e); return base; }
+    }
+    if (window.MapaCultural && typeof window.MapaCultural.mergeMedia === 'function') {
+      try { return window.MapaCultural.mergeMedia(base, secundarias) || base; }
+      catch (e2) { logWarn('mergeMedia', e2); return base; }
+    }
+    if (!UNION_AVISO) {
+      UNION_AVISO = true;
+      logWarn('motor sin mergeMedia: se pinta solo la variante default');
+    }
+    return base;
+  }
+
+  // Repone la variante de albumes SOLO si la cache se construyo sin ella (chip
+  // apagado en la carga) y el usuario la enciende ahora. Fuera de ese caso no
+  // hay red: el motor filtra su copia en cache.
+  function reponerAlbumes() {
+    var m = mc;
+    if (!m || !modoUnion(m)) return;
+    if (!albumesMotor(m) || MEDIA_CON_ALBUMES) return;
+    if (!MEDIA_CACHE) return;
+    recargarMedia();
+  }
+
+  // Capa de media: UN dataset fusionado en modo union y la ruta legacy intacta
+  // cuando el motor no soporta union. DOS peticiones por activacion de capa o
+  // cambio de alcance (la de albumes es fail-soft) y CERO por zoom: el
+  // repintado de zoomend/moveend lo hace el motor desde su copia en cache.
+  // scope=mio exige sesion (400 SESION_REQUERIDA sin header) y el uuid del
+  // dueno se deriva de ella. Si el fetch propio falla, se conserva la publica.
   function recargarMedia(forzar) {
     var m = ensureMC();
     if (!m) return;
-    var vista = vistaMotor();
-    if (MEDIA_CACHE && !forzar && MEDIA_CACHE_VISTA === vista) {
+    var clave = claveMedia(m);
+    var unido = modoUnion(m);
+    var quiereAlbumes = unido && albumesMotor(m);
+    // La cache sirve si es del MISMO dataset y, en modo union, si incluye la
+    // variante de albumes cuando el chip esta encendido.
+    var completo = !quiereAlbumes || MEDIA_CON_ALBUMES;
+    if (MEDIA_CACHE && !forzar && MEDIA_CLAVE === clave && completo) {
       m.setMedia(MEDIA_CACHE);
       medirMediaActiva();
       if (typeof m.refresh === 'function') m.refresh();
@@ -460,24 +602,41 @@
     }
     if (MEDIA_CARGANDO) return;
     MEDIA_CARGANDO = true;
-    var vistaQ = (vista === 'albumes') ? '&vista=albumes' : '';
-    fetch(api() + '/api/interacciones?tipo=multimedia_mapa' + vistaQ)
-      .then(leerJson)
-      .then(function (d) {
-        var publicos = (d && d.ok && d.data) ? d.data : [];
-        var u = usuario();
-        if (!u || !u.id) { aplicarMedia(publicos, vista); return null; }
-        return fetch(api() + '/api/interacciones?tipo=multimedia_mapa&scope=mio' + vistaQ,
-          { headers: authHeaders() })
-          .then(leerJson)
-          .then(function (p) {
-            var propios = (p && p.ok && p.data) ? p.data : [];
-            aplicarMedia(mergeMediaPropia(publicos, propios), vista);
-          })
-          .catch(function (e) {
-            logWarn('media propia', e);
-            aplicarMedia(publicos, vista);
-          });
+    var alcance = alcancePropio(m) ? 'propia' : 'todo';
+    if (!unido) {
+      // Ruta legacy (motor sin union): misma peticion que antes, con la vista
+      // del motor en la query y el merge scope=mio de siempre. La clave ya
+      // distingue vista y alcance.
+      var vistaAlb = (vistaMotor() === 'albumes');
+      pedirVariante(vistaAlb, alcance, true)
+        .then(function (lista) { aplicarMedia(lista, clave, vistaAlb); })
+        .catch(function (e) {
+          logWarn('media mapa', e);
+          MEDIA_CARGANDO = false;
+        });
+      return;
+    }
+    // Modo union: la variante default manda y la de vista=albumes es
+    // fail-soft. Si el chip de albumes esta apagado, la segunda se omite
+    // (optimizacion permitida por D3.1: no cambia ningun pixel visible).
+    // Sin scope=mio son DOS peticiones; con el, las dos llevan &scope=mio.
+    var pDef = pedirVariante(false, alcance, false);
+    var pAlb = quiereAlbumes
+      ? pedirVariante(true, alcance, false).then(function (rows) {
+          if (!rows || !rows.length) { logWarn('variante albumes vacia'); return null; }
+          return rows;
+        }, function (e) {
+          logWarn('variante albumes', e);
+          return null;
+        })
+      : Promise.resolve(null);
+    Promise.all([pDef, pAlb])
+      .then(function (res) {
+        var alb = res[1];
+        // El flag anota que la cache se construyo PIDIENDO la variante de
+        // albumes (aunque volviera vacia): asi el fail-soft no se reintenta en
+        // cada cambio de filtro. Si volvio vacia se pinta la default.
+        aplicarMedia(fusionarVariantes(m, res[0], alb), clave, quiereAlbumes);
       })
       .catch(function (e) {
         logWarn('media mapa', e);
@@ -532,45 +691,115 @@
     // clasico se conserva tal cual: la caja que se genera aqui es la MISMA
     // que el motor recibe en mediaControls, asi que el motor es el unico que
     // engancha sus clicks y el unico dueno del estado.
-    if (S.unificado) return;
+    // ADR-116: en los dos modos la fila lleva "Solo mio", que si no existe se
+    // crea (uno solo por documento) y lo gobierna este modulo con gate.
+    if (S.unificado) {
+      var cajaPagina = document.getElementById('mm-personal-media');
+      if (cajaPagina) asegurarChipMio(cajaPagina);
+      return;
+    }
     var existente = document.getElementById('mm-personal-media');
-    if (existente) { existente.style.display = ''; return; }
+    if (existente) { existente.style.display = ''; asegurarChipMio(existente); return; }
     var card = document.querySelector('.mmx-card');
     if (!card) return;
     var head = card.querySelector('.mmx-head');
     var box = document.createElement('div');
     box.id = 'mm-personal-media';
     box.className = 'mmx-media';
-    // CONTRATO UNICO de markup: el item de VISTA de albumes es
-    // data-media="albumes" (el mismo que usa el HTML de index.html y de
-    // comunidad.html y el que engancha el motor). Los demas items son tipos
-    // de media y usan data-media. El motor (mediaControls) es quien engancha
-    // los clicks de esta caja, asi que aqui no se pone un segundo manejador
-    // (dos manejadores alternarian el mismo filtro dos veces y se cancelarian).
+    // CONTRATO UNICO de markup (ADR-116): la fila ofrece Fotos, Videos,
+    // Audios, Albumes y "Solo mio". NO se pinta "Todo": el maestro es el boton
+    // principal del panel y la rama 'all' queda inerte para hosts externos.
+    // Los tipos y albumes llevan data-media (el mismo contrato de index.html y
+    // comunidad.html) y los engancha el motor; el de ALBUMES no llama a
+    // setMediaVista: lo gobierna mediaAlbumes. "Solo mio" usa data-mm-mio para
+    // no chocar con el selector del motor.
     box.innerHTML = '<span class="mmx-media-lbl">Media</span>'
-      + '<button type="button" class="mmx-mbtn" data-media="all">Todo</button>'
       + '<button type="button" class="mmx-mbtn" data-media="foto">Fotos</button>'
       + '<button type="button" class="mmx-mbtn" data-media="video">Videos</button>'
       + '<button type="button" class="mmx-mbtn" data-media="audio">Audios</button>'
       + '<button type="button" class="mmx-mbtn" data-media="albumes">&#x1F4DA; &#xC1;lbumes</button>';
     if (head && head.parentNode === card) card.insertBefore(box, head.nextSibling);
     else card.appendChild(box);
+    asegurarChipMio(box);
   }
 
-  // Pinta el estado de los controles de media LEYENDOLO DEL MOTOR. El item
-  // data-media="albumes" es una VISTA, no un tipo: se enciende con el estado
-  // de vista del motor (mediaVista) y nunca con mediaTypes['albumes'], que no
-  // existe y por eso lo apagaba siempre. Se acepta tambien data-vista (el
-  // atributo que el markup genero antes) para no romper si aparece en algun
-  // lado, pero el valor de los dos es el mismo estado del motor.
+  // Chip "Solo mio": UNO solo en el documento. Si ya existe (el del panel de la
+  // pagina o una pasada previa) se enlaza ese; si no, se crea al final de la
+  // fila. Enciende la capa si estaba apagada y conserva el gate de sesion del
+  // motor (ADR-116 D4.iv): sin sesion no se activa y se pide login.
+  function asegurarChipMio(box) {
+    if (!box) return null;
+    var chip = document.getElementById('mm-personal-mio');
+    if (!chip) chip = box.querySelector('[data-mm-mio]');
+    if (!chip) {
+      chip = document.createElement('button');
+      chip.type = 'button';
+      chip.id = 'mm-personal-mio';
+      chip.className = (box.className && box.className.indexOf('mmx-media') >= 0)
+        ? 'mmx-mbtn' : 'mf-item';
+      chip.setAttribute('data-mm-mio', '1');
+      chip.textContent = 'Solo mio';
+      box.appendChild(chip);
+    }
+    if (chip.__mmMio) return chip;
+    chip.__mmMio = true;
+    chip.addEventListener('click', function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      alternarSoloMio();
+    });
+    return chip;
+  }
+
+  // "Solo mio" (ADR-116 D4.iv): enciende la capa si estaba apagada, delega el
+  // flag en el motor (setMediaSoloMio) y recarga porque el alcance propio entra
+  // en la clave de cache. Sin sesion NO se activa: no hay modo publico
+  // alternativo.
+  function alternarSoloMio() {
+    var m = ensureMC();
+    if (!m) return false;
+    var quiero = !alcancePropio(m);
+    if (quiero && !haySesion()) {
+      pedirLogin('Inicia sesion para ver solo tu media');
+      return false;
+    }
+    if (typeof m.setMediaSoloMio === 'function') {
+      var real = false;
+      try { real = m.setMediaSoloMio(quiero) === true; }
+      catch (e) { logWarn('setMediaSoloMio', e); }
+      // El motor tiene el gate de sesion: si lo rechaza, no se marca.
+      if (quiero && real !== true) {
+        pedirLogin('Inicia sesion para ver solo tu media');
+        sincronizarToggleMedia();
+        return false;
+      }
+    }
+    var es = (typeof m.getState === 'function') ? m.getState() : null;
+    if (quiero && (!es || !es.mediaEnabled)) {
+      propio(function () { m.setMediaEnabled(true); });
+    }
+    sincronizarToggleMedia();
+    recargarMedia();
+    return true;
+  }
+
+  // Pinta el estado de los controles de media LEYENDOLO DEL MOTOR. En modo
+  // union el chip data-media="albumes" es una CATEGORIA (mediaAlbumes, default
+  // true) y en la ruta legacy sigue siendo la vista (mediaVista). Se acepta
+  // tambien data-vista (el atributo que el markup genero antes) para no romper
+  // si aparece en algun lado. La ETIQUETA la calcula el motor (getMediaLabel,
+  // ADR-116 D6): el host deja de derivar el texto.
   function sincronizarToggleMedia() {
     var box = document.getElementById('mm-personal-media');
     if (!box) return;
+    asegurarChipMio(box);
     var m = ensureMC();
     var estado = (m && typeof m.getState === 'function')
       ? m.getState()
       : { mediaEnabled: false, mediaTypes: {}, mediaVista: 'sueltos' };
-    var esAlbumes = (estado.mediaVista === 'albumes');
+    var unido = !!(estado && estado.mediaUnion === true) || modoUnion(m);
+    var esAlbumes = unido
+      ? !!(estado && estado.mediaAlbumes === true)
+      : !!(estado && estado.mediaVista === 'albumes');
     var btns = box.querySelectorAll('[data-media],[data-vista]');
     for (var i = 0; i < btns.length; i++) {
       var b = btns[i];
@@ -584,6 +813,15 @@
       }
       var v = b.getAttribute('data-vista');
       if (v != null) b.classList.toggle('on', esAlbumes && v === 'albumes');
+    }
+    var mios = box.querySelectorAll('[data-mm-mio]');
+    for (var j = 0; j < mios.length; j++) {
+      if (mios[j].classList) mios[j].classList.toggle('on', !!(estado && estado.mediaSoloMio));
+    }
+    var lbl = box.querySelector('.mmx-media-lbl');
+    if (lbl && m && typeof m.getMediaLabel === 'function') {
+      try { lbl.textContent = m.getMediaLabel(); }
+      catch (ee) { logWarn('getMediaLabel', ee); }
     }
   }
 
@@ -1017,8 +1255,9 @@
 
   // Vista de la capa: 'sueltos' (media individual) o 'albumes' (grupos).
   // El estado lo lleva el motor compartido (item [data-media="albumes"] del
-  // panel); aqui solo se delega. El reload de la capa llega por
-  // onMediaVistaChange, que vuelve a armar la query desde el motor.
+  // panel); aqui solo se delega. Con mediaUnion el motor IGNORA esta vista y
+  // fuerza 'sueltos' (ADR-116 D3.4): un host antiguo no puede reintroducir la
+  // exclusion de albumes. Ningun manejador local la fuerza.
   function setMediaVista(vista) {
     var m = ensureMC();
     if (!m || typeof m.setMediaVista !== 'function') return null;
@@ -1026,8 +1265,8 @@
   }
 
   // Relanza la carga de la capa multimedia (misma fuente que usa el mapa).
-  // La cache es por vista: si la vista del motor cambio, no se sirve la de
-  // 'sueltos' y se vuelve a pedir (&vista=albumes).
+  // Unica via de red de la capa: dos peticiones por activacion o cambio de
+  // alcance y NINGUNA por zoom (el repintado sale de la copia en cache).
   function refrescarMedia() {
     if (!ensureMC()) return false;
     recargarMedia();

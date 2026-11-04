@@ -59,6 +59,31 @@
 /* Item individual de video: se mantiene REDONDO (solo tinte rojo). */
 .mc-root .mpa-media-pin-video{border-style:solid;border-color:#ff8a80;box-shadow:0 3px 10px rgba(231,76,60,.55)}
 
+/* ---- Cluster de medios (ADR-116 D5.8) ------------------------- */
+/* Contrato UNICO de clases: los mismos nombres, estados y tamanos
+   existen en el bloque inline de index.html. Un nombre distinto en
+   cualquiera de los dos lados es un fallo de la entrega, no una
+   variante. Los tamanos (44/52/60) coinciden con el iconSize del
+   motor; el numero se posiciona en % para no recortarse con el
+   overflow del circulo. */
+.mc-root .mc-media-cluster{position:relative;width:44px;height:44px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0D1520;border:2.5px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.5);cursor:pointer;transition:transform .14s,box-shadow .14s}
+.mc-root .mc-media-cluster:hover{transform:scale(1.08);box-shadow:0 6px 18px rgba(0,0,0,.62);z-index:1000}
+.mc-root .mc-media-cluster-s{width:44px;height:44px}
+.mc-root .mc-media-cluster-m{width:52px;height:52px}
+.mc-root .mc-media-cluster-l{width:60px;height:60px}
+.mc-root .mc-media-cluster-foto{border-color:#fff}
+.mc-root .mc-media-cluster-video{border-color:#ff8a80}
+.mc-root .mc-media-cluster-audio{border-color:#8fd3ff}
+.mc-root .mc-media-cluster-album{border-color:#fff3d6;box-shadow:0 4px 14px rgba(217,119,6,.55)}
+.mc-root .mc-media-cluster-thumb{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
+.mc-root .mc-media-cluster-ico{font-size:18px;line-height:1;color:#F5E6D0}
+.mc-root .mc-media-cluster-num{position:absolute;right:10%;bottom:10%;min-width:17px;height:17px;padding:0 3px;border-radius:9px;background:var(--gold);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;line-height:15px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.55)}
+.mc-root .mc-media-cluster-pop{max-height:260px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;margin:-2px -4px}
+.mc-root .mc-media-cluster-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;border-radius:4px;transition:background .12s}
+.mc-root .mc-media-cluster-row:hover{background:rgba(255,74,0,.16)}
+.mc-root .mc-media-cluster-row-thumb{width:34px;height:34px;flex-shrink:0;object-fit:cover;border-radius:6px;background:rgba(255,255,255,.08)}
+.mc-root .mc-media-cluster-row-txt{display:flex;flex-direction:column;min-width:0;font-size:11px;line-height:1.25;color:#F5E6D0}
+
 /* ---- Pin de ubicacion del usuario ----------------------------- */
 /* Identifica PERSONA, no categoria: por eso es punto CENTRADO con anillo
    blanco y no gota con emoji. El color de marca lo inyecta el motor como

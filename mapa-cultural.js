@@ -1,6 +1,6 @@
 /* =============================================================
    mapa-cultural.js -- Motor compartido del Mapa Cultural LATAWEL
-   Version 1.5.0. IIFE, ASCII-safe estricto, sin backticks.
+   Version 1.6.0. IIFE, ASCII-safe estricto, sin backticks.
 
    Porta a un modulo reusable el motor del mapa de index.html
    (pines, clustering por proximidad, capa multimedia y drawer
@@ -13,20 +13,74 @@ create(opts)  -> instancia (multi-instancia por pagina)
       init(opts)    -> instancia default; idempotente
       refresh, setPlaces, setMedia, setMediaEnabled, setMediaTypes,
       setRatingMin, getRatingMin, setMediaVista, getMediaVista,
-      setMediaSoloMio, toggleFilter, isFilterOn,
+      setMediaSoloMio, setMediaAlbumes, getMediaAlbumes, getMediaUnion,
+      getMediaLabel, mergeMedia, toggleFilter, isFilterOn,
       getMap, openDrawer, closeDrawer,
       normalizePlace, normalizeMedia, esc, starHtml,
       photoPlaceholderHTML, haversineKm
-      (extras de apoyo a pruebas: clusterize, filterMediaDefault,
-       filterMediaPropios)
+      (extras de apoyo a pruebas: clusterize, mediaImportance,
+       mediaClusterize, filterMediaDefault, filterMediaPropios)
 
    Instancia:
       { init, refresh, destroy, setPlaces, setMedia, setMediaEnabled,
         setMediaTypes, setRatingMin, getRatingMin, setMediaVista,
-        getMediaVista, setMediaSoloMio, toggleFilter, isFilterOn,
+        getMediaVista, setMediaSoloMio, setMediaAlbumes, getMediaAlbumes,
+        getMediaUnion, getMediaLabel, mergeMedia, toggleFilter, isFilterOn,
         onFilterChange, getState, getMap, openDrawer,
         closeDrawer, geolocate, resetColombia, fitBounds,
         setUserPos, clearUserPos, getUserPos }
+
+   1.6.0
+     - Modo UNION de la capa de medios (ADR-116), OPT-IN con la opcion
+       mediaUnion (default false): un anfitrion que no la active sigue en la
+       ruta legacy sin ningun cambio. Con mediaUnion activo la capa pinta UNA
+       sola coleccion fusionada y mediaVista DEJA de seleccionar dataset: se
+       conserva por compatibilidad, se fuerza 'sueltos' y el filtrado real lo
+       hacen mediaTypes + mediaAlbumes. Un host viejo que llame
+       setMediaVista('albumes') solo enciende el flag de albumes y no puede
+       reintroducir la exclusion de las fotos sueltas.
+     - Nuevo estado mediaAlbumes (default true), presente SIEMPRE y con efecto
+       solo en modo union. API setMediaAlbumes / getMediaAlbumes /
+       getMediaUnion. Los albumes dejan de ser una vista y pasan a ser una
+       categoria aditiva mas del conjunto.
+     - Predicado de pintado por categoria en modo union: un album
+       (destino_album, album_grupo o media_type 'album') se pinta SOLO con
+       mediaAlbumes; cualquier otro item, SOLO si mediaTypes[media_type].
+       Se retira el predicado de vista unica. mediaCategoriasActivas() cuenta
+       foto + video + audio + albumes y sustituye a mediaTiposActivos() en los
+       guards de encendido y apagado (en la ruta legacy da el mismo numero, asi
+       que la regresion es cero).
+     - Semantica ADITIVA de los chips (solo en modo union): con la capa
+       apagada el primer clic enciende SOLO la categoria pedida; con la capa
+       encendida el clic alterna solo esa categoria y nunca fuerza la vista de
+       sueltos. El boton principal enciende las cuatro al encender y al apagar
+       solo oculta la capa. setMediaSoloMio(true) enciende la capa
+       conservando las categorias y mantiene el gate de sesion.
+     - getMediaLabel() es la UNICA implementacion de la etiqueta: la capa
+       apagada dice 'Ninguno', el modo union nombra solo las categorias
+       activas ('Fotos, Videos + Albumes', 'Todo'); filtroMediaLabel delega
+       en ella y syncFiltroLabels sigue publicando [data-mf-label="med"].
+     - filtroSnapshot pasa a 7 claves (mediaAlbumes). Los snapshots de 6
+       claves siguen siendo legibles sin lanzar y en modo union la mediaVista
+       restaurada se ignora (queda 'sueltos').
+     - normalizeMedia normaliza votos / rating_promedio / fotos_count a
+       numero finito o 0 (los strings 'null', '' y 'undefined' son ausentes) y
+       afina la key a id -> media_id -> compuesta. Nueva mergeMedia(primarias,
+       secundarias): fusion campo a campo 'primer valor no vacio', con clave
+       de identidad unica y sin descartar la segunda fila.
+     - CLUSTERING propio de la capa de MEDIA (ADR-116 D5), separado del
+       clustering de lugares: rejilla de 40 px (opcion mediaClusterRadius),
+       representante por importancia (votos + 2*rating_promedio +
+       0.5*min(fotos_count,20)) y miembros ordenados por esa misma
+       importancia. Miniatura del representante SOLO para foto y album, con
+       onerror que cae al icono de tipo (ADR-008); video y audio son enlaces
+       externos y NUNCA usan media_url como miniatura. Contador con el numero
+       de items del grupo. Clic: por debajo de zoom 17 y con coordenadas
+       distintas, setView a zoom +2 (tope 17); en zoom 17 o con todos los
+       miembros en la misma coordenada, popup con lista de hasta 12 items que
+       abren el drawer por el camino de siempre. Topes de pintado 600 items /
+       300 marcadores y repintado desde la cache normalizada: un zoom NUNCA
+       pide datos.
 
    1.5.0
      - Pin de UBICACION DEL USUARIO en el mapa. geolocate() ya obtenia la
@@ -176,7 +230,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 (function () {
   'use strict';
 
-  var VERSION = '1.5.0';
+  var VERSION = '1.6.0';
 
   // Paleta de pines por categoria (paridad con index-api-connector.js
   // y refreshMapaMarkers de index.html).
@@ -199,6 +253,9 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
   var PIN_DEFECTO = '\uD83D\uDCCD';
   var CAMARA = '\uD83D\uDCF7';
   var TOPE_MEDIA_PINS = 300;
+  // Tope de ITEMS de media que entran al clustering (ADR-116 D5.5/D5.7). Los
+  // topes son de pintado, no de datos: st.media conserva todo lo recibido.
+  var MEDIA_TOP_ITEMS = 600;
 
   var TILE_VOYAGER = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   var TILE_OSM = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -251,14 +308,99 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 
   /* ---------- normalizacion unificada ---------- */
 
+  // Numero del contrato de datos (ADR-116 D5.2): falta, null, no numerico o
+  // los strings 'null' / '' / 'undefined' cuentan 0. Un 0 explicito del
+  // backend NO es ausente y se conserva como 0.
+  function mediaNum(v) {
+    if (v === undefined || v === null) return 0;
+    var s = v;
+    if (typeof s === 'string') s = s.replace(/^\s+|\s+$/g, '');
+    if (s === '' || s === 'null' || s === 'undefined') return 0;
+    var n = Number(s);
+    return isFinite(n) ? n : 0;
+  }
+
+  // "Vacio" para el merge campo a campo: undefined, null o los strings
+  // 'null' / '' / 'undefined' recortados. El numero 0 NO es vacio.
+  function mediaVacio(v) {
+    if (v === undefined || v === null) return true;
+    if (typeof v !== 'string') return false;
+    var s = v.replace(/^\s+|\s+$/g, '');
+    return (s === '' || s === 'null' || s === 'undefined');
+  }
+
+  function mediaKeyOf(raw) {
+    if (raw.id != null) return String(raw.id);
+    if (raw.media_id != null) return String(raw.media_id);
+    return String(raw.origen || '') + ':' + String(raw.origen_id || '') + ':' + String(raw.media_url || '');
+  }
+
   function normalizeMedia(raw) {
     if (!raw) return null;
     var m = {};
     for (var k in raw) { if (has(raw, k)) m[k] = raw[k]; }
-    m.key = (raw.id != null)
-      ? String(raw.id)
-      : String(raw.origen || '') + ':' + String(raw.origen_id || '') + ':' + String(raw.media_url || '');
+    // Numericos del contrato SIEMPRE presentes: el clustering y el
+    // representante por importancia los leen sin comprobar tipo.
+    m.votos = mediaNum(raw.votos);
+    m.rating_promedio = mediaNum(raw.rating_promedio);
+    m.fotos_count = mediaNum(raw.fotos_count);
+    m.key = mediaKeyOf(raw);
     return m;
+  }
+
+  // Clave de identidad para FUSIONAR las dos variantes de la capa. Es la del
+  // normalizador con una unica precision: la degradacion a origen + origen_id
+  // solo vale para las filas AGREGADAS de album (destino_album / album_grupo),
+  // que es el caso documentado en ADR-031. Para el resto sin id, la clave
+  // incluye media_url y media_type para NO colapsar dos fotos individuales del
+  // mismo album o del mismo destino.
+  function mediaMergeKey(raw) {
+    if (raw.id != null) return String(raw.id);
+    if (raw.media_id != null) return String(raw.media_id);
+    var origen = String(raw.origen || '');
+    var oid = String(raw.origen_id || '');
+    if (origen === 'destino_album' || origen === 'album_grupo') return origen + ':' + oid;
+    return origen + ':' + oid + ':' + String(raw.media_url || '') + ':' + String(raw.media_type || '');
+  }
+
+  // Union de las dos variantes en UNA coleccion. Merge CAMPO A CAMPO con
+  // "primer valor no vacio": primero todas las filas default y despues las de
+  // vista=albumes, de modo que votos/rating_promedio vienen de default y
+  // fotos_count del album. Una fila secundaria NUNCA se descarta: solo cede
+  // los campos que la primaria ya tiene no vacios.
+  function mergeMedia(primarias, secundarias) {
+    var orden = [];
+    var idx = {};
+    function absorbe(lista) {
+      var arr = lista || [];
+      for (var i = 0; i < arr.length; i++) {
+        var raw = arr[i];
+        // Se normaliza para descartar filas invalidas (null) y fijar el
+        // contrato numerico, pero la comparacion de "vacio" se hace sobre el
+        // valor CRUDO: el 0 que produce la normalizacion de un campo AUSENTE
+        // no puede bloquear el fotos_count del album (ADR-116 D5.2).
+        if (!normalizeMedia(raw)) continue;
+        var k = mediaMergeKey(raw);
+        var prev = idx[k];
+        var f;
+        if (!prev) {
+          var copia = {};
+          for (f in raw) { if (has(raw, f)) copia[f] = raw[f]; }
+          idx[k] = copia;
+          orden.push(k);
+          continue;
+        }
+        for (f in raw) {
+          if (!has(raw, f)) continue;
+          if (mediaVacio(prev[f])) prev[f] = raw[f];
+        }
+      }
+    }
+    absorbe(primarias);
+    absorbe(secundarias);
+    var out = [];
+    for (var j = 0; j < orden.length; j++) out.push(normalizeMedia(idx[orden[j]]));
+    return out;
   }
 
   function normalizePlace(raw) {
@@ -402,6 +544,63 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         out.push({ lat: p.lat, lng: p.lng, cnt: 1, keys: [p.key] });
       }
     });
+    return out;
+  }
+
+  // Importancia de un item de MEDIA (ADR-116 D5.2): votos + 2*rating_promedio
+  // + 0.5*min(fotos_count, 20). Los tres campos llegan ya normalizados a
+  // numero, pero la funcion tolera basura (NaN / undefined / no numerico -> 0)
+  // para poder probarse aislada. Puro: no depende de Leaflet ni del estado.
+  function mediaImportance(item) {
+    var v = mediaNum(item && item.votos);
+    var r = mediaNum(item && item.rating_promedio);
+    var f = mediaNum(item && item.fotos_count);
+    if (f > 20) f = 20;
+    return v + 2 * r + 0.5 * f;
+  }
+
+  // Clustering de MEDIA por REJILLA de celdas de 'radius' px (ADR-116 D5.1).
+  // Puro: no toca Leaflet ni el estado, por eso se prueba sin mapa.
+  //   projectFn(lat, lng) -> { x, y }    (Leaflet: map.project([lat,lng], z))
+  //   devuelve [{ lat, lng, cnt, rep, members }]
+  // members va ORDENADO por importancia descendente y rep = members[0].
+  // Rejilla y no comparacion par a par: con el tope de 600 items un O(n^2)
+  // seria inaceptable. El artefacto de frontera de celda (dos items a 41 px
+  // caen en celdas distintas) se ACEPTA y se documenta: no se promete
+  // clustering por distancia geografica.
+  // El centroide se calcula con media incremental, igual que clusterize, para
+  // que dos items del mismo grupo no salten de celda al repintar.
+  function mediaClusterize(items, projectFn, radius) {
+    var out = [];
+    if (typeof projectFn !== 'function') return out;
+    var cs = (radius > 0) ? radius : 40;
+    var grupos = {};
+    var orden = [];
+    (items || []).forEach(function (it) {
+      if (!it) return;
+      var la = Number(it.lat);
+      var ln = Number(it.lng);
+      if (!isFinite(la) || !isFinite(ln)) return;
+      var pt = projectFn(la, ln);
+      if (!pt || !isFinite(pt.x) || !isFinite(pt.y)) return;
+      var k = Math.floor(pt.x / cs) + ':' + Math.floor(pt.y / cs);
+      var g = grupos[k];
+      if (!g) {
+        g = { lat: la, lng: ln, cnt: 0, rep: null, members: [] };
+        grupos[k] = g;
+        orden.push(g);
+      }
+      g.lat = (g.lat * g.cnt + la) / (g.cnt + 1);
+      g.lng = (g.lng * g.cnt + ln) / (g.cnt + 1);
+      g.cnt++;
+      g.members.push(it);
+    });
+    for (var i = 0; i < orden.length; i++) {
+      var gr = orden[i];
+      gr.members.sort(function (a, b) { return mediaImportance(b) - mediaImportance(a); });
+      gr.rep = gr.members[0] || null;
+      out.push(gr);
+    }
     return out;
   }
 
@@ -746,6 +945,20 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       // Alcance de la capa de medios al contenido propio y clave de
       // localStorage donde se persiste el snapshot de filtro (null = no).
       mediaSoloMio: false,
+      // (ADR-116): modo UNION de la capa de medios. OPT-IN y default
+      // false: sin el, todo sigue en la ruta legacy con mediaVista como
+      // selector de dataset. Con mediaUnion activo la capa pinta la coleccion
+      // fusionada y mediaVista se IGNORA (se fuerza 'sueltos'); el filtrado
+      // real lo hacen mediaTypes + mediaAlbumes.
+      mediaUnion: false,
+      // Categoria ADITIVA de albumes dentro de la union. Siempre esta en el
+      // estado; en la ruta legacy se ignora por completo (no cambia el
+      // pintado ni siquiera con su default true).
+      mediaAlbumes: true,
+      // Rejilla (px) del clustering propio de MEDIA (ADR-116 D5.1), separada
+      // del clusterPx de lugares. 40 px por coherencia con el clustering de
+      // lugares; el artefacto de frontera de celda se acepta y se documenta.
+      mediaClusterRadius: 40,
       persistKey: null,
       clusterLinksNavigate: false,
       mediaPhotoIcon: null,
@@ -794,6 +1007,10 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       media: [],
       mediaEnabled: false,
       mediaTypes: { foto: false, video: false, audio: false },
+      // Cuarta categoria del conjunto, ADITIVA y con efecto solo en
+      // modo union. Nace de la opcion (default true) y restoreFiltro la
+      // reescribe si la preferencia persistida la trae.
+      mediaAlbumes: OPT.mediaAlbumes !== false,
       // Alcance de la capa de medios al contenido propio. No se deriva de la
       // sesion en el arranque: nace de la opcion y el gate lo aplica
       // setMediaSoloMio al ACTIVARLO.
@@ -1167,6 +1384,185 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       });
     }
 
+    /* ---------- clustering propio de la capa de MEDIA (ADR-116 D5) ---------- */
+
+    // Tipo EFECTIVO de un item para el cluster: los albumes (agregado del
+    // destino, grupo de comunidad o media_type 'album') cuentan como 'album';
+    // el resto, su media_type. 'foto' es el fallback historico.
+    function mediaTipoClase(item) {
+      var tipo = (item && item.media_type) || 'foto';
+      if (item && (item.origen === 'destino_album' || item.origen === 'album_grupo' || tipo === 'album')) return 'album';
+      if (tipo === 'video') return 'video';
+      if (tipo === 'audio') return 'audio';
+      return 'foto';
+    }
+
+    // Icono de tipo. Video y audio son ENLACES EXTERNOS (YouTube/Spotify), no
+    // ficheros: su media_url NUNCA va como <img>.
+    function mediaTipoEmoji(item) {
+      var tipo = mediaTipoClase(item);
+      if (tipo === 'album') return '\uD83D\uDCDA';
+      if (tipo === 'video') return '\u25B6';
+      if (tipo === 'audio') return '\u266B';
+      return fotoIcon();
+    }
+
+    // Miniatura SOLO para foto y album con URL usable. Descarta '', 'null' y
+    // 'undefined', que en el contrato de datos son ausentes.
+    function mediaThumbOk(item) {
+      var tipo = mediaTipoClase(item);
+      if (tipo !== 'foto' && tipo !== 'album') return false;
+      var u = item && item.media_url;
+      if (typeof u !== 'string') return false;
+      return !mediaVacio(u);
+    }
+
+    // Fallback ADR-008: si la miniatura falla se oculta la img y se muestra el
+    // span de icono que va justo detras. El contador es un hermano aparte, asi
+    // que no se pierde.
+    var MEDIA_CLUSTER_ONERROR = 'this.style.display=\'none\';this.nextSibling.style.display=\'\';';
+
+    function mediaClusterIcon(g) {
+      var cnt = g.cnt || 0;
+      var rep = g.rep;
+      var tipo = mediaTipoClase(rep);
+      var size = (cnt < 10) ? 44 : ((cnt < 100) ? 52 : 60);
+      // Contrato de clases EXACTO (ADR-116 D5.8): mismos nombres en las dos
+      // casas. Un nombre distinto en cualquiera de las dos es un fallo de la
+      // entrega, no una variante. Aqui van literales para que el contrato sea
+      // verificable por grep.
+      var cls = 'mc-media-cluster';
+      cls += (cnt < 10) ? ' mc-media-cluster-s' : ((cnt < 100) ? ' mc-media-cluster-m' : ' mc-media-cluster-l');
+      if (tipo === 'album') cls += ' mc-media-cluster-album';
+      else if (tipo === 'video') cls += ' mc-media-cluster-video';
+      else if (tipo === 'audio') cls += ' mc-media-cluster-audio';
+      else cls += ' mc-media-cluster-foto';
+      var ico = mediaTipoEmoji(rep);
+      var inner;
+      if (mediaThumbOk(rep)) {
+        inner = '<img class="mc-media-cluster-thumb" src="' + esc(rep.media_url) + '" alt="" loading="lazy"'
+          + ' onerror="' + MEDIA_CLUSTER_ONERROR + '">'
+          + '<span class="mc-media-cluster-ico" style="display:none">' + ico + '</span>';
+      } else {
+        inner = '<span class="mc-media-cluster-ico">' + ico + '</span>';
+      }
+      return L.divIcon({
+        html: '<div class="' + cls + '" title="' + esc(String(cnt) + ' medios') + '">'
+          + inner
+          + '<span class="mc-media-cluster-num">' + cnt + '</span></div>',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        className: ''
+      });
+    }
+
+    // Todos los miembros comparten coordenada EXACTA: ningun zoom los separa.
+    function mediaClusterMismoPunto(g) {
+      var ms = (g && g.members) || [];
+      if (ms.length < 2) return true;
+      var la = Number(ms[0].lat), ln = Number(ms[0].lng);
+      for (var i = 1; i < ms.length; i++) {
+        if (Number(ms[i].lat) !== la || Number(ms[i].lng) !== ln) return false;
+      }
+      return true;
+    }
+
+    function mediaClusterClick(g) {
+      if (!st.map) return;
+      var zoom = st.map.getZoom();
+      if (zoom < 17 && !mediaClusterMismoPunto(g)) {
+        st.map.setView([g.lat, g.lng], Math.min(zoom + 2, 17), { animate: true });
+        return;
+      }
+      openMediaClusterPopup(g);
+    }
+
+    // Popup de lista (ADR-116 D5.4): hasta 12 items ordenados por importancia.
+    // Los listeners se enganchan en popupopen, no al construir el HTML.
+    function openMediaClusterPopup(g) {
+      if (!st.map || typeof L === 'undefined') return;
+      var ms = (g && g.members) || [];
+      var top = Math.min(ms.length, 12);
+      var html = '<div class="mc-media-cluster-pop">';
+      for (var i = 0; i < top; i++) {
+        var it = ms[i];
+        var ico = mediaTipoEmoji(it);
+        var thumb;
+        if (mediaThumbOk(it)) {
+          thumb = '<img class="mc-media-cluster-row-thumb" src="' + esc(it.media_url) + '" alt="" loading="lazy"'
+            + ' onerror="' + MEDIA_CLUSTER_ONERROR + '">'
+            + '<span class="mc-media-cluster-ico" style="display:none">' + ico + '</span>';
+        } else {
+          thumb = '<span class="mc-media-cluster-ico">' + ico + '</span>';
+        }
+        var titulo = it.media_title || it.album_titulo || 'Multimedia';
+        var meta = (mediaTipoClase(it) === 'album') ? 'Album' : mdMediaBadge(it.media_type);
+        var votos = mediaNum(it.votos);
+        var rt = mdRating(it);
+        if (votos > 0) meta += ' \u00b7 ' + votos + (votos === 1 ? ' voto' : ' votos');
+        if (rt != null) meta += ' \u00b7 ' + rt + ' / 5';
+        html += '<div class="mc-media-cluster-row" data-mc-media-row="' + i + '">'
+          + thumb
+          + '<div class="mc-media-cluster-row-txt">'
+          + '<div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+          + esc(titulo) + '</div>'
+          + '<div style="font-size:10px;color:#888">' + esc(meta) + '</div>'
+          + '</div></div>';
+      }
+      html += '</div>';
+      var cm = L.marker([g.lat, g.lng], { opacity: 0, interactive: false });
+      cm.addTo(st.mediaLayer);
+      // Los listeners de las filas se enganchan en 'popupopen' ANTES de abrir,
+      // no al construir el HTML (mismo patron que el popup de lugares).
+      cm.bindPopup(html, { maxWidth: 300 });
+      cm.on('popupopen', function (ev) {
+        var node = (ev && ev.popup && ev.popup.getElement) ? ev.popup.getElement() : null;
+        if (!node) return;
+        var rows = node.querySelectorAll('[data-mc-media-row]');
+        for (var j = 0; j < rows.length; j++) {
+          (function (row) {
+            row.addEventListener('click', function (e) {
+              if (e && e.stopPropagation) e.stopPropagation();
+              var idx = parseInt(row.getAttribute('data-mc-media-row'), 10);
+              if (!(idx >= 0) || idx >= ms.length) return;
+              openMediaDrawer(ms[idx]);
+            });
+          })(rows[j]);
+        }
+      });
+      cm.on('popupclose', function () {
+        try { st.mediaLayer.removeLayer(cm); } catch (e) { log('media popupclose', e); }
+      });
+      cm.openPopup();
+    }
+
+    // Pin suelto: MISMO camino y mismo icono que antes del clustering.
+    function paintMediaPin(item) {
+      var lat = parseFloat(item.lat);
+      var lng = parseFloat(item.lng);
+      var esAlbumDestino = (item.origen === 'destino_album' || item.origen === 'album_grupo');
+      var marker = L.marker([lat, lng], { icon: mediaIcon(item) });
+      marker.on('click', function () { openMediaDrawer(item); });
+      if (esAlbumDestino) {
+        marker.bindTooltip((item.album_titulo || '\u00c1lbum del destino') + ' \u00b7 ' + (parseInt(item.fotos_count, 10) || 0) + ' fotos');
+      }
+      marker.addTo(st.mediaLayer);
+    }
+
+    function paintMediaCluster(g) {
+      var marker = L.marker([g.lat, g.lng], { icon: mediaClusterIcon(g) });
+      marker.on('click', function (e) {
+        // El clic del cluster NO se propaga al drawer del representante.
+        if (e && e.originalEvent && typeof e.originalEvent.stopPropagation === 'function') {
+          e.originalEvent.stopPropagation();
+        } else if (typeof L !== 'undefined' && L.DomEvent && typeof L.DomEvent.stopPropagation === 'function') {
+          L.DomEvent.stopPropagation(e);
+        }
+        mediaClusterClick(g);
+      });
+      marker.addTo(st.mediaLayer);
+    }
+
     function renderMarkers() {
       if (!st.initialized || !st.map || typeof L === 'undefined') return;
       Object.keys(st.markers).forEach(function (k) {
@@ -1440,17 +1836,61 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       return mdCatLabel(c);
     }
 
-    function filtroMediaLabel() {
-      // La etiqueta deriva PRIMERO de mediaEnabled: con la capa apagada no
-      // puede decir 'Albumes' aunque mediaVista siga en 'albumes' (esa vista
-      // se conserva para reencender, pero con la capa OCULTA no se muestra).
-      if (!st.mediaEnabled) return 'Todos';
-      if (st.mediaVista === 'albumes') return '\u00c1lbumes';
-      if (mediaTiposActivos() !== 1) return 'Todo';
-      if (st.mediaTypes.foto) return 'Fotos';
-      if (st.mediaTypes.video) return 'Videos';
-      return 'Audios';
+    // Categorias activas CON NOMBRE, en orden fijo. Es la materia prima de la
+    // etiqueta unica: foto, video, audio y, SOLO en modo union, albumes.
+    function mediaCategoriasEtiqueta() {
+      var out = [];
+      if (st.mediaTypes.foto) out.push('Fotos');
+      if (st.mediaTypes.video) out.push('Videos');
+      if (st.mediaTypes.audio) out.push('Audios');
+      if (unionOn() && st.mediaAlbumes) out.push('\u00c1lbumes');
+      return out;
     }
+
+    // getMediaLabel() es la UNICA implementacion del texto del canal de medios
+    // (ADR-116 D6). Contrato exacto: capa apagada -> 'Ninguno' (no
+    // 'Todos': decir "todos" sin nada encendido es falso); ruta legacy con
+    // mediaVista 'albumes' -> 'Albumes'; modo union -> nombra SOLO las
+    // categorias activas, con 'Todo' cuando estan las cuatro y lista separada
+    // por comas con ' + ' antes de la ultima en el resto de combinaciones.
+    function getMediaLabel() {
+      var base;
+      var cats;
+      var n;
+      var i;
+      if (!st.mediaEnabled) {
+        base = 'Ninguno';
+      } else if (!unionOn()) {
+        // Legacy: la vista manda y el texto historico se conserva entero.
+        if (st.mediaVista === 'albumes') {
+          base = '\u00c1lbumes';
+        } else {
+          cats = mediaCategoriasEtiqueta();
+          base = (cats.length === 1) ? cats[0] : 'Todo';
+        }
+      } else {
+        cats = mediaCategoriasEtiqueta();
+        n = cats.length;
+        if (n === 0) base = 'Ninguno';
+        else if (n === 4) base = 'Todo';
+        else if (n === 1) base = cats[0];
+        else {
+          base = cats[0];
+          for (i = 1; i < n; i++) {
+            base += (i === n - 1) ? ' + ' + cats[i] : ', ' + cats[i];
+          }
+        }
+      }
+      if (st.mediaSoloMio) {
+        // El alcance propio no puede decir 'Todo' (no lo es) ni 'Ninguno'
+        // (el filtro propio esta activo): ambos casos colapsan en 'Solo mio'.
+        if (base === 'Todo' || base === 'Ninguno') return 'Solo mio';
+        return 'Mio \u00b7 ' + base;
+      }
+      return base;
+    }
+
+    function filtroMediaLabel() { return getMediaLabel(); }
 
     // 0 = "Todos" (sin filtro); por encima de 0, el valor con estrella ASCII.
     // El umbral ya no es entero (paso 0.2): se imprime el decimal tal cual
@@ -1512,6 +1952,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
           foto: st.mediaTypes.foto, video: st.mediaTypes.video, audio: st.mediaTypes.audio
         },
         mediaVista: st.mediaVista,
+        mediaAlbumes: !!st.mediaAlbumes,
         mediaSoloMio: st.mediaSoloMio
       };
     }
@@ -1613,6 +2054,14 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         }
       }
       if (d.mediaVista === 'albumes' || d.mediaVista === 'sueltos') st.mediaVista = d.mediaVista;
+      // Septima clave del snapshot. Un snapshot del formato anterior (6 claves)
+      // sigue siendo legible y restaura la categoria de albumes con su default
+      // true, sin lanzar y sin descartar el resto de la preferencia.
+      st.mediaAlbumes = (typeof d.mediaAlbumes === 'boolean') ? d.mediaAlbumes : true;
+      // En modo union la vista NO selecciona dataset: el valor persistido se
+      // IGNORA y queda 'sueltos', igual que hace setMediaVista. Asi un
+      // snapshot viejo con 'albumes' no puede reintroducir la exclusion.
+      if (unionOn()) st.mediaVista = 'sueltos';
       var r = parseFloat(d.ratingMin);
       if (!isNaN(r) && isFinite(r)) {
         if (r < 0) r = 0;
@@ -1641,6 +2090,22 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     // apaga. El anfitrion recarga la capa por onMediaVistaChange.
     function setMediaVista(v) {
       var nv = (v === 'albumes') ? 'albumes' : 'sueltos';
+      if (unionOn()) {
+        // MODO UNION: mediaVista NO selecciona dataset. Se conserva el campo
+        // por compatibilidad pero se fuerza 'sueltos' SIEMPRE, y 'albumes' solo
+        // enciende la categoria aditiva. Un host viejo que llame este metodo no
+        // puede reintroducir la exclusion de las fotos sueltas y tampoco
+        // dispara onMediaVistaChange: no hay recarga que pedir.
+        st.mediaVista = 'sueltos';
+        if (nv === 'albumes') {
+          setMediaAlbumes(true);
+        } else {
+          syncMediaBtns();
+          syncFiltroLabels();
+          renderMedia();
+        }
+        return st.mediaVista;
+      }
       var cambio = (nv !== st.mediaVista);
       st.mediaVista = nv;
       if (nv === 'albumes' && st.mediaLayer) {
@@ -1659,6 +2124,35 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 
     function getMediaVista() { return st.mediaVista; }
 
+    // Categoria ADITIVA "albumes" (ADR-116 D2). El flag vive SIEMPRE
+    // en el estado; en la ruta legacy se guarda pero no cambia ni el pintado
+    // ni el encendido de la capa (la vista de albumes sigue mandando alli).
+    function setMediaAlbumes(v) {
+      st.mediaAlbumes = !!v;
+      if (unionOn()) {
+        // Misma coherencia que setMediaTypes: sin ninguna categoria activa la
+        // capa se apaga; con alguna activa y la capa oculta, se enciende.
+        if (mediaCategoriasActivas() === 0) {
+          st.mediaEnabled = false;
+          removeMediaLayer();
+        } else if (!st.mediaEnabled) {
+          st.mediaEnabled = true;
+          addMediaLayer();
+        }
+      }
+      syncMediaBtns();
+      renderMedia();
+      syncFiltroLabels();
+      fireFilterChange();
+      return !!st.mediaAlbumes;
+    }
+
+    function getMediaAlbumes() { return !!st.mediaAlbumes; }
+
+    // El modo union es una opcion del motor, no un estado mutable: se lee de
+    // las opciones vigentes para que un init() posterior lo refleje.
+    function getMediaUnion() { return unionOn(); }
+
     // ALCANCE PROPIO de la capa de medios. El flag en si lo aplica el
     // anfitrion (el motor no conoce la forma del item ni como se consulta el
     // contenido del usuario), pero el gate de sesion vive aqui: pedir "mi
@@ -1672,6 +2166,22 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         return st.mediaSoloMio;
       }
       st.mediaSoloMio = want;
+      if (unionOn() && want && !st.mediaEnabled) {
+        // D4.iv: "solo mio" ENCIENDE la capa si estaba apagada, CONSERVANDO
+        // las categorias actuales. El gate de sesion de arriba se mantiene
+        // intacto: sin sesion no se llega aqui. Solo cuando no hay ninguna
+        // categoria activa se rellenan los defaults, porque una capa
+        // encendida y vacia seria un estado que miente.
+        st.mediaEnabled = true;
+        addMediaLayer();
+        if (mediaCategoriasActivas() === 0) {
+          st.mediaTypes.foto = true;
+          st.mediaTypes.video = true;
+          st.mediaTypes.audio = true;
+          st.mediaAlbumes = true;
+        }
+        syncMediaBtns();
+      }
       renderMedia();
       syncFiltroLabels();
       fireFilterChange();
@@ -1996,6 +2506,21 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       return n;
     }
 
+    // Modo UNION (opt-in, ADR-116 D3). Se lee de las opciones y no de una
+    // copia en el estado: un init() posterior con mediaUnion:true surte efecto
+    // sin recrear la instancia.
+    function unionOn() { return !!st.options.mediaUnion; }
+
+    // Categorias activas del conjunto: los tres tipos MAS albumes cuando el
+    // modo union esta activo y el flag esta encendido. En la ruta legacy el
+    // resultado es identico al de mediaTiposActivos(), asi que sustituirlo en
+    // los guards no cambia ningun comportamiento historico.
+    function mediaCategoriasActivas() {
+      var n = mediaTiposActivos();
+      if (unionOn() && st.mediaAlbumes) n++;
+      return n;
+    }
+
     // Indice de referencia (slug / uuid / key) -> destino, para resolver el
     // rating del destino de un item de media sin consultar la red.
     function refIndexPlaces() {
@@ -2023,48 +2548,90 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       return placeRating(ref) >= st.ratingMin;
     }
 
+    // PINTADO de la capa de media. Orden NORMATIVO (ADR-116 D5.7):
+    //   normalizar (ya hecho en setMedia) -> un pin por destino -> ordenar por
+    //   importancia -> recortar a 600 -> agrupar (rejilla 40 px) -> recortar a
+    //   300 marcadores (clusters y pines sueltos) -> pintar.
+    // Cambiar este orden altera los conteos: es contrato, no estilo.
+    // REPINTADO SIN RED (D5.6): solo lee de la copia normalizada en cache
+    // (st.media); ningun camino de esta funcion dispara fetch ni toca la red.
+    // mediaItems() aplica el mediaFilter del anfitrion, que por contrato es un
+    // filtro SINCRONO de filas (los dos hosts lo usan asi): ni el motor ni los
+    // hosts piden datos aqui. Un zoom nunca dispara una peticion.
     function renderMedia() {
       if (!st.initialized || !st.mediaLayer || typeof L === 'undefined') return;
       st.mediaLayer.clearLayers();
       if (!st.mediaEnabled) return;
       var items = mediaItems();
       if (!items.length) return;
+      var union = unionOn();
+      var refIdx = (st.ratingMin > 0 && st.activeCat !== 'visitados') ? refIndexPlaces() : null;
+      // Recorte por viewport: NO es un filtro de datos (st.media queda intacto),
+      // es culling de pintado. Sin el, un paneo dejaba pines congelados fuera de
+      // bounds, que es el bug que cubre la regresion de onMoved.
       var bounds = st.map.getBounds();
-      var n = 0;
       var destinosVistos = {};
       var albumesVistos = {};
-      var soloAlbumes = (st.mediaVista === 'albumes');
-      var refIdx = (st.ratingMin > 0 && st.activeCat !== 'visitados') ? refIndexPlaces() : null;
-      items.forEach(function (item) {
-        var lat = parseFloat(item.lat);
-        var lng = parseFloat(item.lng);
-        if (!lat || !lng) return;
-        var esAlbumDestino = (item.origen === 'destino_album' || item.origen === 'album_grupo');
-        if (soloAlbumes && !esAlbumDestino) return;
-        if (refIdx && !mediaPasaRating(item, refIdx)) return;
-        if (!esAlbumDestino && !st.mediaTypes[item.media_type]) return;
-        if (!bounds.contains([lat, lng])) return;
-        if (n >= TOPE_MEDIA_PINS) return;
+      var cand = [];
+      var i, item, lat, lng, esAlbumDestino, esAlbum;
+      // 1) Candidatos: se descartan las filas sin lat/lng parseables, las que
+      //    no pasan el predicado de categoria / rating y las que caen fuera
+      //    del viewport (culling de pintado). Nunca se purga la cache
+      //    normalizada (st.media).
+      for (i = 0; i < items.length; i++) {
+        item = items[i];
+        if (!item) continue;
+        lat = parseFloat(item.lat);
+        lng = parseFloat(item.lng);
+        if (!lat || !lng) continue;
+        esAlbumDestino = (item.origen === 'destino_album' || item.origen === 'album_grupo');
+        if (union) {
+          // ALBUM = agregado de album o media_type 'album', y se pinta SOLO
+          // con mediaAlbumes. La foto/video/audio individual de un album
+          // (origen 'album') NO es album: la manda mediaTypes.
+          esAlbum = (esAlbumDestino || item.media_type === 'album');
+          if (esAlbum) { if (!st.mediaAlbumes) continue; }
+          else if (!st.mediaTypes[item.media_type]) continue;
+        } else {
+          // Ruta legacy: el predicado es EXACTAMENTE el historico.
+          if (st.mediaVista === 'albumes' && !esAlbumDestino) continue;
+          if (!esAlbumDestino && !st.mediaTypes[item.media_type]) continue;
+        }
+        if (refIdx && !mediaPasaRating(item, refIdx)) continue;
+        if (!bounds.contains([lat, lng])) continue;
+        // 2) UN pin por destino (mediaOnePinPerDestino, default true).
         if (st.options.mediaOnePinPerDestino !== false && item.origen === 'destino' && item.origen_id) {
-          if (destinosVistos[item.origen_id]) return;
+          if (destinosVistos[item.origen_id]) continue;
           destinosVistos[item.origen_id] = true;
         }
         if (esAlbumDestino && item.origen_id) {
-          if (albumesVistos[item.origen_id]) return;
+          if (albumesVistos[item.origen_id]) continue;
           albumesVistos[item.origen_id] = true;
         }
+        cand.push(item);
+      }
+      if (!cand.length) return;
+      // 3) Importancia DESCENDENTE y 4) recorte a MEDIA_TOP_ITEMS.
+      cand.sort(function (a, b) { return mediaImportance(b) - mediaImportance(a); });
+      if (cand.length > MEDIA_TOP_ITEMS) cand.length = MEDIA_TOP_ITEMS;
+      // 5) Agrupacion en pixeles. st.map.project es puro (no toca la red).
+      var zoom = st.map.getZoom();
+      var grupos = mediaClusterize(cand, function (la, ln) {
+        return st.map.project([la, ln], zoom);
+      }, st.options.mediaClusterRadius || 40);
+      // 6) Recorte a TOPE_MEDIA_PINS marcadores y 7) pintado. Los grupos
+      //    llegan en orden de importancia de su representante, asi que el
+      //    recorte se queda con los grupos mas importantes.
+      var pintados = 0;
+      for (i = 0; i < grupos.length && pintados < TOPE_MEDIA_PINS; i++) {
         try {
-          var marker = L.marker([lat, lng], { icon: mediaIcon(item) });
-          marker.on('click', function () { openMediaDrawer(item); });
-          if (esAlbumDestino) {
-            marker.bindTooltip((item.album_titulo || '\u00c1lbum del destino') + ' \u00b7 ' + (parseInt(item.fotos_count, 10) || 0) + ' fotos');
-          }
-          marker.addTo(st.mediaLayer);
-          n++;
+          if (grupos[i].cnt === 1 && grupos[i].rep) paintMediaPin(grupos[i].rep);
+          else paintMediaCluster(grupos[i]);
+          pintados++;
         } catch (e) {
           log('media marker error', e);
         }
-      });
+      }
     }
 
     // H2: los botones se resuelven DENTRO de la raiz de medios que pasa el
@@ -2081,18 +2648,21 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     function syncMediaBtns() {
       if (!st.mediaRoot) return;
       // Registro visual VERAZ: con mediaEnabled=false NINGUN chip queda
-      // encendido (ni de tipo ni de vista); con true, los chips de tipo y de
-      // vista derivan de mediaTypes/mediaVista. Todo sale de la unica fuente
-      // de verdad (mediaEnabled).
+      // encendido; con true, los chips de tipo y de albumes derivan de
+      // mediaTypes / mediaAlbumes (union) o de mediaVista (legacy). Todo sale
+      // de la unica fuente de verdad (mediaEnabled).
+      // El item retirado data-media="all" (ADR-116 D1) NO se marca: si un host
+      // externo conserva el nodo, su clase queda como la deje el host y la rama
+      // del manejador sigue siendo inerte para el contrato.
       var base = !!st.mediaEnabled;
-      var btnAll = st.mediaRoot.querySelector('[data-media="all"]');
-      if (btnAll) btnAll.classList.toggle('on', base);
+      var union = unionOn();
       var btns = mediaBtns();
       for (var i = 0; i < btns.length; i++) {
         var t = btns[i].getAttribute('data-media');
         if (t === 'all') continue;
         if (t === 'albumes') {
-          btns[i].classList.toggle('on', base && st.mediaVista === 'albumes');
+          var onAlb = union ? !!st.mediaAlbumes : (st.mediaVista === 'albumes');
+          btns[i].classList.toggle('on', base && onAlb);
           continue;
         }
         btns[i].classList.toggle('on', base && st.mediaTypes[t] === true);
@@ -2109,10 +2679,16 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 
     function setMediaEnabled(v) {
       st.mediaEnabled = !!v;
-      if (st.mediaEnabled && mediaTiposActivos() === 0) {
+      // D4.ii: en modo union el interruptor principal ENCIENDE las cuatro
+      // categorias (foto, video, audio y albumes). APAGARLO no toca ninguna
+      // categoria: reencender recupera la combinacion previa. En la ruta legacy
+      // el guard es el historico, porque mediaCategoriasActivas() coincide con
+      // mediaTiposActivos() cuando no hay union.
+      if (st.mediaEnabled && (unionOn() || mediaCategoriasActivas() === 0)) {
         st.mediaTypes.foto = true;
         st.mediaTypes.video = true;
         st.mediaTypes.audio = true;
+        if (unionOn()) st.mediaAlbumes = true;
       }
       if (st.mediaEnabled) addMediaLayer(); else removeMediaLayer();
       syncMediaBtns();
@@ -2125,7 +2701,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       if (obj) {
         for (var k in obj) { if (has(obj, k) && has(st.mediaTypes, k)) st.mediaTypes[k] = !!obj[k]; }
       }
-      if (mediaTiposActivos() === 0) {
+      if (mediaCategoriasActivas() === 0) {
         st.mediaEnabled = false;
         removeMediaLayer();
       } else if (!st.mediaEnabled) {
@@ -2148,6 +2724,43 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       if (st.initialized) renderMedia();
     }
 
+    // Clic de CATEGORIA en modo union (T3.1 / T3.2, ADR-116 D2). Semantica
+    // aditiva de verdad:
+    //  - capa APAGADA: enciende la capa con SOLO la categoria pedida (nunca
+    //    "todo menos lo pedido", que era el defecto historico);
+    //  - capa ENCENDIDA: alterna solo esa categoria y NUNCA toca mediaVista.
+    // Si al apagar la ultima categoria el conjunto queda vacio, la capa se
+    // apaga (D4.iii: decide mediaCategoriasActivas(), no mediaTiposActivos()).
+    function clickMediaCategoriaUnion(tipo) {
+      var esAlb = (tipo === 'albumes');
+      if (!st.mediaEnabled) {
+        st.mediaTypes.foto = false;
+        st.mediaTypes.video = false;
+        st.mediaTypes.audio = false;
+        st.mediaAlbumes = false;
+        if (esAlb) st.mediaAlbumes = true;
+        else st.mediaTypes[tipo] = true;
+        st.mediaEnabled = true;
+        addMediaLayer();
+      } else if (esAlb) {
+        st.mediaAlbumes = !st.mediaAlbumes;
+        if (mediaCategoriasActivas() === 0) {
+          st.mediaEnabled = false;
+          removeMediaLayer();
+        }
+      } else {
+        st.mediaTypes[tipo] = !st.mediaTypes[tipo];
+        if (mediaCategoriasActivas() === 0) {
+          st.mediaEnabled = false;
+          removeMediaLayer();
+        }
+      }
+      syncMediaBtns();
+      renderMedia();
+      syncFiltroLabels();
+      fireFilterChange();
+    }
+
     function bindMediaControls() {
       if (st.mediaRoot || typeof document === 'undefined') return;
       var root = st.options.mediaControls;
@@ -2159,6 +2772,21 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         if (!b) return;
         if (typeof root.contains === 'function' && !root.contains(b)) return;
         var tipo = b.getAttribute('data-media');
+        if (unionOn()) {
+          if (tipo === 'all') {
+            // Rama conservada INERTE del item retirado (D1): un host externo
+            // que aun emita 'all' sigue alternando la capa, como hacia, pero
+            // el motor ya no marca ese nodo (syncMediaBtns).
+            setMediaEnabled(!st.mediaEnabled);
+            syncMediaBtns();
+            return;
+          }
+          if (tipo === 'albumes' || has(st.mediaTypes, tipo)) {
+            clickMediaCategoriaUnion(tipo);
+            return;
+          }
+          return;
+        }
         if (tipo === 'albumes') {
           // Vista de albumes: cualquier otro valor la apaga.
           setMediaVista(st.mediaVista === 'albumes' ? 'sueltos' : 'albumes');
@@ -2691,6 +3319,9 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         ratingMin: st.ratingMin,
         ratingMinPrevio: st.ratingMinPrevio,
         mediaVista: st.mediaVista,
+        mediaAlbumes: !!st.mediaAlbumes,
+        mediaUnion: unionOn(),
+        mediaCategoriasActivas: mediaCategoriasActivas(),
         mediaSoloMio: st.mediaSoloMio,
         visible: st.visible.slice(),
         map: st.map,
@@ -2700,6 +3331,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 
     function init(options) {
       if (options) st.options = mergeOptions(st.options, options);
+      // Invariante del modo union: con mediaUnion activo mediaVista NO
+      // selecciona dataset. Se fuerza 'sueltos' tambien al re-inicializar con
+      // la opcion ya activa (el estado pudo quedar en 'albumes' de una
+      // instancia creada antes de encender la union).
+      if (unionOn()) st.mediaVista = 'sueltos';
       wireDrawer();
       bindDrawerOnce();
       if (st.map) {
@@ -2755,10 +3391,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         // setMediaEnabled(true), y mediaVista llega ya asignada desde
         // restoreFiltro sin pasar por setMediaVista (nada de fetch espurio).
         if (!st.filtroRestaurado) st.mediaEnabled = !!o.mediaEnabled;
-        if (st.mediaEnabled && mediaTiposActivos() === 0) {
+        if (st.mediaEnabled && mediaCategoriasActivas() === 0) {
           st.mediaTypes.foto = true;
           st.mediaTypes.video = true;
           st.mediaTypes.audio = true;
+          if (unionOn()) st.mediaAlbumes = true;
         }
         st.mediaLayer = L.layerGroup();
         if (st.mediaEnabled) st.mediaLayer.addTo(st.map);
@@ -2796,6 +3433,18 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       getRatingMin: getRatingMin,
       setMediaVista: setMediaVista,
       getMediaVista: getMediaVista,
+      setMediaAlbumes: setMediaAlbumes,
+      getMediaAlbumes: getMediaAlbumes,
+      getMediaUnion: getMediaUnion,
+      // Etiqueta UNICA del canal de medios: los anfitriones dejan de derivar
+      // el texto por su cuenta (ADR-116 D6).
+      getMediaLabel: getMediaLabel,
+      // Normalizador/fusionador de las dos variantes de la capa: ningun host
+      // reimplementa la clave de identidad (ADR-116 D3.3).
+      mergeMedia: mergeMedia,
+      // Extras de apoyo a pruebas del clustering de medios (puros).
+      mediaImportance: mediaImportance,
+      mediaClusterize: mediaClusterize,
       setMediaSoloMio: setMediaSoloMio,
       getMediaSoloMio: getMediaSoloMio,
       toggleFilter: toggleFilter,
@@ -2849,6 +3498,10 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     getRatingMin: function () { return defaultInst().getRatingMin(); },
     setMediaVista: function (v) { return defaultInst().setMediaVista(v); },
     getMediaVista: function () { return defaultInst().getMediaVista(); },
+    setMediaAlbumes: function (v) { return defaultInst().setMediaAlbumes(v); },
+    getMediaAlbumes: function () { return defaultInst().getMediaAlbumes(); },
+    getMediaUnion: function () { return defaultInst().getMediaUnion(); },
+    getMediaLabel: function () { return defaultInst().getMediaLabel(); },
     setMediaSoloMio: function (v) { return defaultInst().setMediaSoloMio(v); },
     getMediaSoloMio: function () { return defaultInst().getMediaSoloMio(); },
     // getState() tambien vive en la facade por el mismo motivo que el resto de
@@ -2870,11 +3523,14 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     closeDrawer: function () { return defaultInst().closeDrawer(); },
     normalizePlace: normalizePlace,
     normalizeMedia: normalizeMedia,
+    mergeMedia: mergeMedia,
     esc: esc,
     starHtml: starHtml,
     photoPlaceholderHTML: photoPlaceholderHTML,
     haversineKm: haversineKm,
     clusterize: clusterize,
+    mediaImportance: mediaImportance,
+    mediaClusterize: mediaClusterize,
     filterMediaDefault: filterMediaDefault,
     filterMediaPropios: filterMediaPropios,
     mdCatLabel: mdCatLabel,

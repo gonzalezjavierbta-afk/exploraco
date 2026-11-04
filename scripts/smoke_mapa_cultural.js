@@ -1,7 +1,18 @@
-// Smoke de mapa-cultural.js (entrega 2026-09-19): valida la
-// normalizacion unificada (shape index + shape tipo=mapa), que
-// setPlaces antes de init no lanza, el clustering por proximidad a
-// 40px y el filtro default de la capa multimedia (excluye
+// Smoke de mapa-cultural.js. Version cubierta: 1.6.0 (ADR-116).
+// Cubre DOS rutas del motor, y conviven a proposito en este archivo:
+//  - la instancia LEGACY (sin la opcion mediaUnion, default false): es la
+//    regresion historica del mapa de comunidad.html/index.html y NO se
+//    toca; si el modo union se comiera el comportamiento viejo, los
+//    bloques (1)-(29) lo delatarian;
+//  - instancias SEPARADAS con mediaUnion:true (bloques 30-38): aditividad
+//    de los chips, fusion mergeMedia, importancia y clustering de media,
+//    topes de pintado, etiqueta unica, snapshot de 7 claves y predicado
+//    de categorias.
+// El modo union es OPT-IN, asi que las dos rutas deben seguir vivas: por
+// eso nada de lo nuevo reutiliza las instancias legacy.
+// Valida ademas la normalizacion unificada (shape index + shape
+// tipo=mapa), que setPlaces antes de init no lanza, el clustering por
+// proximidad a 40px y el filtro default de la capa multimedia (excluye
 // origen='album', incluye destino/destino_album con slug coincidente).
 // Patron vm de los smokes existentes del repo.
 const fs = require('fs');
@@ -39,12 +50,19 @@ check('API: window.MapaCultural expuesto', !!MC);
 // 1.4.2 es un bump FUNCIONAL de patch: el toggle rapido de Directorio pasa a
 // ser un ver/no-ver real (syncCatBtns reconcilia los chips con activeCat) y
 // en Medios etiqueta/chips se derivan de mediaEnabled.
-// Si el motor vuelve a 1.4.1 o sube de 1.4.2, el smoke debe detectar la
-// regresion.
-check('API: version 1.5.0', MC && MC.version === '1.5.0');
+// 1.5.0 sumo el pin de usuario y la paridad de su CSS.
+// 1.6.0 (ADR-116) es un bump FUNCIONAL grande: modo UNION opt-in
+// (mediaUnion), cuarta categoria aditiva mediaAlbumes, mergeMedia, la
+// importancia y el clustering propio de media con sus topes de pintado, la
+// etiqueta unica getMediaLabel y el snapshot de 7 claves.
+// Si el motor vuelve a 1.5.0 (o salta a otra version), el smoke debe
+// detectar la regresion.
+check('API: version 1.6.0', MC && MC.version === '1.6.0');
 ['create', 'init', 'refresh', 'setPlaces', 'setMedia', 'setMediaEnabled',
  'setMediaTypes', 'getMap', 'getState', 'openDrawer', 'closeDrawer', 'normalizePlace',
- 'normalizeMedia', 'esc', 'starHtml', 'photoPlaceholderHTML', 'haversineKm']
+ 'normalizeMedia', 'esc', 'starHtml', 'photoPlaceholderHTML', 'haversineKm',
+ 'setMediaAlbumes', 'getMediaAlbumes', 'getMediaUnion', 'getMediaLabel',
+ 'mergeMedia', 'mediaImportance', 'mediaClusterize']
   .forEach(function (fn) {
     check('API: existe ' + fn, MC && typeof MC[fn] === 'function');
   });
@@ -155,7 +173,8 @@ check('mediaFilter default: capa filtra estricto (comunidad)', instStrict.getSta
 // ---- (extra) instancia: metodos del contrato -----------------------
 ['init', 'refresh', 'destroy', 'setPlaces', 'setMedia', 'setMediaEnabled',
  'setMediaTypes', 'setRatingMin', 'getRatingMin', 'setMediaVista', 'getMediaVista',
- 'setMediaSoloMio', 'getMediaSoloMio', 'toggleFilter', 'isFilterOn',
+ 'setMediaSoloMio', 'getMediaSoloMio', 'setMediaAlbumes', 'getMediaAlbumes',
+ 'getMediaUnion', 'getMediaLabel', 'toggleFilter', 'isFilterOn',
  'onFilterChange', 'getMap', 'getState', 'filtroSnapshot', 'openDrawer', 'closeDrawer',
  'geolocate', 'resetColombia'].forEach(function (fn) {
   check('instancia: metodo ' + fn, inst && typeof inst[fn] === 'function');
@@ -225,7 +244,16 @@ function mkMapStub() {
     __layers: [],
     setView: function () { return this; },
     getZoom: function () { return 14; },
-    project: function () { return { x: 0, y: 0 }; },
+    // Proyeccion REALISTA, no {x:0,y:0}. El motor proyecta a PIXELES para
+    // agrupar (rejilla de 40 px), asi que un stub plano metia todos los items
+    // en la misma celda y dos pines de media distintos colapsaban en un
+    // cluster. Se usa la misma escala que el smoke en su seccion de
+    // clustering: 100000 px por grado. El motor llama project([lat,lng], z).
+    project: function (ll) {
+      var la = Number(ll && ll[0]);
+      var ln = Number(ll && ll[1]);
+      return { x: ln * 100000, y: la * 100000 };
+    },
     on: function (t, fn) { this.__handlers[t] = fn; return this; },
     off: function () { return this; },
     __fire: function (t) {
@@ -259,8 +287,11 @@ function layerStub() {
     openPopup: function () { return this; }
   };
 }
-function mkMarker() {
+function mkMarker(ll) {
   return {
+    // Coordenada con la que se pinto el marcador: es lo que permite afirmar
+    // QUE item se pinto (y cual no) en las pruebas del predicado de media.
+    __latlng: ll,
     on: function () { return this; },
     addTo: function (layer) {
       if (layer && typeof layer.addLayer === 'function') layer.addLayer(this);
@@ -274,12 +305,15 @@ function mkMarker() {
 }
 var L2 = {
   _markers: [],
+  _icons: [],
   _tileCalls: 0,
   map: function () { return mkMapStub(); },
   tileLayer: function () { L2._tileCalls++; return { addTo: function () { return this; } }; },
   layerGroup: function () { var g = layerStub(); groups.push(g); return g; },
-  marker: function () { var m = mkMarker(); L2._markers.push(m); return m; },
-  divIcon: function () { return {}; }
+  marker: function (ll) { var m = mkMarker(ll); L2._markers.push(m); return m; },
+  // Se guardan los iconos: el html del cluster de media lleva el cnt, que es
+  // la unica forma observable de comprobar el recorte a 600 items.
+  divIcon: function (o) { L2._icons.push(o); return {}; }
 };
 
 var timerSeq = 0;
@@ -295,7 +329,16 @@ function flushTimers() {
   }
 }
 
-var sandbox2 = { window: {}, console: console, document: doc, L: L2, setTimeout: fakeSetTimeout, clearTimeout: fakeClearTimeout };
+// Contador de RED del sandbox: el motor NUNCA hace fetch (la red es cosa del
+// anfitrion). Se cuenta para poder afirmar que setMedia / setMediaTypes /
+// setMediaAlbumes / restore no disparan peticiones.
+var netCalls = { fetch: 0, xhr: 0 };
+var sandbox2 = {
+  window: {}, console: console, document: doc, L: L2,
+  setTimeout: fakeSetTimeout, clearTimeout: fakeClearTimeout,
+  fetch: function () { netCalls.fetch++; return { then: function () { return this; } }; },
+  XMLHttpRequest: function () { netCalls.xhr++; }
+};
 vm.createContext(sandbox2);
 vm.runInContext(src, sandbox2, { filename: 'mapa-cultural.js' });
 var MC2 = sandbox2.window.MapaCultural;
@@ -590,7 +633,12 @@ function mfToggles(html) { return countRe(/data-mf-toggle="(dir|med|punt)"/g, ht
 function mfPanels(html) { return countRe(/data-mf-panel="(dir|med|punt)"/g, html); }
 function mfPanelsHidden(html) { return countRe(/data-mf-panel="(dir|med|punt)"[^>]*\shidden\b/g, html); }
 function mfLabels(html) { return countRe(/class="mf-drop-label" data-mf-label="(dir|med|punt)"/g, html); }
-function mfMediaItems(html) { return countRe(/data-media="[^"]+"/g, html); }
+// Cuenta SOLO los items de markup (<button ... data-media="X">). Antes el
+// regex contaba cualquier aparicion del atributo y se colaba la referencia de
+// JS de index.html (bar.querySelector('[data-media="albumes"]')), asi que el
+// numero no describia el markup.
+function mfMediaItems(html) { return countRe(/<button[^>]*\bdata-media="[^"]+"/g, html); }
+function mfMediaAll(html) { return countRe(/data-media="all"/g, html); }
 function mfFreeButtons(html) { return countRe(/class="mf-btn(?=["\s])/g, html); }
 
 // Paneles reales por conteo de <div>/</div> anidados. Devuelve true si el
@@ -635,7 +683,14 @@ pages.forEach(function (pg) {
   check('markup ' + n + ': 3 data-mf-toggle (dir/med/punt)', mfToggles(h) === 3);
   check('markup ' + n + ': 3 data-mf-panel con hidden', mfPanels(h) === 3 && mfPanelsHidden(h) === 3);
   check('markup ' + n + ': 3 data-mf-label', mfLabels(h) === 3);
-  check('markup ' + n + ': 5 items [data-media] con albumes', mfMediaItems(h) === 5 && /data-media="albumes"/.test(h));
+  // REPLACED (no borrado): eran 5 items [data-media] porque el markup de
+  // index.html traia ademas el item "Todos" (data-media="all"). ADR-116 D1 lo
+  // RETIRA: el conjunto pasa a ser aditivo y el boton principal es el unico
+  // interruptor, asi que el conteo real del archivo hoy es 4 en las dos
+  // paginas (foto/video/audio/albumes) y 'all' no aparece NINGUNA vez
+  // (ADR-116 V2). El conteo se deriva del archivo real, no de memoria.
+  check('markup ' + n + ': 4 items [data-media] con albumes', mfMediaItems(h) === 4 && /data-media="albumes"/.test(h));
+  check('markup ' + n + ': 0 items [data-media="all"] (retirado en ADR-116 D1)', mfMediaAll(h) === 0);
   // step="0.2": el markup debe seguir declarando el paso REAL del motor. Con
   // 0.5 el range no podia ofrecer los umbrales intermedios que el motor v1.4.0
   // acepta (guarda de contrato: markup y setRatingMin no pueden divergir).
@@ -969,7 +1024,12 @@ function mkLS() {
   return ls;
 }
 function mkSand3(ls) {
-  var s = { window: {}, console: console, document: doc, L: L2, setTimeout: fakeSetTimeout, clearTimeout: fakeClearTimeout };
+  var s = {
+    window: {}, console: console, document: doc, L: L2,
+    setTimeout: fakeSetTimeout, clearTimeout: fakeClearTimeout,
+    // La restauracion de la preferencia tampoco puede tocar la red.
+    fetch: function () { netCalls.fetch++; return { then: function () { return this; } }; }
+  };
   if (ls) s.localStorage = ls;
   vm.createContext(s);
   vm.runInContext(src, s, { filename: 'mapa-cultural.js' });
@@ -1289,10 +1349,12 @@ check('facade: mutar lo devuelto NO pisa el estado interno',
   MC2.getState().mediaTypes.foto !== 'CONTAMINADO' && MC2.getState().places.indexOf('CONTAMINADO') === -1);
 // filtroSnapshot() vive en la INSTANCIA (es parte del contrato v1.4.0, junto
 // a getState) y debe ser coherente con ella: mismo shape, mismos valores.
+// v1.6.0 la amplia a 7 claves; las 6 historicas siguen siendo obligatorias.
 var fsnap = facadeInst.filtroSnapshot();
-check('instancia: filtroSnapshot() tiene las 6 llaves del contrato',
+check('instancia: filtroSnapshot() conserva las 6 llaves historicas y anade mediaAlbumes',
   ['activeCat', 'ratingMin', 'mediaEnabled', 'mediaTypes', 'mediaVista', 'mediaSoloMio']
-    .every(function (k) { return fsnap.hasOwnProperty(k); }));
+    .every(function (k) { return fsnap.hasOwnProperty(k); })
+  && fsnap.hasOwnProperty('mediaAlbumes'));
 check('instancia: filtroSnapshot() coincide con getState()',
   fsnap.activeCat === facadeSt.activeCat && fsnap.ratingMin === facadeSt.ratingMin
   && fsnap.mediaEnabled === facadeSt.mediaEnabled && fsnap.mediaVista === facadeSt.mediaVista
@@ -1436,7 +1498,12 @@ var aOff = pathA.getState();
 check('medios via API: toggleFilter(media) apaga y conserva la vista',
   aOff.mediaEnabled === false && aOff.mediaVista === 'albumes');
 check('medios via API: con la capa oculta NINGUN chip encendido', chipsAllOff(chipsA));
-check('medios via API: con la capa oculta la etiqueta NO dice Albumes', lblA._lbl.textContent === 'Todos');
+// D6 (ADR-116): la etiqueta del canal de medios tiene UNA sola
+// implementacion (getMediaLabel) y con la capa apagada dice 'Ninguno', no
+// 'Todos': decir "todos" sin nada encendido es falso. Se conserva el
+// aserto historico ("NO dice Albumes") con el valor nuevo del contrato.
+check('medios via API: con la capa oculta la etiqueta NO dice Albumes sino Ninguno',
+  lblA._lbl.textContent === 'Ninguno' && lblA._lbl.textContent !== '\u00c1lbumes');
 
 groups.length = 0;
 var chipsB = mkMediaChips();
@@ -1451,7 +1518,8 @@ check('medios via panel: el item all deja EXACTAMENTE el mismo estado que la API
   bOff.mediaEnabled === aOff.mediaEnabled && bOff.mediaVista === aOff.mediaVista
   && bOff.mediaEnabled === false && bOff.mediaVista === 'albumes');
 check('medios via panel: con la capa oculta NINGUN chip encendido', chipsAllOff(chipsB));
-check('medios via panel: la etiqueta NO dice Albumes', lblB._lbl.textContent === 'Todos');
+check('medios via panel: la etiqueta NO dice Albumes sino Ninguno (D6)',
+  lblB._lbl.textContent === 'Ninguno' && lblB._lbl.textContent !== '\u00c1lbumes');
 // Reencender por ambos caminos vuelve al MISMO estado (capa on, vista albumes).
 pathA.toggleFilter('media');
 clickM({ target: chipsB[0] });
@@ -1464,5 +1532,376 @@ check('medios: con la capa on la etiqueta de ambos caminos dice Albumes',
   lblA._lbl.textContent === '\u00c1lbumes' && lblB._lbl.textContent === '\u00c1lbumes');
 check('medios: isFilterOn(media) sigue a mediaEnabled',
   pathA.isFilterOn('media') === true && pathB.isFilterOn('media') === true);
+
+// =====================================================================
+// (30) ADR-116 / v1.6.0 - EL MODO UNION ES OPT-IN: LA RUTA LEGACY SIGUE VIVA
+// TODO lo anterior corre SIN mediaUnion, asi que es la regresion real del
+// mapa de comunidad.html/index.html. Aqui se afirma el contrato de la
+// opcion: sin ella getMediaUnion() es false, mediaVista sigue eligiendo
+// dataset y mediaAlbumes, aunque valga true, es INERTE.
+// =====================================================================
+check('ADR-116: sin la opcion getMediaUnion() es false (opt-in)',
+  pathA.getMediaUnion() === false && MC2.getMediaUnion() === false);
+check('ADR-116: en legacy mediaAlbumes vale true pero NO cuenta como categoria',
+  pathA.getState().mediaAlbumes === true
+  && pathA.getState().mediaVista === 'albumes'
+  && pathA.getState().mediaCategoriasActivas === 3);
+check('ADR-116: en legacy getMediaLabel() sigue diciendo Albumes con esa vista',
+  pathA.getMediaLabel() === '\u00c1lbumes');
+
+// =====================================================================
+// (31) ADR-116 / V4 - ADITIVIDAD DE LOS CHIPS EN MODO UNION
+// Instancia SEPARADA con mediaUnion:true. La legacy de arriba no se toca:
+// si el modo union se comiera la ruta historica, los bloques (1)-(29) lo
+// delatarian. Semantica (D4): con la capa apagada el primer clic enciende
+// SOLO la categoria pedida; con la capa encendida el clic alterna esa
+// categoria y nunca toca mediaVista.
+// =====================================================================
+function mkMediaChips4() {
+  return [mkMediaChip('foto'), mkMediaChip('video'), mkMediaChip('audio'), mkMediaChip('albumes')];
+}
+groups.length = 0;
+var chipsU = mkMediaChips4();
+var rootU = mkMediaRootM(chipsU);
+var uniInst = MC2.create({
+  map: 'mm-personal-map',
+  mediaFilter: false,
+  mediaUnion: true,
+  mediaControls: rootU,
+  usuario: { id: 7, nombre: 'Ana' }
+});
+var clickU = rootU.__handlers.click;
+var u0 = uniInst.getState();
+check('union: arranque en sueltos, capa apagada y solo albumes en su default',
+  uniInst.getMediaUnion() === true && u0.mediaEnabled === false
+  && u0.mediaTypes.foto === false && u0.mediaTypes.video === false
+  && u0.mediaTypes.audio === false && u0.mediaAlbumes === true
+  && uniInst.getMediaVista() === 'sueltos');
+clickU({ target: chipsU[1] }); // video
+var uA = uniInst.getState();
+check('union aditividad: clic en video con la capa apagada -> solo video y capa ENCENDIDA',
+  uA.mediaEnabled === true && uA.mediaTypes.video === true
+  && uA.mediaTypes.foto === false && uA.mediaTypes.audio === false && uA.mediaAlbumes === false);
+check('union aditividad: el unico chip encendido es el de video',
+  chipsU[1].classList.contains('on') && countOn(chipsU) === 1);
+clickU({ target: chipsU[0] }); // foto
+var uB = uniInst.getState();
+check('union aditividad: segundo clic en foto SUMA (foto y video true)',
+  uB.mediaEnabled === true && uB.mediaTypes.foto === true && uB.mediaTypes.video === true
+  && uB.mediaTypes.audio === false && uB.mediaAlbumes === false && countOn(chipsU) === 2);
+clickU({ target: chipsU[3] }); // albumes
+clickU({ target: chipsU[2] }); // audio
+var uC = uniInst.getState();
+check('union aditividad: con las cuatro encendidas la etiqueta es Todo',
+  uC.mediaCategoriasActivas === 4 && uniInst.getMediaLabel() === 'Todo');
+// Apagar foto, video y audio deja la capa ENCENDIDA porque albumes sigue on.
+clickU({ target: chipsU[0] });
+clickU({ target: chipsU[1] });
+clickU({ target: chipsU[2] });
+var uD = uniInst.getState();
+check('union aditividad: apagar foto/video/audio deja la capa ENCENDIDA (solo albumes)',
+  uD.mediaEnabled === true && uD.mediaAlbumes === true
+  && uD.mediaTypes.foto === false && uD.mediaTypes.video === false && uD.mediaTypes.audio === false
+  && uD.mediaCategoriasActivas === 1 && countOn(chipsU) === 1);
+clickU({ target: chipsU[3] });
+var uE = uniInst.getState();
+check('union aditividad: apagar la CUARTA categoria apaga la capa (0 activas)',
+  uE.mediaEnabled === false && uE.mediaCategoriasActivas === 0 && countOn(chipsU) === 0);
+uniInst.toggleFilter('media');
+var uF = uniInst.getState();
+check('union aditividad: el boton principal encendiendo pone las CUATRO a true',
+  uF.mediaEnabled === true && uF.mediaTypes.foto === true && uF.mediaTypes.video === true
+  && uF.mediaTypes.audio === true && uF.mediaAlbumes === true && uF.mediaCategoriasActivas === 4);
+
+// =====================================================================
+// (32) ADR-116 / V6 - IMPORTANCIA Y CLUSTERING DE MEDIA (puro)
+// mediaImportance = votos + 2*rating_promedio + 0.5*min(fotos,20).
+// mediaClusterize agrupa por REJILLA de celdas de 40 px: se prueban las
+// funciones exportadas, sin mapa ni Leaflet.
+// =====================================================================
+check('mediaImportance: ceros -> 0',
+  MC.mediaImportance({ votos: 0, rating_promedio: 0, fotos_count: 0 }) === 0);
+check('mediaImportance: votos 3 + rating 4.5 -> 12',
+  MC.mediaImportance({ votos: 3, rating_promedio: 4.5, fotos_count: 0 }) === 12);
+check('mediaImportance: 8 fotos -> 4',
+  MC.mediaImportance({ votos: 0, rating_promedio: 0, fotos_count: 8 }) === 4);
+check('mediaImportance: el tope de fotos es 20 (0.5*20 = 10, fotos 50 no aporta mas)',
+  numEq(MC.mediaImportance({ votos: 0, rating_promedio: 0, fotos_count: 20 }), 10)
+  && numEq(MC.mediaImportance({ votos: 0, rating_promedio: 0, fotos_count: 50 }), 10));
+check('mediaImportance: basura o campos ausentes -> 0 (no NaN)',
+  MC.mediaImportance({ votos: 'x', rating_promedio: null, fotos_count: undefined }) === 0
+  && MC.mediaImportance({}) === 0);
+// Proyeccion a pixeles: 100000 px por grado, la MISMA escala que usa el
+// smoke en su seccion de clustering.
+var proyectoPx = function (lat, lng) { return { x: lng * 100000, y: lat * 100000 }; };
+// Dos items a 10 px: 4.7001/-74.0603 y 4.7002/-74.0602. Se eligen coordenadas
+// que caen en la MISMA celda de la rejilla (x en [-7406040,-7406000), y en
+// [470000,470040)); con "puntos a ojo" el artefacto de frontera de celda,
+// que el motor documenta y acepta, haria el test inestable.
+var mediaCerca = [
+  { key: 'u1', lat: 4.7001, lng: -74.0603, votos: 0, rating_promedio: 0, fotos_count: 0 },
+  { key: 'u2', lat: 4.7002, lng: -74.0602, votos: 3, rating_promedio: 4.5, fotos_count: 0 }
+];
+var grCerca = MC.mediaClusterize(mediaCerca, proyectoPx, 40);
+check('mediaClusterize: 2 items a pocos px -> 1 grupo con cnt 2',
+  grCerca.length === 1 && grCerca[0].cnt === 2);
+check('mediaClusterize: rep = el de mayor importancia',
+  grCerca[0].rep === mediaCerca[1] && numEq(MC.mediaImportance(grCerca[0].rep), 12));
+check('mediaClusterize: members ordenado por importancia DESCENDENTE',
+  grCerca[0].members.length === 2 && grCerca[0].members[0] === mediaCerca[1]
+  && grCerca[0].members[1] === mediaCerca[0]);
+check('mediaClusterize: centroide entre los dos items',
+  numEq(grCerca[0].lat, 4.70015) && numEq(grCerca[0].lng, -74.06025));
+var mediaLejos = [
+  { key: 'u3', lat: 4.0, lng: -74.0, votos: 1, rating_promedio: 0, fotos_count: 0 },
+  { key: 'u4', lat: 3.0, lng: -75.0, votos: 0, rating_promedio: 0, fotos_count: 0 }
+];
+var grLejos = MC.mediaClusterize(mediaLejos, proyectoPx, 40);
+check('mediaClusterize: 2 items lejanos -> 2 grupos', grLejos.length === 2);
+var mediaTres = [
+  { key: 'w1', lat: 4.7001, lng: -74.0603, votos: 1, rating_promedio: 0, fotos_count: 0 },
+  { key: 'w2', lat: 4.7001, lng: -74.0603, votos: 9, rating_promedio: 0, fotos_count: 0 },
+  { key: 'w3', lat: 4.7001, lng: -74.0603, votos: 4, rating_promedio: 2, fotos_count: 0 }
+];
+var grTres = MC.mediaClusterize(mediaTres, proyectoPx, 40);
+check('mediaClusterize: con 3 miembros el orden es 9 > 8 > 1 de importancia',
+  grTres.length === 1 && grTres[0].members[0].key === 'w2'
+  && grTres[0].members[1].key === 'w3' && grTres[0].members[2].key === 'w1'
+  && grTres[0].rep === mediaTres[1]);
+
+// =====================================================================
+// (33) ADR-116 / V7 - ETIQUETA UNICA DEL CANAL DE MEDIOS
+// getMediaLabel() es la unica implementacion (D6): apagada -> 'Ninguno';
+// union encendida -> nombres de las categorias activas, 'Todo' con las
+// cuatro y lista con ', ' + ' + ' antes de la ultima en el resto; con
+// mediaSoloMio antepone 'Mio - ' y colapsa 'Todo'/'Ninguno' en 'Solo mio'.
+// =====================================================================
+uniInst.setMediaEnabled(false);
+check('etiqueta: union con la capa apagada dice Ninguno (aunque las 4 sigan marcadas)',
+  uniInst.getMediaLabel() === 'Ninguno' && uniInst.getState().mediaCategoriasActivas === 4);
+uniInst.setMediaEnabled(true); // el boton principal rellena las cuatro
+check('etiqueta: union con las cuatro dice Todo', uniInst.getMediaLabel() === 'Todo');
+uniInst.setMediaAlbumes(false);
+uniInst.setMediaTypes({ foto: true, video: false, audio: false });
+check('etiqueta: una sola categoria dice su nombre', uniInst.getMediaLabel() === 'Fotos');
+uniInst.setMediaTypes({ video: true });
+check('etiqueta: dos categorias se unen con " + " antes de la ultima',
+  uniInst.getMediaLabel() === 'Fotos + Videos');
+uniInst.setMediaTypes({ audio: true });
+check('etiqueta: tres categorias -> "Fotos, Videos + Audios"',
+  uniInst.getMediaLabel() === 'Fotos, Videos + Audios');
+uniInst.setMediaAlbumes(true);
+check('etiqueta: con albumes vuelve a ser Todo', uniInst.getMediaLabel() === 'Todo');
+uniInst.setMediaSoloMio(true);
+check('etiqueta: con mediaSoloMio y Todo el motor dice Solo mio',
+  uniInst.getMediaLabel() === 'Solo mio');
+uniInst.setMediaAlbumes(false);
+uniInst.setMediaTypes({ video: false, audio: false });
+check('etiqueta: con mediaSoloMio y una categoria el prefijo es "Mio - <categoria>"',
+  uniInst.getMediaLabel() === 'Mio \u00b7 Fotos');
+uniInst.setMediaSoloMio(false);
+check('etiqueta: al soltar mediaSoloMio vuelve el texto sin prefijo',
+  uniInst.getMediaLabel() === 'Fotos');
+
+// =====================================================================
+// (34) ADR-116 / V6 - TOPES DE PINTADO (600 items y 300 marcadores)
+// Los topes son de PINTADO, no de datos: st.media conserva todo lo
+// recibido. El recorte a 600 se mide en el html del icono del cluster
+// (cnt), que es lo unico observable sin tocar el motor.
+// =====================================================================
+groups.length = 0;
+var topesInst = MC2.create({ map: 'mm-personal-map', mediaFilter: false, mediaUnion: true });
+var topesLayer = groups[groups.length - 1];
+var mismosItems = [];
+for (var ti = 0; ti < 601; ti++) {
+  mismosItems.push({
+    origen: 'album', origen_id: 'top-a-' + ti, media_url: 'top-a-' + ti,
+    media_type: 'foto', lat: 4.6, lng: -74.1
+  });
+}
+topesInst.setMedia(mismosItems);
+L2._icons.length = 0;
+topesInst.setMediaTypes({ foto: true, video: false, audio: false });
+var stTope = topesInst.getState();
+check('topes: 601 items normalizados se conservan TODOS en el estado', stTope.media.length === 601);
+check('topes: 601 items en la misma celda -> 1 marcador de cluster', topesLayer.__added.length === 1);
+var iconoTope = L2._icons.length ? L2._icons[L2._icons.length - 1] : null;
+var cntTope = iconoTope ? (String(iconoTope.html || '').match(/mc-media-cluster-num">(\d+)</) || [])[1] : '';
+check('topes: el recorte deja 600 items en el cluster', String(cntTope) === '600');
+var lejosItems = [];
+for (var tj = 0; tj < 601; tj++) {
+  lejosItems.push({
+    origen: 'album', origen_id: 'top-b-' + tj, media_url: 'top-b-' + tj,
+    media_type: 'foto', lat: 4 + tj * 0.01, lng: -74.1
+  });
+}
+topesInst.setMedia(lejosItems);
+check('topes: el segundo setMedia tampoco purga el estado', topesInst.getState().media.length === 601);
+check('topes: 601 items en celdas distintas -> exactamente 300 marcadores',
+  topesLayer.__added.length === 300);
+check('topes: el pintado nunca supera 300 marcadores', topesLayer.__added.length <= 300);
+
+// =====================================================================
+// (35) ADR-116 / V5 - FUSION mergeMedia (union de las dos variantes)
+// Orden NORMATIVO (D5.2): primero la tanda default y despues la de
+// vista=albumes, con "primer valor no vacio" campo a campo. Una fila
+// secundaria NUNCA se descarta: solo cede los campos ya rellenos.
+// =====================================================================
+var fusDefault = [
+  { media_id: 501, origen: 'destino', origen_id: 'fu-a', media_url: 'fu-a-1', media_type: 'foto', votos: 3, rating_promedio: 4.5 }
+];
+var fusAlbum = [
+  { media_id: 501, origen: 'destino', origen_id: 'fu-a', media_url: 'fu-a-1', media_type: 'foto', votos: 99, rating_promedio: 1, fotos_count: 8, album_titulo: 'Album A' }
+];
+var fusMismo = MC.mergeMedia(fusDefault, fusAlbum);
+check('mergeMedia: la misma clave en las dos tandas da UNA fila sin perder campos',
+  fusMismo.length === 1 && fusMismo[0].album_titulo === 'Album A' && fusMismo[0].media_url === 'fu-a-1');
+check('mergeMedia: el orden normativo NO deja que el album pise votos/rating',
+  fusMismo[0].votos === 3 && numEq(fusMismo[0].rating_promedio, 4.5));
+check('mergeMedia: fotos_count SI llega del album', fusMismo[0].fotos_count === 8);
+var fusTotal = MC.mergeMedia(
+  [{ media_id: 1, origen: 'destino', origen_id: 't1', media_url: 't1', media_type: 'foto' },
+    { media_id: 2, origen: 'destino', origen_id: 't2', media_url: 't2', media_type: 'foto' }],
+  [{ media_id: 2, origen: 'destino', origen_id: 't2', media_url: 't2', media_type: 'foto' },
+    { media_id: 3, origen: 'destino', origen_id: 't3', media_url: 't3', media_type: 'foto' }]
+);
+check('mergeMedia: total = union por origen+media_id (2+2 con 1 compartida -> 3)', fusTotal.length === 3);
+var fusGrupo = MC.mergeMedia(
+  [{ origen: 'album_grupo', origen_id: 'ag-1', media_url: 'ag-1-a', media_type: 'foto' }],
+  [{ origen: 'album_grupo', origen_id: 'ag-1', media_url: 'ag-1-b', media_type: 'foto', fotos_count: 5 }]
+);
+check('mergeMedia: fila sin media_id de album_grupo se deduplica por origen+origen_id',
+  fusGrupo.length === 1 && fusGrupo[0].fotos_count === 5);
+var fusDa = MC.mergeMedia(
+  [{ origen: 'destino_album', origen_id: 'da-1', media_url: 'da-1-a', media_type: 'album' }],
+  [{ origen: 'destino_album', origen_id: 'da-1', media_url: 'da-1-b', media_type: 'album' }]
+);
+check('mergeMedia: destino_album sin id tambien deduplica por origen+origen_id', fusDa.length === 1);
+var fusAlbumFotos = MC.mergeMedia([
+  { origen: 'album', origen_id: 'alb-1', media_url: 'al-1', media_type: 'foto' },
+  { origen: 'album', origen_id: 'alb-1', media_url: 'al-2', media_type: 'foto' }
+]);
+check('mergeMedia: dos fotos del mismo album con media_url distinta NO se colapsan',
+  fusAlbumFotos.length === 2);
+var fusVaciosOk = true;
+var fusVacios = ['null', '', 'undefined'];
+for (var fv = 0; fv < fusVacios.length; fv++) {
+  var fusV = MC.mergeMedia(
+    [{ media_id: 700 + fv, origen: 'destino', origen_id: 'v-' + fv, media_url: 'v-' + fv, media_type: 'foto', album_titulo: fusVacios[fv] }],
+    [{ media_id: 700 + fv, origen: 'destino', origen_id: 'v-' + fv, media_url: 'v-' + fv, media_type: 'foto', album_titulo: 'REAL' }]
+  );
+  if (fusV.length !== 1 || fusV[0].album_titulo !== 'REAL') fusVaciosOk = false;
+}
+check('mergeMedia: "null", "" y "undefined" cuentan como vacio (la secundaria rellena)', fusVaciosOk);
+var fusAusente = MC.mergeMedia(
+  [{ media_id: 710, origen: 'destino', origen_id: 'v-a', media_url: 'v-a', media_type: 'foto' }],
+  [{ media_id: 710, origen: 'destino', origen_id: 'v-a', media_url: 'v-a', media_type: 'foto', album_titulo: 'REAL' }]
+);
+check('mergeMedia: el campo ausente tambien es vacio', fusAusente.length === 1 && fusAusente[0].album_titulo === 'REAL');
+var fusCero = MC.mergeMedia(
+  [{ media_id: 711, origen: 'destino', origen_id: 'v-c', media_url: 'v-c', media_type: 'foto', votos: 0 }],
+  [{ media_id: 711, origen: 'destino', origen_id: 'v-c', media_url: 'v-c', media_type: 'foto', votos: 9 }]
+);
+check('mergeMedia: el 0 numerico NO es vacio (no lo pisa la secundaria)', fusCero[0].votos === 0);
+
+// =====================================================================
+// (36) ADR-116 / V7 - SNAPSHOT DE 7 CLAVES Y COMPATIBILIDAD CON EL DE 6
+// filtroSnapshot gana mediaAlbumes. Un snapshot viejo de 6 claves debe
+// seguir siendo legible: mediaAlbumes cae a su default true. En modo
+// union un mediaVista 'albumes' persistido NO reintroduce la exclusion.
+// =====================================================================
+var snapU = uniInst.filtroSnapshot();
+check('snapshot: 7 claves e incluye mediaAlbumes',
+  Object.keys(snapU).length === 7 && snapU.hasOwnProperty('mediaAlbumes')
+  && ['activeCat', 'ratingMin', 'mediaEnabled', 'mediaTypes', 'mediaVista', 'mediaAlbumes', 'mediaSoloMio']
+    .every(function (k) { return snapU.hasOwnProperty(k); }));
+var SNAP6 = {
+  activeCat: 'hostal',
+  ratingMin: 3.4,
+  mediaEnabled: true,
+  mediaTypes: { foto: true, video: true, audio: false },
+  mediaVista: 'albumes',
+  mediaSoloMio: false
+};
+var KEY_SNAP6 = 'mc_smoke_snap6';
+var lsS6 = mkLS();
+lsS6.setItem(KEY_SNAP6, JSON.stringify(SNAP6));
+var MC6 = mkSand3(lsS6);
+groups.length = 0;
+var legR6 = MC6.create({ map: 'mm-personal-map', mediaFilter: false, persistKey: KEY_SNAP6 });
+check('snapshot 6 claves: en LEGACY se restaura como siempre (vista albumes, umbral y tipos)',
+  legR6.getMediaVista() === 'albumes' && numEq(legR6.getRatingMin(), 3.4)
+  && legR6.getState().mediaTypes.foto === true && legR6.getState().mediaTypes.audio === false);
+check('snapshot 6 claves: la clave nueva cae a su default true',
+  legR6.getState().mediaAlbumes === true && legR6.filtroSnapshot().mediaAlbumes === true);
+lsS6.setItem(KEY_SNAP6, JSON.stringify(SNAP6)); // el init anterior ya republico su estado
+groups.length = 0;
+var uniR6 = MC6.create({ map: 'mm-personal-map', mediaFilter: false, mediaUnion: true, persistKey: KEY_SNAP6 });
+check('snapshot 6 claves: en UNION mediaAlbumes sigue cayendo a true',
+  uniR6.getState().mediaAlbumes === true);
+check('snapshot 6 claves: en UNION un mediaVista albumes persistido queda en sueltos',
+  uniR6.getMediaVista() === 'sueltos' && uniR6.filtroSnapshot().mediaVista === 'sueltos');
+
+// =====================================================================
+// (37) ADR-116 / V1 - PREDICADO DE PINTADO POR CATEGORIA
+// En modo union un album (destino_album / album_grupo / media_type album)
+// se pinta SOLO con mediaAlbumes; el resto, SOLO si mediaTypes[media_type].
+// En legacy mediaVista='albumes' sigue excluyendo lo que no sea album.
+// Los items se colocan en celdas distintas para que cada uno sea su propio
+// pin y se pueda afirmar QUE fila se pinto (por su coordenada).
+// =====================================================================
+function latLngsDe(layer) {
+  return (layer.__added || []).map(function (m) {
+    var ll = m.__latlng || [];
+    return String(ll[0]) + ',' + String(ll[1]);
+  });
+}
+var predItems = [
+  { origen: 'destino_album', origen_id: 'pd-a', media_url: 'pd-album', media_type: 'album', lat: 4.60, lng: -74.10 },
+  { origen: 'destino', origen_id: 'pd-a', media_url: 'pd-foto', media_type: 'foto', lat: 4.70, lng: -74.20 },
+  { origen: 'album', origen_id: 'al-x', media_url: 'al-foto', media_type: 'foto', lat: 4.80, lng: -74.30 }
+];
+groups.length = 0;
+var predInst = MC2.create({ map: 'mm-personal-map', mediaFilter: false, mediaUnion: true });
+var predLayer = groups[groups.length - 1];
+predInst.setMedia(predItems.slice());
+predInst.setMediaTypes({ foto: true, video: false, audio: false });
+predInst.setMediaAlbumes(true);
+check('union predicado: albumes ON + foto ON pinta las tres filas',
+  predInst.getState().mediaEnabled === true && predLayer.__added.length === 3
+  && latLngsDe(predLayer).indexOf('4.6,-74.1') !== -1);
+predInst.setMediaAlbumes(false);
+check('union predicado: albumes OFF no pinta el album pero SI las fotos',
+  predLayer.__added.length === 2 && latLngsDe(predLayer).indexOf('4.6,-74.1') === -1
+  && latLngsDe(predLayer).indexOf('4.7,-74.2') !== -1);
+predInst.setMediaAlbumes(true);
+predInst.setMediaTypes({ foto: false });
+check('union predicado: albumes ON + foto OFF pinta el album y NO la foto',
+  predLayer.__added.length === 1 && latLngsDe(predLayer)[0] === '4.6,-74.1');
+groups.length = 0;
+var legPred = MC2.create({ map: 'mm-personal-map', mediaFilter: false });
+var legPredLayer = groups[groups.length - 1];
+legPred.setMedia(predItems.slice());
+legPred.setMediaTypes({ foto: true, video: false, audio: false });
+legPred.setMediaVista('albumes');
+check('legacy predicado: mediaVista albumes sigue excluyendo lo que no sea album',
+  legPred.getMediaVista() === 'albumes' && legPredLayer.__added.length === 1
+  && latLngsDe(legPredLayer)[0] === '4.6,-74.1');
+
+// =====================================================================
+// (38) ADR-116 - EL MOTOR NO HACE RED
+// El contador de fetch/XMLHttpRequest vive en el sandbox: ni setMedia, ni
+// setMediaTypes, ni setMediaAlbumes, ni la restauracion de la preferencia
+// pueden disparar peticiones (la red es cosa del anfitrion).
+// =====================================================================
+var redAntes = netCalls.fetch + netCalls.xhr;
+uniInst.setMedia([{ origen: 'destino', origen_id: 'red-1', media_url: 'red-1', media_type: 'foto', lat: 4.6, lng: -74.1 }]);
+uniInst.setMediaTypes({ foto: true, video: true, audio: false });
+uniInst.setMediaAlbumes(false);
+uniInst.setMediaVista('albumes');
+check('red: setMedia/setMediaTypes/setMediaAlbumes/setMediaVista no disparan peticiones',
+  (netCalls.fetch + netCalls.xhr) === redAntes);
+check('red: ninguna operacion del smoke (ni las restauraciones) hizo fetch',
+  netCalls.fetch === 0 && netCalls.xhr === 0);
 
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');

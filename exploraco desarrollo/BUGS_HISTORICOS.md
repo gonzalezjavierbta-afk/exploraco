@@ -2607,4 +2607,22 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 
 
+## BUG-146: en el mapa cultural, **"Albumes" pedia OTRO DATASET** (`&vista=albumes`, 3 filas) en vez de filtrar, y los chips de tipo **alternaban en vez de sumar** -- se veian albumes y **desaparecia el resto de medios** (30 videos y 5 audios fuera de vista) -- **CERRADO EN CODIGO / PENDIENTE DE DEPLOY (2026-11-03, TSK-251 / ADR-116)**
+
+**Severidad: ALTA (perdida de contenido silenciosa en la UI: la pantalla era coherente, solo con menos medios). Estado: CERRADO EN CODIGO en el arbol de trabajo -- sin commit y sin deploy, luego en produccion el defecto SIGUE ACTIVO hasta el despliegue.**
+
+**Sintoma (reportado por el operador, uso real):** al elegir **Albumes** el mapa mostraba **albumes y no el resto de medios**. La vista de album pedia `&vista=albumes`, que en produccion devuelve **3 filas**, mientras la variante normal servia **345** (**foto 310 / video 30 / audio 5**): los **30** videos y los **5** audios **existian**, pero quedaban **fuera** de la vista. Sin error, sin 404 y sin 500.
+
+**Causa raiz (3 puntos, una sola raiz: se trato como "fuente de datos" lo que era "filtro de vista").** (1) **Dataset en vez de filtro:** el chip cambiaba la **variante del endpoint** (`&vista=albumes`) en lugar de **filtrar en cliente** la capa ya cargada. (2) **Chips que alternaban en vez de sumar:** el estado de tipo se comportaba como **radio** (uno activo) y no como **seleccion aditiva**, luego encender "album" **apagaba** el resto. (3) **Ausencia de dedupe/clustering:** sin fusion de las dos variantes ni representante por proximidad, la unica forma de "no duplicar" era **pedir menos datos**, que es exactamente lo que producia el sintoma.
+
+**Fix (el argumento vive solo en ADR-116).** **Capa unica:** los hosts piden las **dos variantes del mismo endpoint** y fusionan en cliente con `MapaCultural.mergeMedia`; albumes como **flag aditivo** (`mediaAlbumes`); **filtros aditivos** con primer clic que enciende **solo** esa categoria; etiqueta unica `getMediaLabel()`; **clustering de medios** con representante por importancia (`votos + 2*rating_promedio + 0.5*min(fotos_count,20)`) y **popup de lista**; topes **600 items / 300 marcadores**. **Cero backend:** `api/interacciones.js` **sin cambios**, cero migraciones.
+
+**Verificacion:** `node scripts/smoke_mapa_cultural.js` **343/343 PASS**; `npm run smoke:mapas` **367/367 PASS**; `node --check` en los **3** JS; **ASCII** y **balance de divs** limpios; certificado por **@qa-auditor** con **V1-V10 en verde**.
+
+**Por que ningun smoke lo detecto (y regla que sale de aqui):** el endpoint respondia **200** con un dataset **valido** y el cliente pintaba **ese** dataset sin queja; el defecto vivia en la **interseccion** entre *que pide el cliente* y *que espera el usuario del chip*, y ningun test de contrato compara **intencion** con **payload**. Regla: **un chip de categoria filtra una capa YA cargada; si ademas cambia el endpoint, deja de ser un filtro y se convierte en otra vista.**
+
+**Registro:** detectado por el operador en el mapa cultural (uso real, no revision de codigo); cerrado en la misma tanda **TSK-251 / ADR-116**. No duplica las fichas anteriores del modulo (**BUG-080**, **BUG-082**), que eran de **render** y de **guardados**, no de **contrato de filtros**.
+
+
+
 

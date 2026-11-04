@@ -1,4 +1,9 @@
-// index-api-connector.js  v8 \u2014 completo y definitivo
+// index-api-connector.js  v9 \u2014 completo y definitivo
+// v9 (ADR-116 D3): con mediaUnion la capa de medios pide la variante default y
+// la variante vista=albumes EN PARALELO y las fusiona con mergeMedia() del
+// motor; la segunda peticion es FAIL-SOFT (si falla o vuelve vacia se pinta
+// solo la default). Sin mediaUnion la ruta legacy no cambia: una peticion y
+// vista como dataset.
 // Actualiza: PL[], DEST_PHOTOS{}, MAPA_PLACES[], DEST_FEATURED_IDS[],
 //            AGENDA_EVENTS[] (secci\u00f3n eventos), stats reales, b\u00fasqueda en tiempo real
 
@@ -387,6 +392,80 @@
     return f;
   }
 
+  // ADR-116 D3.1: mediaUnion es opt-in del motor. Sin motor, sin la opcion o
+  // si el getter lanza, se trabaja en la ruta legacy de siempre.
+  function esMediaUnion() {
+    var MC = motorMedia();
+    if (!MC || typeof MC.getMediaUnion !== 'function') return false;
+    try { return MC.getMediaUnion() === true; } catch (e) { return false; }
+  }
+
+  // ADR-116 D2/D3.1: albumes es un flag aditivo, no un dataset. Si el motor
+  // aun no expone el getter se asume ENCENDIDO (default del motor): pedir la
+  // variante de mas no rompe nada; omitirla con albumes encendidos si pierde
+  // contenido.
+  function mediaAlbumesOn() {
+    var MC = motorMedia();
+    if (!MC || typeof MC.getMediaAlbumes !== 'function') return true;
+    try { return MC.getMediaAlbumes() !== false; } catch (e) { return true; }
+  }
+
+  // Coordenada pintable: parseable y distinta de 0 (mismo criterio que la
+  // ruta legacy). El motor normaliza votos/rating/fotos_count: no se duplica.
+  function mediaCoord(v) {
+    if (v === null || v === undefined || v === '') return null;
+    var n = parseFloat(v);
+    if (!isFinite(n) || n === 0) return null;
+    return n;
+  }
+
+  // El backend devuelve a veces el STRING "null" como url (medido: 1 de 3
+  // filas album_grupo). Se trata como ausente, no como url.
+  function mediaUrlLimpia(v) {
+    if (v === null || v === undefined) return '';
+    if (typeof v !== 'string') return v;
+    var s = v.replace(/^\s+|\s+$/g, '');
+    if (!s || s === 'null' || s === 'undefined') return '';
+    return s;
+  }
+
+  // Saneo minimo del modo union: url "null" -> ausente ANTES de fusionar
+  // (para que el merge por primer valor no vacio no herede basura) y solo
+  // filas con coords parseables, que son las que MAPA_MEDIA pinta. Este
+  // archivo no guarda cache de filas: la copia normalizada vive en el motor.
+  function filasMediaUnion(filas) {
+    var out = [];
+    (filas || []).forEach(function (m) {
+      if (!m) return;
+      m.media_url = mediaUrlLimpia(m.media_url);
+      if (mediaCoord(m.lat) === null || mediaCoord(m.lng) === null) return;
+      out.push(m);
+    });
+    return out;
+  }
+
+  // Fusion por el HELPER DEL MOTOR (ADR-116 D3.3): la clave de identidad
+  // (origen + media_id, con degradacion a origen + origen_id) es competencia
+  // del motor y NO se reimplementa aqui. Si el motor desplegado no expone
+  // mergeMedia no se inventa una clave local: se pinta solo la variante
+  // default y se avisa (despliegue desincronizado).
+  function fusionarMedia(filasDefault, filasAlbum) {
+    if (!filasAlbum || !filasAlbum.length) return filasDefault;
+    var facade = window.MapaCultural;
+    if (!facade || typeof facade.mergeMedia !== 'function') {
+      console.warn('[index-api] union: motor sin mergeMedia, se pinta solo default');
+      return filasDefault;
+    }
+    try {
+      var unidas = facade.mergeMedia(filasDefault, filasAlbum);
+      if (Array.isArray(unidas)) return unidas;
+      console.warn('[index-api] union: mergeMedia no devolvio array, se pinta solo default');
+    } catch (e) {
+      console.warn('[index-api] union: mergeMedia fallo: ' + (e && e.message));
+    }
+    return filasDefault;
+  }
+
   // Recarga de la capa cuando el filtro del motor cambia. Idempotente: una
   // sola suscripcion por instancia. Solo vuelve a pedir si cambia la FIRMA de
   // la query (vista o alcance): mover el puntaje o la categoria no vuelve a
@@ -404,63 +483,137 @@
     }
   }
 
-  // Carga (o recarga) la capa de multimedia. La query se arma SIEMPRE con el
-  // estado del motor: &vista=albumes para la vista de grupos y
-  // &scope=mio&usuario_id= para el alcance propio. forzar=true ignora la
-  // deduplicacion por firma (recarga manual).
+  // Carga (o recarga) la capa de multimedia. Dos rutas:
+  //  - legacy (sin mediaUnion): UNA peticion; mediaVista elige el dataset
+  //    (&vista=albumes) como hoy. Cero regresion.
+  //  - union (ADR-116 D3): dos peticiones en paralelo, default + vista=albumes,
+  //    fusionadas por el helper del motor. La segunda es FAIL-SOFT: si falla,
+  //    vuelve vacia o no hay mergeMedia, se pinta la default y la capa no se
+  //    queda en blanco. &scope=mio&usuario_id= aplica igual en las dos
+  //    variantes. forzar=true ignora la deduplicacion por firma (recarga
+  //    manual).
   function cargarMapaMedia(forzar) {
     suscribirFiltroMedia();
     var f = filtroMedia();
     var uid = (window.ExploraCO && window.ExploraCO.usuario && window.ExploraCO.usuario.id)
       ? String(window.ExploraCO.usuario.id) : '';
     var soloMio = (f.soloMio && !!uid);
-    // Firma de lo que pide esta consulta: si no cambio, la capa ya esta.
-    var firma = f.vista + '|' + (soloMio ? ('mio:' + uid) : 'publico');
+    var union = esMediaUnion();
+    var conAlbumes = union ? mediaAlbumesOn() : (f.vista === 'albumes');
+    // Firma de lo que pide esta consulta: incluye el MODO y, en union, el flag
+    // de albumes, para no servir una respuesta de un modo en el otro. En modo
+    // union mediaVista se ignora (D3.4), asi que no entra en la firma. Si no
+    // cambio, la capa ya esta.
+    var firma = (union ? ('union' + (conAlbumes ? '+albumes' : '')) : ('legacy:' + f.vista))
+      + '|' + (soloMio ? ('mio:' + uid) : 'publico');
     if (!forzar && firma === MEDIA_FIRMA && (MEDIA_LISTO || MEDIA_PIDIDA)) return;
     MEDIA_FIRMA = firma;
     MEDIA_PIDIDA = true;
     MEDIA_LISTO = false;
     var tok = ++MEDIA_TOKEN;
-    var mediaUrl = '/api/interacciones?tipo=multimedia_mapa';
-    // Vista de albumes: pide las filas agrupadas (album_grupo/destino_album).
-    if (f.vista === 'albumes') mediaUrl += '&vista=albumes';
-    // Solo con el alcance propio activo Y sesion se restringe el scope.
-    if (soloMio) {
-      mediaUrl += '&scope=mio&usuario_id=' + encodeURIComponent(uid);
-    }
-    mediaUrl += '&_t=' + Date.now();
+    // Parametros comunes: alcance propio solo con sesion activa.
+    var qs = '?tipo=multimedia_mapa';
+    if (soloMio) qs += '&scope=mio&usuario_id=' + encodeURIComponent(uid);
     // scope=mio exige Authorization: Bearer (el uuid del dueno se deriva
     // de la sesion); la capa publica funciona con el objeto vacio.
     var authHeaders = (window.ExploraCO && typeof window.ExploraCO.authHeaders === 'function')
       ? (window.ExploraCO.authHeaders() || {})
       : {};
-    fetch(mediaUrl, { headers: authHeaders })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
+
+    if (!union) {
+      // Ruta LEGACY intacta: una sola peticion y mediaVista como dataset.
+      var mediaUrl = '/api/interacciones' + qs;
+      // Vista de albumes: pide las filas agrupadas (album_grupo/destino_album).
+      if (f.vista === 'albumes') mediaUrl += '&vista=albumes';
+      mediaUrl += '&_t=' + Date.now();
+      fetch(mediaUrl, { headers: authHeaders })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (tok !== MEDIA_TOKEN) return; // respuesta obsoleta: otra vista ya pidio
+          MEDIA_PIDIDA = false;
+          if (!d.ok || !d.data) {
+            // Sin exito la capa sigue SIN_LISTO: el siguiente ciclo la reintenta.
+            console.warn('[index-api] Sin multimedia de mapa:', d.error || 'vacio');
+            return;
+          }
+          MEDIA_LISTO = true;
+          var nuevoMedia = d.data.filter(function (m) {
+            return m.media_url
+              && m.lat != null && m.lat !== 0
+              && m.lng != null && m.lng !== 0;
+          });
+          if (typeof MAPA_MEDIA !== 'undefined') replArr(MAPA_MEDIA, nuevoMedia);
+          // Re-render de la capa media: sin esto, si el usuario abre el mapa
+          // antes de que llegue la respuesta, la capa queda vacia hasta la
+          // siguiente interaccion (auditoria QA -> hallazgo M1).
+          if (typeof refreshMapaMarkers === 'function') { try { refreshMapaMarkers(); } catch (e) { console.warn('[index-api] refresh tras multimedia:', e.message); } }
+          console.log('[index-api] MAPA_MEDIA:' + nuevoMedia.length
+            + ' | vista:' + f.vista + (soloMio ? ' (solo mio)' : ' (publico)'));
+        })
+        .catch(function (e) {
+          if (tok === MEDIA_TOKEN) { MEDIA_PIDIDA = false; MEDIA_LISTO = false; }
+          console.warn('[index-api] Error multimedia mapa:', e.message);
+        });
+      return;
+    }
+
+    // Modo UNION (ADR-116 D3.1): variante default + variante vista=albumes en
+    // paralelo, con los mismos parametros de alcance.
+    var t = Date.now();
+    var pDefault;
+    try {
+      pDefault = fetch('/api/interacciones' + qs + '&_t=' + t, { headers: authHeaders })
+        .then(function (r) { return r.json(); });
+    } catch (e) {
+      pDefault = Promise.reject(e);
+    }
+    // Albumes apagado: la segunda variante se omite (optimizacion D3.1).
+    var pAlbumes = Promise.resolve([]);
+    if (conAlbumes) {
+      try {
+        pAlbumes = fetch('/api/interacciones' + qs + '&vista=albumes&_t=' + t, { headers: authHeaders })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d || d.ok !== true || !Array.isArray(d.data) || !d.data.length) {
+              console.warn('[index-api] union: vista=albumes sin filas, se pinta default');
+              return [];
+            }
+            return d.data;
+          })
+          .catch(function (e) {
+            // FAIL-SOFT: una segunda peticion no puede degradar la primera.
+            console.warn('[index-api] union: fallo vista=albumes, se pinta default: ' + (e && e.message));
+            return [];
+          });
+      } catch (e) {
+        console.warn('[index-api] union: fetch de vista=albumes no disponible: ' + (e && e.message));
+      }
+    }
+    Promise.all([pDefault, pAlbumes])
+      .then(function (par) {
         if (tok !== MEDIA_TOKEN) return; // respuesta obsoleta: otra vista ya pidio
         MEDIA_PIDIDA = false;
-        if (!d.ok || !d.data) {
-          // Sin exito la capa sigue SIN_LISTO: el siguiente ciclo la reintenta.
-          console.warn('[index-api] Sin multimedia de mapa:', d.error || 'vacio');
+        var dDefault = par[0];
+        if (!dDefault || dDefault.ok !== true || !Array.isArray(dDefault.data)) {
+          // Sin la variante default la capa sigue SIN_LISTO: se reintenta.
+          console.warn('[index-api] union: variante default sin datos:', (dDefault && dDefault.error) || 'vacio');
           return;
         }
         MEDIA_LISTO = true;
-        var nuevoMedia = d.data.filter(function (m) {
-          return m.media_url
-            && m.lat != null && m.lat !== 0
-            && m.lng != null && m.lng !== 0;
-        });
+        var filasDefault = filasMediaUnion(dDefault.data);
+        var filasAlbum = filasMediaUnion(par[1]);
+        // Orden normativo de fusion: primero default, despues albumes (D5.2).
+        var nuevoMedia = fusionarMedia(filasDefault, filasAlbum);
         if (typeof MAPA_MEDIA !== 'undefined') replArr(MAPA_MEDIA, nuevoMedia);
-        // Re-render de la capa media: sin esto, si el usuario abre el mapa
-        // antes de que llegue la respuesta, la capa queda vacia hasta la
-        // siguiente interaccion (auditoria QA -> hallazgo M1).
+        // Re-render de la capa media (mismo motivo que en la ruta legacy).
         if (typeof refreshMapaMarkers === 'function') { try { refreshMapaMarkers(); } catch (e) { console.warn('[index-api] refresh tras multimedia:', e.message); } }
         console.log('[index-api] MAPA_MEDIA:' + nuevoMedia.length
-          + ' | vista:' + f.vista + (soloMio ? ' (solo mio)' : ' (publico)'));
+          + ' | union:default ' + filasDefault.length + ' + albumes ' + filasAlbum.length
+          + (soloMio ? ' (solo mio)' : ' (publico)'));
       })
       .catch(function (e) {
         if (tok === MEDIA_TOKEN) { MEDIA_PIDIDA = false; MEDIA_LISTO = false; }
-        console.warn('[index-api] Error multimedia mapa:', e.message);
+        console.warn('[index-api] Error multimedia mapa (union):', e && e.message);
       });
   }
 
