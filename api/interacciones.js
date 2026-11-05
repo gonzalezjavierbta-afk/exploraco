@@ -479,6 +479,53 @@ function resolverRadioM(categoria, tags, nombre, radioExplicito) {
   return RADIO_DEFAULT_M;
 }
 
+// BUG-139 (frente backend): atribucion de las fotos del destino.
+// destinos_fotos no tiene columnas propias de autor/licencia: el dato vive
+// en tags.creditos_fotos [{url, autor, licencia}] (lo escribe el seed).
+// Devuelve SIEMPRE un array ya resuelto y NUNCA lanza: tags NULL, clave
+// ausente, jsonb serializado como string (incluso doble stringify) o un
+// contenido que no es array degradan a []. Solo se emiten claves con valor
+// real (url obligatoria; autor/licencia si existen), para que el cliente no
+// reciba objetos {autor:''} que simulan un credito inexistente.
+function creditosFotosDeTags(tags) {
+  var lista = null;
+  try {
+    var t = tags;
+    if (typeof t === 'string') {
+      var s = t.trim();
+      if (s.charAt(0) === '"' && s.charAt(s.length - 1) === '"') {
+        try { s = JSON.parse(s); } catch (eCfDbl) {}
+      }
+      t = JSON.parse(s);
+    }
+    if (!t || typeof t !== 'object' || Array.isArray(t)) return [];
+    lista = t.creditos_fotos;
+    if (typeof lista === 'string') {
+      var s2 = lista.trim();
+      if (s2.charAt(0) === '"' && s2.charAt(s2.length - 1) === '"') {
+        try { s2 = JSON.parse(s2); } catch (eCfDbl2) {}
+      }
+      lista = JSON.parse(s2);
+    }
+  } catch (eCf) {
+    return [];
+  }
+  if (!Array.isArray(lista)) return [];
+  var out = [];
+  lista.forEach(function(c) {
+    if (!c || typeof c !== 'object') return;
+    var url = String(c.url == null ? '' : c.url).trim();
+    if (!url) return;
+    var o = { url: url };
+    var au = String(c.autor == null ? '' : c.autor).trim();
+    var li = String(c.licencia == null ? '' : c.licencia).trim();
+    if (au) o.autor = au;
+    if (li) o.licencia = li;
+    out.push(o);
+  });
+  return out;
+}
+
 function tieneCoordsValidas(lat, lng) {
   return typeof lat === 'number' && typeof lng === 'number'
     && isFinite(lat) && isFinite(lng) && lat !== 0 && lng !== 0;
@@ -8505,13 +8552,32 @@ module.exports = async function handler(req, res) {
         }
         var gdUsuarioId = req.query.usuario_id || null;
 
-        var gdDestinoRows = await sql(
-          'SELECT id, nombre, slug, ciudad, lat, lng'
-          + ' FROM destinos'
-          + ' WHERE (slug = $1 OR id = $2) AND status = \'published\''
-          + ' LIMIT 1',
-          [gdSlug, gdDestinoId]
-        );
+        // BUG-139 (frente backend): tags entra en el SELECT para resolver la
+        // atribucion de las fotos (creditos_fotos) sin query extra. Un
+        // esquema viejo sin la columna (42703) degrada al SELECT legacy en
+        // vez de tumbar la galeria: el contrato de hoy se mantiene intacto.
+        var gdDestinoRows;
+        try {
+          gdDestinoRows = await sql(
+            'SELECT id, nombre, slug, ciudad, lat, lng, tags'
+            + ' FROM destinos'
+            + ' WHERE (slug = $1 OR id = $2) AND status = \'published\''
+            + ' LIMIT 1',
+            [gdSlug, gdDestinoId]
+          );
+        } catch (gdTagsErr) {
+          if (gdTagsErr && gdTagsErr.code === '42703') {
+            gdDestinoRows = await sql(
+              'SELECT id, nombre, slug, ciudad, lat, lng'
+              + ' FROM destinos'
+              + ' WHERE (slug = $1 OR id = $2) AND status = \'published\''
+              + ' LIMIT 1',
+              [gdSlug, gdDestinoId]
+            );
+          } else {
+            throw gdTagsErr;
+          }
+        }
         if (!gdDestinoRows.length)
           return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
         var gdDestino = gdDestinoRows[0];
@@ -8597,6 +8663,11 @@ module.exports = async function handler(req, res) {
           return contarComentarioSafe(sql, f.id).then(function(n) { f.comentarios = n; });
         }));
 
+        // BUG-139 (frente backend): la atribucion se emite YA RESUELTA en
+        // dos rutas (raiz y destino) porque galeria.html lee ambas; el
+        // objeto tags crudo NO se expone. Si no hay dato, array vacio.
+        var gdCreditos = creditosFotosDeTags(gdDestino.tags);
+
         var gdRespuesta = {
           ok: true,
           destino: {
@@ -8606,9 +8677,11 @@ module.exports = async function handler(req, res) {
             ciudad: gdDestino.ciudad,
             lat: gdDestino.lat,
             lng: gdDestino.lng,
+            creditos_fotos: gdCreditos,
           },
           fotos: gdFotos,
           usuarios: gdUsuarios,
+          creditos_fotos: gdCreditos,
         };
 
         // items[] unificado (clave SOLO presente si el cliente pide

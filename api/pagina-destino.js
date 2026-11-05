@@ -680,9 +680,46 @@ function topRelacionados(d, candidatos, n) {
   return scored.slice(0, n).map(function(s){ return s.row; });
 }
 
+// TSK-224: la seccion "relacionados" enlazaba destinos de OTRA ciudad
+// (medido en /medellin.html: 2 de 3 enlaces ajenos, Bogota y Cartagena).
+// Criterio de cierre SEMANTICO: todo enlace debe pertenecer a la ciudad de
+// la pagina. El slug es solo un proxy y NO se usa como criterio.
+// Se comparan los nombres reales del campo: ciudad || city (/api/destinos
+// emite ambos; aqui los candidatos vienen del SELECT del handler, que trae
+// ciudad). Normalizacion obligatoria antes de comparar: trim, minusculas y
+// sin tildes, porque en datos conviven "Bogota" y "Bogot\u00e1" (un === crudo
+// deja pasar duplicados y produce falsos negativos).
+function normCiudad(v) {
+  if (v === null || v === undefined) return '';
+  return String(v).trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+// Devuelve solo los candidatos de la ciudad de la pagina. Con menos
+// candidatos validos se muestran menos (nunca se rellena con otra ciudad)
+// y, si quedan 0, buildHTML no emite la seccion: sin cabecera huerfana
+// (mismo criterio que BUG-130). Si la pagina no declara ciudad no hay
+// pertenencia demostrable, asi que degrada a 0 en vez de enlazar a ciegas.
+function filtrarPorCiudad(d, candidatos) {
+  var lista = Array.isArray(candidatos) ? candidatos : [];
+  var ciudadPagina = normCiudad(d && (d.ciudad || d.city));
+  if (!ciudadPagina) return [];
+  var out = [];
+  for (var i = 0; i < lista.length; i++) {
+    var c = lista[i];
+    if (c && normCiudad(c.ciudad || c.city) === ciudadPagina) out.push(c);
+  }
+  return out;
+}
+
 function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLider, fotosViajeros, fotosAlbum) {
   var cat   = d.categoria_slug || 'sitio';
   var relacionados = relacionados || [];
+  // TSK-224: filtro semantico por ciudad ANTES de decidir si se emite la
+  // seccion. Si el filtro deja 0, secRelacionados queda vacia y no hay
+  // cabecera huerfana. Ver normCiudad/filtrarPorCiudad (ambito de modulo).
+  relacionados = filtrarPorCiudad(d, relacionados);
   // ADR-034: fotos de comunidad (viajeros + albumes) para el hero y la
   // galeria. Son opcionales al final de la firma para no romper llamadas
   // existentes (smokes/loaders) y degradan a [] si no llegan.
@@ -3561,7 +3598,11 @@ module.exports = async function handler(req, res) {
         "SELECT id, slug, nombre, ciudad, region, foto_hero, emoji, hero_bg, rating, total_resenas, categoria_slug, tags FROM destinos WHERE categoria_slug=$1 AND status='published' AND id<>$2 ORDER BY rating DESC NULLS LAST LIMIT 50",
         [d.categoria_slug, d.id]
       );
-      relacionados = topRelacionados(d, relRows, 3);
+      // TSK-224: mismo criterio aplicado al pool ANTES del recorte a 3. Si
+      // solo se filtrara el top 3 ya rankeado se perderian hermanos de la
+      // ciudad que quedaron mas abajo por rating; con el filtro previo la
+      // seccion muestra hasta 3 destinos REALMENTE de la ciudad.
+      relacionados = topRelacionados(d, filtrarPorCiudad(d, relRows), 3);
     }
 
     var html = buildHTML(d, det, fotosRows, resenasRows, autor, relacionados, dimsAvg, spotLider, fotosViajeros, fotosAlbum);

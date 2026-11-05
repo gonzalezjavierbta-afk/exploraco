@@ -2313,7 +2313,7 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **Verificacion:** `573001234567` **ausente** de `index.html` (medido por `Select-String`); el teaser crea semilla y redirige (`index.html:2686-2695`); `node --check` del inline **PASS**; divs `index.html` **375/375**; ASCII **0 bytes nuevos**. El criterio `[manual]` de "no se abre WhatsApp y el numero no aparece en el camino de publicacion" queda en el **checklist de navegador de `NEXT.md`**.
 
-## BUG-129: `contacto.html:54` conserva el **mismo numero de relleno** `573001234567` -- **ABIERTO (fuera del alcance de ADR-099)**
+## BUG-129: `contacto.html:54` conserva el **mismo numero de relleno** `573001234567` -- **ABIERTO por DECISION del operador (2026-11-04): el numero NO se corrige**
 
 **Severidad: MEDIA de contenido** (no rompe nada, pero **todo usuario que escribe por el canal de contacto de la web escribe al vacio**; es el unico canal de contacto publicado). **Estado: ABIERTO, sin tarea asignada y sin arreglar en esta tanda.**
 
@@ -2322,6 +2322,8 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **Lo que este bug NO es:** no es una regresion de ADR-099 (el numero **ya estaba** ahi antes) y **no** se corrige aqui: sustituirlo por el numero real es una **decision de negocio** (que numero, de quien, con que horario de atencion) y no un cambio tecnico; ademas queda **fuera del alcance** del embudo unico.
 
 **Deuda:** dar de alta el numero real (o retirar el canal) en una tarea propia de contenido. Hasta entonces, **el canal de contacto de la web no entrega los mensajes**.
+
+**ACTUALIZACION 2026-11-04 (pase documental unico R2; TSK-252 fila 9) -- ACEPTADA POR DECISION DEL OPERADOR; el defecto NO se corrige.** El operador **acepta el numero de relleno `573001234567`** de `contacto.html:54`: deja de figurar como **pendiente** y se anota como **decision vigente**, no como olvido ni como deuda que alguien deba retomar. **El estado sigue siendo ABIERTO por decision**, no por falta de trabajo: si el operador cambia el criterio, la unica accion es sustituir el literal por el numero real (o retirar el canal), sin tocar nada mas. El enunciado original de arriba se conserva integro (ADR-003).
 
 ## BUG-130: un destino con **una sola foto** renderiza la seccion de galeria con **cabecera y cuerpo vacio** -- **ABIERTO (todas las categorias)** -- **RESUELTO EN CODIGO / PENDIENTE DE REDEPLOY (2026-11-04, Tanda B / TSK-252 fila 8; ver el cierre al final de este registro)**
 
@@ -2334,6 +2336,8 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **Deuda:** decidir el comportamiento correcto con una sola foto -- (a) ocultar **tambien la cabecera** (`hayGaleria && hayGaleriaCurada`) o (b) tratar `>= 1` como galeria valida -- y cubrirlo con un smoke de `buildHTML()` en el fixture de **1 foto**. Afecta a **las 5 categorias** porque el guard es comun.
 
 **ACTUALIZACION 2026-11-04 (Tanda B / TSK-252 fila 8) -- RESUELTO EN CODIGO; PENDIENTE DE REDEPLOY.** El estado "ABIERTO" de arriba se conserva (ADR-003) y queda **superado en codigo**, no en el aire. **Opcion elegida: (b)**, `>= 1` es galeria valida, con dos guardas mas para que no queden huecos: `api/pagina-destino.js:2030-2134` (**36+/21-**) deja `hayGaleria = galMerge.length > 0`; `gal-main` se pinta **desde 1** media; `.gal-thumbs` **solo** si hay miniaturas; el CTA "Ver todas" **solo** con **>1**; y la seccion completa **solo se emite con >= 1** media, luego con **0 fotos** no hay cabecera huerfana **ni se consume `nextNum()`** (el contador de secciones no se desfasa). **Evidencia medida:** `node --check` **PASS**; ASCII delta **0**; arnes `vm` **9/9** (3 escenarios x 3 categorias): **0 fotos** -> `section=0`, `h2=0`, divs **349/349**; **1 foto** -> `section=1`, `h2=1`, `gal-main=1`, `img=1`, divs **353/353**, 609 B; **4 fotos** -> **identico al pre-fix** (`main=1`, `gal-i=3`, `thumbs=1`, `CTA=1`, divs **361/361**, 1895 B); `check_buildHTML_inline.js` **OK** (365/365); `gold_shield.js` **LIMPIO** (915 PASS / 22 FAIL baseline, **0 nuevos**). **Criterio de cierre pendiente (sin cumplir):** ver en el HTML **servido** de un destino de **1 foto** la galeria con **1** imagen y sin bloque vacio. Gate: redeploy.
+
+**ACTUALIZACION 2026-11-04 (pase documental unico R2 de cierre; TSK-252 filas 7b y 15) -- SIGUE RESUELTO EN CODIGO / PENDIENTE DE REDEPLOY, y el commit NO esta en el remoto.** Medido: `main` esta **`ahead 1`** de `origin/main`; el commit **`0d844f4`** ("arreglos") contiene este arreglo y **NO se ha pusheado**, luego **el defecto sigue visible en el aire** (`https://latawel.com` sirve el motor anterior). El estado correcto hasta el push + deploy es exactamente el del titulo: **RESUELTO EN CODIGO / PENDIENTE DE REDEPLOY**; no se afirma "en produccion" ni se cierra el bug. La misma tanda deja en el arbol, sin commitear, la capa de credito del backend (`api/interacciones.js`, fila 7b) y el filtro de relacionados (`api/pagina-destino.js`, fila 15).
 
 ## BUG-131: **deudas aceptadas** del embudo unico -- fallback de `ADMIN_SECRET`, ledger fuera de la CTE atómica y `COALESCE` de compatibilidad en la cola -- **ABIERTAS / ACEPTADAS**
 
