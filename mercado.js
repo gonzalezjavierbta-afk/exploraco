@@ -382,6 +382,28 @@
     if (!a || typeof a.slotHtml !== 'function' || typeof a.arteDe !== 'function') return null;
     return a;
   }
+  /* Vitrina del catalogo: solo pinta lo que TIENE lamina. Degradacion ADR-008:
+   * si cartas-arte.js no cargo (arteApi() === null) devuelve true y la rejilla
+   * se ve EXACTAMENTE como hoy, con todos los productos. Si arteDe lanza, true:
+   * la vista nunca se vacia por un fallo del modulo de arte.
+   * Solo la usa la vitrina: el inventario del dueno y el filtro "Lo tienes" NO
+   * pasan por aqui (el dueno ve lo suyo con o sin lamina). */
+  function tieneArteCatalogo(c) {
+    var o = c || {};
+    var clave = String(o.clave || '');
+    var api = arteApi();
+    if (!api) return true;
+    try {
+      return !!api.arteDe({
+        clave: clave,
+        marca: o.marca_nombre,
+        nombre: o.nombre || clave,
+        xp: o.precio_xp
+      });
+    } catch (e) {
+      return true;
+    }
+  }
   function cRarezaClase(rareza, variante) {
     var c = cartasUI();
     if (c && typeof c.claseRareza === 'function') {
@@ -835,6 +857,9 @@
       var cant = invCant(String(c.clave || ''));
       if (_filtroCat === 'mios' && cant <= 0) return false;
       if (_filtroCat === 'otros' && cant > 0) return false;
+      /* Vitrina: "Todos" y "Disponible" ocultan lo que no tiene lamina.
+       * "Lo tienes" NO filtra por arte: el dueno ve sus productos siempre. */
+      if (_filtroCat !== 'mios' && !tieneArteCatalogo(c)) return false;
       if (_filtroFac !== 'todas') {
         var fac = String(c.faccion_requerida || '').trim().toLowerCase();
         /* Un articulo sin faccion se usa desde CUALQUIER faccion, asi que
@@ -916,16 +941,24 @@
     var api = arteApi();
     _fichaCat = [];
     var nMios = todo.filter(function (c) { return invCant(String(c.clave || '')) > 0; }).length;
+    /* Contadores coherentes con lo que se PINTA: "Todos" y "Disponible" cuentan
+     * solo lo que tiene lamina; "Lo tienes" cuenta lo poseido con o sin arte
+     * (comportamiento de siempre). Sin cartas-arte.js los tres numeros son los
+     * de siempre, porque tieneArteCatalogo() devuelve true. */
+    var nArte = todo.filter(function (c) { return tieneArteCatalogo(c); }).length;
+    var nDisp = todo.filter(function (c) {
+      return tieneArteCatalogo(c) && invCant(String(c.clave || '')) <= 0;
+    }).length;
     var h = '<div class="mk-sec-t">Catalogo de productos</div>';
     if (!todo.length) return h + '<div class="mk-msg">No se pudo cargar el catalogo de productos.</div>';
     h += '<div class="mk-vista">';
     h += '<button type="button" class="mk-chip' + (_filtroCat === 'todos' ? ' on' : '')
-      + '" onclick="Mercado.setFiltroCat(\'todos\')">Todos<span class="mk-chip-n">' + todo.length + '</span></button>';
+      + '" onclick="Mercado.setFiltroCat(\'todos\')">Todos<span class="mk-chip-n">' + nArte + '</span></button>';
     h += '<button type="button" class="mk-chip' + (_filtroCat === 'mios' ? ' on' : '')
       + '" onclick="Mercado.setFiltroCat(\'mios\')">Lo tienes<span class="mk-chip-n">' + nMios + '</span></button>';
     h += '<button type="button" class="mk-chip' + (_filtroCat === 'otros' ? ' on' : '')
       + '" onclick="Mercado.setFiltroCat(\'otros\')">Disponible<span class="mk-chip-n">'
-      + (todo.length - nMios) + '</span></button>';
+      + (nDisp) + '</span></button>';
     h += '<input class="chat-inp mk-busca" type="search" placeholder="Buscar producto o clave..."'
       + ' value="' + esc(_buscaCat) + '" oninput="Mercado.buscarCatalogo(this.value)">';
     h += '</div>';
@@ -943,7 +976,13 @@
     h += '</div>';
     var list = catalogoFiltrado();
     if (!list.length) {
-      return h + '<div class="mk-msg">Ningun producto coincide con ese filtro.</div>';
+      /* Catalogo con filas pero sin UNA sola lamina: mensaje propio en vez del
+       * generico de filtro. Solo alcanzable con cartas-arte.js cargado. */
+      var sinArte = (_filtroCat === 'todos' && todo.length > 0 && !nArte);
+      return h + '<div class="mk-msg">'
+        + (sinArte ? 'Aun no hay productos con diseno en el mercado.'
+          : 'Ningun producto coincide con ese filtro.')
+        + '</div>';
     }
     h += (api ? '<div class="cartas-silo">' : '') + '<div class="mk-cat">';
     list.forEach(function (c) {
