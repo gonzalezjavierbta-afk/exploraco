@@ -13053,3 +13053,88 @@ Este ADR no deja preguntas abiertas. El operador resolvio el mismo dia las cinco
 ### Estado
 
 **APROBADO COMO DISENO (2026-11-04); FASE 1 EN CURSO, FASE 2 NADA IMPLEMENTADO.** **Sin preguntas abiertas:** R1-R4 cerradas por el operador el 2026-11-04 (set parcialmente ilustrado aceptado, activa sin lamina bloqueada, plaza de museo liberada, escrow sin cancelacion masiva). Fase 1 en curso: el pre-flight ya existe; 064 + D3/R2 + D7 + D11 pendientes. Fase 2 pendiente (13 lecturas + 2 lookups + D4 + D5 + D9 + D10 + D4.4), con el pre-flight de V7 como puerta. Deuda declarada: 27 cartas fuera de juego hasta que el operador suba laminas; los bugs del mercado y del drop siguen vivos hasta Fase 2; aserto de paridad de columnas vista/tabla en el smoke (V1). TASKS.md, NEXT.md y BUGS se actualizan en un unico pase de @docs-keeper (ADR-084/R2) y no repiten este argumento. *(ANOTACION 2026-11-05: **FASE 1 COMPLETA** en arbol de trabajo (admin + pre-flight, Escudo GOLD PASS, QA 9/9, cero endpoints nuevos); **Fase 2 en cola y BLOQUEADA POR DATO** -- el pre-flight sigue en **exit 1** (27 cartas, 27 activas, 0 con diseno, 0 jugables) hasta que el operador suba **al menos 1 lamina por nivel de gate** (10/14/20/25). Enunciado original conservado, ADR-003.)*
+
+## ADR-118: En el mercado NO hay limite diario de **COMPRA** -- se retiran los tres topes de compra (20/24 h en `mercado_comprar`, global de 5/dia y Gate 5 por clave de 057 en `comprar_consumible`); el limite es de **USO** (intercambio de cartas 3/dia) y `consumibles.limite_diario` se conserva como **dato sin aplicacion** [**deroga** la clausula anti-farming de ADR-055 en `mercado_comprar`; NO deroga el resto de ADR-055 ni ADR-003]
+
+**ID:** ADR-118
+**Fecha:** 2026-11-04
+**Autor:** @docs-keeper en pase documental unico R2 (ADR-084). Registra una **decision del OPERADOR** ya ejecutada en el arbol de trabajo por la tanda de codigo; no la reabre ni la redisenna. El argumento vive aqui UNA sola vez (ADR-084 D1); `TASKS.md` y `NEXT.md` apuntan.
+**Estado:** **APLICADO EN ARBOL DE TRABAJO (2026-11-04); SIN COMMIT Y SIN DEPLOY.** Cero migracion, cero DML, cero endpoint nuevo (`api/*.js` = **8**, ADR-001/ADR-010).
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor encabezado del fichero era **ADR-117** (linea **12906**, `Select-String -Pattern "^## ADR-"`); fichero medido **13.055 lineas / 2.139.754 bytes**; **118** es el consecutivo libre. No hay TOC.
+
+### Problema
+
+**Los tres topes eran de COMPRA y ese es el defecto, no su numero.** Comprar es un **SUMIDERO** de XP: el usuario entrega XP y recibe un bien, la masa monetaria **baja**. Un tope de compra no protege la economia de una inyeccion: la **contrae**. El anti-farming se estaba aplicando en la puerta equivocada.
+
+**Los tres median lo que no habia que medir.** (1) El tope de **20 compras por comprador en 24 h** contaba **operaciones**, no valor: 20 compras de 100 XP castigaban igual que 20 de 4.000, y el usuario que decide vaciar su XP en insumos recibia un **429** justo cuando hacia lo que el sistema quiere que haga. (2) El tope **global de 5 compras/dia** en `comprar_consumible` mezclaba productos de precio y funcion distintos en un mismo cupo: un consumible de 200 XP competia con otro de 4.000 por el quinto hueco del dia. (3) El **Gate 5 por clave** (migracion 057, solo `categoria='faccion'` con `limite_diario > 0`) nacio con el esquema pero nunca se uso como palanca de producto: era una columna con efecto, sin politica detras.
+
+**Coste de mantenimiento ya medido:** los tres emitian codigos (`LIMITE_COMPRAS_24H` 429, `LIMITE_DIARIO` 409, `'Limite de 5 compras por dia alcanzado'` 429) que `mercado.js` traducia en **3** entradas de diccionario. Retirar los topes sin retirar el diccionario dejaba **tres ramas muertas** en el cliente, y el comentario del fichero seguia declarando "estos tres" textos literales.
+
+### Datos medidos (2026-11-04, contra el archivo real; ADR-006)
+
+1. **Alcance del cambio:** `git diff --stat` = **4** ficheros **M** y **0** untracked: `api/interacciones.js` **49** lineas (**12+/37-**), `mercado.js` **7**, `scripts/smoke_057_consumibles_faccion.js` **39**, `scripts/smoke_test_gamificacion_v4.js` **8**. `api/interacciones.js` sube a **v31** (cabecera, lineas **1-9**, declara el alcance y lo que se conserva).
+2. **Retiro (a) `mercado_comprar`** (rama en **17550**; el bloque eliminado estaba en **17599-17606**): fuera `mqCount` (`COUNT(*) FROM mercado_ventas WHERE comprador_id = ... AND creado_en > NOW() - INTERVAL '24 hours'`) y su **`429 LIMITE_COMPRAS_24H`**. El flujo pasa de `CANTIDAD_INSUFICIENTE` a la carga de `mqUsr`.
+3. **Retiro (b) y (c) `comprar_consumible`** (rama en **14012**; bloque eliminado **14113-14138**): fuera el **Gate 5** (`ccLimDia`/`ccLimRows`/`ccLimN`, `COUNT` por `consumible_id`, **`409 LIMITE_DIARIO`**) y el **tope global** (`ccCount`, `COUNT` global, **`429 'Limite de 5 compras por dia alcanzado'`**). El flujo va del gate de XP directo al `UPDATE`.
+4. **Cliente:** `mercado.js` pierde las **3** entradas (`LIMITE_COMPRAS_24H` L89, `LIMITE_DIARIO` L100, texto literal L107) y el comentario de L101-102 pasa de "estos tres" a "estos dos".
+5. **Se conserva, medido en este pase:** `CARTA_INTERCAMBIO_LIMITE_DIA = 3` (**2745**, aplicado en **15404-15407**); `VISITAS_DIA_MAX` con **`429 LIMITE_DIARIO`** en `activos_ocultos` (**11520-11527**) y el limite de **visitas diarias** (**19012**); stock **30**, `amuleto_x2`, gates de faccion/nivel/era y cobro de XP **intactos**.
+6. **Columna conservada:** `consumibles.limite_diario` sigue en el esquema (**30** coincidencias en `db/migrations/*.sql`) y en los `SELECT` de **9835** y **14027** (normalizada en **9921**). **Cero migracion** (ADR-003).
+7. **Presupuesto:** `api/*.js` = **8** ficheros. Ningun endpoint nuevo ni extendido.
+
+### Opciones evaluadas
+
+**(A) Retirar la APLICACION de los tres topes y conservar el dato y la columna.** Cierra los tres caminos, no toca el esquema ni produccion, y deja el rollback en el codigo (revertir el diff). **Elegida.**
+
+**(B) Apagar solo el Gate 5 poniendo `limite_diario = 0` en las filas.** No cierra nada mas: los topes de **20/24 h** y **5/dia** son **constantes en codigo**, no columnas, y seguirian vivos; ademas exige DML sobre produccion para conseguir un efecto parcial. Descartada.
+
+**(C) `DROP` de la columna y de los codigos de error.** Migracion destructiva que rompe los dos `SELECT` que hoy leen `limite_diario` (9835, 14027) y choca con ADR-003. Descartada.
+
+**(D) Subir los numeros (20 -> N, 5 -> M).** Sigue racionando la compra y no elimina los tres codigos muertos del cliente. Descartada: el problema es el criterio (compra), no la cifra.
+
+**(E) Sustituir el tope de compra por un tope de USO nuevo** (p.ej. "N consumibles usados por dia"). Es un limite **nuevo** y la politica del operador lo excluye expresamente (D4). Descartada.
+
+### Decision
+
+**D1 -- Gate de COMPRA retirado entero: los tres.** `mercado_comprar` deja de contar compras (sin 20/24 h, sin `429 LIMITE_COMPRAS_24H`); `comprar_consumible` deja de contar compras globales (sin 5/dia, sin `429 'Limite de 5 compras por dia alcanzado'`) y deja de aplicar el limite por clave (sin Gate 5, sin `409 LIMITE_DIARIO`). El unico freno que queda en los dos flujos es el que ya existia y no es un tope: **stock 30**, **saldo de XP suficiente**, **gates de faccion/nivel/era** y **amuleto**.
+**D2 -- El unico limite que queda es de USO, y es el que ya existia: el intercambio P2P de cartas, 3/dia.** `CARTA_INTERCAMBIO_LIMITE_DIA = 3` (**2745**) no se toca. La distincion es normativa: **comprar no se limita; usar si puede limitarse**, porque el uso es lo que puede inflar el juego y la compra lo que drena la economia.
+**D3 -- La columna `consumibles.limite_diario` SE CONSERVA** en el esquema, en el `SELECT` y en su normalizacion; **solo se retiro su aplicacion**. Pasa de palanca de producto a **dato historico**: leerla ya no describe ninguna regla vigente, y **reintroducirla como tope exige un ADR nuevo** (no un `UPDATE` ni un commit de codigo).
+**D4 -- No se anade ningun limite de uso nuevo.** Ni por consumible, ni por dia, ni por categoria. La politica del operador es explicita: mercado sin tope de compra, y el unico tope de uso que existe es el de intercambio que ya estaba.
+**D5 -- Los codigos que ya no se emiten se retiran del diccionario del cliente en el MISMO pase.** No se dejan ramas de traduccion muertas: `LIMITE_COMPRAS_24H`, `LIMITE_DIARIO` y `'Limite de 5 compras por dia alcanzado'` salen de `mercado.js`.
+**D6 -- Los topes que se quedan vivos se blindan con smokes INVERTIDOS.** La suite debe **fallar** si alguien reintroduce en silencio lo retirado: el bloque **T4** de `smoke_057_consumibles_faccion.js` afirma ahora `200` con `limite_diario 1` ya consumido y `200` con `globN:5`, y el **check 67** de `smoke_test_gamificacion_v4.js` afirma la **ausencia** del tope de 5/dia. El **check 70** (3 intercambios/dia) queda intacto **a proposito**: es el limite que D2 conserva.
+
+### Invariantes
+
+- **I1:** **0** `COUNT` sobre `compra_consumibles` o `mercado_ventas` en los flujos de compra; el freno es de saldo, stock y gates.
+- **I2:** **0** emision de `LIMITE_COMPRAS_24H`, de `LIMITE_DIARIO` de mercado/consumibles y de `'Limite de 5 compras por dia alcanzado'`.
+- **I3:** `CARTA_INTERCAMBIO_LIMITE_DIA = 3`, los limites de visitas (`activos_ocultos` y visitas diarias), el stock **30** y el `amuleto_x2` siguen **vigentes y sin cambios**.
+- **I4:** `consumibles.limite_diario` sigue **legible** y **sin efecto**; cero DDL y cero DML.
+- **I5:** `api/*.js` = **8**; ningun endpoint nuevo ni ampliado.
+
+### Verificacion
+
+- **V1:** `npm test` -> **EXIT 0** (suite completa verde; evidencia de la tanda de codigo, este pase no la re-ejecuta).
+- **V2:** `node scripts/smoke_057_consumibles_faccion.js` -> **148/148 PASS**, exit **0** (re-ejecutado en este pase).
+- **V3:** `node scripts/smoke_test_gamificacion_v4.js` -> **97 PASS / 0 FAIL**, exit **0** (re-ejecutado en este pase): check **67** afirma la ausencia del tope y check **70** (3/dia) sigue verde.
+- **V4:** `node --check` **4/4**; **0** bytes > 127 anadidos; **8/8** funciones serverless.
+- **V5 (ausencias medidas en este pase):** `LIMITE_COMPRAS_24H` = **0** en `api/interacciones.js` y en `mercado.js`; `Limite de 5 compras` = **0**; `ccLimDia` = **0**; `CARTA_INTERCAMBIO_LIMITE_DIA` = **3** apariciones (vivo).
+- **V6:** `git status` = **4 M**, **0** untracked; **sin commit y sin deploy**.
+
+### Consecuencias y riesgos
+
+1. **Un usuario con XP puede vaciar el stock de una clave (30 unidades).** Se acepta: el stock acota el dano y el precio en XP acota la capacidad; la compra sigue **drenando** la economia, que es el sentido del mercado.
+2. **Ya no existe anti-farming de operaciones en el mercado.** Si la emision de XP se volviera farmeable, el mercado seria la via de convertirla en bienes. La defensa correcta esta **en la emision de XP** (ADR-053 y sus sucesores), no en un tope de compra: es el argumento de D1, no una excepcion.
+3. **`limite_diario` es un dato que puede enganar** a quien lea el esquema. Mitigacion: D3 y este ADR; **no se borra** (ADR-003) y **no se re-aplica** sin ADR nuevo.
+4. **Un smoke invertido puede dar un falso rojo** si alguien reescribe los flujos de compra. Es el comportamiento buscado: obliga a decidir si el tope vuelve, en vez de reintroducirlo por copia.
+5. **Orden de deploy:** no es invertible ni hace falta que lo sea. Backend primero solo deja al cliente con textos que no llegan a usarse; cliente primero solo deja codigos sin traducir. Ninguno de los dos rompe el flujo.
+
+### Relacion con ADRs
+
+- **ADR-001 / ADR-010:** 8/8 funciones serverless; cero endpoint nuevo.
+- **ADR-002:** ASCII-safe en `api/*.js`, `mercado.js` y los dos smokes.
+- **ADR-003:** la columna `limite_diario` se conserva; cero `DROP`, cero borrado de dato (D3).
+- **ADR-006:** baseline medido contra el archivo real en este pase (diff, ausencias y permanencias).
+- **ADR-055:** se **deroga** su clausula de anti-farming de **20 compras/24 h** aplicada en `mercado_comprar`; el resto de ADR-055 (nodos, impuesto, cross-Casa, autocompra) **sigue vigente**.
+- **ADR-084:** el argumento se escribe **una vez** aqui; `TASKS.md` TSK-254 y `NEXT.md` solo apuntan.
+
+### Estado
+
+**APLICADO EN ARBOL DE TRABAJO (2026-11-04); SIN COMMIT Y SIN DEPLOY.** Los tres topes de compra ya **no existen** en el codigo y los tres codigos ya **no existen** en el cliente; los smokes que los vigilaban estan **invertidos y en verde** (148/148 y 97/97). **No requiere migracion, ni paso de datos, ni orden de deploy.** Pendiente del operador: **commit, push y deploy**, y una **compra real en produccion** por cada uno de los dos flujos (`mercado_comprar` y `comprar_consumible`) como QA de cierre, que el arbol de trabajo no puede dar.

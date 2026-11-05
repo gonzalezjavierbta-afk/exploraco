@@ -210,9 +210,9 @@ check('64. POST tipo=pandilla_unirse existe', srcInt.indexOf("tipo2 === 'pandill
 check('65. POST tipo=pandilla_salir existe', srcInt.indexOf("tipo2 === 'pandilla_salir'") !== -1);
 check('66. POST tipo=pandilla_reto existe', srcInt.indexOf("tipo2 === 'pandilla_reto'") !== -1);
 
-// --- 8. Anti-farming en codigo ---
-check('67. anti-farming max 5 compras/dia implementado',
-  srcInt.indexOf("INTERVAL '1 day'") !== -1 || srcInt.indexOf('5 compras') !== -1);
+// --- 8. Anti-farming en codigo (los topes de COMPRA ya fueron retirados) ---
+check('67. anti-farming 5 compras/dia RETIRADO (sin tope global de compra ni 20/24h)',
+  srcInt.indexOf('5 compras') === -1 && srcInt.indexOf('LIMITE_COMPRAS_24H') === -1);
 check('68. anti-farming cooldown pandilla 14 dias implementado',
   srcInt.indexOf('14 * 24 * 3600') !== -1 || srcInt.indexOf('14 day') !== -1);
 check('69. anti-farming max 1 pandilla activa por usuario',
@@ -382,7 +382,7 @@ console.log('  (Verificacion en vivo: SELECT clave, precio_xp FROM consumibles O
 console.log('- Checks 51-53: Max 10 miembros / nivel 14 en codigo fuente');
 console.log('  (Verificacion en vivo: POST pandilla_crear sin nivel 14 -> 403)');
 console.log('- Check 67-72: Anti-farming en codigo fuente');
-console.log('  (Verificacion en vivo: 6 compras en 1 dia -> 429)');
+console.log('  (Verificacion en vivo: 6 compras en 1 dia -> 200, sin tope global)');
 console.log('- Check 73-75: ASCII-safe por buffer read');
 console.log('  (Verificacion en vivo: Escudo GOLD antes de deploy)');
 console.log('- Checks 80-85: Shape de respuesta documentado en comentarios/retornos');

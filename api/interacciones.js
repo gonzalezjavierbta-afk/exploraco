@@ -1,3 +1,12 @@
+// api/interacciones.js  v31 (retirada de los topes de COMPRA diaria): se
+//   eliminan 3 limites anti-farming SOLO en los flujos de compra:
+//   (1) mercado_comprar: tope de 20 compras por comprador en 24 h;
+//   (2) comprar_consumible: tope global de cinco compras por dia;
+//   (3) comprar_consumible Gate 5: limite diario por clave (categoria
+//       'faccion' con limite_diario > 0).
+//   Se CONSERVA el SELECT de limite_diario (degradacion escalonada) y NO
+//   se toca ningun otro tope: carta_intercambiar (3/dia) y los limites de
+//   visitas siguen igual. Cero endpoints nuevos (8/8); sin esquema nuevo.
 // api/interacciones.js  v30 (Unificacion del Arbol de Clases, ADR-058
 //   seccion 8.3 / M-2): se ELIMINA el bono plano x1.2 del Arbol y el Arbol
 //   pasa a usar el MISMO factor escalonado del motor de XP
@@ -13999,7 +14008,7 @@ module.exports = async function handler(req, res) {
       // Requieren la migracion 010 aplicada en Neon.
       // ==========================================================
 
-      // Comprar consumible pagando xp_total (anti-farming max 5/dia).
+      // Comprar consumible pagando xp_total (sin tope diario de compras).
       if (tipo2 === 'comprar_consumible') {
         // ADR-110 R2: el autor es SIEMPRE el 'sub' del token firmado. El
         // usuario_id del body se acepta por compatibilidad y se IGNORA (no se
@@ -14093,8 +14102,8 @@ module.exports = async function handler(req, res) {
         }
         // Gate de era (ADR-056): compra exclusiva por era. El item solo se
         // compra si la era ganada del usuario coincide con era_exclusiva.
-        // NULL = sin gate (tienda base). Va antes del chequeo de XP, del
-        // anti-farming y del UPDATE.
+        // NULL = sin gate (tienda base). Va antes del chequeo de XP
+        // y del UPDATE.
         var ccEraItem = ccCons[0].era_exclusiva || null;
         if (ccEraItem) {
           var ccEraUsuario = calcularEraVisibleLocal(ccUsr[0].xp_total, ccUsr[0].nivel_max);
@@ -14110,32 +14119,6 @@ module.exports = async function handler(req, res) {
         var ccDisp = Math.max(ccXp - numXp(ccUsr[0].xp_gastado_sinks), 0);
         if (ccDisp < ccPrecio)
           return res.status(409).json({ ok: false, error: 'XP insuficiente', xp_disponible: red2(ccDisp), xp_total: red2(ccXp), precio: ccPrecio });
-        // Gate 5 (migracion 057): LIMITE DIARIO POR CLAVE. SOLO para categoria
-        // 'faccion' con limite_diario > 0 (0 = sin tope por clave, valor de las
-        // filas clasicas). Cuenta las compras de ESTE consumible en 24 h.
-        var ccLimDia = parseInt(ccCons[0].limite_diario, 10) || 0;
-        if (ccCategoria === 'faccion' && ccLimDia > 0) {
-          var ccLimRows = await sql(
-            "SELECT COUNT(*)::int AS n FROM compra_consumibles WHERE usuario_id=$1 AND consumible_id=$2 AND creado_en > NOW() - INTERVAL '1 day'",
-            [usuarioId2, ccCons[0].id]
-          ).catch(function(eCcLim) {
-            console.warn('[interacciones] comprar_consumible limite diario no leido: ' + (eCcLim && eCcLim.message));
-            return [];
-          });
-          var ccLimN = (ccLimRows[0] && ccLimRows[0].n) ? ccLimRows[0].n : 0;
-          if (ccLimN >= ccLimDia)
-            return res.status(409).json({
-              ok: false, error: 'LIMITE_DIARIO',
-              limite_diario: ccLimDia, compras_24h: ccLimN
-            });
-        }
-        // Anti-farming: max 5 compras por dia por usuario
-        var ccCount = await sql(
-          "SELECT COUNT(*)::int AS n FROM compra_consumibles WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL '1 day'",
-          [usuarioId2]
-        ).catch(function(){ return []; });
-        if ((ccCount[0] && ccCount[0].n) >= 5)
-          return res.status(429).json({ ok: false, error: 'Limite de 5 compras por dia alcanzado' });
         // amuleto_x2: no apilar multiplicadores activos
         var ccCaps = ccUsr[0].capacidades || {};
         if (ccClave === 'amuleto_x2' && (parseInt(ccCaps.multiplicador_x2_usos, 10) || 0) > 0)
@@ -17596,14 +17579,6 @@ module.exports = async function handler(req, res) {
             return res.status(409).json({ ok: false, error: 'OFERTA_NO_DISPONIBLE' });
           if (numXp(mqOf[0].cantidad_restante) < mqCant)
             return res.status(409).json({ ok: false, error: 'CANTIDAD_INSUFICIENTE' });
-          // Anti-farming: tope de 20 compras por comprador en 24h.
-          var mqCount = await sql(
-            "SELECT COUNT(*)::int AS n FROM mercado_ventas WHERE comprador_id=$1::uuid"
-            + " AND creado_en > NOW() - INTERVAL '24 hours'",
-            [mqUid]
-          );
-          if ((mqCount[0] && Number(mqCount[0].n)) >= 20)
-            return res.status(429).json({ ok: false, error: 'LIMITE_COMPRAS_24H' });
           mqUsr = await sql(
             'SELECT casa, xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1',
             [mqUid]

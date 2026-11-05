@@ -8,7 +8,7 @@
 // Bloque T1  GET  ?tipo=consumibles      -> 8 columnas + escalera de degradacion
 // Bloque T2  bloqueado/motivo_bloqueo    -> prioridad faccion > nivel > era
 // Bloque T3  POST ?tipo=comprar_consumible -> orden de gates y cero cobro
-// Bloque T4  limite_diario por clave     -> solo faccion; tope global 5 intacto
+// Bloque T4  sin topes de compra             -> ni por clave ni global 5/dia
 // Bloque T5  stock                       -> 409 STOCK_LLENO con tope 30 (1 sola declaracion)
 // Bloque T6  POST ?tipo=usar_consumible  -> rama faccion atomica
 // Bloque T7  consumirBonoFaccion         -> decremento condicionado + bono PLANO + ledger propio
@@ -498,7 +498,7 @@ async function run() {
   // Con faccion_requerida NULL (estado que deja la 062) la compra se aplica a
   // CUALQUIER faccion: se compra con un usuario 'artistas' y con un usuario sin
   // faccion. nivel_requerido se deja en NULL para aislar el gate de faccion; la
-  // conservacion de nivel_requerido = 4 se afirma en T2-11 y en T4-8.
+  // conservacion de nivel_requerido = 4 se afirma en T2-11.
   var comprasFase1 = [];
   for (var cf = 0; cf < CLAVES_FASE1.length; cf++) {
     instalarMock(mockCompra({
@@ -525,21 +525,24 @@ async function run() {
     t3f._status === 200, t3f._json || t3f._status);
 
   console.log('');
-  console.log('== T4 limite_diario por clave (solo faccion) + tope global de 5');
-  // El LIMITE_DIARIO depende de categoria = 'faccion' y limite_diario > 0, NO
-  // del gate de faccion: con faccion_requerida NULL (estado de la 062 en las 4
-  // claves de fase 1) el tope por clave sigue vivo.
+  console.log('== T4 sin topes de compra: ni limite por clave ni tope global de 5');
+  // Politica vigente de comprar_consumible: NO hay tope por clave (LIMITE_DIARIO),
+  // NO hay tope global de 5 compras/dia ni el viejo tope de 20 compras/24h. El
+  // unico tope de compra que queda es el STOCK de 30 (bloque T5). Estos checks
+  // afirman justo eso: con los contadores historicos llenos, la compra es 200.
   instalarMock(mockCompra({
     item: { categoria: 'faccion', limite_diario: 1, faccion_requerida: null },
     fac: 'artistas', limN: 1, globN: 1
   }));
   var t4a = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'consumible_catalejo_explorador' });
-  check('T4-1: faccion con limite_diario 1 y 1 compra en 24 h -> 409 LIMITE_DIARIO',
-    t4a._status === 409 && t4a._json && t4a._json.error === 'LIMITE_DIARIO', t4a._json);
-  check('T4-2: el 409 informa limite_diario y compras_24h',
-    !!(t4a._json && t4a._json.limite_diario === 1 && t4a._json.compras_24h === 1), t4a._json);
-  check('T4-3: el limite por clave se evalua antes del cobro',
-    cuentaSql('xp_total = xp_total - $1') === 0);
+  check('T4-1: faccion con limite_diario 1 y 1 compra en 24 h -> 200 (tope por clave retirado)',
+    t4a._status === 200, t4a._json || t4a._status);
+  check('T4-2: esa compra se cobra igual (1 UPDATE de xp y 1 asiento de ledger)',
+    cuentaSql('xp_total = xp_total - $1') === 1
+    && cuentaSql('INSERT INTO compra_consumibles') === 1);
+  check('T4-3: la compra ya no consulta el tope por clave ni el contador global',
+    cuentaSql('consumible_id=$2') === 0
+    && cuentaSql('FROM compra_consumibles') === 0);
 
   instalarMock(mockCompra({
     item: { categoria: 'social', limite_diario: 1, faccion_requerida: null },
@@ -556,13 +559,11 @@ async function run() {
     fac: null, globN: 5
   }));
   var t4c = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'prod_cafe' });
-  check('T4-6: el tope GLOBAL de 5 compras/dia sigue vivo -> 429',
-    t4c._status === 429, t4c._json || t4c._status);
-  check('T4-7: el 429 global trae el mensaje historico de 5 compras',
-    !!(t4c._json && String(t4c._json.error || '').indexOf('5 compras por dia') !== -1), t4c._json);
-  check('T4-8: el LIMITE_DIARIO no depende del gate de faccion (item con faccion_requerida NULL)',
-    t4a._status === 409 && t4a._json && t4a._json.error === 'LIMITE_DIARIO'
-    && t4a._json.limite_diario === 1, t4a._json);
+  check('T4-6: con 5 compras previas hoy la compra sigue siendo 200 (tope global retirado)',
+    t4c._status === 200, t4c._json || t4c._status);
+  check('T4-7: la respuesta ya no trae el mensaje historico de 5 compras por dia',
+    !(t4c._json && String(t4c._json.error || '').indexOf('5 compras por dia') !== -1),
+    t4c._json);
 
   console.log('');
   console.log('== T5 stock: 409 STOCK_LLENO con tope 30');

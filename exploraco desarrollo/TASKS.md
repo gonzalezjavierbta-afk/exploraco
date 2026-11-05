@@ -6950,5 +6950,42 @@ El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 evento
 
 **Enlaces (no argumentos; ADR-084 D1).** **ADR-117** (decision, D1-D11, invariantes I1-I6 y verificacion V1-V9) | **ADR-001** (8/8 y D7) | **ADR-002** (ASCII-safe) | **ADR-003** (cero borrado: D2, D5, D9, D11) | **ADR-006** (baseline = archivo real) | **ADR-008** (Silent Fallback de la miniatura) | **ADR-010** (presupuesto de funciones) | **ADR-062** (rama `cartas_ofertas`) | **TSK-243** (cartas unificadas) | **TSK-248** y **TSK-249** (arte y ficha de carta).
 
+## TSK-254 - El mercado pierde los topes de COMPRA: retirados los tres limites (20/24 h de `mercado_comprar`, global de 5/dia y Gate 5 por clave de `comprar_consumible` en el mismo pase), limpiadas las 3 entradas muertas de `mercado.js` y blindado con 2 smokes invertidos; el limite de USO (intercambio 3/dia), las visitas, el stock 30 y la columna `consumibles.limite_diario` se conservan - 2026-11-04 - COMPLETADA EN ARBOL DE TRABAJO (sin commit y sin deploy)
+
+**Estado: COMPLETADA Y VERIFICADA EN ARBOL DE TRABAJO -- 2026-11-04** (pase documental unico R2). **El argumento de la decision vive SOLO en ADR-118** (`DECISIONS.md`, ADR-084 D1); aqui solo el **alcance real**, la **evidencia medida** y el **relevo**. **Cero migracion, cero DML, cero endpoint nuevo** (`api/*.js` = **8**, ADR-001/ADR-010).
+
+**Alcance real ejecutado (3 topes de compra retirados; ningun tope de uso tocado).**
+
+1. **`api/interacciones.js` (v31; `git diff --stat` = 49 lineas, 12+/37-) -- `mercado_comprar`.** Retirado el anti-farming de **20 compras por comprador en 24 h** (rama en **17550**; bloque eliminado **17599-17606**): fuera `mqCount` (`COUNT(*) FROM mercado_ventas` por `comprador_id` en 24 h) y su `429 LIMITE_COMPRAS_24H`. El flujo pasa de `CANTIDAD_INSUFICIENTE` a la carga de `mqUsr`.
+2. **`api/interacciones.js` -- `comprar_consumible` (rama en `14012`; bloque eliminado `14113-14138`).** (a) Retirado el **tope global de 5 compras/dia** (`ccCount`, `COUNT` global sobre `compra_consumibles`, `429 'Limite de 5 compras por dia alcanzado'`); (b) retirado el **Gate 5 `LIMITE_DIARIO` por clave** (solo `categoria='faccion'` con `limite_diario > 0`): fuera `ccLimDia`/`ccLimRows`/`ccLimN`, el `COUNT` por `consumible_id` y el `409 LIMITE_DIARIO`. El flujo va del gate de XP directo al `UPDATE`.
+3. **`mercado.js` (7 lineas).** Eliminadas las **3** entradas del diccionario de errores que ya no se emiten (`LIMITE_COMPRAS_24H` L89, `LIMITE_DIARIO` L100, `'Limite de 5 compras por dia alcanzado'` L107) y el comentario de L101-102 pasa de "estos tres" a "estos dos". Cero ramas de traduccion muertas.
+4. **`scripts/smoke_057_consumibles_faccion.js` (39 lineas).** Bloque **T4** rehecho como **"sin topes de compra"** (`== T4 sin topes de compra: ni limite por clave ni tope global de 5`, L528): `faccion` con `limite_diario:1` y `limN:1` -> **200** (T4-1) y `social` con `globN:5` -> **200** (T4-3); **T4-1..T4-7 renumerados**. El encabezado del fichero (L11) declara el bloque nuevo.
+5. **`scripts/smoke_test_gamificacion_v4.js` (8 lineas).** **Check 67 invertido** (L214): `'anti-farming 5 compras/dia RETIRADO (sin tope global de compra ni 20/24h)'`. **Check 70 (3 intercambios/dia) intacto a proposito.**
+
+**Verificacion medida (ADR-006; V2 y V3 re-ejecutados en este pase, no citados).**
+
+- **V1:** `npm test` -> **EXIT 0** (suite completa verde; evidencia de la tanda de codigo, este pase no la re-ejecuta).
+- **V2:** `node scripts/smoke_057_consumibles_faccion.js` -> **`RESULTADO: OK - 148 verificaciones pasaron`**, exit **0**.
+- **V3:** `node scripts/smoke_test_gamificacion_v4.js` -> **`Checks: 97 total, 97 PASS, 0 FAIL`**, exit **0**.
+- **V4:** `node --check` **4/4** (`api/interacciones.js`, `mercado.js` y los 2 smokes); **0** bytes > 127 anadidos; `api/*.js` = **8**.
+- **V5 (grep de ausencia, medido aqui):** `LIMITE_COMPRAS_24H` = **0** en `api/interacciones.js` y en `mercado.js`; `Limite de 5 compras` = **0**; `ccLimDia` = **0**; `CARTA_INTERCAMBIO_LIMITE_DIA` = **3** apariciones (vivo).
+- **V6:** `git status` = **4 M** (`api/interacciones.js`, `mercado.js`, los 2 smokes), **0** untracked. **Sin commit y sin deploy.**
+
+**Lo que se conserva (INTACTO a proposito, ADR-118 D2/D3).**
+
+| Elemento | Anclaje medido | Estado |
+|---|---|---|
+| Intercambio P2P de cartas, **3/dia** (limite de USO) | `CARTA_INTERCAMBIO_LIMITE_DIA = 3` en **2745**, aplicado **15404-15407** | **VIGENTE** |
+| Limite de **visitas** de `activos_ocultos` | `VISITAS_DIA_MAX` + `429 LIMITE_DIARIO` en **11520-11527** | **VIGENTE** |
+| Limite de **visitas diarias** | `429 LIMITE_DIARIO` en **19012** | **VIGENTE** |
+| **Stock 30**, `amuleto_x2`, gates faccion/nivel/era, cobro de XP | flujos de compra | **SIN CAMBIOS** |
+| Columna `consumibles.limite_diario` | esquema (**30** coincidencias en `db/migrations/*.sql`) + `SELECT` en **9835** y **14027** (normalizada **9921**) | **CONSERVADA, SIN APLICACION** |
+
+**Deudas y riesgos declarados.** (1) `limite_diario` queda como **dato sin efecto**: quien lea el esquema puede creer que limita; se documenta en ADR-118 D3 y **no se borra** (ADR-003). (2) **Sin anti-farming de operaciones** en el mercado: si la emision de XP se volviera farmeable, la defensa va en la emision, no en un tope de compra. (3) Los smokes invertidos **pueden dar falso rojo** si se reescriben los flujos: es el comportamiento buscado (obliga a decidir si el tope vuelve).
+
+**Pendiente (operador).** **Commit + push + deploy** de los **4** ficheros, y **una compra real en produccion por cada flujo** (`mercado_comprar` y `comprar_consumible`) como QA de cierre. **No hay migracion, ni paso de datos, ni orden de deploy obligatorio** (el cambio tolera ambos ordenes).
+
+**Enlaces (no argumentos; ADR-084 D1).** **ADR-118** (decision, D1-D6, invariantes I1-I5 y verificacion V1-V6) | **ADR-055** (se deroga su anti-farming 20/24 h; el resto sigue) | **ADR-001/ADR-010** (8/8) | **ADR-002** (ASCII-safe) | **ADR-003** (columna conservada) | **ADR-006** (baseline medido) | **TSK-151** (origen del anti-farming del mercado) | **migracion 057** (origen del Gate 5 por clave).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

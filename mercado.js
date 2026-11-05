@@ -86,7 +86,6 @@
     XP_INSUFICIENTE: 'No te alcanza el XP para esta operacion.',
     AUTOCOMPRA_PROHIBIDA: 'No puedes comprar tu propia oferta.',
     CROSS_CASA_NO_PERMITIDO: 'Esa Casa no permite operar entre Casas.',
-    LIMITE_COMPRAS_24H: 'Alcanzaste el limite de 20 compras en 24 horas.',
     SCHEMA_NOT_MIGRATED: 'El Mercado se esta habilitando. Vuelve pronto.',
     SESION_REQUERIDA: 'Inicia sesion para operar en el Mercado.',
     SESION_EXPIRADA: 'Tu sesion expiro. Vuelve a entrar.',
@@ -97,14 +96,12 @@
     FACCION_INSUFICIENTE: 'Ese articulo es de otra faccion.',
     ERA_INSUFICIENTE: 'Ese articulo es de otra era.',
     STOCK_LLENO: 'Ya tienes el tope de unidades de ese articulo.',
-    LIMITE_DIARIO: 'Alcanzaste el limite diario de ese articulo.',
     PUNTOS_INSUFICIENTES: 'No te alcanza el XP para esta operacion.',
     USUARIO_ID_INVALIDO: 'Tu sesion no es valida. Vuelve a entrar.',
-    /* Estos tres NO son codigos del motor: son los textos literales que
-     * devuelve comprar_consumible en sus ramas de XP, tope diario y amuleto. */
+    /* Estos dos NO son codigos del motor: son los textos literales que
+     * devuelve comprar_consumible en sus ramas de XP y de amuleto. */
     'XP insuficiente': 'No te alcanza el XP para esta compra.',
     'XP insuficiente para la compra': 'No te alcanza el XP para esta compra.',
-    'Limite de 5 compras por dia alcanzado': 'Alcanzaste el limite de 5 compras por dia.',
     'Ya tienes un amuleto x2 activo': 'Ya tienes un amuleto x2 activo.'
   };
 
