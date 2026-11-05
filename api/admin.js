@@ -375,6 +375,46 @@ function normalizarNivelGateCarta(valor) {
   if (!isFinite(n) || n < 1 || n > 100) return undefined;
   return n;
 }
+// ADR-117 D11: ocultar una carta libera su plaza de museo. El cambio de
+// estado y la limpieza van en UN solo statement con CTE para que no exista
+// el estado parcial "carta oculta pero equipada". No toca cantidad ni borra
+// filas (ADR-003). Recibe sql porque el cliente Neon vive en el handler.
+// Devuelve {aplicadas, museo_limpiado}; si usuarios_cartas no existe (42P01)
+// o le falta una columna (42703) la limpieza es best-effort: la desactivacion
+// se completa igual y la curaduria nunca queda bloqueada.
+async function desactivarCartasD11(sql, ids) {
+  var lista = Array.isArray(ids) ? ids : [ids];
+  var apl = [];
+  var limpiados = 0;
+  var i, j;
+  try {
+    var r = await sql(
+      'WITH inp AS (SELECT unnest($1::text[]) AS id), '
+      + 'upd AS (UPDATE cartas_catalogo c SET activo=false FROM inp i '
+      + 'WHERE c.id = i.id RETURNING c.id), '
+      + 'limp AS (UPDATE usuarios_cartas SET en_museo=false, orden_museo=NULL '
+      + 'WHERE carta_id IN (SELECT id FROM upd) AND en_museo = true RETURNING 1), '
+      + 'apl AS (SELECT id FROM upd) '
+      + 'SELECT i.id, (SELECT count(*) FROM limp) AS museo_limpiado '
+      + 'FROM inp i JOIN apl a ON a.id = i.id',
+      [lista]
+    );
+    for (i = 0; i < r.length; i++) {
+      apl.push(r[i].id);
+      if (!limpiados) limpiados = Number(r[i].museo_limpiado) || 0;
+    }
+    return { aplicadas: apl, museo_limpiado: limpiados };
+  } catch (eD11) {
+    if (!esquemaAusente(eD11)) throw eD11;
+    var r2 = await sql(
+      'UPDATE cartas_catalogo SET activo=false WHERE id = ANY($1::text[]) RETURNING id',
+      [lista]
+    );
+    for (j = 0; j < r2.length; j++) apl.push(r2[j].id);
+    console.warn('[admin cartas] museo no limpiado (esquema ausente): ' + eD11.code);
+    return { aplicadas: apl, museo_limpiado: 0 };
+  }
+}
 
 // -- CARTAS: EMISOR / UGC / MARCA (D-6 del ADR-108, migracion 060) --------
 // cartas_catalogo gana emisor_tipo ('sistema'|'ugc'|'marca'), emisor_id
@@ -1060,11 +1100,20 @@ module.exports = async function handler(req, res) {
   // == CARTAS DE TERRITORIO (ADR-062, migraciones 040/041) =================
   // CRUD del catalogo cartas_catalogo con el mismo patron que consumibles:
   // router real por ?recurso=cartas y ?tipo=cartas_lista|cartas_crear|
-  // cartas_editar|cartas_toggle. El id es identidad y NUNCA se edita (igual
-  // que consumibles.clave). CERO BORRADO FISICO: no hay DELETE; la baja es
-  // cartas_toggle (activo = NOT activo, o body.activo explicito). Degradacion
-  // 503 SCHEMA_NOT_MIGRATED (42P01/42703) si la 040 no corrio (patron
-  // BUG-021). No crea endpoints (8/8, ADR-001).
+  // cartas_editar|cartas_toggle|cartas_imagenes_masivas|cartas_lote. El id es
+  // identidad y NUNCA se edita (igual que consumibles.clave). CERO BORRADO
+  // FISICO: no hay DELETE; la baja es cartas_toggle (activo = NOT activo, o
+  // body.activo explicito). Degradacion 503 SCHEMA_NOT_MIGRATED (42P01/42703)
+  // si la 040 no corrio (patron BUG-021). No crea endpoints (8/8, ADR-001).
+  // ADR-117 (Fase 1): JUGABLE = activo=true AND imagen_url no vacia; activo
+  // sigue siendo el unico interruptor de curaduria. La autoridad de juego es
+  // la vista cartas_jugables (064); aqui tiene_diseno/jugable son solo
+  // curaduria. Activar sin lamina -> 400 CARTA_SIN_DISENO; quitar la lamina
+  // a una carta ACTIVA -> 400 CARTA_ACTIVA_SIN_DISENO (desactivar primero);
+  // crear sin lamina nace INACTIVA (motivo SIN_DISENO). Las acciones en masa
+  // (imagenes_masivas <=100, lote <=200) resuelven en UN statement, saltan
+  // las que ya tienen diseno salvo reemplazar:true y desactivar limpia la
+  // plaza de museo (D11) sin tocar cantidad ni borrar filas (ADR-003).
   if (recurso === 'cartas') {
     if (!auth(req)) return denegar(res, 'admin');
     var tipoCa = req.query.tipo || 'cartas_lista';
@@ -1075,7 +1124,9 @@ module.exports = async function handler(req, res) {
         if (req.method !== 'GET') return res.status(405).end();
         var filasCa = await sql(
           'SELECT id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en, '
-          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable '
+          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, '
+          + '(imagen_url IS NOT NULL AND btrim(imagen_url) <> \'\') AS tiene_diseno, '
+          + '(activo AND imagen_url IS NOT NULL AND btrim(imagen_url) <> \'\') AS jugable '
           + 'FROM cartas_catalogo '
           + 'ORDER BY activo DESC, set_slug ASC, nivel_gate ASC NULLS FIRST, id ASC'
         );
@@ -1101,6 +1152,15 @@ module.exports = async function handler(req, res) {
         var imgCa = String(body.imagen_url == null ? '' : body.imagen_url).trim() || null;
         if (imgCa && imgCa.length > 500)
           return res.status(400).json({ ok:false, error:'IMAGEN_URL_INVALIDA' });
+        // ADR-117 D3.3: la carta nace con activo = presencia de lamina. Sin
+        // lamina se crea INACTIVA (la respuesta lo declara) y pedir activo
+        // explicito sin lamina es un 400: ningun camino activa sin diseno.
+        if (('activo' in body) && body.activo === true && !imgCa)
+          return res.status(400).json({
+            ok:false, error:'CARTA_SIN_DISENO',
+            detalle:'Sin imagen_url la carta no puede nacer activa'
+          });
+        var actCa = imgCa ? (body.activo !== false) : false;
         // D-6 del ADR-108 (migracion 060): emisor, descripcion, stats_json,
         // es_canjeable_qr y fusionable entran por la MISMA via (cartas_crear).
         var emiTipoCa = normalizarEmisorTipoCarta(body.emisor_tipo);
@@ -1138,15 +1198,20 @@ module.exports = async function handler(req, res) {
         if (existCa.length)
           return res.status(409).json({ ok:false, error:'Ya existe una carta con ese id' });
         var insCa = await sql(
-          'INSERT INTO cartas_catalogo (id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, '
+          'INSERT INTO cartas_catalogo (id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, '
           + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable) '
-          + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14) '
+          + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15) '
           + 'RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en, '
           + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable',
-          [idCa, nomCa, setCa, rarCa, nivCa, evCa, imgCa,
+          [idCa, nomCa, setCa, rarCa, nivCa, evCa, imgCa, actCa,
            emiTipoCa, emiCa, marCa, descCa, JSON.stringify(statsCa), qrCa, fusCa]
         );
-        return res.status(201).json({ ok:true, data: insCa[0], mensaje:'Carta creada' });
+        var respCa = { ok:true, data: insCa[0], mensaje:'Carta creada' };
+        if (!imgCa) {
+          respCa.activo = false;
+          respCa.motivo = 'SIN_DISENO';
+        }
+        return res.status(201).json(respCa);
       }
 
       // --- Editar: campos de contenido (NUNCA el id) --------------------
@@ -1161,10 +1226,13 @@ module.exports = async function handler(req, res) {
         var tocaEmiCa = ('emisor_tipo' in body) || ('emisor_id' in body) || ('marca_id' in body);
         var tocaInvCa = tocaEmiCa || ('fusionable' in body) || ('nivel_gate' in body)
           || ('es_evento' in body) || ('es_canjeable_qr' in body);
+        // ADR-117 D3.2: tocar imagen_url exige leer activo para no dejar sin
+        // lamina una carta ACTIVA (el invariante I1 se romperia por detras).
+        var tocaImgCa = ('imagen_url' in body);
         var curCa = [];
-        if (tocaInvCa) {
+        if (tocaInvCa || tocaImgCa) {
           curCa = await sql(
-            'SELECT nivel_gate, es_evento, es_canjeable_qr, emisor_tipo, emisor_id, marca_id, fusionable '
+            'SELECT nivel_gate, es_evento, es_canjeable_qr, emisor_tipo, emisor_id, marca_id, fusionable, activo '
             + 'FROM cartas_catalogo WHERE id=$1 LIMIT 1',
             [body.id]
           );
@@ -1209,6 +1277,14 @@ module.exports = async function handler(req, res) {
           var imgE2 = String(body.imagen_url == null ? '' : body.imagen_url).trim() || null;
           if (imgE2 && imgE2.length > 500)
             return res.status(400).json({ ok:false, error:'IMAGEN_URL_INVALIDA' });
+          // ADR-117 D3.2/R2: quitar la lamina de una carta ACTIVA se bloquea
+          // (dos pasos explicitos: desactivar y luego limpiar). Sobre una
+          // carta inactiva limpiar la lamina si se permite.
+          if (!imgE2 && curCa.length && curCa[0].activo === true)
+            return res.status(400).json({
+              ok:false, error:'CARTA_ACTIVA_SIN_DISENO',
+              detalle:'Desactiva la carta antes de quitar el diseno'
+            });
           setsCa.push('imagen_url=$' + piCa++); paramsCa.push(imgE2);
         }
         if ('descripcion' in body) {
@@ -1305,13 +1381,163 @@ module.exports = async function handler(req, res) {
       if (tipoCa === 'cartas_toggle') {
         if (req.method !== 'POST') return res.status(405).end();
         if (!body.id) return res.status(400).json({ ok:false, error:'id requerido' });
-        var filaCa = await sql('SELECT activo FROM cartas_catalogo WHERE id=$1 LIMIT 1',[body.id]);
+        var filaCa = await sql('SELECT activo, imagen_url FROM cartas_catalogo WHERE id=$1 LIMIT 1',[body.id]);
         if (!filaCa.length) return res.status(404).json({ ok:false, error:'Carta no encontrada' });
         var nuevoCa = (typeof body.activo === 'boolean') ? body.activo : !filaCa[0].activo;
-        await sql('UPDATE cartas_catalogo SET activo=$1 WHERE id=$2',[nuevoCa, body.id]);
+        // ADR-117 D3: activar sin lamina se bloquea (sin escribir nada).
+        // Desactivar NUNCA se bloquea.
+        var disenoCa = String(filaCa[0].imagen_url == null ? '' : filaCa[0].imagen_url).trim() !== '';
+        if (nuevoCa === true && !disenoCa)
+          return res.status(400).json({
+            ok:false, error:'CARTA_SIN_DISENO', ids:[body.id],
+            detalle:'Carga la lamina (imagen_url) antes de activar la carta'
+          });
+        var limpCa = 0;
+        if (nuevoCa === true) {
+          await sql('UPDATE cartas_catalogo SET activo=true WHERE id=$1',[body.id]);
+        } else {
+          // D11: desactivar y limpiar la plaza de museo, en un solo statement.
+          var desCa = await desactivarCartasD11(sql, [body.id]);
+          limpCa = desCa.museo_limpiado;
+        }
         return res.status(200).json({
-          ok:true, activo:nuevoCa,
+          ok:true, activo:nuevoCa, museo_limpiado:limpCa,
           mensaje: nuevoCa ? 'Carta activada' : 'Carta desactivada',
+        });
+      }
+
+      // --- Laminas en masa (ADR-117 D7) ---------------------------------
+      // items:[{id, imagen_url}] (o archivos:[{nombre, url}], el nombre de
+      // archivo se normaliza a id). Un solo statement con unnest + UPDATE
+      // ... WHERE id = ANY(...); reemplazar=false SALTA las que ya tienen
+      // diseno. No borra ni vacia la lamina de ninguna fila (ADR-003).
+      if (tipoCa === 'cartas_imagenes_masivas') {
+        if (req.method !== 'POST') return res.status(405).end();
+        var entCa = [];
+        var ii, ia, itCa, arCa, nomArCa;
+        if (Array.isArray(body.items)) {
+          for (ii = 0; ii < body.items.length; ii++) {
+            itCa = body.items[ii] || {};
+            entCa.push({ id: itCa.id, url: itCa.imagen_url });
+          }
+        } else if (Array.isArray(body.archivos)) {
+          for (ia = 0; ia < body.archivos.length; ia++) {
+            arCa = body.archivos[ia] || {};
+            nomArCa = String(arCa.nombre == null ? '' : arCa.nombre).trim().toLowerCase();
+            nomArCa = nomArCa.replace(/\.(png|jpe?g|webp|gif|avif)$/, '');
+            entCa.push({ id: nomArCa, url: arCa.url });
+          }
+        }
+        if (!entCa.length)
+          return res.status(400).json({ ok:false, error:'ITEMS_VACIO', detalle:'items debe ser un array no vacio' });
+        if (entCa.length > 100)
+          return res.status(400).json({ ok:false, error:'DEMASIADOS_ITEMS', detalle:'maximo 100 laminas por commit' });
+        var reempCa = body.reemplazar === true;
+        var rechCa = [];
+        var mapaCa = {};
+        var ordenCa = [];
+        var k, idK, urlK;
+        for (k = 0; k < entCa.length; k++) {
+          idK = normalizarSlugCarta(entCa[k].id, 60);
+          urlK = String(entCa[k].url == null ? '' : entCa[k].url).trim();
+          if (!idK) {
+            rechCa.push({ id: String(entCa[k].id == null ? '' : entCa[k].id), motivo:'ID_INVALIDO' });
+            continue;
+          }
+          if (!urlK || urlK.length > 500) {
+            rechCa.push({ id: idK, motivo:'IMAGEN_URL_INVALIDA' });
+            continue;
+          }
+          if (!mapaCa[idK]) ordenCa.push(idK);
+          mapaCa[idK] = urlK;
+        }
+        var idsCa = [];
+        var urlsCa = [];
+        var m;
+        for (m = 0; m < ordenCa.length; m++) { idsCa.push(ordenCa[m]); urlsCa.push(mapaCa[ordenCa[m]]); }
+        var aplCa = [];
+        if (idsCa.length) {
+          var resCa = await sql(
+            'WITH inp AS (SELECT * FROM unnest($1::text[], $2::text[]) AS t(id, url)), '
+            + 'upd AS (UPDATE cartas_catalogo c SET imagen_url = i.url FROM inp i '
+            + 'WHERE c.id = i.id AND ($3::boolean OR c.imagen_url IS NULL OR btrim(c.imagen_url) = \'\') '
+            + 'RETURNING c.id), '
+            + 'apl AS (SELECT id FROM upd) '
+            + 'SELECT i.id, CASE WHEN a.id IS NOT NULL THEN \'aplicada\' '
+            + 'WHEN c.id IS NULL THEN \'NO_ENCONTRADA\' ELSE \'YA_TIENE_DISENO\' END AS estado '
+            + 'FROM inp i LEFT JOIN apl a ON a.id = i.id '
+            + 'LEFT JOIN cartas_catalogo c ON c.id = i.id',
+            [idsCa, urlsCa, reempCa]
+          );
+          var n;
+          for (n = 0; n < resCa.length; n++) {
+            if (resCa[n].estado === 'aplicada') aplCa.push(resCa[n].id);
+            else rechCa.push({ id: resCa[n].id, motivo: resCa[n].estado });
+          }
+        }
+        return res.status(200).json({ ok:true, aplicadas: aplCa, rechazadas: rechCa });
+      }
+
+      // --- Lote: activar/desactivar N cartas (ADR-117 D3 + D11) ---------
+      // Activar solo toca las que tienen diseno (el resto -> SIN_DISENO).
+      // Desactivar usa el helper D11: el CTE hace catalogo y museo en una
+      // sola sentencia (orden: cartas_catalogo -> usuarios_cartas).
+      if (tipoCa === 'cartas_lote') {
+        if (req.method !== 'POST') return res.status(405).end();
+        if (!Array.isArray(body.ids) || !body.ids.length)
+          return res.status(400).json({ ok:false, error:'IDS_VACIO', detalle:'ids debe ser un array no vacio' });
+        if (body.ids.length > 200)
+          return res.status(400).json({ ok:false, error:'DEMASIADOS_IDS', detalle:'maximo 200 ids por lote' });
+        if (typeof body.activo !== 'boolean')
+          return res.status(400).json({ ok:false, error:'ACTIVO_INVALIDO', detalle:'activo debe ser boolean' });
+        var rechLoteCa = [];
+        var vistosCa = {};
+        var idsLoteCa = [];
+        var q, idQ;
+        for (q = 0; q < body.ids.length; q++) {
+          idQ = normalizarSlugCarta(body.ids[q], 60);
+          if (!idQ) {
+            rechLoteCa.push({ id: String(body.ids[q] == null ? '' : body.ids[q]), motivo:'ID_INVALIDO' });
+            continue;
+          }
+          if (vistosCa[idQ]) continue;
+          vistosCa[idQ] = true;
+          idsLoteCa.push(idQ);
+        }
+        var aplLoteCa = [];
+        if (body.activo === true) {
+          if (idsLoteCa.length) {
+            var resLoteCa = await sql(
+              'WITH inp AS (SELECT unnest($1::text[]) AS id), '
+              + 'upd AS (UPDATE cartas_catalogo c SET activo=true FROM inp i '
+              + 'WHERE c.id = i.id AND c.imagen_url IS NOT NULL AND btrim(c.imagen_url) <> \'\' '
+              + 'RETURNING c.id), '
+              + 'apl AS (SELECT id FROM upd) '
+              + 'SELECT i.id, CASE WHEN a.id IS NOT NULL THEN \'aplicada\' '
+              + 'WHEN c.id IS NULL THEN \'NO_ENCONTRADA\' ELSE \'SIN_DISENO\' END AS estado '
+              + 'FROM inp i LEFT JOIN apl a ON a.id = i.id '
+              + 'LEFT JOIN cartas_catalogo c ON c.id = i.id',
+              [idsLoteCa]
+            );
+            var s;
+            for (s = 0; s < resLoteCa.length; s++) {
+              if (resLoteCa[s].estado === 'aplicada') aplLoteCa.push(resLoteCa[s].id);
+              else rechLoteCa.push({ id: resLoteCa[s].id, motivo: resLoteCa[s].estado });
+            }
+          }
+          return res.status(200).json({ ok:true, activo:true, aplicadas: aplLoteCa, rechazadas: rechLoteCa });
+        }
+        var desLoteCa = await desactivarCartasD11(sql, idsLoteCa);
+        var t2;
+        for (t2 = 0; t2 < desLoteCa.aplicadas.length; t2++) aplLoteCa.push(desLoteCa.aplicadas[t2]);
+        var u;
+        for (u = 0; u < idsLoteCa.length; u++) {
+          if (aplLoteCa.indexOf(idsLoteCa[u]) < 0)
+            rechLoteCa.push({ id: idsLoteCa[u], motivo:'NO_ENCONTRADA' });
+        }
+        return res.status(200).json({
+          ok:true, activo:false, aplicadas: aplLoteCa, rechazadas: rechLoteCa,
+          museo_limpiado: desLoteCa.museo_limpiado
         });
       }
 

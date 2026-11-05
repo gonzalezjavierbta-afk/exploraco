@@ -2504,6 +2504,57 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5">El ID es identidad (slug ASCII) y no se puede editar despues de crear. El nivel gate es opcional (vacio = carta sin gate).</div>
     </div>
 
+    <!-- Carga masiva de disenos (parte B) -->
+    <details id="cartas-masivo" style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 18px">
+      <summary style="cursor:pointer;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">&#128193; Cargar disenos en masa</summary>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <input type="file" id="cartas-masivo-file" multiple accept="image/*" onchange="cartasMasivoArchivos(this.files)" style="flex:1 1 260px;min-width:200px;font-size:11px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2)">
+          <label style="display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">
+            <input type="checkbox" id="cartas-masivo-reemplazar" onchange="cartasMasivoRepintar()" style="width:15px;height:15px;cursor:pointer">
+            Reemplazar disenos existentes
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">
+            <input type="checkbox" id="cartas-masivo-activar" checked style="width:15px;height:15px;cursor:pointer">
+            Poner en juego al subir
+          </label>
+        </div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.5">El nombre del archivo se convierte en el id de la carta: minusculas, sin extension, y lo que no sea letra, numero, guion o guion bajo pasa a guion bajo. Los archivos sin carta no se suben.</div>
+        <div id="cartas-masivo-preview"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-gold btn-sm" id="cartas-masivo-subir" onclick="cartasMasivoSubir()" disabled style="opacity:.45">Subir 0 disenos</button>
+          <button class="btn btn-ghost btn-sm" id="cartas-masivo-limpiar" onclick="cartasMasivoLimpiar()">Limpiar</button>
+          <span id="cartas-masivo-estado" style="font-size:11px;font-weight:700;color:var(--muted)"></span>
+        </div>
+      </div>
+    </details>
+
+    <!-- Resumen y filtros (parte A: diseno visible de un golpe) -->
+    <div id="cartas-resumen" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button type="button" class="status-pill on" id="cartas-chip-todas" onclick="cartaFiltroSet('todas')">Todas</button>
+      <button type="button" class="status-pill" id="cartas-chip-juego" onclick="cartaFiltroSet('juego')">En juego</button>
+      <button type="button" class="status-pill" id="cartas-chip-sindiseno" onclick="cartaFiltroSet('sindiseno')">Sin diseno</button>
+      <button type="button" class="status-pill" id="cartas-chip-off" onclick="cartaFiltroSet('off')">Desactivadas</button>
+      <select class="form-input" id="cartas-filtro-set" onchange="cartaFiltroSetSel(this.value)" style="margin-left:auto;max-width:220px;font-size:11px;padding:6px 10px">
+        <option value="">Todos los sets</option>
+      </select>
+    </div>
+
+    <!-- Barra de acciones de la seleccion multiple (parte B) -->
+    <div id="cartas-selbar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:10px 14px">
+      <label style="display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">
+        <input type="checkbox" id="cartas-sel-visibles" onchange="cartaSelVisibles(this.checked)" style="width:15px;height:15px;cursor:pointer">
+        Seleccionar visibles
+      </label>
+      <span id="cartas-sel-count" style="font-size:11px;font-weight:800;color:var(--muted)">0 seleccionadas</span>
+      <div style="display:flex;gap:6px;margin-left:auto">
+        <button class="btn btn-gold btn-sm" id="cartas-sel-on" onclick="cartasLoteEstado(true)" disabled style="opacity:.45">Poner en juego (0)</button>
+        <button class="btn btn-danger btn-sm" id="cartas-sel-off" onclick="cartasLoteEstado(false)" disabled style="opacity:.45">Quitar del juego (0)</button>
+        <button class="btn btn-ghost btn-sm" id="cartas-sel-clear" onclick="cartaSelLimpiar()" disabled style="opacity:.45">Limpiar</button>
+      </div>
+    </div>
+
     <!-- Lista -->
     <div id="cartas-lista">
       <div style="text-align:center;padding:48px 0;color:var(--muted)">
@@ -2557,7 +2608,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Imagen URL</div>
         <input class="form-input" id="carta-edit-imagen" placeholder="https://..." style="width:100%">
-        <button class="btn btn-ghost btn-sm" type="button" style="margin-top:6px" onclick="adminSubirImagen('carta-edit-imagen')">&#x2B06; Subir imagen</button>
+        <button class="btn btn-ghost btn-sm" type="button" style="margin-top:6px" onclick="cartasSubirDisenoModal()">&#x2B06; Subir diseno</button>
       </div>
       <!-- D-6 del ADR-108: emisor, ids, descripcion, stats_json, canje QR y fusionable -->
       <div>
@@ -10740,6 +10791,18 @@ function cargarSaludRed() {
 
 var _cartasCache = [];
 var _cartasEditId = null;
+/* Estado de los filtros de la lista de cartas (parte A). No recarga del
+   servidor: renderCartas() filtra sobre _cartasCache. */
+var _cartasFiltro = 'todas';
+var _cartasFiltroSet = '';
+/* Parte B: seleccion multiple por id y cola del lote masivo. La seleccion
+   se limpia al recargar la lista (loadCartas). */
+var _cartasSel = {};
+var _cartasLoteArchivos = [];
+var _cartasLoteBusy = false;
+/* Auto-apertura del bloque masivo: solo se decide en el primer pintado del
+   resumen (si no hay cartas en juego); despues manda el operador. */
+var _cartasMasivoAuto = false;
 
 /* D-6 del ADR-108 (migracion 060): emisor_tipo / emisor_id / marca_id /
    descripcion / stats_json / es_canjeable_qr / fusionable viajan en el MISMO
@@ -10780,6 +10843,7 @@ function cartaCamposD6(esModal) {
 async function loadCartas() {
   var lista = document.getElementById('cartas-lista');
   if (!lista) return;
+  _cartasSel = {};
   lista.innerHTML = '<div style="text-align:center;padding:48px 0;color:var(--muted)"><div style="font-size:26px;margin-bottom:10px">&#127183;</div><div style="font-size:13px;font-weight:600">Cargando cartas...</div></div>';
   try {
     var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_lista', { headers: _adminHeaders() });
@@ -10794,22 +10858,146 @@ async function loadCartas() {
   }
 }
 
+/* ---- PARTE A: el diseno de carta se ve de un golpe ----
+   El backend manda tiene_diseno y jugable en cartas_lista; si una
+   respuesta antigua no los trae se degrada a imagen_url / activo para
+   no romper el render. Los contadores reflejan SIEMPRE el total del
+   catalogo: el filtro solo recorta la lista. Prefijo "carta"/"cartas"
+   para evitar colisiones (BUG-006/018/019). */
+function cartaTieneDiseno(c) {
+  if (c && typeof c.tiene_diseno === 'boolean') return c.tiene_diseno;
+  return !!(c && c.imagen_url);
+}
+function cartaEsJugable(c) {
+  if (c && typeof c.jugable === 'boolean') return c.jugable;
+  return !!(c && c.activo && cartaTieneDiseno(c));
+}
+function cartaFiltroPasa(c) {
+  if (_cartasFiltroSet && String(c.set_slug || '') !== _cartasFiltroSet) return false;
+  if (_cartasFiltro === 'juego') return cartaEsJugable(c);
+  if (_cartasFiltro === 'sindiseno') return !cartaTieneDiseno(c);
+  if (_cartasFiltro === 'off') return !c.activo;
+  return true;
+}
+function cartaFiltroSet(f) {
+  _cartasFiltro = f || 'todas';
+  var ids = { todas: 'cartas-chip-todas', juego: 'cartas-chip-juego',
+    sindiseno: 'cartas-chip-sindiseno', off: 'cartas-chip-off' };
+  for (var k in ids) {
+    if (!Object.prototype.hasOwnProperty.call(ids, k)) continue;
+    var el = document.getElementById(ids[k]);
+    if (el) el.className = 'status-pill' + (k === _cartasFiltro ? ' on' : '');
+  }
+  /* Cambiar de filtro limpia la seleccion: nunca se actua sobre filas
+     ocultas (decision del operador). */
+  _cartasSel = {};
+  renderCartas();
+}
+function cartaFiltroSetSel(valor) {
+  _cartasFiltroSet = String(valor || '');
+  /* Cambiar de set tambien limpia la seleccion. */
+  _cartasSel = {};
+  renderCartas();
+}
+function cartaStatChip(label, val, color) {
+  return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;min-width:80px">'
+    + '<div style="font-size:16px;font-weight:800;line-height:1.1;color:' + color + '">' + saludFmtInt(val) + '</div>'
+    + '<div style="font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.5px">' + label + '</div>'
+    + '</div>';
+}
+function renderCartasResumen() {
+  var cont = document.getElementById('cartas-resumen');
+  if (!cont) return;
+  /* Contadores mutuamente excluyentes: Total = En juego + Sin diseno +
+     Desactivadas. En juego = jugable; Sin diseno = activa sin lamina;
+     Desactivadas = !activo (con o sin lamina). */
+  var total = _cartasCache.length, juego = 0, sinDis = 0, off = 0;
+  for (var i = 0; i < _cartasCache.length; i++) {
+    var c = _cartasCache[i];
+    if (!c.activo) { off++; continue; }
+    if (cartaEsJugable(c)) { juego++; continue; }
+    sinDis++;
+  }
+  cont.innerHTML = cartaStatChip('Total', total, 'var(--text)')
+    + cartaStatChip('En juego', juego, 'var(--green)')
+    + cartaStatChip('Sin diseno', sinDis, sinDis > 0 ? '#B45309' : 'var(--muted)')
+    + cartaStatChip('Desactivadas', off, off > 0 ? 'var(--red)' : 'var(--muted)');
+  /* El bloque de carga masiva se abre solo en el PRIMER pintado y solo si
+     no hay ninguna carta en juego. Despues no se vuelve a tocar el open,
+     para no pelear con el toggle manual del operador. */
+  if (!_cartasMasivoAuto) {
+    _cartasMasivoAuto = true;
+    var det = document.getElementById('cartas-masivo');
+    if (det) det.open = (juego === 0);
+  }
+}
+function renderCartasFiltroSets() {
+  var sel = document.getElementById('cartas-filtro-set');
+  if (!sel) return;
+  var sets = [], vistos = {};
+  for (var i = 0; i < _cartasCache.length; i++) {
+    var s = String(_cartasCache[i].set_slug || '');
+    if (!s || vistos[s]) continue;
+    vistos[s] = 1;
+    sets.push(s);
+  }
+  sets.sort();
+  var html = '<option value="">Todos los sets</option>';
+  for (var j = 0; j < sets.length; j++) {
+    html += '<option value="' + escH(sets[j]) + '">' + escH(sets[j]) + '</option>';
+  }
+  sel.innerHTML = html;
+  if (!_cartasFiltroSet || !vistos[_cartasFiltroSet]) _cartasFiltroSet = '';
+  sel.value = _cartasFiltroSet;
+}
+function cartaBadgeHTML(c) {
+  if (!c.activo)
+    return '<span style="background:var(--red-l);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">&#9679; Desactivada</span>';
+  if (!cartaTieneDiseno(c))
+    return '<span style="background:#FEF3C7;color:#B45309;font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">&#9679; Sin diseno</span>';
+  return '<span style="background:var(--green-l);color:var(--green);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">&#9679; En juego</span>';
+}
+/* Miniatura 54x72 con Silent Fallback (ADR-008): el icono neutro vive
+   detras y la imagen lo cubre; si la imagen falla se oculta y queda el
+   hueco neutro, sin romper la fila. */
+function cartaThumbHTML(c) {
+  var url = String(c.imagen_url || '');
+  var img = url
+    ? '<img src="' + escH(url) + '" alt="" loading="lazy" style="position:relative;width:54px;height:72px;object-fit:cover;display:block" onerror="this.style.display=\'none\'">'
+    : '';
+  return '<div style="position:relative;flex:0 0 54px;width:54px;height:72px;border-radius:8px;overflow:hidden;background:var(--bg2);border:1px solid var(--border)">'
+    + '<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--muted2)">&#127183;</div>'
+    + img
+    + '</div>';
+}
 function renderCartas() {
   var lista = document.getElementById('cartas-lista');
   if (!lista) return;
+  renderCartasResumen();
+  renderCartasFiltroSets();
+  var visibles = _cartasCache.filter(cartaFiltroPasa);
+  renderCartasSelBar(visibles);
   if (!_cartasCache.length) {
     lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#127183;</div>'
       + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Aun no hay cartas</div>'
       + '<div style="font-size:11px;color:var(--muted)">Crea la primera con el formulario de arriba</div></div>';
     return;
   }
-  var filas = _cartasCache.map(function(c) {
-    var badge = c.activo
-      ? '<span style="background:var(--green-l);color:var(--green);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">&#9679; Activa</span>'
-      : '<span style="background:var(--red-l);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">&#9679; Inactiva</span>';
+  if (!visibles.length) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#128269;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Ninguna carta coincide con el filtro</div>'
+      + '<div style="font-size:11px;color:var(--muted)">Cambia el estado o vuelve a "Todos los sets"</div></div>';
+    return;
+  }
+  var filas = visibles.map(function(c) {
     var gate = (c.nivel_gate == null) ? 'Sin gate' : ('Nv ' + saludFmtInt(c.nivel_gate));
     var evt = c.es_evento ? 'Si' : 'No';
+    var subir = cartaTieneDiseno(c) ? 'Cambiar diseno' : 'Subir diseno';
     return '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
+      + '<input type="checkbox" ' + (_cartasSel[c.id] ? 'checked' : '')
+      +   ' onclick="cartaSelToggle(\'' + escH(c.id) + '\', this.checked)"'
+      +   ' style="flex:0 0 auto;width:16px;height:16px;cursor:pointer;margin:0" title="Seleccionar ' + escH(c.id) + '">'
+      + cartaThumbHTML(c)
       + '<div style="flex:0 0 170px;font-family:monospace;font-size:12px;color:var(--text2)">' + escH(c.id) + '</div>'
       + '<div style="flex:1 1 200px;min-width:150px">'
       +   '<div style="font-size:13px;font-weight:800">' + escH(c.nombre) + '</div>'
@@ -10818,8 +11006,9 @@ function renderCartas() {
       + '<div style="flex:0 0 90px"><span style="background:var(--bg2);color:var(--text2);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;text-transform:capitalize">' + escH(c.rareza || '') + '</span></div>'
       + '<div style="flex:0 0 80px;font-size:12px;font-weight:700">' + gate + '</div>'
       + '<div style="flex:0 0 90px;font-size:11px;color:var(--muted)">Evento: ' + evt + '</div>'
-      + '<div style="flex:0 0 90px">' + badge + '</div>'
+      + '<div style="flex:0 0 100px">' + cartaBadgeHTML(c) + '</div>'
       + '<div style="flex:0 0 auto;display:flex;gap:6px;margin-left:auto">'
+      +   '<button class="btn btn-ghost btn-sm" onclick="cartasSubirDiseno(\'' + escH(c.id) + '\')">' + subir + '</button>'
       +   '<button class="btn btn-ghost btn-sm" onclick="abrirEditarCarta(\'' + escH(c.id) + '\')">Editar</button>'
       +   (c.activo
       ?     '<button class="btn btn-danger btn-sm" onclick="toggleCarta(\'' + escH(c.id) + '\')">Desactivar</button>'
@@ -10828,6 +11017,312 @@ function renderCartas() {
       + '</div>';
   }).join('');
   lista.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + filas + '</div>';
+}
+
+/* Subida individual del diseno: reusa adminSubirImagen (unica via de
+   subida, MediaUpload contexto admin) y persiste SOLO {id, imagen_url}
+   contra cartas_editar. El backend rechaza con 400
+   CARTA_ACTIVA_SIN_DISENO si una carta activa se queda sin diseno. */
+function cartasSubirDiseno(id) {
+  if (!id) return;
+  adminSubirImagen(null, function (url) {
+    if (url) cartasGuardarDiseno(id, url);
+  });
+}
+function cartasSubirDisenoModal() {
+  if (!_cartasEditId) { showAdminToast('Abre una carta antes de subir el diseno', 'error'); return; }
+  var id = _cartasEditId;
+  adminSubirImagen('carta-edit-imagen', function (url) {
+    if (url) cartasGuardarDiseno(id, url);
+  });
+}
+async function cartasGuardarDiseno(id, url) {
+  try {
+    var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_editar', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ id: id, imagen_url: url })
+    });
+    var data = await resp.json();
+    if (!data.ok) {
+      if (data.error === 'CARTA_ACTIVA_SIN_DISENO') {
+        showAdminToast('Desactiva la carta antes de quitar el diseno', 'error');
+        return;
+      }
+      throw new Error(data.detalle || data.error || 'No se pudo guardar el diseno');
+    }
+    showAdminToast('Diseno guardado', 'success');
+    loadCartas();
+  } catch (e) {
+    showAdminToast('Error: ' + e.message, 'error');
+  }
+}
+
+/* ---- PARTE B: seleccion multiple y carga masiva de disenos ----
+   La seleccion vive en _cartasSel (id -> true) y solo expone checkbox en
+   las filas visibles tras filtro. El lote de estado usa cartas_lote; el
+   lote de laminas sube SECUENCIAL con MediaUpload (misma via que
+   adminSubirImagen) y confirma con cartas_imagenes_masivas. Prefijo
+   "carta"/"cartas" para evitar colisiones (BUG-006/018/019). */
+function renderCartasSelBar(visibles) {
+  var vis = visibles || [];
+  var n = Object.keys(_cartasSel).length;
+  var selVis = 0;
+  for (var i = 0; i < vis.length; i++) if (_cartasSel[vis[i].id]) selVis++;
+  var cb = document.getElementById('cartas-sel-visibles');
+  if (cb) {
+    cb.checked = vis.length > 0 && selVis === vis.length;
+    cb.indeterminate = selVis > 0 && selVis < vis.length;
+    cb.disabled = vis.length === 0;
+  }
+  var cnt = document.getElementById('cartas-sel-count');
+  if (cnt) cnt.textContent = n + ' seleccionadas';
+  var bOn = document.getElementById('cartas-sel-on');
+  if (bOn) { bOn.disabled = n === 0; bOn.textContent = 'Poner en juego (' + n + ')'; bOn.style.opacity = n ? '1' : '.45'; }
+  var bOff = document.getElementById('cartas-sel-off');
+  if (bOff) { bOff.disabled = n === 0; bOff.textContent = 'Quitar del juego (' + n + ')'; bOff.style.opacity = n ? '1' : '.45'; }
+  var bClr = document.getElementById('cartas-sel-clear');
+  if (bClr) { bClr.disabled = n === 0; bClr.style.opacity = n ? '1' : '.45'; }
+}
+function cartaSelToggle(id, checked) {
+  if (!id) return;
+  if (checked) _cartasSel[id] = true; else delete _cartasSel[id];
+  renderCartasSelBar(_cartasCache.filter(cartaFiltroPasa));
+}
+function cartaSelVisibles(checked) {
+  var vis = _cartasCache.filter(cartaFiltroPasa);
+  for (var i = 0; i < vis.length; i++) {
+    if (checked) _cartasSel[vis[i].id] = true; else delete _cartasSel[vis[i].id];
+  }
+  renderCartas();
+}
+function cartaSelLimpiar() {
+  _cartasSel = {};
+  renderCartas();
+}
+async function cartasLoteEstado(activo) {
+  if (_cartasLoteBusy) return;
+  var ids = Object.keys(_cartasSel);
+  if (!ids.length) { showAdminToast('No hay cartas seleccionadas', 'error'); return; }
+  if (ids.length > 200) { showAdminToast('Maximo 200 cartas por lote', 'error'); return; }
+  _cartasLoteBusy = true;
+  try {
+    var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_lote', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ ids: ids, activo: !!activo })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.detalle || data.error || 'No se pudo aplicar el lote');
+    var apl = (data.aplicadas || []).length;
+    var rec = data.rechazadas || [];
+    var sinDis = 0, iR;
+    for (iR = 0; iR < rec.length; iR++) if (rec[iR].motivo === 'SIN_DISENO') sinDis++;
+    var msg = apl + (apl === 1 ? ' carta actualizada' : ' cartas actualizadas');
+    if (rec.length) msg += ' | ' + rec.length + ' rechazadas';
+    if (sinDis) msg += ' (' + sinDis + ' sin diseno: sube la lamina antes de activarlas)';
+    if (data.museo_limpiado > 0) msg += ' | ' + data.museo_limpiado + ' retiradas del museo';
+    showAdminToast(msg, (apl === 0 && rec.length) ? 'error' : 'success');
+    _cartasSel = {};
+    loadCartas();
+  } catch (e) {
+    showAdminToast('Error: ' + e.message, 'error');
+  }
+  _cartasLoteBusy = false;
+}
+/* El nombre del archivo se convierte en id con la MISMA regla que usa el
+   servidor para validar: minusculas, sin extension de imagen y solo
+   [a-z0-9_-]. Se envia ya normalizado para que ambos lados coincidan. */
+function cartaIdDesdeArchivo(nombre) {
+  var s = String(nombre || '').trim().toLowerCase();
+  s = s.replace(/\.(png|jpe?g|webp|gif|avif)$/, '');
+  s = s.replace(/[^a-z0-9_-]+/g, '_').replace(/^_+/, '').replace(/_+$/, '');
+  if (!s || s.length > 60) return '';
+  return s;
+}
+function cartasMasivoEstadoChip(estado) {
+  var cfg = {
+    ok: ['Emparejado', 'var(--green-l)', 'var(--green)'],
+    noexiste: ['Carta no existe', 'var(--red-l)', 'var(--red)'],
+    yadiseno: ['Ya tiene diseno (se saltara)', '#FEF3C7', '#B45309'],
+    duplicado: ['Nombre duplicado', 'var(--bg2)', 'var(--muted)'],
+    invalido: ['Nombre invalido', 'var(--bg2)', 'var(--muted)'],
+    fallo: ['Fallo de subida', 'var(--red-l)', 'var(--red)']
+  };
+  var x = cfg[estado] || ['Pendiente', 'var(--bg2)', 'var(--muted)'];
+  return '<span style="background:' + x[1] + ';color:' + x[2] + ';font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap">' + x[0] + '</span>';
+}
+function cartasMasivoEstado(txt) {
+  var el = document.getElementById('cartas-masivo-estado');
+  if (el) el.textContent = txt || '';
+}
+function cartasMasivoArchivos(files) {
+  if (_cartasLoteBusy) { showAdminToast('Hay un lote en curso', 'error'); return; }
+  var lista = files || [];
+  var arr = [], i;
+  for (i = 0; i < lista.length; i++) {
+    var nom = String(lista[i].name || '');
+    arr.push({ file: lista[i], nombre: nom, id: cartaIdDesdeArchivo(nom), estado: 'pendiente' });
+  }
+  if (arr.length > 100) {
+    arr = arr.slice(0, 100);
+    showAdminToast('Maximo 100 imagenes por lote: se toman las primeras 100', 'error');
+  }
+  _cartasLoteArchivos = arr;
+  cartasMasivoEstado('');
+  cartasMasivoRepintar();
+}
+function cartasMasivoRepintar() {
+  var cont = document.getElementById('cartas-masivo-preview');
+  if (!cont) return;
+  var reemplazar = !!(document.getElementById('cartas-masivo-reemplazar') || {}).checked;
+  var porId = {}, i;
+  for (i = 0; i < _cartasCache.length; i++) porId[_cartasCache[i].id] = _cartasCache[i];
+  var vistos = {}, ok = 0, noExiste = 0, yaTiene = 0, dup = 0, invalido = 0;
+  for (i = 0; i < _cartasLoteArchivos.length; i++) {
+    var a = _cartasLoteArchivos[i];
+    var c = a.id ? porId[a.id] : null;
+    if (!a.id) { a.estado = 'invalido'; invalido++; }
+    else if (vistos[a.id]) { a.estado = 'duplicado'; dup++; }
+    else if (!c) { a.estado = 'noexiste'; noExiste++; }
+    else if (cartaTieneDiseno(c) && !reemplazar) { a.estado = 'yadiseno'; yaTiene++; }
+    else { a.estado = 'ok'; ok++; }
+    if (a.id) vistos[a.id] = 1;
+  }
+  if (!_cartasLoteArchivos.length) {
+    cont.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Sin archivos. Elige imagenes para previsualizar el emparejamiento antes de subir.</div>';
+  } else {
+    var filas = '';
+    for (i = 0; i < _cartasLoteArchivos.length; i++) {
+      var b = _cartasLoteArchivos[i];
+      filas += '<tr>'
+        + '<td style="padding:5px 8px;border-top:1px solid var(--border);font-family:monospace;font-size:11px">' + escH(b.nombre) + '</td>'
+        + '<td style="padding:5px 8px;border-top:1px solid var(--border);font-family:monospace;font-size:11px;color:var(--text2)">' + escH(b.id || '-') + '</td>'
+        + '<td style="padding:5px 8px;border-top:1px solid var(--border)">' + cartasMasivoEstadoChip(b.estado) + '</td>'
+        + '</tr>';
+    }
+    cont.innerHTML = '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:11px">'
+      + '<thead><tr style="background:var(--bg2)">'
+      + '<th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Archivo</th>'
+      + '<th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">ID emparejado</th>'
+      + '<th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Estado</th>'
+      + '</tr></thead><tbody>' + filas + '</tbody></table></div>'
+      + '<div style="font-size:10px;color:var(--muted);margin-top:8px">' + ok + ' emparejados | '
+      + noExiste + ' sin carta | ' + yaTiene + ' ya tienen diseno | ' + dup + ' duplicados | ' + invalido + ' nombre invalido</div>';
+  }
+  var btn = document.getElementById('cartas-masivo-subir');
+  if (btn) {
+    btn.disabled = ok === 0 || _cartasLoteBusy;
+    btn.textContent = 'Subir ' + ok + (ok === 1 ? ' diseno' : ' disenos');
+    btn.style.opacity = (ok > 0 && !_cartasLoteBusy) ? '1' : '.45';
+  }
+}
+function cartasMasivoLimpiar() {
+  if (_cartasLoteBusy) { showAdminToast('Hay un lote en curso', 'error'); return; }
+  _cartasLoteArchivos = [];
+  var inp = document.getElementById('cartas-masivo-file');
+  if (inp) inp.value = '';
+  cartasMasivoEstado('');
+  cartasMasivoRepintar();
+}
+function cartasMasivoReporte(subidos, apl, rech, fallos, activadas, rechLote) {
+  var cont = document.getElementById('cartas-masivo-preview');
+  if (cont) {
+    var lineas = '<div style="font-size:12px;font-weight:800;margin-bottom:6px">Lote terminado</div>'
+      + '<div style="font-size:11px;color:var(--text2);line-height:1.7">Subidas OK: ' + subidos.length
+      + ' | Aplicadas: ' + apl.length + ' | Rechazadas: ' + rech.length
+      + ' | Fallos de subida: ' + fallos.length
+      + (activadas ? ' | En juego: ' + activadas : '') + '</div>';
+    var det = [], i;
+    for (i = 0; i < rech.length && i < 12; i++) det.push(rech[i].id + ': ' + rech[i].motivo);
+    for (i = 0; i < fallos.length && i < 12; i++) det.push(fallos[i].nombre + ': ' + fallos[i].motivo);
+    for (i = 0; i < rechLote.length && i < 12; i++) det.push(rechLote[i].id + ': ' + rechLote[i].motivo);
+    if (det.length) lineas += '<div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6">' + escH(det.join(' | ')) + '</div>';
+    cont.innerHTML = '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px">' + lineas + '</div>';
+  }
+  var btn = document.getElementById('cartas-masivo-subir');
+  if (btn) { btn.disabled = true; btn.textContent = 'Subir 0 disenos'; btn.style.opacity = '.45'; }
+}
+async function cartasMasivoSubir() {
+  if (_cartasLoteBusy) return;
+  if (!window.MediaUpload) { showAdminToast('Subida no disponible', 'error'); return; }
+  var pend = [], i;
+  for (i = 0; i < _cartasLoteArchivos.length; i++)
+    if (_cartasLoteArchivos[i].estado === 'ok') pend.push(_cartasLoteArchivos[i]);
+  if (!pend.length) { showAdminToast('No hay archivos emparejados para subir', 'error'); return; }
+  var secret = (typeof ADMIN_SECRET !== 'undefined' ? ADMIN_SECRET : '')
+    || (typeof _adminSecretResolver === 'function' ? _adminSecretResolver() : '');
+  if (!secret) { showAdminToast('Sesion admin no disponible', 'error'); return; }
+  var reemplazar = !!(document.getElementById('cartas-masivo-reemplazar') || {}).checked;
+  var activar = !!(document.getElementById('cartas-masivo-activar') || {}).checked;
+  _cartasLoteBusy = true;
+  cartasMasivoRepintar();
+  var subidos = [], fallos = [];
+  for (i = 0; i < pend.length; i++) {
+    cartasMasivoEstado('Subiendo ' + (i + 1) + '/' + pend.length + ': ' + pend[i].nombre);
+    var v = window.MediaUpload.validar(pend[i].file, 'foto');
+    if (!v || !v.ok) { fallos.push({ nombre: pend[i].nombre, motivo: (v && v.error) ? v.error : 'INVALIDO' }); continue; }
+    try {
+      var r = await window.MediaUpload.subir({ file: pend[i].file, tipo: 'foto', contexto: 'admin', adminToken: secret });
+      if (!r || !r.url) throw new Error('sin URL');
+      subidos.push({ nombre: pend[i].id, url: r.url });
+    } catch (eS) {
+      fallos.push({ nombre: pend[i].nombre, motivo: (eS && eS.message) ? eS.message : 'FALLO_SUBIDA' });
+    }
+  }
+  var apl = [], rech = [], activadas = 0, rechLote = [];
+  if (subidos.length) {
+    cartasMasivoEstado('Guardando ' + subidos.length + ' disenos...');
+    try {
+      var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_imagenes_masivas', {
+        method: 'POST',
+        headers: _adminHeaders(),
+        body: JSON.stringify({ archivos: subidos, reemplazar: reemplazar })
+      });
+      var data = await resp.json();
+      if (!data.ok) throw new Error(data.detalle || data.error || 'No se pudo guardar el lote');
+      apl = data.aplicadas || [];
+      rech = data.rechazadas || [];
+    } catch (eM) {
+      _cartasLoteBusy = false;
+      cartasMasivoEstado('');
+      showAdminToast('Error: ' + eM.message, 'error');
+      cartasMasivoRepintar();
+      return;
+    }
+  }
+  if (activar && apl.length) {
+    cartasMasivoEstado('Poniendo en juego ' + apl.length + ' cartas...');
+    try {
+      var resp2 = await fetch('/api/admin?recurso=cartas&tipo=cartas_lote', {
+        method: 'POST',
+        headers: _adminHeaders(),
+        body: JSON.stringify({ ids: apl, activo: true })
+      });
+      var data2 = await resp2.json();
+      if (data2.ok) {
+        activadas = (data2.aplicadas || []).length;
+        rechLote = data2.rechazadas || [];
+      } else {
+        rechLote.push({ id: '-', motivo: data2.error || 'LOTE_FALLO' });
+      }
+    } catch (eL) {
+      rechLote.push({ id: '-', motivo: (eL && eL.message) ? eL.message : 'LOTE_FALLO' });
+    }
+  }
+  _cartasLoteBusy = false;
+  var msg = subidos.length + ' subidos, ' + apl.length + ' aplicados';
+  if (rech.length) msg += ', ' + rech.length + ' rechazados';
+  if (fallos.length) msg += ', ' + fallos.length + ' con fallo';
+  if (activar) msg += ' | ' + activadas + ' en juego';
+  showAdminToast(msg, (apl.length || activadas) ? 'success' : 'error');
+  cartasMasivoReporte(subidos, apl, rech, fallos, activadas, rechLote);
+  cartasMasivoEstado('');
+  _cartasLoteArchivos = [];
+  var inp = document.getElementById('cartas-masivo-file');
+  if (inp) inp.value = '';
+  loadCartas();
 }
 
 async function crearCarta() {
@@ -10875,7 +11370,11 @@ async function crearCarta() {
     cartaSetValor('carta-stats', '');
     cartaSetValor('carta-qr', '0');
     cartaSetValor('carta-fusion', '1');
-    showAdminToast(data.mensaje || 'Carta creada', 'success');
+    if (data.activo === false || data.motivo === 'SIN_DISENO') {
+      showAdminToast('Carta creada FUERA DE JUEGO: sube el diseno para activarla', 'success');
+    } else {
+      showAdminToast(data.mensaje || 'Carta creada', 'success');
+    }
     loadCartas();
   } catch (e) {
     showAdminToast('Error: ' + e.message, 'error');
@@ -10956,8 +11455,16 @@ async function toggleCarta(id) {
       body: JSON.stringify({ id: id })
     });
     var data = await resp.json();
-    if (!data.ok) throw new Error(data.error || 'No se pudo alternar');
-    showAdminToast(data.mensaje || 'Estado actualizado', 'success');
+    if (!data.ok) {
+      if (data.error === 'CARTA_SIN_DISENO') {
+        showAdminToast('Sin diseno: sube el diseno antes de poner la carta en juego', 'error');
+        return;
+      }
+      throw new Error(data.detalle || data.error || 'No se pudo alternar');
+    }
+    var msgCa = data.mensaje || 'Estado actualizado';
+    if (data.museo_limpiado > 0) msgCa += ' (' + data.museo_limpiado + ' cartas retiradas del museo)';
+    showAdminToast(msgCa, 'success');
     loadCartas();
   } catch (e) {
     showAdminToast('Error: ' + e.message, 'error');
