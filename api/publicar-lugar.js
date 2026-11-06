@@ -42,6 +42,12 @@ const ECCompletitud = require('../lib/completitud.js');
 // el fetch() a /api/interacciones y, con el, el autor_id = null silencioso
 // cuando ese salto de red fallaba. Cero dependencia externa.
 const ECSesion = require('../lib/sesion.js');
+// ADR-119 D1/D2 -- el contrato del MENU (platos, carta, domicilio) vive UNA
+// sola vez en lib/menu.js, con doble superficie (CommonJS aqui, global
+// ECMenu en admin/mi-perfil). Aqui solo se APLICA: prohibido duplicar los
+// topes o la regla de WhatsApp en este fichero. El mismo modulo normaliza en
+// LECTURA (platosDe/archivosDeCarta/canalesDe), asi que no hay backfill.
+const ECMenu = require('../lib/menu.js');
 
 // ADR-109 paso 4b: el secreto admin NO tiene fallback publico (fail-closed).
 // Sin process.env.ADMIN_SECRET la rama admin responde 503; la comparacion es
@@ -361,7 +367,12 @@ var CLAVES_CLIENTE = [
   // comida
   'tipo_comida', 'cocina', 'ambiente', 'precio_promedio', 'terraza', 'reservas',
   'domicilio', 'menu_destacado', 'opciones_dieta', 'horario_detallado',
-  'domicilio_plataformas',
+  'domicilio_plataformas', 'rappi', 'ifood',
+  // ADR-119 D2/D3/D4 -- menu v2 y domicilio v2. Las cuatro claves nuevas
+  // entran en la lista blanca del cliente y NUNCA en CLAVES_SOLO_SERVIDOR:
+  // las escribe el autor. Su normalizacion y sus topes viven en lib/menu.js
+  // (normalizarMenuEnTags), no aqui.
+  'carta_archivos', 'carta_nota', 'domicilio_zonas', 'whatsapp_pedidos',
   // sitio -- naturaleza / aventura / parque / juego legacy del validador
   'dificultad', 'dificultad_desc', 'duracion', 'altitud', 'temporada',
   'temporada_nota', 'temporada_matriz', 'precio_entrada', 'distancia',
@@ -392,6 +403,14 @@ var CLAVES_SOLO_SERVIDOR = [
   // por la puerta de atras. Fail-closed por los dos consumidores (POST y
   // PATCH comparten claveProhibida, ADR-109 T9 (vi)).
   'pub_autor_origen'
+];
+
+// ADR-119 -- las seis claves del MENU que comparten POST y PATCH. Se listan
+// aparte para que normalizarMenuEnTags pueda tratarlas como bloque (D13:
+// reemplazo del array completo) sin tocar el resto de la lista blanca.
+var CLAVES_MENU = [
+  'menu_destacado', 'carta_archivos', 'carta_nota',
+  'domicilio_plataformas', 'domicilio_zonas', 'whatsapp_pedidos'
 ];
 
 var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -578,6 +597,43 @@ function construirTagsCliente(b, catSlug) {
   if (b.sitio_equipamiento && b.sitio_equipamiento.length) tags.equipamiento = b.sitio_equipamiento;
   if (b.sitio_temporada && b.sitio_temporada.length) tags.temporada = b.sitio_temporada;
   return tags;
+}
+
+// ADR-119 -- normalizacion del MENU en el camino de escritura (POST y PATCH).
+// Un solo punto, porque el POST y el PATCH comparten las mismas seis claves:
+//   menu_destacado, carta_archivos, carta_nota, domicilio_plataformas,
+//   domicilio_zonas, whatsapp_pedidos
+// D13: se reemplaza el ARRAY COMPLETO de cada clave PRESENTE; las claves que
+// no llegan no se tocan (el merge JSONB sigue siendo por clave, jamas por
+// item y jamas sobre 'tags' entero).
+// D14: campo nuevo invalido -> 400 con codigo estable, nunca clamp silencioso.
+// Por eso se devuelve errores[0] (codigo + campo) en vez de corregir: un
+// recorte silencioso es un dato que el autor cree guardado y no lo esta.
+// La normalizacion es IDEMPOTENTE y de LECTURA: no hay backfill (D2).
+// null/undefined = "no toca": se quita la clave del delta para que el merge
+// JSONB no escriba un null encima. Para BORRAR un array se manda [] (D13).
+function normalizarMenuEnTags(tags) {
+  var i;
+  for (i = 0; i < CLAVES_MENU.length; i++) {
+    var km = CLAVES_MENU[i];
+    if (!Object.prototype.hasOwnProperty.call(tags, km)) continue;
+    if (tags[km] === null || tags[km] === undefined) delete tags[km];
+  }
+  var r = ECMenu.normalizarFicha(tags);
+  if (!r.ok) return { ok: false, error: r.errores[0] };
+  var k;
+  for (k in r.ficha) {
+    if (Object.prototype.hasOwnProperty.call(r.ficha, k)) tags[k] = r.ficha[k];
+  }
+  return { ok: true };
+}
+
+// Forma unica de la respuesta 400 de una clave nueva del menu. Se usa igual
+// en POST y en PATCH para que el cliente distinga el campo por 'campo' y no
+// por el texto de 'error'.
+function errorMenuJson(err) {
+  return { ok: false, error: err.codigo, code: err.codigo, campo: err.campo,
+    motivo: err.motivo || undefined };
 }
 
 // D7 + D8.4 + D3.3 -- UNA sola validacion para el POST y para la transicion
@@ -872,6 +928,13 @@ async function manejarPost(req, res) {
       var vu = String(body.video_url).trim();
       if (esVideoUrlSegura(vu)) tags.video_url = vu;
     }
+
+    // ADR-119 D14 -- menu v2: se valida y se normaliza ANTES de tocar la base.
+    // Un plato sin nombre, un archivo con URL no segura, un WhatsApp
+    // impronunciable o un tope excedido cortan aqui con 400; sin esto, una
+    // ficha con menu roto entraria en la cola y el error se veria en el render.
+    var menuPost = normalizarMenuEnTags(tags);
+    if (!menuPost.ok) return res.status(400).json(errorMenuJson(menuPost.error));
 
     // D2.2 -- bono geo: <= 300 m entre dispositivo y pin. D5 -- se guarda
     // tambien pub_geo_dist_m para que un futuro recalculo sea posible sin
@@ -1415,6 +1478,13 @@ async function manejarPatch(req, res) {
       if (!Object.prototype.hasOwnProperty.call(tagsPost, k)) continue;
       if (delta[k] === undefined) delta[k] = tagsPost[k];
     }
+
+    // ADR-119 D13/D14 -- mismo contrato que el POST. El delta ya viene
+    // filtrado por CLAVES_CLIENTE (sentencia anterior), asi que aqui solo se
+    // normaliza lo que el cliente manda: el array completo por clave, 400 con
+    // codigo estable si algo es invalido, cero clamp silencioso.
+    var menuPatch = normalizarMenuEnTags(delta);
+    if (!menuPatch.ok) return res.status(400).json(errorMenuJson(menuPatch.error));
 
     if (delta.subcategoria !== undefined) {
       var sc = String(delta.subcategoria === null ? '' : delta.subcategoria).toLowerCase();

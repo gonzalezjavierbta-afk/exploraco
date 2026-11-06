@@ -6987,5 +6987,42 @@ El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 evento
 
 **Enlaces (no argumentos; ADR-084 D1).** **ADR-118** (decision, D1-D6, invariantes I1-I5 y verificacion V1-V6) | **ADR-055** (se deroga su anti-farming 20/24 h; el resto sigue) | **ADR-001/ADR-010** (8/8) | **ADR-002** (ASCII-safe) | **ADR-003** (columna conservada) | **ADR-006** (baseline medido) | **TSK-151** (origen del anti-farming del mercado) | **migracion 057** (origen del Gate 5 por clave).
 
+## TSK-255 - Menu + carta + domicilio en las fichas de categoria **comida** (ADR-119): contrato unico en `lib/menu.js`, silo `menu-comida.css`, 4 claves nuevas de backend, pestana Carta/Menu y Delivery en el admin, autoservicio en `publicar.html` y render agrupado con `hasMenu` JSON-LD - 2026-11-06 - COMPLETADA EN ARBOL DE TRABAJO Y CERTIFICADA POR QA (sin commit y sin deploy)
+
+**Estado: COMPLETADA Y VERIFICADA EN ARBOL DE TRABAJO -- 2026-11-06** (pase documental unico R2). **El argumento de la decision vive SOLO en ADR-119** (`DECISIONS.md`, ADR-084 D1); aqui solo el **alcance real**, la **evidencia medida** y el **relevo**. **Cero migracion, cero DML, cero endpoint nuevo** (`api/*.js` = **8**, ADR-001/ADR-010).
+
+**Ficheros nuevos (2).**
+
+1. **`lib/menu.js`** -- contrato de menu: saneo, **topes de escritura** (`TOPE_PLATOS` **60**, `TOPE_ARCHIVOS` **10**, `TOPE_PLATAFORMAS` **8**, `TOPE_NOMBRE` **80**, `TOPE_DESCRIPCION` **280**), agrupacion por categoria para el render y normalizacion de la ficha. **Una sola implementacion, dos superficies** (`module.exports` + `window`, patron ADR-044/ADR-099 D4).
+2. **`menu-comida.css`** -- silo de la categoria bajo `.tpl-comida` (ADR-004), con reset de silo y **0 reglas sueltas** en `:root`.
+
+**Alcance real ejecutado (backend).**
+
+1. **`api/publicar-lugar.js`** -- **4** claves nuevas en la lista blanca del cliente: `carta_archivos`, `carta_nota`, `domicilio_zonas`, `whatsapp_pedidos` (nunca en `CLAVES_SOLO_SERVIDOR`: las escribe el autor); `rappi`/`ifood` entran en `CLAVES_CLIENTE` (**antes se descartaban en silencio**, BUG-150); rechazo **400 con codigo** cuando el payload no cumple el contrato.
+2. **`api/utilidades.js`** -- tipo de media **`documento`** limitado a **`application/pdf`** con tope **10 MB** (la carta completa de un restaurante).
+3. **`api/admin-destinos.js`** -- normaliza el menu con `lib/menu.js` y devuelve **`avisos[]`** con los recortes y rechazos aplicados (el admin ve que se recorto, no lo adivina).
+
+**Alcance real ejecutado (cliente).**
+
+4. **`media-upload.js`** -- tipo **`documento`** = `application/pdf`, **10 MB**; cualquier otro documento (docx, xlsx, txt) sigue sin tipo.
+5. **`admin.html`** -- pestana **Carta/Menu** real (alta por filas, agrupacion por categoria, `precio_texto` como fallback del precio), **Delivery** basico (zonas + WhatsApp de pedidos), **carta multi-archivo**, y **vaciado de arrays** con la guarda `CATEGORY_TAG_VACIABLES` (el constructor de tags emite arrays vacios: se puede borrar el ultimo plato/archivo/plataforma/zona, BUG-149).
+6. **`publicar.html`** (autoservicio del dueno) -- las **9** claves del colector y de la precarga (las 4 nuevas + `menu_destacado`, `domicilio`, `domicilio_plataformas`, `carta_archivos`... en su contrato), y **Rappi/iFood solo se emiten con URL segura** (un chip sin URL ya no genera canal fantasma, BUG-151).
+7. **`api/pagina-destino.js`** -- render **agrupado** del menu, bloque de **carta** (PDF en pestana nueva, visor nativo) y de **domicilio**, **`hasMenu`** en el JSON-LD (**solo** en comida y **solo** con al menos un plato) y `menu-comida.css` cargado **solo** en fichas de comida.
+
+**Verificacion medida (QA, certificacion 2026-11-06; no re-ejecutada en este pase documental).**
+
+- **V1:** **34/34** escenarios de QA en verde.
+- **V2:** `node --check` **10/10**.
+- **V3:** **ASCII** = **0** bytes > 127 en lo anadido.
+- **V4:** balance de divs **1327/1327** y **210/210**.
+- **V5:** `express_check` **917 PASS / 22 FAIL**, los **22 TODOS preexistentes** (**21** en `scripts/` + el doble-escape de `api/utilidades.js:937,1006`), **0** regresiones atribuibles a esta feature.
+- **V6 (comprobado en este pase contra el archivo real, ADR-006):** `lib/menu.js` y `menu-comida.css` existen; `TOPE_PLATOS = 60`; `api/publicar-lugar.js:370` ya lista `domicilio_plataformas`, `rappi`, `ifood`; `api/utilidades.js:105` = `documento: ['application/pdf']`; `admin.html:4152` = `CATEGORY_TAG_VACIABLES`; `api/pagina-destino.js:23` sigue con `https://latawel.com` en `BASE`.
+
+**Bugs cerrados en esta tanda:** **BUG-147** (filas sin `data-field` que se descartaban al guardar), **BUG-148** (`unPlato()` sin `foto`), **BUG-149** (constructor de tags que no emitia arrays vacios), **BUG-150** (`rappi`/`ifood` fuera de `CLAVES_CLIENTE`), **BUG-151** (Rappi/iFood sin URL en `publicar.html`), **BUG-152** (residual de precarga). Detalle en `BUGS_HISTORICOS.md`.
+
+**Pendiente (operador; no bloquea el cierre de codigo).** (1) **Limpieza opcional en Neon** de `domicilio_plataformas[]` con `{nombre:'Rappi'|'iFood', url:null}` generados por BUG-151. (2) **Revision aparte de `BASE`** en `api/pagina-destino.js:23` (sigue `https://latawel.com`). (3) **Decidir** si `rappi`/`ifood` se retiran como escalares cuando todo el parque use el array. (4) Los **badges de menu/domicilio en el directorio** quedaron **FUERA** de esta entrega. (5) **Commit + push + deploy** de la tanda.
+
+**Enlaces (no argumentos; ADR-084 D1).** **ADR-119** (contrato, D1-D16) | **ADR-004** (silo `.tpl-comida`) | **ADR-008** (fallback de imagenes de plato) | **ADR-002** (ASCII-safe) | **ADR-003** (cero borrado logico) | **ADR-006** (baseline medido) | **ADR-044/ADR-099 D4** (una sola implementacion fisica) | **ADR-098** (tipo de media nuevo) | **ADR-113/ADR-117** (dominio `CartasUI` del juego, sin colision).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

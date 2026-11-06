@@ -6,9 +6,11 @@
  * API PUBLICA (contrato fijo):
  *
  *   window.MediaUpload.LIMITES
- *     { foto: 5242880, audio: 15728640, video: 31457280 }
+ *     { foto: 5242880, audio: 15728640, video: 31457280, documento: 10485760 }
  *
- *   window.MediaUpload.tipoDeArchivo(file) -> 'foto' | 'audio' | 'video' | null
+ *   window.MediaUpload.tipoDeArchivo(file)
+ *     -> 'foto' | 'audio' | 'video' | 'documento' | null
+ *     'documento' solo para application/pdf (carta completa de restaurantes).
  *
  *   window.MediaUpload.validar(file, tipo) -> { ok, tipo?, error? }
  *     Valida mime y tamano ANTES de subir (espejo de api/blob-upload.js).
@@ -44,13 +46,22 @@
   var BLOB_CLIENT_URL = 'https://esm.sh/@vercel/blob@' + BLOB_VERSION + '/client';
   var HANDLE_UPLOAD_URL = '/api/utilidades?tipo=blob_upload';
 
-  var LIMITES = { foto: 5 * 1024 * 1024, audio: 15 * 1024 * 1024, video: 30 * 1024 * 1024 };
+  var LIMITES = {
+    foto: 5 * 1024 * 1024,
+    audio: 15 * 1024 * 1024,
+    video: 30 * 1024 * 1024,
+    documento: 10 * 1024 * 1024
+  };
 
   var MIME_OK = {
     foto: /^image\/(jpeg|png|webp|gif|avif)$/i,
     audio: /^audio\//i,
-    video: /^video\//i
+    video: /^video\//i,
+    documento: /^application\/pdf$/i
   };
+
+  /* Solo PDF: cualquier otro documento (docx, xlsx, txt...) no tiene tipo. */
+  var EXT_DOCUMENTO = /\.pdf$/i;
 
   var _modulo = null;
 
@@ -155,6 +166,7 @@
     if (/^image\//i.test(mime)) { return 'foto'; }
     if (/^audio\//i.test(mime)) { return 'audio'; }
     if (/^video\//i.test(mime)) { return 'video'; }
+    if (MIME_OK.documento.test(mime)) { return 'documento'; }
     return null;
   }
 
@@ -165,9 +177,17 @@
     var t = tipo || tipoDeArchivo(file);
     if (!t || !LIMITES[t]) { return { ok: false, error: 'Tipo de archivo no permitido' }; }
     if (!MIME_OK[t].test(String(file.type || ''))) {
+      if (t === 'documento') { return { ok: false, error: 'Para la carta solo se acepta un archivo PDF' }; }
       return { ok: false, error: 'Formato no permitido para ' + t };
     }
+    if (t === 'documento') {
+      var nombre = String(file.name || '');
+      if (nombre && !EXT_DOCUMENTO.test(nombre)) {
+        return { ok: false, error: 'El archivo debe terminar en .pdf' };
+      }
+    }
     if (file.size > LIMITES[t]) {
+      if (t === 'documento') { return { ok: false, error: 'El PDF supera el limite de ' + mb(LIMITES[t]) + ' MB' }; }
       return { ok: false, error: 'El archivo supera el limite de ' + mb(LIMITES[t]) + ' MB' };
     }
     return { ok: true, tipo: t };

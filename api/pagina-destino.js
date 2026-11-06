@@ -15,6 +15,10 @@
 // Sin contenido inventado: solo secciones con datos disponibles se renderizan
 
 const { neon } = require('@neondatabase/serverless');
+// ADR-119 D1: contrato UNICO del menu de comida (forma, saneo, topes y
+// precedencia de WhatsApp). Es una libreria de lib/, no un endpoint: no
+// consume ninguna de las 8/8 funciones serverless. El motor solo pinta.
+const ECMenu = require('../lib/menu.js');
 
 var BASE = process.env.SITE_BASE_URL || 'https://latawel.com';
 var CAT_LABEL = { hostal:'Hospedaje', comida:'Comida & Restaurantes', sitio:'Lugares & Sitios', evento:'Eventos', blog:'Inspirate' };
@@ -143,6 +147,67 @@ function money(n) {
   return '$' + parts.join('');
 }
 
+// ADR-119 D8: agrupa los platos por categoria SOLO para el render.
+// Lectura pura: no recorta, no filtra y no reordena dentro de cada grupo (el
+// orden del autor se conserva; D7 prohibe auto-ordenar los disponibles
+// primero). Sin ninguna categoria -> un unico grupo titulado TITULO_MENU,
+// sin sub-encabezados. Con categorias -> catalogo sugerido, luego valores
+// libres en orden alfabetico y el residual GRUPO_OTROS al final.
+function menuAgruparPlatos(platos) {
+  var lista = Array.isArray(platos) ? platos : [];
+  var grupos = [];
+  var porClave = {};
+  var conCategoria = 0;
+  var i;
+  for (i = 0; i < lista.length; i++) {
+    var p = lista[i] || {};
+    var cat = String(p.categoria === null || p.categoria === undefined ? '' : p.categoria)
+      .replace(/\s+/g, ' ').trim();
+    if (cat) conCategoria++;
+    var clave = cat.toLowerCase();
+    var g = porClave[clave];
+    if (!g) {
+      g = {
+        titulo: cat ? (cat.charAt(0).toUpperCase() + cat.slice(1)) : ECMenu.GRUPO_OTROS,
+        clave: clave,
+        platos: []
+      };
+      porClave[clave] = g;
+      grupos.push(g);
+    }
+    g.platos.push(p);
+  }
+  if (!grupos.length) return [];
+  // D8: sin categoria en NINGUN plato -> una sola seccion "Menu" sin
+  // sub-encabezado (el <h2> de la ficha ya la titula).
+  if (!conCategoria) {
+    return [{ titulo: ECMenu.TITULO_MENU, clave: '', platos: lista, sinTitulo: true }];
+  }
+  var orden = [];
+  var usados = {};
+  var sugeridas = ECMenu.CATEGORIAS_SUGERIDAS;
+  for (i = 0; i < sugeridas.length; i++) {
+    var ks = String(sugeridas[i]).toLowerCase();
+    if (porClave[ks]) {
+      orden.push(porClave[ks]);
+      usados[ks] = 1;
+    }
+  }
+  var resto = [];
+  for (i = 0; i < grupos.length; i++) {
+    if (usados[grupos[i].clave] || !grupos[i].clave) continue;
+    resto.push(grupos[i]);
+  }
+  resto.sort(function (a, b) {
+    var ka = String(a.titulo).toLowerCase();
+    var kb = String(b.titulo).toLowerCase();
+    return ka < kb ? -1 : (ka > kb ? 1 : 0);
+  });
+  for (i = 0; i < resto.length; i++) orden.push(resto[i]);
+  if (porClave['']) orden.push(porClave['']);
+  return orden;
+}
+
 // Extrae el dominio legible de una URL web (sin protocolo ni "www.")
 // para mostrarlo como informacion oficial visible en el hero (TSK-075).
 function dominioWeb(u) {
@@ -187,6 +252,43 @@ function mediaEsFotoValida(u, tipo) {
   return true;
 }
 
+// JSON-LD del menu: reutiliza el MISMO agrupado del render (menuAgruparPlatos)
+// para que el orden y los titulos de las secciones coincidan con la ficha.
+// Solo se emite offers.price cuando pl.precio es un numero; precio_texto es
+// texto libre y NO se convierte ni se inventa un precio. Sin platos devuelve
+// null y el llamador no anade la clave hasMenu.
+function menuSchemaLD(platos) {
+  var grupos = menuAgruparPlatos(platos);
+  var secciones = [];
+  var i;
+  for (i = 0; i < grupos.length; i++) {
+    var g = grupos[i] || {};
+    var lista = Array.isArray(g.platos) ? g.platos : [];
+    var items = [];
+    for (var j = 0; j < lista.length; j++) {
+      var p = lista[j] || {};
+      var nombre = String(p.nombre === null || p.nombre === undefined ? '' : p.nombre).trim();
+      if (!nombre) continue;
+      var item = { '@type':'MenuItem', 'name':nombre };
+      var desc = String(p.descripcion === null || p.descripcion === undefined ? '' : p.descripcion).trim();
+      if (desc) item['description'] = desc;
+      if (typeof p.precio === 'number' && isFinite(p.precio)) {
+        item['offers'] = { '@type':'Offer', 'price':p.precio, 'priceCurrency':'COP' };
+      }
+      items.push(item);
+    }
+    if (!items.length) continue;
+    var titulo = String(g.titulo === null || g.titulo === undefined ? '' : g.titulo).trim();
+    secciones.push({
+      '@type':'MenuSection',
+      'name': titulo || ECMenu.TITULO_MENU,
+      'hasMenuItem': items
+    });
+  }
+  if (!secciones.length) return null;
+  return { '@type':'Menu', 'hasMenuSection': secciones };
+}
+
 // img (4o argumento, opcional): URL YA resuelta por la cascada del hero
 // (foto_hero -> foto -> primera curada valida -> Unsplash por categoria).
 // Con tags.sin_foto_hero esa cascada NO llega al Unsplash de categoria y el
@@ -226,6 +328,13 @@ function schemaLD(d, cat, autor, img) {
     if (d.rating && d.total_resenas>0) schema['aggregateRating'] = { '@type':'AggregateRating','ratingValue':parseFloat(d.rating).toFixed(1),'ratingCount':d.total_resenas,'bestRating':'5','worstRating':'1' };
     if (d.precio_desde) schema['priceRange'] = d.precio_desde;
     if (d.telefono) schema['telephone'] = d.telefono;
+    // ADR-119: hasMenu solo en fichas de comida y solo con al menos un plato.
+    // Sin platos no se crea la clave (nada de hasMenu vacio).
+    if (cat === 'comida') {
+      var tagsMenu = (typeof d.tags === 'object' && d.tags) ? d.tags : (safeJSON(d.tags) || {});
+      var menuLD = menuSchemaLD(ECMenu.platosDe(tagsMenu));
+      if (menuLD) schema['hasMenu'] = menuLD;
+    }
   }
   return '<script type="application/ld+json">\n'+JSON.stringify(schema,null,2)+'\n<\/script>';
 }
@@ -898,22 +1007,27 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var ambienteComida   = tags.ambiente        || '';
   var terrazaComida    = tags.terraza         || '';
   var reservasComida   = tags.reservas        || '';
+  // ADR-119 D8: el flag legacy domicilio se sigue leyendo como senal de
+  // "hace domicilio", pero NO genera modulo por si solo: sin canales no hay
+  // a donde mandar al usuario. Tambien se consume en el TRACE de abajo.
   var domicilioComida  = tags.domicilio       || '';
-  var rappiUrl         = tags.rappi           || '';
-  var ifoodUrl         = tags.ifood           || '';
-  var domicilioZona    = tags.domicilio_zona  || '';
-  var menuDestacado = safeJSON(tags.menu_destacado); if(!Array.isArray(menuDestacado)) menuDestacado=[];
-  var opcionesDieta = safeJSON(tags.opciones_dieta); if(!Array.isArray(opcionesDieta)) opcionesDieta=[];
-  var domicilioPlataformas = safeJSON(tags.domicilio_plataformas); if(!Array.isArray(domicilioPlataformas)) domicilioPlataformas=[];
+  // ADR-119 D1: menu, carta y canales salen del contrato UNICO lib/menu.js.
+  // El motor NO reimplementa forma, saneo, topes ni precedencia de WhatsApp.
+  var menuPlatos    = ECMenu.platosDe(tags);
+  var cartaArchivos = ECMenu.archivosDeCarta(tags);
+  var canalesComida = ECMenu.canalesDe(tags, d);
   // horario_detallado es un objeto {dia:{abre,cierra,estado}}, no un arreglo
   var horarioDetallado = (tags.horario_detallado && typeof tags.horario_detallado === 'object' && !Array.isArray(tags.horario_detallado)) ? tags.horario_detallado : null;
 
   if (cat === 'comida') {
     console.log('[TRACE][pagina-comida]',
-      'platos=' + menuDestacado.length,
-      'opciones_dieta=' + opcionesDieta.length,
-      'horario_detallado=' + (horarioDetallado ? Object.keys(horarioDetallado).length : 0),
-      'domicilio_plataformas=' + domicilioPlataformas.length);
+      'platos=' + menuPlatos.length,
+      'carta=' + cartaArchivos.length,
+      'plataformas=' + canalesComida.plataformas.length,
+      'zonas=' + (canalesComida.zonas.length ? 1 : 0),
+      'whatsapp_pedidos=' + (canalesComida.whatsapp_origen || 'ninguno'),
+      'domicilio=' + (domicilioComida || 'no'),
+      'horario_detallado=' + (horarioDetallado ? Object.keys(horarioDetallado).length : 0));
   }
 
   // Campos especificos de evento desde tags JSONB (TASK-003)
@@ -2252,7 +2366,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '</tbody></table></div></section>' : '';
 
   // -- SECCION: Perfil gastronomico (TASK-002, solo comida) -----------
-  var MENU_BADGE = { popular:'\u2b50 Mas popular', vegano:'\ud83c\udf31 Vegano', sin_gluten:'Sin gluten' };
   var perfilComidaCards = [];
   if (tipoComida)     perfilComidaCards.push({ ico:'\ud83c\udf7d', lbl:'Tipo',            val:tipoComida });
   if (cocinaTipo)      perfilComidaCards.push({ ico:'\ud83c\udf74', lbl:'Cocina',           val:cocinaTipo });
@@ -2269,21 +2382,82 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       }).join('')+'</div>'
     + '</div></section>' : '';
 
-  // -- SECCION: Menu destacado (TASK-002, solo comida) -----------------
-  var secMenuDestacado = menuDestacado.length ?
-    '<section class="ssec bwarm" id="menu"><div class="sin">'
-    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Menu destacado</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + '<div class="igrid">'+menuDestacado.map(function(m){
-        var badgeTxt = m.badge ? (MENU_BADGE[m.badge] || m.badge) : '';
-        var photoDiv = m.foto ? fotoImg(m.foto, 'mimg', false, m.nombre || 'Foto del plato', 'height:110px;border-radius:8px;margin-bottom:10px') : '';
-        return '<div class="icard" style="text-align:left">'
-          + photoDiv
-          + '<div class="ilbl">'+esc(m.nombre||'')+'</div>'
-          + '<div class="ival">'+esc(m.precio||'')+'</div>'
-          + (badgeTxt ? '<span class="tpill" style="margin-top:6px;display:inline-block">'+badgeTxt+'</span>' : '')
+  // -- SECCION: Menu (ADR-119, solo comida) ---------------------------
+  // El contrato, el saneo y la agrupacion viven en lib/menu.js. Aqui solo
+  // se pinta: cero secciones si no hay platos (D8), agotados SIEMPRE
+  // visibles con sello textual (D7) y orden del autor intacto.
+  var secMenuComida = '';
+  if (cat === 'comida' && menuPlatos.length) {
+    var gruposMenu = menuAgruparPlatos(menuPlatos);
+    var menuBodyHTML = '';
+    for (var gm = 0; gm < gruposMenu.length; gm++) {
+      var grupoMenu = gruposMenu[gm];
+      var cardsMenuHTML = grupoMenu.platos.map(function(pl){
+        var agotado = pl.disponible === false;
+        var precioTxt = '';
+        if (typeof pl.precio === 'number' && pl.precio > 0) precioTxt = money(pl.precio);
+        else if (pl.precio_texto) precioTxt = pl.precio_texto;
+        var badgeTxt = agotado
+          ? (pl.badge ? 'Agotado \u00b7 ' + pl.badge : 'Agotado')
+          : (pl.badge || '');
+        var fotoHTML = pl.foto
+          ? '<div class="mc-foto">' + fotoImg(pl.foto, '', false, pl.nombre || 'Foto del plato') + '</div>'
+          : '';
+        var alergHTML = (Array.isArray(pl.alergenos) && pl.alergenos.length)
+          ? '<ul class="mc-alerg">' + pl.alergenos.map(function(a){
+              return '<li>' + esc(a) + '</li>';
+            }).join('') + '</ul>'
+          : '';
+        return '<div class="mc-card' + (agotado ? ' is-agotado' : '') + '">'
+          + fotoHTML
+          + (badgeTxt ? '<span class="mc-badge">' + esc(badgeTxt) + '</span>' : '')
+          + '<div class="mc-nombre">' + esc(pl.nombre || '') + '</div>'
+          + (precioTxt ? '<div class="mc-precio">' + esc(precioTxt) + '</div>' : '')
+          + (pl.descripcion ? '<div class="mc-desc">' + esc(pl.descripcion) + '</div>' : '')
+          + alergHTML
+          + (pl.porcion ? '<div class="mc-porcion">' + esc(pl.porcion) + '</div>' : '')
           + '</div>';
-      }).join('')+'</div>'
-    + '</div></section>' : '';
+      }).join('');
+      menuBodyHTML += '<div class="mc-sec">'
+        + (grupoMenu.sinTitulo ? '' : '<div class="mc-sec-h"><h3>' + esc(grupoMenu.titulo) + '</h3></div>')
+        + '<div class="mc-grid">' + cardsMenuHTML + '</div>'
+        + '</div>';
+    }
+    secMenuComida = '<section class="ssec bwarm" id="menu"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">' + esc(ECMenu.TITULO_MENU) + '</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="tpl-comida">' + menuBodyHTML + '</div>'
+      + '</div></section>';
+  }
+
+  // -- SECCION: Carta completa (ADR-119 D3, solo comida) --------------
+  // Imagenes como miniatura enlazada (nunca <iframe>), PDF como enlace al
+  // visor nativo. Sin archivos no hay galeria NI nota (D8).
+  var secCartaComida = '';
+  if (cat === 'comida' && cartaArchivos.length) {
+    var galCartaHTML = '';
+    for (var ca = 0; ca < cartaArchivos.length; ca++) {
+      var archCarta = cartaArchivos[ca];
+      var tituloCarta = archCarta.titulo || ('Carta ' + (ca + 1));
+      if (archCarta.tipo === 'imagen') {
+        galCartaHTML += '<a class="mc-gal-item" href="' + esc(archCarta.url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + esc(tituloCarta) + '">'
+          + fotoImg(archCarta.url, '', false, tituloCarta)
+          + '</a>';
+      } else {
+        // tipo pdf o indecidible (null): enlace, jamas se adivina por el host.
+        galCartaHTML += '<a class="mc-gal-pdf" href="' + esc(archCarta.url) + '" target="_blank" rel="noopener noreferrer">'
+          + '<span aria-hidden="true">' + (archCarta.tipo === 'pdf' ? '\uD83D\uDCC4' : '\uD83D\uDD17') + '</span>'
+          + '<span>' + esc(tituloCarta) + '</span>'
+          + '</a>';
+      }
+    }
+    secCartaComida = '<section class="ssec bwhite" id="carta"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Carta</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="tpl-comida">'
+      + '<div class="mc-sec"><div class="mc-gal">' + galCartaHTML + '</div></div>'
+      + (canalesComida.nota ? '<p>' + esc(canalesComida.nota) + '</p>' : '')
+      + '</div>'
+      + '</div></section>';
+  }
 
   // -- SECCION: Horarios por dia (TASK-002, solo comida) ---------------
   var DIAS_ORDEN = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
@@ -2311,19 +2485,40 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     }
   }
 
-  // -- SECCION: Opciones dieteticas y domicilio (TASK-002, solo comida) --
-  var deliveryBtnsComida = [];
-  if (rappiUrl) deliveryBtnsComida.push('<a class="cbtn dark" href="'+esc(rappiUrl)+'" target="_blank">Rappi</a>');
-  if (ifoodUrl) deliveryBtnsComida.push('<a class="cbtn dark" href="'+esc(ifoodUrl)+'" target="_blank">iFood</a>');
-
-  var secDeliveryComida = (opcionesDieta.length || domicilioComida === 'Si' || deliveryBtnsComida.length || domicilioPlataformas.length || domicilioZona) ?
-    '<section class="ssec bwarm" id="delivery"><div class="sin">'
-    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Opciones dieteticas y domicilio</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + (opcionesDieta.length ? '<div class="tagrow" style="margin-bottom:16px">'+opcionesDieta.map(function(o){ return '<span class="tpill">\ud83c\udf31 '+esc(o)+'</span>'; }).join('')+'</div>' : '')
-    + (domicilioComida === 'Si' ? '<div class="hbox"><strong>Domicilio:</strong> '+(domicilioZona ? 'Cobertura en '+esc(domicilioZona) : 'Disponible')
-        + (domicilioPlataformas.length ? ' \u00b7 Tambien en: '+domicilioPlataformas.map(esc).join(', ') : '') + '</div>' : '')
-    + (deliveryBtnsComida.length ? '<div class="cgrid" style="margin-top:14px">'+deliveryBtnsComida.join('')+'</div>' : '')
-    + '</div></section>' : '';
+  // -- SECCION: Domicilio (ADR-119 D4/D8/D9, solo comida) --------------
+  // Sin canales (WhatsApp, plataformas o zonas) NO hay modulo: un titulo
+  // "Domicilio" solo no dice nada. Un chip sin URL si cuenta como contenido.
+  // El numero solo vive dentro del href de wa.me, nunca como texto crudo.
+  var secDomicilioComida = '';
+  var domicilioCanales = !!(canalesComida.whatsapp
+    || canalesComida.plataformas.length
+    || canalesComida.zonas.length);
+  if (cat === 'comida' && domicilioCanales) {
+    var waHrefComida = '';
+    if (canalesComida.whatsapp) {
+      var waMensaje = 'Hola, quiero pedir de ' + String(d.nombre || '') + ' (visto en ExploraCO).';
+      waHrefComida = 'https://wa.me/' + String(canalesComida.whatsapp)
+        + '?text=' + encodeURIComponent(waMensaje);
+    }
+    var appsComidaHTML = canalesComida.plataformas.length
+      ? '<div class="mc-deliv-apps">' + canalesComida.plataformas.map(function(plat){
+          return plat.url
+            ? '<a href="' + esc(plat.url) + '" target="_blank" rel="noopener noreferrer">' + esc(plat.nombre) + '</a>'
+            : '<span>' + esc(plat.nombre) + '</span>';
+        }).join('') + '</div>'
+      : '';
+    var zonaComidaHTML = canalesComida.zonas.length
+      ? '<p class="mc-deliv-zona">Cobertura: ' + esc(canalesComida.zonas.join(', ')) + '</p>'
+      : '';
+    secDomicilioComida = '<section class="ssec bwarm" id="delivery"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Domicilio</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="tpl-comida"><div class="mc-sec"><div class="mc-deliv">'
+      + (waHrefComida ? '<a class="mc-deliv-cta" href="' + esc(waHrefComida) + '" target="_blank" rel="noopener noreferrer">\uD83D\uDCAC Pedir por WhatsApp</a>' : '')
+      + appsComidaHTML
+      + zonaComidaHTML
+      + '</div></div></div>'
+      + '</div></section>';
+  }
 
   // -- SECCION: Fecha y sede (TASK-003, solo evento) -------------------
   var infoEventoCards = [];
@@ -2774,9 +2969,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     {id:'actividades', label:'Actividades', has:!!secActividadesHostal},
     {id:'eventos-hostal', label:'Eventos',  has:!!secEventosHostal},
     {id:'perfil-comida', label:'Cocina',    has:!!secPerfilComida},
-    {id:'menu',        label:'Menu',        has:!!secMenuDestacado},
+    {id:'menu',        label:'Menu',        has:!!secMenuComida},
+    {id:'carta',       label:'Carta',       has:!!secCartaComida},
     {id:'horarios',    label:'Horarios',    has:!!secHorariosComida},
-    {id:'delivery',    label:'Domicilio',   has:!!secDeliveryComida},
+    {id:'delivery',    label:'Domicilio',   has:!!secDomicilioComida},
     {id:'evento-fechas', label:'Fecha y sede', has:!!secEventoInfo},
     {id:'lineup',      label:'Lineup',      has:!!secLineupEvento},
     {id:'agenda',      label:'Agenda',      has:!!secAgendaEvento},
@@ -2894,6 +3090,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<link rel="canonical" href="'+BASE+'/'+esc(d.slug)+'.html">\n'
     + schemaLD(d, cat, autor, hero) + '\n'
     + '<link rel="stylesheet" href="dictado-voz.css?v=1">\n'
+    + (cat === 'comida' ? '<link rel="stylesheet" href="menu-comida.css?v=1">\n' : '')
     + '<style>'+CSS+'</style>\n</head>\n<body'+(cat==='blog'?' class="blog"':'')+'>\n\n'
 
     + '<div class="topbar"><a class="tl" href="/index.html"><img src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL"></a><div class="tsep"></div>'
@@ -2968,9 +3165,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
         + secActividadesHostal + '\n'
         + secEventosHostal + '\n'
         + secPerfilComida + '\n'
-        + secMenuDestacado + '\n'
+        + secMenuComida + '\n'
+        + secCartaComida + '\n'
         + secHorariosComida + '\n'
-        + secDeliveryComida + '\n'
+        + secDomicilioComida + '\n'
         + secEventoInfo + '\n'
         + secLineupEvento + '\n'
         + secAgendaEvento + '\n'

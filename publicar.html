@@ -125,6 +125,26 @@
     .btn-add { border: 1.5px dashed var(--brand); color: var(--brand-dark); background: transparent; padding: .625rem 1rem; border-radius: 10px; font-size: .875rem; font-weight: 600; cursor: pointer; width: 100%; margin-top: .25rem; transition: background .15s; }
     .btn-add:hover { background: #fff8ec; }
 
+    /* MENU / CARTA / DOMICILIO (solo restaurante) */
+    .comida-plato { background: #fafafa; border: 1px solid #e5e7eb; border-radius: 12px; padding: .75rem; margin-bottom: .75rem; }
+    .comida-plato-line { display: grid; grid-template-columns: 1.6fr 1fr .9fr .9fr; gap: .5rem; margin-bottom: .5rem; }
+    .comida-plato-line2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-bottom: .5rem; }
+    .comida-plato input, .comida-plato select, .comida-plato textarea { width: 100%; padding: .5rem .625rem; border: 1.5px solid #ddd; border-radius: 8px; font-size: .875rem; font-family: inherit; }
+    .comida-plato textarea { resize: vertical; margin-bottom: .5rem; }
+    .comida-plato-acciones { display: flex; flex-wrap: wrap; gap: .375rem; align-items: center; }
+    .comida-mini { padding: .3rem .55rem; border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: inherit; font-size: .75rem; cursor: pointer; }
+    .comida-mini:hover { border-color: var(--brand); }
+    .comida-foto-chip { display: flex; align-items: center; gap: .5rem; }
+    .comida-foto-chip img { width: 38px; height: 38px; object-fit: cover; border-radius: 8px; }
+    .comida-carta-item { display: grid; grid-template-columns: 56px 1fr auto; gap: .5rem; align-items: center; border: 1px solid #e5e7eb; border-radius: 10px; padding: .5rem; margin-bottom: .5rem; background: #fff; }
+    .comida-carta-item img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
+    .comida-carta-item input { width: 100%; padding: .45rem .55rem; border: 1.5px solid #ddd; border-radius: 8px; font-size: .8125rem; font-family: inherit; }
+    .comida-pdf { width: 56px; height: 56px; border-radius: 8px; background: #fff0f0; color: #b91c1c; font-weight: 700; font-size: .7rem; display: flex; align-items: center; justify-content: center; border: 1px solid #fecaca; }
+    .comida-plataforma-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+    .comida-plataforma-row input { padding: .5rem .625rem; border: 1.5px solid #ddd; border-radius: 8px; font-size: .875rem; font-family: inherit; width: 100%; }
+    .comida-aviso { font-size: .78rem; color: var(--error); margin-top: .3rem; }
+    @media(max-width:520px){ .comida-plato-line, .comida-plato-line2, .comida-plataforma-row { grid-template-columns: 1fr; } }
+
     /* FOTO */
     .foto-upload { border: 2px dashed #ddd; border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; transition: all .2s; position: relative; }
     .foto-upload:hover, .foto-upload.dragover { border-color: var(--brand); background: #fff8ec; }
@@ -870,6 +890,89 @@
       </div>
     </div>
 
+    <!-- MENU, CARTA Y DOMICILIO (solo restaurante / comida) -->
+    <div class="form-card" id="card-comida-menu" style="display:none">
+      <div class="form-card-title">&#127869; Menu y carta <span style="font-size:.8rem;font-weight:400;color:var(--muted)">opcionales</span></div>
+
+      <p class="comida-aviso" id="comida-aviso-global" role="alert" hidden></p>
+
+      <div class="field">
+        <label>Platos destacados</label>
+        <div class="field-hint">El orden de las filas es el orden de la carta. Maximo 60 platos.</div>
+        <div id="comida-menu-list"></div>
+        <datalist id="comida-categorias-dl">
+          <option value="Entrantes"></option>
+          <option value="Principales"></option>
+          <option value="Postres"></option>
+          <option value="Bebidas"></option>
+        </datalist>
+        <datalist id="comida-badges-dl">
+          <option value="Popular"></option>
+          <option value="Vegano"></option>
+          <option value="Sin gluten"></option>
+        </datalist>
+        <button type="button" class="btn-add" onclick="addComidaPlato()">+ Agregar plato</button>
+        <p class="field-hint" id="comida-menu-count" role="status" aria-live="polite">0 / 60</p>
+      </div>
+
+      <div class="field">
+        <label>Carta completa (imagenes o PDF)</label>
+        <div class="field-hint">Hasta 10 archivos: JPG, PNG o PDF de la carta fisica.</div>
+        <input type="file" id="comida-carta-file" accept="image/*,application/pdf" multiple onchange="comidaCartaSubir(this)">
+        <div class="field-hint" id="comida-carta-estado" role="status" aria-live="polite"></div>
+        <div id="comida-carta-list"></div>
+        <p class="field-hint" id="comida-carta-count">0 / 10</p>
+      </div>
+
+      <div class="field">
+        <label>Nota de la carta</label>
+        <textarea id="carta_nota" rows="2" maxlength="200" placeholder="Ej: Precios en pesos, incluyen impuesto." oninput="comidaCartaNotaCnt()"></textarea>
+        <p class="field-hint"><span id="comida-carta-nota-cnt">0</span> / 200</p>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>WhatsApp de pedidos</label>
+          <input type="tel" id="whatsapp_pedidos" inputmode="numeric" placeholder="573001234567" oninput="comidaWhatsappEco()">
+          <div class="field-hint">Solo digitos. Si escribes 10 digitos que empiezan por 3 se agrega 57.</div>
+          <div class="field-hint" id="comida-whatsapp-eco" role="status" aria-live="polite"></div>
+        </div>
+        <div class="field">
+          <label>Ofrece domicilio</label>
+          <select id="domicilio">
+            <option value="">Seleccionar...</option>
+            <option value="Si">Si</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Zonas de cobertura</label>
+        <input type="text" id="domicilio_zonas" placeholder="El Poblado, Laureles, Envigado">
+        <div class="field-hint">Barrios o zonas separados por comas.</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Rappi URL</label>
+          <input type="url" id="rappi" placeholder="https://www.rappi.com.co/...">
+        </div>
+        <div class="field">
+          <label>iFood URL</label>
+          <input type="url" id="ifood" placeholder="https://www.ifood.com.co/...">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Otras plataformas</label>
+        <div class="field-hint">Maximo 8; el enlace es opcional. Rappi e iFood van arriba.</div>
+        <div id="comida-plataformas-list"></div>
+        <button type="button" class="btn-add" onclick="addComidaPlataforma()">+ Agregar plataforma</button>
+        <p class="field-hint" id="comida-plataformas-count">0 / 8</p>
+      </div>
+    </div>
+
     <!-- FAQs -->
     <div class="form-card">
       <div class="form-card-title">❓ Preguntas frecuentes <span style="font-size:.8rem;font-weight:400;color:var(--muted)">opcionales</span></div>
@@ -946,6 +1049,7 @@
 
 <script src="usuario-session.js"></script>
 <script src="/lib/completitud.js"></script>
+<script src="/lib/menu.js"></script>
 <script src="media-upload.js?v=1"></script>
 <script src="dictado-voz.js?v=1"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1250,6 +1354,10 @@ document.querySelectorAll('.tipo-chip[data-cat]').forEach(function(chip) {
     document.getElementById('f-subcategoria-sitio').style.display = cat === 'sitio' ? 'block' : 'none';
     // Comida/restaurante: subcategoría
     document.getElementById('f-subcategoria-comida').style.display = cat === 'restaurante' ? 'block' : 'none';
+    // Comida/restaurante: menu, carta y domicilio (ADR-119). Solo esta
+    // categoria ve el bloque; el resto de flujos no cambia.
+    var cardComida = document.getElementById('card-comida-menu');
+    if (cardComida) cardComida.style.display = cat === 'restaurante' ? 'block' : 'none';
     // Evento: subcategoría
     document.getElementById('f-subcategoria-evento').style.display = cat === 'evento' ? 'block' : 'none';
     // ADR-099 D8.3: blog es una categoria; su selector de tema solo aplica ahi.
@@ -1437,6 +1545,697 @@ function removeRow(id) {
 }
 
 // ============================================================
+// ADR-119 -- MENU, CARTA Y DOMICILIO (solo restaurante / comida)
+// Un solo bloque. Los topes y la forma de cada campo NO se copian
+// aqui: salen de lib/menu.js (window.ECMenu), el mismo modulo que
+// usa el servidor. El servidor sigue siendo la autoridad; aqui
+// solo se avisa antes de gastar la peticion.
+// ASCII-safe (ADR-002): sin acentos literales ni backticks.
+// ============================================================
+
+// Tope del modulo con respaldo local: si lib/menu.js no cargo, el
+// formulario sigue usable con los mismos numeros.
+function comidaTope(clave, respaldo) {
+  return (window.ECMenu && typeof window.ECMenu[clave] === 'number')
+    ? window.ECMenu[clave] : respaldo;
+}
+
+function comidaAvisoGlobal(msg) {
+  var el = document.getElementById('comida-aviso-global');
+  if (!el) return;
+  el.textContent = msg ? String(msg) : '';
+  el.hidden = !msg;
+}
+
+// ---------------- A) PLATOS DEL MENU ----------------
+function comidaMenuContar() {
+  var n = document.querySelectorAll('#comida-menu-list .comida-plato').length;
+  var tope = comidaTope('TOPE_PLATOS', 60);
+  var el = document.getElementById('comida-menu-count');
+  if (el) el.textContent = n + ' / ' + tope + (n >= tope ? ' - limite alcanzado' : '');
+  return n;
+}
+
+function addComidaPlato() {
+  var n = comidaMenuContar();
+  var tope = comidaTope('TOPE_PLATOS', 60);
+  if (n >= tope) {
+    comidaAvisoGlobal('Maximo ' + tope + ' platos por lugar. Borra uno para agregar otro.');
+    return null;
+  }
+  comidaAvisoGlobal('');
+  return comidaPlatoFila(null);
+}
+
+function comidaPonerCampo(row, sel, v) {
+  var el = row ? row.querySelector(sel) : null;
+  if (!el || v === null || v === undefined) return;
+  el.value = String(v);
+}
+
+function comidaPlatoFila(p) {
+  var list = document.getElementById('comida-menu-list');
+  if (!list) return null;
+  var row = document.createElement('div');
+  row.className = 'comida-plato';
+  row.innerHTML =
+    '<div class="comida-plato-line">' +
+      '<input type="text" class="plato-nombre" maxlength="80" placeholder="Nombre del plato *">' +
+      '<input type="text" class="plato-categoria" list="comida-categorias-dl" maxlength="40" placeholder="Categoria">' +
+      '<input type="text" class="plato-precio" inputmode="decimal" placeholder="Precio">' +
+      '<input type="text" class="plato-porcion" maxlength="40" placeholder="Porcion">' +
+    '</div>' +
+    '<textarea class="plato-descripcion" rows="2" maxlength="280" placeholder="Descripcion (opcional)"></textarea>' +
+    '<div class="comida-plato-line2">' +
+      '<input type="text" class="plato-alergenos" placeholder="Alergenos separados por comas">' +
+      '<input type="text" class="plato-badge" list="comida-badges-dl" maxlength="24" placeholder="Badge (opcional)">' +
+    '</div>' +
+    '<div class="comida-foto-chip">' +
+      '<img class="plato-foto-prev" alt="" style="display:none">' +
+      '<input type="hidden" class="plato-foto-url" value="">' +
+      '<label class="comida-mini">Foto<input type="file" accept="image/*" class="plato-foto-file" style="display:none"></label>' +
+      '<button type="button" class="comida-mini" onclick="comidaPlatoQuitarFoto(this)">Quitar foto</button>' +
+      '<label class="comida-mini" style="display:inline-flex;align-items:center;gap:.35rem"><input type="checkbox" class="plato-disponible" checked>Disponible</label>' +
+      '<span class="plato-foto-estado field-hint"></span>' +
+    '</div>' +
+    '<div class="comida-plato-acciones">' +
+      '<button type="button" class="comida-mini" onclick="comidaMoverPlato(this,-1)">&#8593; Subir</button>' +
+      '<button type="button" class="comida-mini" onclick="comidaMoverPlato(this,1)">&#8595; Bajar</button>' +
+      '<button type="button" class="comida-mini" onclick="comidaBorrarPlato(this)">Borrar</button>' +
+      '<span class="plato-desc-cnt field-hint">0 / 280</span>' +
+    '</div>';
+  list.appendChild(row);
+
+  var fileInp = row.querySelector('.plato-foto-file');
+  if (fileInp) fileInp.onchange = function () { comidaPlatoFotoChange(this); };
+  var prev = row.querySelector('.plato-foto-prev');
+  if (prev) prev.onerror = function () { this.style.display = 'none'; };
+  var desc = row.querySelector('.plato-descripcion');
+  var cnt = row.querySelector('.plato-desc-cnt');
+  if (desc && cnt) desc.addEventListener('input', function () {
+    cnt.textContent = this.value.length + ' / 280';
+  });
+
+  if (p && typeof p === 'object') {
+    comidaPonerCampo(row, '.plato-nombre', p.nombre);
+    comidaPonerCampo(row, '.plato-categoria', p.categoria);
+    comidaPonerCampo(row, '.plato-porcion', p.porcion);
+    comidaPonerCampo(row, '.plato-badge', p.badge);
+    comidaPonerCampo(row, '.plato-precio',
+      (p.precio === null || p.precio === undefined) ? p.precio_texto : p.precio);
+    if (desc) desc.value = p.descripcion ? String(p.descripcion) : '';
+    if (cnt) cnt.textContent = (desc ? desc.value.length : 0) + ' / 280';
+    var al = row.querySelector('.plato-alergenos');
+    if (al) al.value = Array.isArray(p.alergenos) ? p.alergenos.join(', ')
+      : (p.alergenos ? String(p.alergenos) : '');
+    var chk = row.querySelector('.plato-disponible');
+    if (chk && p.disponible === false) chk.checked = false;
+    if (p.foto) comidaPlatoPonerFoto(row, p.foto);
+  }
+  comidaMenuContar();
+  return row;
+}
+
+function comidaPlatoPonerFoto(row, url) {
+  if (!row || !url) return;
+  var oculto = row.querySelector('.plato-foto-url');
+  var prev = row.querySelector('.plato-foto-prev');
+  var est = row.querySelector('.plato-foto-estado');
+  if (oculto) oculto.value = url;
+  if (prev) { prev.src = url; prev.style.display = 'block'; }
+  if (est) est.textContent = 'Foto lista';
+}
+
+function comidaPlatoQuitarFoto(btn) {
+  var row = (btn && btn.closest) ? btn.closest('.comida-plato') : null;
+  if (!row) return;
+  var oculto = row.querySelector('.plato-foto-url');
+  var prev = row.querySelector('.plato-foto-prev');
+  var est = row.querySelector('.plato-foto-estado');
+  var file = row.querySelector('.plato-foto-file');
+  if (oculto) oculto.value = '';
+  if (prev) { prev.removeAttribute('src'); prev.style.display = 'none'; }
+  if (est) est.textContent = '';
+  if (file) file.value = '';
+}
+
+function comidaPlatoFotoChange(input) {
+  var file = (input && input.files) ? input.files[0] : null;
+  if (!file) return;
+  if (!window.MediaUpload || typeof window.MediaUpload.subir !== 'function') {
+    alert('La subida de fotos no esta disponible en este navegador.');
+    return;
+  }
+  var row = (input.closest) ? input.closest('.comida-plato') : null;
+  var est = row ? row.querySelector('.plato-foto-estado') : null;
+  var vv = window.MediaUpload.validar(file, 'foto');
+  if (!vv.ok) { alert(vv.error); input.value = ''; return; }
+  if (est) est.textContent = 'Subiendo...';
+  window.MediaUpload.subir({ file: file, tipo: 'foto', contexto: 'destino', modo: 'publico' })
+    .then(function (r) { comidaPlatoPonerFoto(row, r.url); })
+    .catch(function (e) {
+      if (est) est.textContent = '';
+      alert((e && e.message) ? e.message : 'No se pudo subir la foto');
+    });
+}
+
+function comidaMoverPlato(btn, dir) {
+  var row = (btn && btn.closest) ? btn.closest('.comida-plato') : null;
+  var list = document.getElementById('comida-menu-list');
+  if (!row || !list) return;
+  if (dir < 0) {
+    var prev = row.previousElementSibling;
+    if (prev) list.insertBefore(row, prev);
+  } else {
+    var next = row.nextElementSibling;
+    if (next) list.insertBefore(next, row);
+  }
+  comidaMenuContar();
+}
+
+function comidaBorrarPlato(btn) {
+  var row = (btn && btn.closest) ? btn.closest('.comida-plato') : null;
+  if (!row) return;
+  row.remove();
+  comidaAvisoGlobal('');
+  comidaMenuContar();
+}
+
+function comidaCollectPlatos() {
+  var out = [];
+  var filas = document.querySelectorAll('#comida-menu-list .comida-plato');
+  for (var i = 0; i < filas.length; i++) {
+    var row = filas[i];
+    var nombre = row.querySelector('.plato-nombre') ? row.querySelector('.plato-nombre').value.trim() : '';
+    if (!nombre) continue;
+    var plato = { nombre: nombre };
+    var categoria = row.querySelector('.plato-categoria') ? row.querySelector('.plato-categoria').value.trim() : '';
+    var precio = row.querySelector('.plato-precio') ? row.querySelector('.plato-precio').value.trim() : '';
+    var porcion = row.querySelector('.plato-porcion') ? row.querySelector('.plato-porcion').value.trim() : '';
+    var descripcion = row.querySelector('.plato-descripcion') ? row.querySelector('.plato-descripcion').value.trim() : '';
+    var crudos = row.querySelector('.plato-alergenos') ? row.querySelector('.plato-alergenos').value : '';
+    var badge = row.querySelector('.plato-badge') ? row.querySelector('.plato-badge').value.trim() : '';
+    var foto = row.querySelector('.plato-foto-url') ? row.querySelector('.plato-foto-url').value.trim() : '';
+    var chk = row.querySelector('.plato-disponible');
+    if (categoria) plato.categoria = categoria;
+    if (precio) plato.precio = precio;
+    if (porcion) plato.porcion = porcion;
+    if (descripcion) plato.descripcion = descripcion;
+    var partes = String(crudos || '').split(',');
+    var alergenos = [];
+    for (var j = 0; j < partes.length; j++) {
+      var a = partes[j].trim();
+      if (a) alergenos.push(a);
+    }
+    if (alergenos.length) plato.alergenos = alergenos;
+    if (badge) plato.badge = badge;
+    if (foto) plato.foto = foto;
+    plato.disponible = chk ? !!chk.checked : true;
+    out.push(plato);
+  }
+  return out;
+}
+
+// ---------------- B) CARTA (imagenes o PDF) ----------------
+function comidaCartaContar() {
+  var n = document.querySelectorAll('#comida-carta-list .comida-carta-item').length;
+  var tope = comidaTope('TOPE_ARCHIVOS', 10);
+  var el = document.getElementById('comida-carta-count');
+  if (el) el.textContent = n + ' / ' + tope;
+  return n;
+}
+
+function comidaCartaEstado(msg, esError) {
+  var el = document.getElementById('comida-carta-estado');
+  if (!el) return;
+  el.textContent = msg ? String(msg) : '';
+  el.style.color = esError ? '#b91c1c' : '';
+}
+
+function comidaCartaFila(a) {
+  var list = document.getElementById('comida-carta-list');
+  if (!list) return null;
+  var url = '';
+  var tipo = '';
+  var titulo = '';
+  if (typeof a === 'string') {
+    url = a;
+  } else if (a && typeof a === 'object') {
+    url = a.url ? String(a.url) : '';
+    tipo = a.tipo ? String(a.tipo) : '';
+    titulo = a.titulo ? String(a.titulo) : '';
+  }
+  if (!url) return null;
+  if (tipo !== 'pdf' && tipo !== 'imagen') {
+    tipo = /\.pdf(\?|#|$)/i.test(url) ? 'pdf' : 'imagen';
+  }
+
+  var row = document.createElement('div');
+  row.className = 'comida-carta-item';
+  row.innerHTML =
+    '<div class="comida-carta-thumb"></div>' +
+    '<div>' +
+      '<input type="text" class="carta-titulo" maxlength="60" placeholder="Titulo del archivo (opcional)">' +
+      '<div class="field-hint carta-tipo"></div>' +
+      '<input type="hidden" class="carta-url">' +
+      '<input type="hidden" class="carta-tipo-val">' +
+    '</div>' +
+    '<div class="comida-plato-acciones" style="flex-direction:column">' +
+      '<button type="button" class="comida-mini" onclick="comidaMoverCarta(this,-1)">&#8593;</button>' +
+      '<button type="button" class="comida-mini" onclick="comidaMoverCarta(this,1)">&#8595;</button>' +
+      '<button type="button" class="comida-mini" onclick="comidaBorrarCarta(this)">Borrar</button>' +
+    '</div>';
+  list.appendChild(row);
+
+  var thumb = row.querySelector('.comida-carta-thumb');
+  if (thumb && tipo === 'pdf') {
+    thumb.innerHTML = '<div class="comida-pdf">PDF</div>';
+  } else if (thumb) {
+    var img = document.createElement('img');
+    img.alt = '';
+    img.src = url;
+    img.onerror = function () { this.style.display = 'none'; };
+    thumb.appendChild(img);
+  }
+  var inUrl = row.querySelector('.carta-url');
+  var inTipo = row.querySelector('.carta-tipo-val');
+  var inTitulo = row.querySelector('.carta-titulo');
+  if (inUrl) inUrl.value = url;
+  if (inTipo) inTipo.value = tipo;
+  if (inTitulo) inTitulo.value = titulo;
+  var et = row.querySelector('.carta-tipo');
+  if (et) et.textContent = (tipo === 'pdf') ? 'PDF' : 'Imagen';
+  comidaCartaContar();
+  return row;
+}
+
+// Subida SECUENCIAL: un archivo a la vez (el endpoint firma uno por
+// peticion) y el JWT lo resuelve MediaUpload con la sesion del formulario.
+function comidaCartaSubir(input) {
+  var files = (input && input.files) ? Array.prototype.slice.call(input.files) : [];
+  if (input) input.value = '';
+  if (!files.length) return;
+  if (!window.MediaUpload || typeof window.MediaUpload.subir !== 'function') {
+    comidaCartaEstado('La subida de archivos no esta disponible en este navegador.', true);
+    return;
+  }
+  var tope = comidaTope('TOPE_ARCHIVOS', 10);
+  var actuales = comidaCartaContar();
+  if (actuales >= tope) {
+    comidaCartaEstado('Ya tienes ' + actuales + ' archivos. Maximo ' + tope + ': borra uno para subir otro.', true);
+    return;
+  }
+  if (actuales + files.length > tope) {
+    comidaCartaEstado('Solo caben ' + (tope - actuales) + ' archivo(s) mas: el limite es ' + tope + '.', true);
+    return;
+  }
+
+  var idx = 0;
+  function siguiente() {
+    if (idx >= files.length) {
+      comidaCartaEstado('');
+      comidaCartaContar();
+      return;
+    }
+    var file = files[idx];
+    idx++;
+    comidaCartaEstado('Subiendo ' + idx + ' de ' + files.length + '...');
+    var tipo = window.MediaUpload.tipoDeArchivo(file);
+    if (tipo !== 'foto' && tipo !== 'documento') {
+      comidaCartaEstado('Archivo no permitido: ' + file.name + ' (solo imagen o PDF).', true);
+      siguiente();
+      return;
+    }
+    var vv = window.MediaUpload.validar(file, tipo);
+    if (!vv.ok) {
+      comidaCartaEstado(vv.error + ' (' + file.name + ')', true);
+      siguiente();
+      return;
+    }
+    window.MediaUpload.subir({ file: file, tipo: tipo, contexto: 'destino' })
+      .then(function (r) {
+        comidaCartaFila({
+          url: r.url,
+          tipo: (tipo === 'documento') ? 'pdf' : 'imagen',
+          titulo: ''
+        });
+        siguiente();
+      })
+      .catch(function (e) {
+        comidaCartaEstado((e && e.message) ? e.message : 'No se pudo subir ' + file.name, true);
+        siguiente();
+      });
+  }
+  siguiente();
+}
+
+function comidaMoverCarta(btn, dir) {
+  var row = (btn && btn.closest) ? btn.closest('.comida-carta-item') : null;
+  var list = document.getElementById('comida-carta-list');
+  if (!row || !list) return;
+  if (dir < 0) {
+    var prev = row.previousElementSibling;
+    if (prev) list.insertBefore(row, prev);
+  } else {
+    var next = row.nextElementSibling;
+    if (next) list.insertBefore(next, row);
+  }
+  comidaCartaContar();
+}
+
+function comidaBorrarCarta(btn) {
+  var row = (btn && btn.closest) ? btn.closest('.comida-carta-item') : null;
+  if (!row) return;
+  row.remove();
+  comidaCartaContar();
+}
+
+function comidaCartaNotaCnt() {
+  var ta = document.getElementById('carta_nota');
+  var el = document.getElementById('comida-carta-nota-cnt');
+  if (ta && el) el.textContent = ta.value.length;
+}
+
+function comidaCollectCarta() {
+  var out = [];
+  var rows = document.querySelectorAll('#comida-carta-list .comida-carta-item');
+  for (var i = 0; i < rows.length; i++) {
+    var url = rows[i].querySelector('.carta-url') ? rows[i].querySelector('.carta-url').value.trim() : '';
+    if (!url) continue;
+    var tipo = rows[i].querySelector('.carta-tipo-val') ? rows[i].querySelector('.carta-tipo-val').value : '';
+    var titulo = rows[i].querySelector('.carta-titulo') ? rows[i].querySelector('.carta-titulo').value.trim() : '';
+    var item = { url: url };
+    if (tipo) item.tipo = tipo;
+    if (titulo) item.titulo = titulo;
+    out.push(item);
+  }
+  return out;
+}
+
+// ---------------- C) DOMICILIO Y PLATAFORMAS ----------------
+function comidaWhatsappEco() {
+  var inp = document.getElementById('whatsapp_pedidos');
+  var eco = document.getElementById('comida-whatsapp-eco');
+  if (!inp || !eco) return;
+  var solo = String(inp.value || '').replace(/[^0-9]/g, '');
+  if (solo !== inp.value) inp.value = solo;
+  if (!solo) { eco.textContent = ''; eco.style.color = ''; return; }
+  var M = window.ECMenu;
+  if (!M || typeof M.normalizarWhatsapp !== 'function') { eco.textContent = ''; return; }
+  var r = M.normalizarWhatsapp(solo);
+  if (r.ok && r.numero) {
+    eco.textContent = 'Se guardara como +' + r.numero;
+    eco.style.color = '';
+    return;
+  }
+  if (!r.ok) {
+    eco.textContent = 'Numero incompleto: 10 digitos (celular) o 11-14 con indicativo.';
+    eco.style.color = '#b91c1c';
+    return;
+  }
+  eco.textContent = '';
+}
+
+function comidaPlataformasTotal() {
+  var n = document.querySelectorAll('#comida-plataformas-list .comida-plataforma-row').length;
+  if (String(v('rappi') || '').trim()) n++;
+  if (String(v('ifood') || '').trim()) n++;
+  return n;
+}
+
+function comidaPlataformasContar() {
+  var n = comidaPlataformasTotal();
+  var tope = comidaTope('TOPE_PLATAFORMAS', 8);
+  var el = document.getElementById('comida-plataformas-count');
+  if (el) el.textContent = n + ' / ' + tope + (n >= tope ? ' - limite alcanzado' : '');
+  return n;
+}
+
+function addComidaPlataforma(datos, silencioso) {
+  var tope = comidaTope('TOPE_PLATAFORMAS', 8);
+  if (!silencioso && comidaPlataformasTotal() >= tope) {
+    comidaAvisoGlobal('Maximo ' + tope + ' plataformas contando Rappi e iFood.');
+    return null;
+  }
+  var list = document.getElementById('comida-plataformas-list');
+  if (!list) return null;
+  var row = document.createElement('div');
+  row.className = 'comida-plataforma-row';
+  row.innerHTML =
+    '<input type="text" class="plat-nombre" maxlength="40" placeholder="Plataforma (ej: Uber Eats)">' +
+    '<input type="url" class="plat-url" maxlength="500" placeholder="https://... (opcional)">' +
+    '<button type="button" class="btn-rem" onclick="comidaBorrarPlataforma(this)">&times;</button>';
+  list.appendChild(row);
+  if (datos && typeof datos === 'object') {
+    var nom = row.querySelector('.plat-nombre');
+    var url = row.querySelector('.plat-url');
+    if (nom && datos.nombre) nom.value = String(datos.nombre);
+    if (url && datos.url) url.value = String(datos.url);
+  } else if (typeof datos === 'string' && datos) {
+    var nom2 = row.querySelector('.plat-nombre');
+    if (nom2) nom2.value = datos;
+  }
+  comidaPlataformasContar();
+  return row;
+}
+
+function comidaBorrarPlataforma(btn) {
+  var row = (btn && btn.closest) ? btn.closest('.comida-plataforma-row') : null;
+  if (!row) return;
+  row.remove();
+  comidaPlataformasContar();
+}
+
+// Solo http/https con host: sin enlace la plataforma NO es canal (D8) y un
+// chip vacio haria que el motor pinte #delivery sin domicilio real.
+function comidaUrlSegura(valor) {
+  var s = String(valor === null || valor === undefined ? '' : valor).trim();
+  if (!s) return false;
+  if (window.ECMenu && typeof window.ECMenu.esUrlSegura === 'function') {
+    return window.ECMenu.esUrlSegura(s) === true;
+  }
+  // Respaldo sin el modulo: misma regla, sin red y sin lanzar.
+  if (s.slice(0, 2) === '//') return false;
+  if (typeof URL === 'function') {
+    try {
+      var u = new URL(s);
+      var proto = String(u.protocol || '').toLowerCase();
+      return (proto === 'http:' || proto === 'https:') && !!u.hostname;
+    } catch (e) { return false; }
+  }
+  return /^https?:\/\/[^\s\/]+\.[^\s\/]/i.test(s);
+}
+
+// Rappi e iFood tienen campo propio arriba. El contrato de lectura y de
+// render (lib/menu.js canalesDe / pagina-destino) pinta domicilio_plataformas,
+// asi que las dos se replican ahi SOLO con URL http(s) valida y sin repetir
+// el nombre ni el enlace de una fila. Vacio o invalido = no se empuja nada.
+function comidaCollectPlataformas() {
+  var tope = comidaTope('TOPE_PLATAFORMAS', 8);
+  var out = [];
+  var vistos = {};
+  var urls = {};
+  var i;
+
+  // 1) Filas del formulario: el autor manda.
+  var rows = document.querySelectorAll('#comida-plataformas-list .comida-plataforma-row');
+  for (i = 0; i < rows.length; i++) {
+    var nom = rows[i].querySelector('.plat-nombre') ? rows[i].querySelector('.plat-nombre').value.trim() : '';
+    if (!nom) continue;
+    var k = nom.toLowerCase();
+    if (vistos[k]) continue;
+    var url = rows[i].querySelector('.plat-url') ? rows[i].querySelector('.plat-url').value.trim() : '';
+    vistos[k] = 1;
+    if (url) urls[url.toLowerCase()] = 1;
+    out.push({ nombre: nom, url: url || null });
+  }
+
+  // 2) Escalares Rappi/iFood: solo canal valido y sin duplicar.
+  function escalar(nombre, valor) {
+    var u = String(valor === null || valor === undefined ? '' : valor).trim();
+    if (!u || !comidaUrlSegura(u)) return;
+    var kn = String(nombre).toLowerCase();
+    if (vistos[kn] || urls[u.toLowerCase()]) return;
+    vistos[kn] = 1;
+    urls[u.toLowerCase()] = 1;
+    out.push({ nombre: nombre, url: u });
+  }
+  escalar('Rappi', v('rappi'));
+  escalar('iFood', v('ifood'));
+
+  return out.slice(0, tope);
+}
+
+function comidaCollectZonas() {
+  var inp = document.getElementById('domicilio_zonas');
+  if (!inp) return [];
+  var partes = String(inp.value || '').split(',');
+  var out = [];
+  for (var i = 0; i < partes.length; i++) {
+    var z = partes[i].trim();
+    if (z) out.push(z);
+  }
+  return out;
+}
+
+// ---------------- D) COLECTOR UNICO DE TAGS ----------------
+// Devuelve SOLO las claves de ADR-119. Fuera de restaurante va vacio: la
+// ficha de blog, hostal, sitio o evento no se toca.
+function comidaCollectTags(catVal) {
+  var cat = catVal;
+  if (!cat) {
+    var sel = document.querySelector('input[name="categoria"]:checked');
+    cat = sel ? sel.value : '';
+  }
+  if (cat !== 'restaurante') return {};
+  var ta = document.getElementById('carta_nota');
+  return {
+    menu_destacado: comidaCollectPlatos(),
+    carta_archivos: comidaCollectCarta(),
+    carta_nota: ta ? String(ta.value || '').trim() : '',
+    whatsapp_pedidos: String(v('whatsapp_pedidos') || '').trim(),
+    domicilio: String(v('domicilio') || '').trim(),
+    domicilio_zonas: comidaCollectZonas(),
+    domicilio_plataformas: comidaCollectPlataformas(),
+    rappi: String(v('rappi') || '').trim(),
+    ifood: String(v('ifood') || '').trim()
+  };
+}
+
+// Validacion PREVIA con el mismo modulo que el servidor (ECMenu). Si el
+// modulo no cargo, no se bloquea nada: el servidor sigue validando.
+function comidaMensajeError(e) {
+  var codigo = (e && e.codigo) ? String(e.codigo) : '';
+  var campo = (e && e.campo) ? String(e.campo) : '';
+  var motivo = (e && e.motivo) ? String(e.motivo) : '';
+  if (codigo === 'whatsapp_invalido') {
+    return 'El WhatsApp de pedidos no es valido: escribe 10 digitos (celular) o 11-14 con indicativo.';
+  }
+  if (codigo === 'tope_excedido' && motivo === 'TOPE_PLATOS') {
+    return 'Maximo ' + comidaTope('TOPE_PLATOS', 60) + ' platos por lugar.';
+  }
+  if (codigo === 'tope_excedido' && motivo === 'TOPE_ARCHIVOS') {
+    return 'Maximo ' + comidaTope('TOPE_ARCHIVOS', 10) + ' archivos de carta.';
+  }
+  if (codigo === 'tope_excedido' && motivo === 'TOPE_PLATAFORMAS') {
+    return 'Maximo ' + comidaTope('TOPE_PLATAFORMAS', 8) + ' plataformas de domicilio.';
+  }
+  if (codigo === 'tope_excedido' && motivo === 'TOPE_NOTA') {
+    return 'La nota de la carta admite maximo 200 caracteres.';
+  }
+  if (codigo === 'url_insegura') {
+    return 'Revisa los enlaces: solo se aceptan http o https. Campo: ' + campo + '.';
+  }
+  if (codigo === 'plataforma_invalida') {
+    return 'Cada plataforma necesita un nombre.';
+  }
+  if (codigo === 'carta_archivo_invalido') {
+    return 'El enlace de la carta no es valido: sube el archivo de nuevo.';
+  }
+  if (codigo === 'menu_plato_invalido') {
+    return 'Revisa los platos: cada fila necesita nombre y los enlaces http o https.';
+  }
+  if (codigo === 'tope_excedido') {
+    return 'Superaste el tope de ' + campo + '.';
+  }
+  return 'Revisa el menu, la carta y el domicilio (' + (codigo || 'dato invalido') + ').';
+}
+
+function comidaValidarPrevia(tags) {
+  if (!window.ECMenu || typeof window.ECMenu.normalizarFicha !== 'function') return { ok: true };
+  var r = window.ECMenu.normalizarFicha(tags || {});
+  if (r && r.ok) return { ok: true };
+  var e = (r && r.errores && r.errores.length) ? r.errores[0] : null;
+  return { ok: false, mensaje: comidaMensajeError(e) };
+}
+
+// ---------------- E) PRECARGA (edicion ?id=) ----------------
+// Tolerante a legacy: plato como string, plataforma como string y precio
+// escrito como texto se recuperan sin perder nada (ECMenu normaliza lectura).
+function comidaPrecargarForm(tags) {
+  var t = (tags && typeof tags === 'object') ? tags : {};
+  var M = window.ECMenu;
+
+  var listP = document.getElementById('comida-menu-list');
+  if (listP) listP.textContent = '';
+  var listC = document.getElementById('comida-carta-list');
+  if (listC) listC.textContent = '';
+  var listPl = document.getElementById('comida-plataformas-list');
+  if (listPl) listPl.textContent = '';
+
+  var i;
+
+  // menu_destacado
+  var platos = (M && typeof M.platosDe === 'function') ? M.platosDe(t) : [];
+  for (i = 0; i < platos.length; i++) comidaPlatoFila(platos[i]);
+
+  // carta_archivos
+  var archivos = (M && typeof M.archivosDeCarta === 'function') ? M.archivosDeCarta(t) : [];
+  for (i = 0; i < archivos.length; i++) comidaCartaFila(archivos[i]);
+
+  // carta_nota
+  var ta = document.getElementById('carta_nota');
+  if (ta) {
+    ta.value = (t.carta_nota === null || t.carta_nota === undefined) ? '' : String(t.carta_nota);
+    comidaCartaNotaCnt();
+  }
+
+  // whatsapp_pedidos
+  var wa = document.getElementById('whatsapp_pedidos');
+  if (wa) {
+    wa.value = (t.whatsapp_pedidos === null || t.whatsapp_pedidos === undefined)
+      ? '' : String(t.whatsapp_pedidos);
+    comidaWhatsappEco();
+  }
+
+  // domicilio (Si / No; acepta el legacy en minusculas o booleano)
+  var dom = document.getElementById('domicilio');
+  if (dom) {
+    var dv = String(t.domicilio === null || t.domicilio === undefined ? '' : t.domicilio).toLowerCase();
+    if (dv === 'si' || dv === 'true' || dv === '1') dom.value = 'Si';
+    else if (dv === 'no' || dv === 'false' || dv === '0') dom.value = 'No';
+    else dom.value = '';
+  }
+
+  // domicilio_zonas
+  var zonas = document.getElementById('domicilio_zonas');
+  if (zonas) {
+    var zs = (M && typeof M.zonasDe === 'function') ? M.zonasDe(t) : [];
+    zonas.value = zs.join(', ');
+  }
+
+  // rappi / ifood y domicilio_plataformas: la clave propia manda; si falta,
+  // el nombre se rescata del array (asi el dato no se pierde al reabrir).
+  var plataformas = (M && typeof M.plataformasDe === 'function') ? M.plataformasDe(t) : [];
+  var rappi = (t.rappi === null || t.rappi === undefined) ? '' : String(t.rappi).trim();
+  var ifood = (t.ifood === null || t.ifood === undefined) ? '' : String(t.ifood).trim();
+  var resto = [];
+  for (i = 0; i < plataformas.length; i++) {
+    var nom = String(plataformas[i].nombre || '').toLowerCase();
+    var urlP = plataformas[i].url ? String(plataformas[i].url) : '';
+    if (nom === 'rappi') { if (!rappi && urlP) rappi = urlP; continue; }
+    if (nom === 'ifood' || nom === 'i food') { if (!ifood && urlP) ifood = urlP; continue; }
+    resto.push(plataformas[i]);
+  }
+  var inRappi = document.getElementById('rappi');
+  var inIfood = document.getElementById('ifood');
+  if (inRappi) inRappi.value = rappi;
+  if (inIfood) inIfood.value = ifood;
+  for (i = 0; i < resto.length; i++) addComidaPlataforma(resto[i], true);
+
+  comidaMenuContar();
+  comidaCartaContar();
+  comidaPlataformasContar();
+}
+
+// Contadores en cero al cargar (el bloque nace oculto si la categoria no
+// es restaurante; los valores se recalculan al precargar un borrador).
+comidaMenuContar();
+comidaCartaContar();
+comidaPlataformasContar();
+comidaCartaNotaCnt();
+
+// ============================================================
 // RESUMEN
 // ============================================================
 function subcatResumen(catSel) {
@@ -1581,6 +2380,20 @@ function validarEnvio(modo) {
 
   // El WhatsApp deja de bloquear tambien en el envio completo (D8.4).
   pintarAvisoWhatsapp(v('whatsapp').length > 0 && v('whatsapp').length < 10);
+
+  // ADR-119 D5/D14: topes y forma del menu, la carta y el domicilio con el
+  // MISMO modulo que el servidor (lib/menu.js). Corta antes de la red y sin
+  // vaciar un campo; el servidor vuelve a validar (sigue siendo la autoridad).
+  if (cat && cat.value === 'restaurante') {
+    var revComida = comidaValidarPrevia(comidaCollectTags(cat.value));
+    if (revComida && !revComida.ok) {
+      comidaAvisoGlobal(revComida.mensaje);
+      ok = false;
+      if (window.setStep) window.setStep(3);
+    } else {
+      comidaAvisoGlobal('');
+    }
+  }
 
   if (!ok) {
     // Los campos con error viven en paneles ocultos (ADR-003): por eso
@@ -1771,7 +2584,11 @@ async function submitForm(modo) {
     sitio_temporada: Array.from(document.querySelectorAll('#sitio-temporada-chips .am-chip.selected')).map(function(c){ return c.getAttribute('data-val'); }),
     sitio_permisos: v('sitio_permisos') || null,
     // ADR-099 D9: el video deja de ser exclusivo de blog.
-    video_url: v('video_url') || null
+    video_url: v('video_url') || null,
+    // ADR-119 D2/D3/D4: menu, carta y domicilio viajan en tags. El servidor
+    // reconstruye y normaliza con lib/menu.js (la autoridad de los topes);
+    // fuera de restaurante el objeto viaja vacio y no toca ninguna clave.
+    tags: comidaCollectTags(cat ? cat.value : '')
   };
 
   try {
@@ -2963,6 +3780,9 @@ async function submitForm(modo) {
     }
     marcarChips('.am-chip', tags.amenidades);
     marcarChips('#sitio-temporada-chips .am-chip', tags.temporada);
+    // ADR-119: menu, carta y domicilio se reponen con el mismo normalizador
+    // que el servidor (lib/menu.js), tolerante a legacy.
+    if (typeof comidaPrecargarForm === 'function') comidaPrecargarForm(tags);
   }
 
   function cargarBorrador(id, paso) {

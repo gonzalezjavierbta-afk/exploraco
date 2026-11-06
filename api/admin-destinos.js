@@ -10,6 +10,9 @@
 
 const { neon } = require('@neondatabase/serverless');
 const crypto = require('crypto');
+// ADR-119 D1: la autoridad de escritura de la ficha de menu es lib/menu.js.
+// Se requirea (no se copia) y NO consume funcion serverless (presupuesto 8/8).
+const ECMenu = require('../lib/menu.js');
 
 // ADR-109 paso 4b: el secreto admin NO tiene fallback publico (fail-closed).
 // Sin process.env.ADMIN_SECRET la ruta admin responde 503; la comparacion es
@@ -58,6 +61,74 @@ function normSintro(v) {
   if (v === undefined || v === null) return null;
   var s = String(v).replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
   return s ? s.slice(0, 200) : null;
+}
+
+// == ADR-119 D14: normalizacion del admin (normaliza, NO devuelve 400) ======
+// El admin no es una API estricta: recibe lo que manda el formulario, lo pasa
+// por lib/menu.js y responde los recortes/rechazos en avisos[] con codigos
+// estables. D13: se reemplaza el array COMPLETO de una clave, jamas merge por
+// item ni toque del objeto tags entero. D7: disponible:false se conserva tal
+// cual (viene de unPlato; aqui no se filtra nada).
+var MENU_TOPE_ARRAYS = {
+  menu_destacado:        ECMenu.TOPE_PLATOS,
+  carta_archivos:        ECMenu.TOPE_ARCHIVOS,
+  domicilio_plataformas: ECMenu.TOPE_PLATAFORMAS
+};
+var MENU_AVISO_TEXTO = {
+  menu_plato_invalido:    'Plato descartado: falta nombre o dato valido.',
+  carta_archivo_invalido: 'Archivo de carta descartado: dato invalido.',
+  url_insegura:           'Enlace descartado: la URL no es segura.',
+  whatsapp_invalido:      'WhatsApp descartado: no es un numero valido.',
+  plataforma_invalida:    'Plataforma descartada: falta nombre o dato valido.',
+  tope_excedido:          'Contenido recortado al tope permitido.'
+};
+
+function normalizarTagsAdmin(raw) {
+  var src = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  var tags = {};
+  Object.keys(src).forEach(function (k) { tags[k] = src[k]; });
+  var avisos = [];
+
+  // 1) Recorte de arrays al tope de D5 ANTES de validar: asi el validador ve
+  //    una lista legal y conserva los primeros N en vez de vaciar la clave.
+  Object.keys(MENU_TOPE_ARRAYS).forEach(function (k) {
+    var tope = MENU_TOPE_ARRAYS[k];
+    var v = tags[k];
+    if (Array.isArray(v) && v.length > tope) {
+      tags[k] = v.slice(0, tope);
+      avisos.push({
+        codigo: 'tope_excedido',
+        campo: k,
+        texto: 'Se recortaron ' + (v.length - tope) + ' item(s) de ' + k
+          + ' al tope de ' + tope + '.'
+      });
+    }
+  });
+
+  // 2) Validacion y normalizacion por la unica implementacion (ADR-119 D1).
+  var r = ECMenu.normalizarFicha(tags);
+  var ficha = (r && r.ficha) ? r.ficha : {};
+  Object.keys(ficha).forEach(function (k) { tags[k] = ficha[k]; });
+
+  // 3) Errores -> avisos (nunca 400). Un campo sobre tope de texto se recorta
+  //    aqui mismo en vez de perderse.
+  var errores = (r && r.errores) ? r.errores : [];
+  for (var i = 0; i < errores.length; i++) {
+    var e = errores[i] || {};
+    var codigo = e.codigo || 'campo_ajustado';
+    if (codigo === 'carta_archivo_invalido' && e.motivo === 'URL_INVALIDA') codigo = 'url_insegura';
+    if (e.codigo === 'tope_excedido' && e.campo === 'carta_nota') {
+      tags.carta_nota = String(tags.carta_nota === undefined || tags.carta_nota === null
+        ? '' : tags.carta_nota).slice(0, ECMenu.TOPE_NOTA);
+    }
+    avisos.push({
+      codigo: codigo,
+      campo: e.campo || null,
+      texto: MENU_AVISO_TEXTO[codigo] || 'Campo ajustado por validacion.'
+    });
+  }
+
+  return { tags: tags, avisos: avisos };
 }
 
 // Normaliza la galeria: descarta items sin url valida, deduplica por url (trim),
@@ -284,7 +355,10 @@ module.exports = async function handler(req, res) {
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9-]/g, '');
 
-      var tags = safeJSON(b.tags) || {};
+      // ADR-119 D14: normaliza (no rechaza) y devuelve avisos[].
+      var tagsNorm = normalizarTagsAdmin(safeJSON(b.tags) || {});
+      var tags = tagsNorm.tags;
+      var avisos = tagsNorm.avisos;
 
       var inserted = await sql(
         'INSERT INTO destinos ( '
@@ -391,7 +465,7 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      return res.status(201).json({ ok: true, data: inserted[0] });
+      return res.status(201).json({ ok: true, data: inserted[0], avisos: avisos });
     }
 
     // -- PUT: actualizar destino -----------------------------------
@@ -399,7 +473,11 @@ module.exports = async function handler(req, res) {
       var id = req.query.id;
       if (!id) return res.status(400).json({ ok: false, error: 'id requerido' });
 
-      var tags2 = safeJSON(b.tags) || {};
+      // ADR-119 D14: normaliza (no rechaza) y devuelve avisos[]. D13: el array
+      // COMPLETO de cada clave se reemplaza; tags enteros siguen por merge.
+      var tagsNorm2 = normalizarTagsAdmin(safeJSON(b.tags) || {});
+      var tags2 = tagsNorm2.tags;
+      var avisos2 = tagsNorm2.avisos;
 
       // Construir SET dinamico -- solo actualizar campos que vienen en el body
       var sets = ['actualizado_en = NOW()'];
@@ -528,7 +606,7 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      return res.json({ ok: true, data: updated[0] });
+      return res.json({ ok: true, data: updated[0], avisos: avisos2 });
     }
 
     // -- DELETE -------------------------------------------------------

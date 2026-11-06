@@ -91,13 +91,18 @@ function xe(s) {
 // Autorizacion: Admin (Bearer ADMIN_SECRET) | Usuario (JWT en clientPayload)
 // | Publico (solo contexto 'destino' + foto). Limites: foto 5 MB / audio
 // 15 MB / video 30 MB (espejo de media-upload.js).
+// ADR-119 D3: tipo 'documento' = carta PDF, tope 10 MB. NO es un endpoint
+// nuevo: es un tipo mas del mismo token firmado (presupuesto 8/8 intacto).
+// Retrocompatible: foto/audio/video mantienen tipos, topes y respuesta.
 // [DEUDA-EXPRESS] blobVerificarJwt() duplica el verificador de
 // api/interacciones.js (verificarSesion) para no refactorizar el monolito.
-var BLOB_LIMITES = { foto: 5*1024*1024, audio: 15*1024*1024, video: 30*1024*1024 };
+var BLOB_LIMITES = { foto: 5*1024*1024, audio: 15*1024*1024, video: 30*1024*1024,
+  documento: 10*1024*1024 };
 var BLOB_TIPOS = {
   foto:  ['image/jpeg','image/png','image/webp','image/gif','image/avif'],
   audio: ['audio/mpeg','audio/mp4','audio/aac','audio/wav','audio/ogg','audio/webm','audio/x-m4a'],
   video: ['video/mp4','video/webm','video/quicktime','video/ogg'],
+  documento: ['application/pdf'],
 };
 
 function blobVerificarJwt(token) {
@@ -162,7 +167,10 @@ async function blobUpload(req, res) {
             prefijo = 'usuarios/' + sesion.sub + '/';
             tokenPayload = JSON.stringify({ modo:'usuario', usuario_id:String(sesion.sub), tipo:tipo });
           } else {
-            if (tipo !== 'foto' || String(pl.contexto || '') !== 'destino') throw blobErrorDe('SESION_REQUERIDA');
+            // ADR-119 D3: el PDF de carta se permite en los MISMOS contextos
+            // que la foto (publico/destino incluido), nunca en menos.
+            var esMedioPublico = (tipo === 'foto' || tipo === 'documento');
+            if (!esMedioPublico || String(pl.contexto || '') !== 'destino') throw blobErrorDe('SESION_REQUERIDA');
             prefijo = 'publico/destino/';
             tokenPayload = JSON.stringify({ modo:'publico', tipo:tipo });
           }

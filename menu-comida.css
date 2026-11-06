@@ -1,0 +1,587 @@
+/* =====================================================================
+   menu-comida.css -- Silo visual de la ficha de restaurante (comida).
+
+   ADR-004 (aislamiento atomico): todo selector cuelga de `.tpl-comida`
+   o de `.Tpl-Comida` (el kernel escribe las dos notaciones), con reset
+   de silo al inicio y cero fugas a :root. Cero @import, cero bytes
+   > 127, cero emojis, sin JS y sin backticks.
+
+   Tokens: se reutilizan los de la ficha (--gold, --black, --white,
+   --border, --muted, --text, --warm) via alias locales --mc-* con
+   fallback propio. NO se redeclara ningun token global.
+
+   Contrato de marcado (lo genera el renderer):
+     .mc-sec .mc-sec-h .mc-grid
+     .mc-card .mc-card.is-agotado .mc-foto .mc-nombre .mc-desc
+     .mc-precio .mc-badge .mc-alerg .mc-porcion
+     .mc-gal .mc-gal-item .mc-gal-pdf
+     .mc-deliv .mc-deliv-cta .mc-deliv-apps .mc-deliv-zona
+     .mc-vacio
+   ===================================================================== */
+
+/* ---- Tokens locales + reset de silo ------------------------------- */
+.tpl-comida,
+.Tpl-Comida {
+  --mc-gold: var(--gold, #FF4A00);
+  --mc-black: var(--black, #0F1419);
+  --mc-white: var(--white, #fff);
+  --mc-border: var(--border, #E5E7EB);
+  --mc-warm: var(--warm, #F5F5F5);
+  --mc-text: var(--text, #1A1A1A);
+  /* Secundario legible: --muted (#888) no llega a 4.5:1 sobre blanco
+     para texto de 12-13px, asi que el cuerpo secundario usa este. */
+  --mc-soft: #4B5563;
+  --mc-muted: var(--muted, #6B7280);
+  --mc-wa: #25D366;
+  --mc-wa-ink: #04331A;
+  --mc-radius: 10px;
+  --mc-ease: cubic-bezier(.2, .7, .3, 1);
+}
+
+/* Reset de silo: neutraliza margenes y cajas que el maestro impone.
+   Va antes de cualquier regla propia para que una especificidad igual
+   la gane la declaracion siguiente. */
+.tpl-comida,
+.tpl-comida .mc-sec,
+.tpl-comida .mc-sec *,
+.Tpl-Comida,
+.Tpl-Comida .mc-sec,
+.Tpl-Comida .mc-sec * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---- Foco visible (accesibilidad) -------------------------------- */
+.tpl-comida :focus-visible,
+.Tpl-Comida :focus-visible {
+  outline: 2px solid var(--mc-gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- Seccion ----------------------------------------------------- */
+.tpl-comida .mc-sec,
+.Tpl-Comida .mc-sec {
+  padding: 0;
+  margin: 0 0 30px;
+}
+.tpl-comida .mc-sec:last-child,
+.Tpl-Comida .mc-sec:last-child {
+  margin-bottom: 0;
+}
+
+/* Cabecera: barra vertical dorada + titulo en Barlow Condensed. */
+.tpl-comida .mc-sec-h,
+.Tpl-Comida .mc-sec-h {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0 0 10px;
+  margin: 0 0 16px;
+  border-bottom: 1px solid var(--mc-border);
+}
+.tpl-comida .mc-sec-h::before,
+.Tpl-Comida .mc-sec-h::before {
+  content: "";
+  align-self: stretch;
+  flex: 0 0 3px;
+  min-height: 20px;
+  background: var(--mc-gold);
+  border-radius: 2px;
+}
+.tpl-comida .mc-sec-h h2,
+.tpl-comida .mc-sec-h h3,
+.tpl-comida .mc-sec-h h4,
+.tpl-comida .mc-sec-h strong,
+.Tpl-Comida .mc-sec-h h2,
+.Tpl-Comida .mc-sec-h h3,
+.Tpl-Comida .mc-sec-h h4,
+.Tpl-Comida .mc-sec-h strong {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(20px, 2.6vw, 26px);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--mc-text);
+}
+
+/* ---- Rejilla de platos: 1 / 2 / 3 columnas ----------------------- */
+.tpl-comida .mc-grid,
+.Tpl-Comida .mc-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+/* ---- Tarjeta de plato -------------------------------------------- */
+/* Grid de 2 pistas: nombre (1fr) y precio (auto) comparten la misma
+   linea de lectura; foto, descripcion y chips ocupan el ancho total. */
+.tpl-comida .mc-card,
+.Tpl-Comida .mc-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  column-gap: 10px;
+  padding: 0 0 14px;
+  background: var(--mc-white);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  overflow: hidden;
+  transition: border-color .18s var(--mc-ease),
+              box-shadow .18s var(--mc-ease),
+              transform .18s var(--mc-ease);
+}
+.tpl-comida .mc-card:hover,
+.Tpl-Comida .mc-card:hover {
+  border-color: rgba(255, 74, 0, .5);
+  box-shadow: 0 10px 26px rgba(15, 20, 25, .1);
+  transform: translateY(-2px);
+}
+.tpl-comida .mc-card:focus-within,
+.Tpl-Comida .mc-card:focus-within {
+  border-color: var(--mc-gold);
+  box-shadow: 0 0 0 3px rgba(255, 74, 0, .16);
+}
+
+/* Foto 4:3, sin padding, pegada al borde superior de la tarjeta. */
+.tpl-comida .mc-foto,
+.Tpl-Comida .mc-foto {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--mc-warm);
+  background-position: center;
+  background-size: cover;
+}
+.tpl-comida .mc-foto > img,
+.Tpl-Comida .mc-foto > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Nombre y precio en la misma linea. */
+.tpl-comida .mc-nombre,
+.Tpl-Comida .mc-nombre {
+  grid-column: 1;
+  padding: 12px 0 0 14px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: .3px;
+  color: var(--mc-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tpl-comida .mc-precio,
+.Tpl-Comida .mc-precio {
+  grid-column: 2;
+  justify-self: end;
+  padding: 12px 14px 0 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: .2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mc-gold);
+  white-space: nowrap;
+}
+
+/* Descripcion a 2 lineas con clamp. */
+.tpl-comida .mc-desc,
+.Tpl-Comida .mc-desc {
+  grid-column: 1 / -1;
+  padding: 6px 14px 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--mc-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Chips de alergenos: discretos, en mayusculas pequenas. */
+.tpl-comida .mc-alerg,
+.Tpl-Comida .mc-alerg {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px 0;
+  list-style: none;
+}
+.tpl-comida .mc-alerg > *,
+.Tpl-Comida .mc-alerg > * {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border: 1px solid var(--mc-border);
+  border-radius: 999px;
+  background: var(--mc-warm);
+  font-family: 'Outfit', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: var(--mc-soft);
+  white-space: nowrap;
+}
+
+/* Porcion: metadato tenue, al pie. */
+.tpl-comida .mc-porcion,
+.Tpl-Comida .mc-porcion {
+  grid-column: 1 / -1;
+  padding: 8px 14px 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+  color: var(--mc-muted);
+}
+
+/* ---- Badge sobre la foto ---------------------------------------- */
+.tpl-comida .mc-badge,
+.Tpl-Comida .mc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: rgba(15, 20, 25, .82);
+  color: #fff;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tpl-comida .mc-card > .mc-badge,
+.Tpl-Comida .mc-card > .mc-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  max-width: calc(100% - 20px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Agotado: atenuado, nunca oculto ---------------------------- */
+.tpl-comida .mc-card.is-agotado .mc-foto,
+.Tpl-Comida .mc-card.is-agotado .mc-foto {
+  filter: grayscale(.6);
+  opacity: .72;
+}
+.tpl-comida .mc-card.is-agotado .mc-precio,
+.Tpl-Comida .mc-card.is-agotado .mc-precio {
+  color: var(--mc-soft);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+.tpl-comida .mc-card.is-agotado .mc-nombre,
+.Tpl-Comida .mc-card.is-agotado .mc-nombre {
+  color: var(--mc-soft);
+}
+.tpl-comida .mc-card.is-agotado .mc-badge,
+.Tpl-Comida .mc-card.is-agotado .mc-badge {
+  background: rgba(15, 20, 25, .9);
+}
+/* Sello diagonal: solo aparece con la clase de estado, sin JS. */
+.tpl-comida .mc-card.is-agotado::after,
+.Tpl-Comida .mc-card.is-agotado::after {
+  content: "AGOTADO";
+  position: absolute;
+  top: 16px;
+  right: -38px;
+  z-index: 4;
+  transform: rotate(38deg);
+  padding: 4px 44px;
+  background: rgba(15, 20, 25, .88);
+  color: #fff;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: 2px;
+  pointer-events: none;
+}
+
+/* ---- Galeria / visor de la carta -------------------------------- */
+.tpl-comida .mc-gal,
+.Tpl-Comida .mc-gal {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.tpl-comida .mc-gal-item,
+.Tpl-Comida .mc-gal-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid var(--mc-border);
+  border-radius: 8px;
+  background: var(--mc-warm);
+  cursor: pointer;
+  transition: border-color .18s var(--mc-ease),
+              transform .18s var(--mc-ease);
+}
+.tpl-comida .mc-gal-item img,
+.Tpl-Comida .mc-gal-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .3s var(--mc-ease);
+}
+.tpl-comida .mc-gal-item:hover,
+.tpl-comida .mc-gal-item:focus-visible,
+.Tpl-Comida .mc-gal-item:hover,
+.Tpl-Comida .mc-gal-item:focus-visible {
+  border-color: var(--mc-gold);
+  transform: translateY(-1px);
+}
+.tpl-comida .mc-gal-item:hover img,
+.Tpl-Comida .mc-gal-item:focus-visible img,
+.Tpl-Comida .mc-gal-item:hover img,
+.Tpl-Comida .mc-gal-item:focus-visible img {
+  transform: scale(1.05);
+}
+
+/* Boton de PDF: misma huella que una miniatura, sin depender de JS. */
+.tpl-comida .mc-gal-pdf,
+.Tpl-Comida .mc-gal-pdf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 92px;
+  aspect-ratio: 1 / 1;
+  padding: 8px;
+  border: 1px dashed var(--mc-border);
+  border-radius: 8px;
+  background: var(--mc-white);
+  color: var(--mc-text);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 1px;
+  text-align: center;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color .18s var(--mc-ease),
+              box-shadow .18s var(--mc-ease);
+}
+.tpl-comida .mc-gal-pdf:hover,
+.tpl-comida .mc-gal-pdf:focus-visible,
+.Tpl-Comida .mc-gal-pdf:hover,
+.Tpl-Comida .mc-gal-pdf:focus-visible {
+  border-color: var(--mc-gold);
+  border-style: solid;
+  box-shadow: inset 0 -3px 0 rgba(255, 74, 0, .18);
+}
+
+/* ---- Modulo de domicilio --------------------------------------- */
+.tpl-comida .mc-deliv,
+.Tpl-Comida .mc-deliv {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--mc-border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 74, 0, .06), rgba(255, 74, 0, 0) 55%),
+              var(--mc-white);
+}
+
+/* Primario: WhatsApp. Texto oscuro sobre verde para contraste alto. */
+.tpl-comida .mc-deliv-cta,
+.Tpl-Comida .mc-deliv-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--mc-wa);
+  color: var(--mc-wa-ink);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: 1.2px;
+  text-align: center;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(37, 211, 102, .26);
+  transition: background .16s var(--mc-ease),
+              transform .16s var(--mc-ease),
+              box-shadow .16s var(--mc-ease);
+}
+.tpl-comida .mc-deliv-cta:hover,
+.tpl-comida .mc-deliv-cta:focus-visible,
+.Tpl-Comida .mc-deliv-cta:hover,
+.Tpl-Comida .mc-deliv-cta:focus-visible {
+  background: #1FBE5B;
+  transform: translateY(-1px);
+  box-shadow: 0 9px 20px rgba(37, 211, 102, .32);
+}
+.tpl-comida .mc-deliv-cta:active,
+.Tpl-Comida .mc-deliv-cta:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(37, 211, 102, .24);
+}
+
+/* Secundarios: apps de domicilio, neutros y con la misma altura. */
+.tpl-comida .mc-deliv-apps,
+.Tpl-Comida .mc-deliv-apps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+}
+.tpl-comida .mc-deliv-apps > *,
+.Tpl-Comida .mc-deliv-apps > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--mc-border);
+  border-radius: 8px;
+  background: var(--mc-white);
+  color: var(--mc-text);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: .8px;
+  text-align: center;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color .16s var(--mc-ease),
+              background .16s var(--mc-ease);
+}
+.tpl-comida .mc-deliv-apps > *:hover,
+.tpl-comida .mc-deliv-apps > *:focus-visible,
+.Tpl-Comida .mc-deliv-apps > *:hover,
+.Tpl-Comida .mc-deliv-apps > *:focus-visible {
+  border-color: rgba(15, 20, 25, .45);
+  background: var(--mc-warm);
+}
+
+/* Cobertura: texto de apoyo con punto dorado. */
+.tpl-comida .mc-deliv-zona,
+.Tpl-Comida .mc-deliv-zona {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--mc-soft);
+}
+.tpl-comida .mc-deliv-zona::before,
+.Tpl-Comida .mc-deliv-zona::before {
+  content: "";
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mc-gold);
+  transform: translateY(-2px);
+}
+
+/* ---- Estado sin datos ------------------------------------------ */
+.tpl-comida .mc-vacio,
+.Tpl-Comida .mc-vacio {
+  padding: 28px 18px;
+  border: 1px dashed var(--mc-border);
+  border-radius: 12px;
+  background: var(--mc-white);
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--mc-soft);
+}
+
+/* ---- Responsive: 2 columnas en tablet, 3 en escritorio --------- */
+@media (min-width: 640px) {
+  .tpl-comida .mc-grid,
+  .Tpl-Comida .mc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tpl-comida .mc-sec,
+  .Tpl-Comida .mc-sec {
+    margin-bottom: 36px;
+  }
+  .tpl-comida .mc-deliv,
+  .Tpl-Comida .mc-deliv {
+    gap: 12px;
+    padding: 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .tpl-comida .mc-grid,
+  .Tpl-Comida .mc-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+  .tpl-comida .mc-gal,
+  .Tpl-Comida .mc-gal {
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  }
+}
+
+/* ---- Movimiento reducido --------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .tpl-comida .mc-card,
+  .tpl-comida .mc-card:hover,
+  .tpl-comida .mc-gal-item,
+  .tpl-comida .mc-gal-item img,
+  .tpl-comida .mc-gal-pdf,
+  .tpl-comida .mc-deliv-cta,
+  .tpl-comida .mc-deliv-apps > *,
+  .Tpl-Comida .mc-card,
+  .Tpl-Comida .mc-card:hover,
+  .Tpl-Comida .mc-gal-item,
+  .Tpl-Comida .mc-gal-item img,
+  .Tpl-Comida .mc-gal-pdf,
+  .Tpl-Comida .mc-deliv-cta,
+  .Tpl-Comida .mc-deliv-apps > * {
+    transition: none;
+    transform: none;
+  }
+}

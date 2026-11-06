@@ -2653,6 +2653,54 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 
 **Registro:** detectado por el operador en el mapa cultural (uso real, no revision de codigo); cerrado en la misma tanda **TSK-251 / ADR-116**. No duplica las fichas anteriores del modulo (**BUG-080**, **BUG-082**), que eran de **render** y de **guardados**, no de **contrato de filtros**.
 
+## BUG-147: el admin creaba filas de plato sin `data-field` y `collectMenuItems()` las descartaba al guardar -- **CERRADO EN CODIGO / PENDIENTE DE DEPLOY (2026-11-06, TSK-255 / ADR-119)**
+
+- **Severidad:** ALTA (perdida de dato silenciosa: el editor mostraba el plato y el guardado no lo llevaba).
+- **Sintoma:** se anadian platos a la carta en `admin.html`, la fila se pintaba en pantalla y al guardar el destino volvia **sin ese plato**; sin error, sin aviso y sin 400.
+- **Causa:** `addMenuItem()` construia la fila **sin los atributos `data-field`** que `collectMenuItems()` usa para leer los inputs, luego el colector no encontraba los campos y descartaba la fila entera.
+- **Fix:** la fila nueva nace con los mismos `data-field` que la fila plantilla (una sola forma de fila, generada por la misma funcion).
+- **Estado:** cerrado en el arbol de trabajo; sin commit y sin deploy.
+
+## BUG-148: `unPlato()` no devolvia `foto` y el reemplazo del array en `api/admin-destinos.js` borraba la foto al guardar -- **CERRADO EN CODIGO / PENDIENTE DE DEPLOY (2026-11-06, TSK-255 / ADR-119)**
+
+- **Severidad:** ALTA (perdida de dato silenciosa en cada guardado, no solo en el primero).
+- **Sintoma:** un plato con foto se guardaba bien la primera vez y **perdia la foto** al volver a guardar la ficha, aunque el admin no tocara la imagen.
+- **Causa:** el saneador `unPlato()` de `lib/menu.js` **no devolvia la clave `foto`**; `api/admin-destinos.js` **reemplaza el array completo** del menu con la salida del saneador (ADR-003), luego la clave ausente se escribia como ausente.
+- **Fix:** `unPlato()` devuelve **todas** las claves del contrato, incluidas las opcionales vacias; el reemplazo deja de perder campos que el formulario no envia.
+- **Estado:** cerrado en el arbol de trabajo; sin commit y sin deploy.
+
+## BUG-149: el constructor de tags del admin no emitia arrays vacios -- imposible borrar el ultimo plato, archivo, plataforma o zona -- **CERRADO EN CODIGO / PENDIENTE DE DEPLOY (2026-11-06, TSK-255 / ADR-119)**
+
+- **Severidad:** MEDIA (funcional: el usuario no podia deshacer, y el estado del formulario no coincidia con el de la base).
+- **Sintoma:** al borrar el **ultimo** elemento de una lista (plato, archivo de carta, plataforma de domicilio, zona de entrega) el guardado devolvia la lista **como estaba**: el elemento reaparecia.
+- **Causa:** el constructor de tags de `admin.html` **omitia la clave cuando el array quedaba vacio**, luego el backend no recibia la clave y conservaba el valor previo.
+- **Fix:** las claves listadas en **`CATEGORY_TAG_VACIABLES`** (`admin.html:4152`) se emiten siempre, aunque el array vaya vacio; el resto conserva la omision.
+- **Estado:** cerrado en el arbol de trabajo; sin commit y sin deploy.
+
+## BUG-150: `CLAVES_CLIENTE` no incluia `rappi`/`ifood` y el filtro publico los descartaba en silencio -- **CERRADO EN CODIGO / PENDIENTE DE DEPLOY (2026-11-06, TSK-255 / ADR-119)**
+
+- **Severidad:** ALTA (canales de domicilio **invisibles** en la ficha, con el dato presente en el payload de entrada).
+- **Sintoma:** el autor guardaba Rappi/iFood desde el autoservicio y la ficha publica **nunca** los mostraba; cero error en el cliente y cero rastro en el log.
+- **Causa:** las dos claves no estaban en `CLAVES_CLIENTE` de `api/publicar-lugar.js`; el filtro de lista blanca las **descartaba sin avisar** y no llegaban a `tags`.
+- **Fix:** `rappi`/`ifood` entran en `CLAVES_CLIENTE` (`api/publicar-lugar.js:370`) y **nunca** en `CLAVES_SOLO_SERVIDOR`: las escribe el autor.
+- **Estado:** cerrado en el arbol de trabajo; sin commit y sin deploy.
+
+## BUG-151: `publicar.html` empujaba Rappi/iFood sin URL -- canales fantasma y `#delivery` vacio -- **CERRADO EN CODIGO / PENDIENTE DE DEPLOY (2026-11-06, TSK-255 / ADR-119)**
+
+- **Severidad:** MEDIA (dato basura en `domicilio_plataformas[]` y bloque de domicilio pintado sin enlace).
+- **Sintoma:** la ficha mostraba la plataforma **sin enlace** y el bloque `#delivery` aparecia **vacio**; en el array quedaba un objeto con `url:null`.
+- **Causa:** el colector de `publicar.html` **empujaba el chip por nombre** aunque el campo de URL estuviera vacio, sin validar el esquema `http/https`.
+- **Fix:** el chip solo se emite **con URL segura**; sin URL no hay plataforma y el bloque de domicilio no se pinta.
+- **Estado:** cerrado en el arbol de trabajo; sin commit y sin deploy. **Residual de datos:** las filas `{nombre:'Rappi'|'iFood', url:null}` ya escritas en Neon **no** se limpian en este pase (limpieza opcional anotada en `NEXT.md`).
+
+## BUG-152: residual menor de precarga -- un chip de array llamado Rappi/iFood sin URL se descarta al cargar el formulario -- **CERRADO EN CODIGO / PENDIENTE DE DEPLOY (2026-11-06, TSK-255 / ADR-119)**
+
+- **Severidad:** BAJA (cosmetica; **no** hay perdida de enlace).
+- **Sintoma:** al reabrir una ficha con el residuo de BUG-151, la plataforma **no** aparecia como chip en el formulario de `publicar.html`.
+- **Causa:** la precarga aplica la misma guarda de URL segura que el alta y descarta el objeto con `url:null`.
+- **Fix:** ninguno adicional: es la **limpieza** que se buscaba, y al guardar el array queda sin el objeto invalido.
+- **Estado:** cerrado por comportamiento; el dato huerfano en Neon se limpia (o no) por decision del operador.
+
 
 
 

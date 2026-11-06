@@ -13138,3 +13138,290 @@ Este ADR no deja preguntas abiertas. El operador resolvio el mismo dia las cinco
 ### Estado
 
 **APLICADO EN ARBOL DE TRABAJO (2026-11-04); SIN COMMIT Y SIN DEPLOY.** Los tres topes de compra ya **no existen** en el codigo y los tres codigos ya **no existen** en el cliente; los smokes que los vigilaban estan **invertidos y en verde** (148/148 y 97/97). **No requiere migracion, ni paso de datos, ni orden de deploy.** Pendiente del operador: **commit, push y deploy**, y una **compra real en produccion** por cada uno de los dos flujos (`mercado_comprar` y `comprar_consumible`) como QA de cierre, que el arbol de trabajo no puede dar.
+
+---
+
+## ADR-119: El contrato de datos de "menu + domicilio" de las fichas de categoria **comida** se fija en `tags` con **TRES listas** (`menu_destacado[]` v2, `carta_archivos[]`, `domicilio_plataformas[]`) y **TRES escalares** (`carta_nota`, `domicilio_zonas`, `whatsapp_pedidos`), con tolerancia a la forma legacy (string en plataformas, plato sin categoria/descripcion/disponible) y saneo en **una sola implementacion** (`lib/menu.js`) consumida por los dos caminos de escritura y por el motor de render [NO deroga ninguna premisa de ADR previos; acota ADR-003 a las tres listas y desarrolla ADR-099 D4 para este dominio]
+
+**ID:** ADR-119
+**Fecha:** 2026-11-05
+**Autor:** `@architect` (diseno). Gate de riesgo CONFIRMADO por el operador: el diseno toca `api/publicar-lugar.js` y `api/pagina-destino.js` (`@backend-dev`/`@renderer-dev`), `admin.html` (`@admin-dev`), `mi-perfil.html` y `media-upload.js` (`@frontend-tpl`/`@js-silo-dev`). Este ADR **no escribe codigo, no migra y no despliega**: fija la forma.
+**Estado:** **ACEPTADO / PENDIENTE DE IMPLEMENTAR.** El alcance lo fijo el operador en 8 puntos y se registra como **premisa**, no se re-abre: (1) carga por **dos vias** (`admin.html` y autoservicio del dueno en `mi-perfil.html`, este ultimo por el **camino publico** y por tanto sujeto a `CLAVES_CLIENTE`); (2) carta completa con **imagenes (jpg/png) y PDF**, varias paginas, con visor; (3) plato completo (nombre, descripcion, precio, categoria, porcion, alergenos, disponible/agotado, foto, badge); (4) domicilio **BASICO** (whatsapp de pedidos con mensaje prellenado, zona de cobertura, Rappi, iFood y otras con URL) **sin costo, minimo ni horario**; (5) SEO de menu (`hasMenu`) **lo implementa otro agente**; (6) badges en el directorio de comida quedan **fuera**.
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor encabezado del fichero era **ADR-118** (linea **13057**, `Select-String -Pattern "^## ADR-"`); fichero medido hoy **13.140 lineas / 2.151.418 bytes**; **119** es el consecutivo libre. `menu_destacado`, `carta_archivos` y `domicilio_plataformas` **no aparecen en ningun ADR previo** (0 coincidencias en este fichero): el contrato se fija aqui y **una sola vez** (ADR-084 D1).
+
+### Problema
+
+**El menu de una ficha de comida hoy no es un dato: es un formulario que pierde lo que el usuario escribe.** Tres defectos medidos, y ninguno se arregla con CSS ni con validacion de UI:
+
+1. **Las filas nuevas se pierden al guardar, en silencio.** `collectMenuItems()` (`admin.html:4889-4907`) recolecta **por `[data-field]`**, y `addMenuItem()` (`admin.html:6158-6164`) **crea los inputs sin `data-field`**: la fila aparece en pantalla, el usuario escribe el plato, y al guardar no viaja. El fallo no lanza error: el array que se persiste simplemente **no la incluye**. Es la peor forma de perder un dato, porque la UI confirmo que se guardo.
+2. **La categoria del menu es un control sin camino de datos.** El `<select id="menu-cat-sel">` (`admin.html:1275`) elige el grupo del plato y **no se recolecta en ningun sitio**. Hoy existe como decoracion: el plato se guarda sin saber si es entrante, principal, postre o bebida, y por eso el render no puede agrupar.
+3. **El camino publico descarta claves desconocidas EN SILENCIO, y el de admin no filtra nada.** `CLAVES_CLIENTE` (`api/publicar-lugar.js:351-380`) es la allowlist del autoservicio y el normalizador hace `continue` sobre lo que no este en ella (`:555`, `:1407`); en paralelo, `api/admin-destinos.js:476-479` hace merge JSONB **sin filtro de claves**. Resultado: el dueno y el operador **escriben contratos distintos** sobre la misma columna, y una clave nueva que no se anada a la allowlist **no falla**: desaparece.
+
+A eso se suma el estado del render: `api/pagina-destino.js:905` lee `tags.menu_destacado` y `:2272-2286` pinta una lista **plana** de `.icard` (sin grupos, sin agotados, sin descripcion); `tags.domicilio_plataformas` se pinta como **texto** en `:2319-2326`, de modo que una URL de Rappi pegada ahi es una **cadena muerta** que nadie puede pulsar. Y el WhatsApp existe como **columna** (`d.whatsapp`) y se usa en CTAs (`:1478`, `:2193`, `:2406`, `:2624`, `:2852`) **sin `rel`, sin `?text=`** salvo el precedente de `:1527`, pero **no hay numero distinto para pedidos**: el dueno que atiende reservas por un numero y domicilios por otro no tiene donde decirlo.
+
+### Datos medidos (2026-11-05, contra el archivo real; ADR-006)
+
+1. **Lectura y render:** `api/pagina-destino.js:905` (`tags.menu_destacado`), `:907` (`tags.domicilio_plataformas`), `:916` (log de longitudes), bloque de planos `:2272-2286`, bloque de domicilio como texto `:2319-2326`. Helper de escape del motor: `esc()` en `:65`.
+2. **CTAs de WhatsApp existentes:** `:1478`, `:2193`, `:2406`, `:2624` son `<a ... target="_blank">` **sin `rel`**; `:1527` ya construye `?text=` con `esc(whatsappTour)` y es el **precedente** de mensaje prellenado; `:2852` usa `window.open` (sin `rel` posible).
+3. **Admin:** `collectMenuItems()` `:4889-4907`; `addMenuItem()` `:6158-6164` (sin `data-field`); `<select id="menu-cat-sel">` `:1275` y boton `+ Plato` `:1278`; colector registrado en `:4052` (`collector: collectMenuItems`).
+4. **Motor generico de tags:** `CATEGORY_TAG_FIELDS` en `admin.html:3722` (escalares) y `CATEGORY_TAG_LISTS` en `:3993` (listas de objetos), documentados en `:3703-3711`; `_placeToAPI`/`loadForm`/`collectPlace` **no se editan a mano** para un campo nuevo (patron de 7 pasos).
+5. **Camino publico:** `CLAVES_CLIENTE` (`api/publicar-lugar.js:351-380`) **ya incluye** `menu_destacado` y `domicilio_plataformas` (`:363-364`); el descarte silencioso vive en `:539` (comentario explicito), `:555` y `:1407`.
+6. **Camino admin:** `api/admin-destinos.js:476-479` hace merge JSONB de `tags` **sin allowlist ni saneo**: es la unica via que puede escribir una URL `javascript:` hoy.
+7. **Media y Blob:** `media-upload.js` (18.650 B) declara `HANDLE_UPLOAD_URL = '/api/utilidades?tipo=blob_upload'` (`:45`), `LIMITES = {foto: 5 MB, audio: 15 MB, video: 30 MB}` (`:47`) y `MIMES.foto = /^image\/(jpeg|png|webp|gif|avif)$/i` (`:50-51`). En servidor, `BLOB_TIPOS` (`api/utilidades.js:97-101`) tiene **solo** `foto`/`audio`/`video` y `:152` hace `if (!BLOB_TIPOS[tipo]) tipo = 'foto'`: un `tipo` desconocido **no falla, se degrada a foto** y su mascara de contenido rechaza el PDF.
+8. **Presupuesto:** `api/*.js` = **8** ficheros (`admin-destinos`, `admin`, `destinos`, `interacciones`, `pagina-destino`, `publicar-lugar`, `usuarios`, `utilidades`). **Cero endpoint nuevo** en este ADR (ADR-001/ADR-010): todo se resuelve extendiendo `blob_upload`, `publicar-lugar` y el render.
+9. **Precedente de modulo compartido:** `lib/score.js` y `lib/completitud.js` ya son **una sola implementacion fisica** con doble superficie (servidor y cliente), decision tomada y verificada en **ADR-099 D4**. Este ADR reutiliza el patron, no lo inventa.
+10. **Merge JSONB:** `COALESCE(tags,'{}') || $N::jsonb` **reemplaza el valor completo de la clave**. No existe "merge por item" de un array: o se envia el array entero, o se pierde el resto. Esto condiciona D13.
+
+### Opciones evaluadas
+
+**Sobre la forma de `menu_destacado` (D2):**
+
+- **(A) Clave nueva `menu_items` en paralelo, dejando `menu_destacado` como legacy.** Cero riesgo de forma, pero **dos fuentes de verdad para los mismos 8 campos**: el render tendria que preguntar a las dos y el admin escribir en la que toque. Es el defecto que este ADR cierra, repetido.
+- **(B) Versionar el MISMO `menu_destacado[]` con campos nuevos OPCIONALES y tolerancia total en lectura, sin tocar lo guardado.** Un solo nombre, una sola ruta, cero DML. **Elegida.**
+- **(C) Tabla relacional `menu_items` (plato = fila).** Da ids, consultas y orden, pero exige **migracion**, **endpoint** (o extender otro) y **un tercer camino de escritura**: prohibido por 8/8 y por ADR-003.
+
+**Sobre la carta (D3):**
+
+- **(A) Meta-array de URLs sin tipo, derivando todo del final de la URL.** Barato, pero un `carta.pdf` con query string (`?download=1`) o un Blob sin extension se clasifica mal y el visor pinta una imagen rota.
+- **(B) `carta_archivos[]` con `{url, tipo, titulo}` y **tipo derivado como fallback** cuando falta.** Forma explicita para lo nuevo, tolerante para lo que llegue sin `tipo`. **Elegida.**
+- **(C) Solo PDF, un archivo.** No cubre el caso mayoritario (el dueno fotografia la carta con el movil) y obliga a convertir imagen a PDF, que hoy no se puede hacer sin una funcion nueva.
+
+**Sobre `domicilio_plataformas` (D4):**
+
+- **(A) Cambiar el tipo a `{nombre,url}` y **migrar** los strings existentes.** Rompe filas hasta que corra el DML y exige ventana de migracion: ADR-003 y cero DML.
+- **(B) Aceptar **string legacy** o `{nombre,url}`, normalizando **al leer**.** Lo guardado sigue valido para siempre y lo nuevo gana enlace. **Elegida.**
+- **(C) Una clave por plataforma (`rappi_url`, `ifood_url`, `ubereats_url`, ...).** Explosion de claves en `tags`, y "otras plataformas" (que el operador pidio) no tiene nombre de clave posible.
+
+**Sobre donde vive el saneo (D1):**
+
+- **(a) Saneo duplicado en el render y en cada escritura.** Se desincroniza a la primera regla nueva.
+- **(b) `lib/menu.js` con doble superficie y un smoke de paridad.** Una sola implementacion fisica para forma, saneo, topes, agrupacion y precedencia de WhatsApp. **Elegida.**
+- **(c) Saneo solo en servidor.** El cliente no puede avisar antes de guardar: el usuario descubre el error al enviar (y en el camino admin **no hay servidor que valide**, ver D14).
+
+### Decision
+
+**D1 -- El contrato vive UNA vez, en `lib/menu.js`, con doble superficie (`module.exports` + `window.ExploraMenu`).** Cuatro consumidores: `api/publicar-lugar.js`, `api/pagina-destino.js` (`require`), `admin.html` y `mi-perfil.html` (`<script>`), y opcionalmente `api/admin-destinos.js`. Expone **una** funcion por pregunta, no un helper por campo: `normalizarFicha(tags, opciones)` (forma + topes + saneo, devuelve `{tags, avisos[]}`), `platosDe(menu)` (normaliza + agrupa), `archivosDeCarta(tags)`, `canalesDe(tags, whatsapp)` (precedencia + `wa.me`), `esUrlSegura(v)` y `normalizarWhatsapp(v)`. **Ningun consumidor reimplementa una regla** (Regla de No-Duplicidad, espejo de ADR-044 / ADR-099 D3). Precedente exacto: `lib/score.js` y `lib/completitud.js`. Coste: **un archivo**, cero endpoints.
+
+**D2 -- `menu_destacado[]` v2: el MISMO array, con campos opcionales y retrocompatibilidad por tolerancia en lectura.** Forma canonica de un plato:
+
+```json
+{ "nombre": "Bandeja paisa", "descripcion": "Frijoles, arroz, chicharron, huevo y arepa.",
+  "precio": 28000, "precio_texto": null, "categoria": "principales",
+  "porcion": "para 1 persona", "alergenos": ["lacteos"], "disponible": true,
+  "foto": "https://.../bandeja.jpg", "badge": "El mas pedido" }
+```
+
+- **Obligatorio: solo `nombre`.** Todo lo demas es opcional; un plato `{ "nombre": "Sopa" }` es valido y **se pinta**.
+- **`precio`**: numero entero `>= 0` en COP. Acepta **string numerico** (`"28000"`) y se normaliza a numero. Si el string **no es numerico** (`"2x1"`, `"desde 20"`) se conserva literal en **`precio_texto`** y `precio` queda `null`: **el precio del dueno no se puede perder por no ser un numero**, y no se inventa un valor.
+- **`categoria`**: string libre normalizada (min/trim/colapsar espacios); el catalogo sugerido es `entrantes | principales | postres | bebidas` pero **no es cerrado** (`desayunos`, `parrilla`, `adicionales` son validos y se agrupan con su propio titulo). Ausente o vacia -> D8.
+- **`disponible`**: booleano, **ausente = `true`**. Nunca `null`.
+- **`alergenos`**: array de strings de texto libre (`lacteos`, `mani`, `gluten`, `mariscos`...), sin catalogo cerrado ni traduccion. Acepta un unico string y se convierte en array de 1.
+- **`foto`**: URL `http`/`https`; si no pasa D6 se **descarta el campo** (el plato se queda, la foto no: `onerror` con fallback de ADR-008 cubre el resto).
+- **`badge`**: etiqueta corta del dueno ("Recomendado", "Sin gluten", "Nuevo"); es **del plato**, nunca del lugar (los badges del directorio estan fuera de alcance).
+- **Retrocompatibilidad, sin excepciones:** un plato guardado hoy con `{nombre, precio, foto, badge}` **es un plato v2 valido** (le faltan campos opcionales). **No hay backfill, ni `UPDATE`, ni migracion, ni version en el JSON**: la normalizacion es una **funcion de lectura** y es **idempotente** (`normalizar(normalizar(x)) === normalizar(x)`). Regla dura: **la lectura no reescribe la base**; el dato se "arregla" al pintar y al guardar la siguiente vez.
+- **`id` de plato: NO en v2.** La edicion del admin es **por indice** sobre un array que no se reordena (D7). Si aparece edicion concurrente (dos pestanas, dos duenos), se anade `id` (string <= 40) **como campo opcional** sin romper v2; hasta entonces es **deuda declarada**, no un hueco de forma.
+
+**D3 -- `carta_archivos[]` + `carta_nota`, con visor.** Elemento:
+
+```json
+{ "url": "https://.../carta.pdf", "tipo": "pdf", "titulo": "Carta completa" }
+```
+
+- **`tipo`**: `"imagen"` | `"pdf"`. Si falta, se **deriva** de la URL (`.pdf` -> pdf; `.jpg/.jpeg/.png/.webp/.avif` -> imagen) y, si aun asi no se puede decidir, la entrada se pinta como **enlace "Abrir carta"** (nunca como `<img>`, para no violar la invariante de que un `<img>` solo apunta a una imagen real).
+- **`titulo`**: opcional <= 60; si falta, se usa `"Carta"` + ordinal.
+- **`carta_nota`**: escalar opcional <= 200 ("Precios sujetos a cambio", "Carta del mediodia"). **Sin `carta_archivos` no se pinta** (una nota sobre una carta inexistente es ruido).
+- **Visor:** dos modos, sin librerias. (i) `tipo: 'imagen'` -> tira de miniaturas + imagen ampliada, reutilizando el patron `<img loading="lazy" onerror>` que ya usa la ficha (ADR-008). (ii) `tipo: 'pdf'` -> **enlace** `target="_blank" rel="noopener noreferrer"` que abre el **visor nativo del navegador**, no `<iframe>`/`<embed>`/`<object>`: en iOS Safari un PDF en `iframe` no se pinta de forma fiable (queda un rectangulo gris) y el enlace funciona en todos los navegadores. **Rechazado `pdf.js`**: ~1 MB de JS y una dependencia nueva para una funcionalidad que el navegador ya da, contra la regla de vanilla JS sin build (ADR-001).
+- **El PDF nunca se pre-carga** en la ficha: se enlaza. Un PDF de hasta 10 MB descargado automaticamente en 3G es la peor primera impresion posible.
+
+**D4 -- `domicilio_plataformas[]`: string legacy o `{nombre,url}`, y `domicilio_zonas` como texto.** Elemento:
+
+```json
+{ "nombre": "Rappi", "url": "https://www.rappi.com.co/..." }
+```
+
+- **Se aceptan las dos formas en el mismo array.** Un `"Rappi"` (string, forma legacy) se degrada a `{nombre:"Rappi", url:null}`: se pinta como **chip sin enlace** (con la etiqueta del nombre), **nunca se descarta** y **nunca se linkifica adivinando el host**. Enlazar a la home de Rappi cuando la tienda no existe es peor que no enlazar: manda al usuario a un buscador vacio y el dueno no se entera.
+- **`nombre`** <= 40 (Rappi, iFood, Uber Eats, "Domicilio propio", "WhatsApp"); **`url`** <= 500 y `http`/`https` (D6). Entrada con `url` invalida -> se conserva como **chip sin enlace**, no se borra.
+- **`domicilio_zonas`** (escalar, <= 200): texto libre de cobertura ("Chapinero, Usaquen y Cedritos"). **No se duplica con `barrios`** (campo generico de ciudad/pueblo) ni con `domicilio` (flag booleano ya existente): en comida, la cobertura se escribe **solo** aqui.
+- **Sin costo/minimo/horario de domicilio en esta entrega** (premisa del operador). Si se piden, se anaden como escalares nuevos con ADR, **no** como claves sueltas dentro de los objetos de plataforma.
+
+**D5 -- Topes duros, aplicados en ESCRITURA.** Un solo numero, en `lib/menu.js`, usado por los dos caminos:
+
+| Campo | Tope | Al exceder |
+|---|---|---|
+| `menu_destacado` | **60** platos | publico: `400 MENU_TOPE`; admin: recorta + `avisos[]` (D14) |
+| `nombre` de plato | 80 | igual |
+| `descripcion` | 280 | igual |
+| `precio_texto` | 40 | igual |
+| `categoria` | 40 | igual |
+| `porcion` | 40 | igual |
+| `badge` | 24 | igual |
+| `alergenos` | **12** items x 24 | igual |
+| `foto` de plato | URL 500 | igual |
+| `carta_archivos` | **10** archivos | `400 CARTA_TOPE` |
+| `titulo` de archivo | 60 | igual |
+| `carta_nota` | 200 | igual |
+| `domicilio_plataformas` | **8** plataformas | `400 CANALES_TOPE` |
+| `domicilio_zonas` | 200 | igual |
+| PDF | `application/pdf`, **10 MB** | `400` en el token de Blob (D12) |
+| imagen de carta | los **5 MB** y mascara de `foto` que ya existen | `400` (sin cambio) |
+
+**El tope es de escritura; la LECTURA no recorta nunca** (ADR-003): si una fila llega con 70 platos, se pintan los 70. Recortar al pintar seria exactamente el borrado silencioso que este ADR cierra, y los topes existen para que el caso no ocurra, no para esconderlo.
+
+**D6 -- Saneo: URLs, WhatsApp, texto y `rel`.** Una sola implementacion (D1):
+
+- **URL:** se parsea con `new URL()` (no `startsWith`, no regex sobre el string completo); se exige `protocol === 'http:' || 'https:'`, `host` no vacio, longitud <= 500. Se **rechazan** explicitamente `javascript:`, `data:`, `vbscript:`, `file:` y las protocol-relative (`//host/x`). La URL **se guarda tal cual** (no se normaliza el host: `www` y `trailing slash` son del dueno).
+- **WhatsApp:** se limpian `+`, espacios, guiones y parentesis; **solo digitos**. `10` digitos -> se prefija `57` (regla **explicita**, no heuristica: Colombia es el unico mercado del sitio). `11-14` digitos -> se aceptan tal cual (ya traen indicativo). Cualquier otra longitud o caracter restante -> **invalido**. Render: `https://wa.me/<digitoss>?text=<encodeURIComponent(mensaje)>`.
+- **Texto:** `trim`, colapso de espacios, eliminacion de caracteres de control; **nunca se escapa al guardar** (se guarda literal) y **siempre se escapa al pintar** con el helper del motor (`esc()`, `api/pagina-destino.js:65`) y con la funcion equivalente del cliente. Guardar HTML-escapado duplicaria el escape y romperia el texto.
+- **`rel`:** **todo** enlace externo del modulo (plataformas, PDF, `wa.me`) lleva `target="_blank" rel="noopener noreferrer"`. `noreferrer` ya implica `noopener` en navegadores modernos, pero se escriben las dos (explicito, y coherente con los CTAs actuales, que hoy **no llevan ninguna**: `:1478`, `:2193`, `:2406`, `:2624`).
+- **Cantidad:** arrays saneados conservan el **orden del autor** y se eliminan entradas **vacias** (`{}`, `""`, `null`), que no son datos: no cuentan para los topes.
+
+**D7 -- `disponible:false` es "agotado", y agotado NO es borrado.** Se pinta con `class="plato agotado"`: atenuado (opacidad + borde discontinuo) y con un **sello textual "Agotado"** (no solo color: la senal no puede depender de la percepcion del color). **Nunca se quita del DOM** (ADR-003), **nunca se filtra en servidor**, **nunca se quita del array al guardar**: el plato sigue contando para los 60, sigue mostrando su precio y **no** lleva CTA de pedido. El orden se conserva (**no se auto-ordenan los disponibles primero**): un menu que se reordena solo entre visitas confunde al cliente y al dueno, y el array se edita **por indice**.
+
+**D8 -- Degradacion condicional: lo que no hay, no se pinta.**
+
+- **Sin `categoria` en ningun plato** (o en todos vacia) -> **una sola seccion titulada "Menu"**, sin sub-encabezados.
+- **Con categorias mixtas** -> secciones en el orden del catalogo (`entrantes`, `principales`, `postres`, `bebidas`) y **los valores libres al final**, cada uno con su titulo tal cual (normalizado a capitalizacion, <= 40). Los platos sin categoria van al **grupo residual**, que se titula "Menu" si es el unico, u "Otros" si convive con secciones.
+- **`menu_destacado` vacio o ausente** -> **cero `<section>`**: ni contenedor vacio, ni "Sin menu disponible". Un modulo vacio es un hueco visual que dice que el lugar no tiene carta.
+- **`carta_archivos` vacio** -> no se pinta el visor; **`carta_nota` sin archivos -> no se pinta**.
+- **Sin ningun canal** (`whatsapp_pedidos` invalido + `d.whatsapp` ausente + plataformas sin `url` + `domicilio_zonas` vacio) -> **no se pinta el modulo de domicilio entero**. Un chip "Rappi" sin enlace **si** cuenta como contenido (dice algo cierto); un titulo "Domicilio" solo, no.
+- El flag `domicilio` (booleano legacy) **se sigue leyendo** como senal de "hace domicilio", pero **no** genera modulo por si solo: sin canales no hay a donde mandar al usuario.
+
+**D9 -- Precedencia del WhatsApp: `tags.whatsapp_pedidos` > `d.whatsapp` > sin CTA.** El numero de pedidos es un dato **distinto** del WhatsApp general de la ficha (`d.whatsapp` es columna y se usa en reservas/contacto, `:2406`, `:2624`). Regla:
+
+1. Si `whatsapp_pedidos` normaliza a un numero valido -> **ese** manda en el CTA de pedido, y **no** se sustituye por el general.
+2. Si falta o es invalido -> **fallback** a `d.whatsapp`.
+3. Si tampoco hay -> **no se pinta** el CTA (pero el modulo puede seguir si hay plataformas o zonas).
+- **No hay valor centinela** (`"0"`, `"none"`, `"no"`): un centinela en JSONB es un dato que envejece y que alguien normaliza mal. Para desactivar el CTA se deja el campo vacio; para desactivar el modulo, se quitan los canales.
+- **Mensaje prellenado:** `Hola, quiero pedir de <nombre> (visto en ExploraCO).` -- `encodeURIComponent`, **sin** lista de platos (longitud de URL) y **sin** datos personales. Precedente de `?text=`: `api/pagina-destino.js:1527`.
+- El numero **no se expone nunca como telefono crudo** en el HTML: solo dentro del `href` de `wa.me`.
+
+**D10 -- Registro en el MOTOR GENERICO, no edicion a mano.** Las tres listas van en **`CATEGORY_TAG_LISTS`** (`admin.html:3993`) y los tres escalares en **`CATEGORY_TAG_FIELDS`** (`:3722`), ambos bajo la(s) categoria(s) de comida:
+
+- **Listas:** `menu_destacado` (con su sub-editor de plato: `nombre`, `descripcion`, `precio`/`precio_texto`, `categoria`, `porcion`, `alergenos`, `disponible`, `foto`, `badge`), `carta_archivos` (con subida via `MediaUpload` y `tipo`), `domicilio_plataformas` (`nombre` + `url`).
+- **Escalares:** `carta_nota`, `domicilio_zonas`, `whatsapp_pedidos`.
+- **Prohibido** anadir ramas a mano en `collectPlace()`, `_placeToAPI()` o `loadForm()` para estos seis campos: si un campo necesita UI especial, se declara en la **definicion de la lista** (sub-editor), no como `if` en las tres funciones. Ese es el motivo por el que el motor existe y el que explica el defecto 1 del Problema: `addMenuItem()` es **codigo al margen del motor** y por eso no lleva `data-field`.
+- **`#menu-cat-sel` (`:1275`) no sobrevive como control suelto:** la categoria es **un campo del plato** (D2), no un selector global de la pantalla. Si se conserva el select, es solo como prefiltro visual del editor y **no** se persiste.
+
+**D11 -- Camino publico: CUATRO claves nuevas en `CLAVES_CLIENTE`.** `carta_archivos`, `carta_nota`, `domicilio_zonas`, `whatsapp_pedidos` (`api/publicar-lugar.js:351-380`, bloque `// comida`). Medido: `menu_destacado` y `domicilio_plataformas` **ya estan** (`:363-364`), asi que el delta es **4**, no **6**. Requisitos:
+
+- Las cuatro deben quedar **fuera** de `CLAVES_SERVIDOR` (`:382-384`), o el POST devolvera **400**.
+- El descarte silencioso (`:555`, `:1407`) **se conserva para claves ajenas al contrato** (es lo que impide que un cliente escriba `pub_geo`), pero **no puede ser la primera noticia** de una clave del contrato: el cliente valida **antes** de enviar usando `lib/menu.js`, y un campo del contrato con forma invalida devuelve **400 con codigo**, nunca un `continue`.
+- **`mi-perfil.html`** es autoservicio: la UI del dueno usa el **mismo** sub-editor de `CATEGORY_TAG_LISTS` (o su equivalente) y el **mismo** saneo. Dos UIs, **un** contrato.
+
+**D12 -- PDF por el `blob_upload` existente, con un `tipo` nuevo en LOS DOS lados.** Cero endpoint nuevo (8/8):
+
+- `api/utilidades.js:97-101` -> `BLOB_TIPOS.documento = ['application/pdf']`.
+- `media-upload.js:47` -> `LIMITES.documento = 10 * 1024 * 1024`; `:50-51` -> `MIMES.documento = /^application\/pdf$/i`.
+- **El cliente siempre envia `tipo:'documento'` explicito** para un PDF. El fallback `if (!BLOB_TIPOS[tipo]) tipo = 'foto'` (`api/utilidades.js:152`) **se conserva** por compatibilidad, pero deja de ser el camino de un PDF: hoy un PDF con `tipo` desconocido cae en la mascara `image/*` y se rechaza con un error que no explica nada.
+- **ADR-098 se respeta:** cliente y servidor evaluan el **mismo criterio**; el tipo nuevo se anade en los **dos** sitios en el mismo paso, y el prefijo de Blob sale del mismo `tipo`.
+- PDF servido por Vercel Blob con su `Content-Type` (`application/pdf`): no se reescribe ni se transcodifica nada en el servidor (no hay donde: 8/8).
+
+**D13 -- Escritura JSONB: se reemplaza el ARRAY completo de UNA clave, jamas `tags`.** `COALESCE(tags,'{}') || $N::jsonb` **sustituye el valor de la clave**: un "patch" de un solo plato es imposible sin leer-modificar-escribir. Consecuencias normativas: (i) el cliente envia **siempre** el array completo (`menu_destacado`, `carta_archivos`, `domicilio_plataformas`); (ii) el servidor **no** hace merge por item ni "append"; (iii) jamas se construye un `tags` nuevo desde cero (ADR-003): el `||` se aplica sobre el `tags` existente y el resto de claves sobrevive intacto; (iv) por eso `disponible:false` existe: es la unica forma de retirar un plato de la venta **sin** perder el dato.
+
+**D14 -- Saneo ASIMETRICO, y es deliberado.** Dos caminos de escritura con la **misma** funcion (D1) y **distinta** politica de error:
+
+- **Publico (`publicar-lugar`)**: entrada de usuario -> **valida y rechaza** con `400` + codigo (`MENU_TOPE`, `CARTA_TOPE`, `CANALES_TOPE`, `CAMPO_LARGO`, `URL_INSEGURA`, `WHATSAPP_INVALIDO`). Un `400` ensena; un recorte silencioso, no.
+- **Admin (`admin-destinos.js:476-479`)**: operador de confianza -> **normaliza, recorta y devuelve `avisos[]`** en la respuesta; **nunca bloquea** una edicion editorial a medio guardar por un campo del menu. El admin **pinta** los avisos. Hoy esa ruta **no filtra ninguna clave**: es el unico sitio donde se puede escribir una URL `javascript:` en `tags`, y el saneo tiene que correr **antes** del merge.
+- El `avisos[]` es la respuesta al defecto 3 del Problema: lo que se pierde, **se dice**.
+
+**D15 -- SEO (`hasMenu`) queda definido aqui como PREDICADO, no como implementacion.** `hasMenu = (platosDe(tags.menu_destacado).length > 0) OR (archivosDeCarta(tags).length > 0)`. Lo consume `@seo-dev` en el JSON-LD; este ADR **no** toca metadatos ni `index.html`. El predicado vive en `lib/menu.js` para que el otro agente **no invente un segundo criterio** de "tiene menu".
+
+**D16 -- Aislamiento atomico del CSS (ADR-004).** Todo lo nuevo (`menu-seccion`, `menu-grupo`, `plato`, `agotado`, `sello-agotado`, `carta-visor`, `carta-mini`, `domicilio-chip`, `domicilio-cta`) vive **bajo el selector padre unico de la categoria comida** (`.tpl-comida` / el que fije el silo) con su **Reset de Silo**, y **nada** suelto en `:root`. El estado `agotado` no se estiliza con un selector global (`.agotado` a secas) porque colisionaria con otros silos.
+
+### Contrato: ejemplo completo de una ficha de comida
+
+```json
+{
+  "tipo_comida": "Colombiana",
+  "precio_promedio": "25.000 - 40.000",
+  "menu_destacado": [
+    { "nombre": "Bandeja paisa", "descripcion": "Frijoles, arroz, chicharron, huevo, arepa.",
+      "precio": 28000, "categoria": "principales", "porcion": "para 1 persona",
+      "alergenos": ["lacteos"], "disponible": true,
+      "foto": "https://blob.../bandeja.jpg", "badge": "El mas pedido" },
+    { "nombre": "Ajiaco", "precio": "32000", "categoria": "principales", "disponible": false },
+    { "nombre": "Sopa del dia", "precio_texto": "consultar" }
+  ],
+  "carta_archivos": [
+    { "url": "https://blob.../carta-p1.jpg", "tipo": "imagen", "titulo": "Carta (pag. 1)" },
+    { "url": "https://blob.../carta.pdf", "tipo": "pdf" }
+  ],
+  "carta_nota": "Precios sujetos a cambio sin previo aviso.",
+  "domicilio_zonas": "Chapinero, Usaquen y Cedritos",
+  "whatsapp_pedidos": "573001234567",
+  "domicilio_plataformas": [
+    { "nombre": "Rappi", "url": "https://www.rappi.com.co/restaurantes/..." },
+    { "nombre": "iFood", "url": "https://www.ifood.com.co/..." },
+    "Domicilio propio"
+  ]
+}
+```
+
+Lectura de este ejemplo: "Ajiaco" trae `precio` como string numerico -> se normaliza a `32000` y **no** pierde el valor; se pinta **agotado** y **sigue** en el grupo `principales`; "Sopa del dia" no tiene categoria -> aparece en el grupo residual **"Otros"** (porque convive con `principales`); "Domicilio propio" es un string -> chip **sin enlace**; el PDF se abre en pestana nueva; el CTA de pedido usa `573001234567` **aunque** `d.whatsapp` sea otro numero.
+
+### Invariantes
+
+- **I1:** un plato sin `nombre` no existe; un plato con **solo** `nombre` existe y se pinta. Cero campos obligatorios mas alla de `nombre`.
+- **I2:** `normalizar(normalizar(x)) === normalizar(x)` (idempotencia) y **cero reescrituras** de la base al leer.
+- **I3:** **0** entradas descartadas por su forma: lo invalido se degrada (chip sin enlace, foto sin URL, precio a `precio_texto`) o se rechaza con `400` codificado. **0** `continue` silenciosos sobre claves del contrato.
+- **I4:** **0** `<img>` cuyo `src` no sea una imagen real; **0** `href` con protocolo distinto de `http`/`https`; **0** enlaces externos del modulo sin `rel="noopener noreferrer"`.
+- **I5:** `disponible:false` **no** reduce el numero de nodos del DOM respecto a `disponible:true` (ADR-003).
+- **I6:** el WhatsApp que se pinta en el CTA de pedido es `whatsapp_pedidos` **o** `d.whatsapp`, nunca una mezcla ni un tercer valor.
+- **I7:** `api/*.js` = **8**; ningun endpoint nuevo ni ampliado (solo `blob_upload` con un `tipo` mas).
+- **I8:** cero `ALTER TABLE`, cero `UPDATE` masivo, cero backfill: **no hay cambio de esquema** (todo es `tags` JSONB).
+
+### Impacto
+
+- **`lib/menu.js` (nuevo, ~un archivo):** forma + topes + saneo + agrupacion + precedencia. Doble superficie. **ASCII-safe** (ADR-002). Smoke propio con prueba negativa (que **falle** si alguien relaja el saneo).
+- **`api/pagina-destino.js` (`@renderer-dev`, gate):** los tres modulos dejan de ser planos. `:2272-2286` pasa a `menuHTML()` (secciones + grupos + `.plato` + sello de agotado) y `:2319-2326` a `domicilioHTML()` (chips con/sin enlace + CTA con `?text=` + zonas). Bloque nuevo `cartaHTML()`. Se sigue usando `esc()` (`:65`). **ASCII-safe en los tramos tocados.** Cero `<script>` inline nuevo; el visor de imagenes reutiliza el patron existente.
+- **`admin.html` (`@admin-dev`, gate):** `CATEGORY_TAG_LISTS` (`:3993`) con los tres sub-editores; `CATEGORY_TAG_FIELDS` (`:3722`) con los tres escalares; **`addMenuItem()` (`:6158-6164`) se reescribe para emitir `data-field` en cada input** o, mejor, se elimina a favor del sub-editor del motor (defecto 1). `collectMenuItems()` (`:4889-4907`) se sustituye por el colector generico de la lista. `#menu-cat-sel` (`:1275`) deja de prometer una categoria que no se guarda. **Balance de divs** se re-verifica.
+- **`mi-perfil.html` (`@frontend-tpl`/`@js-silo-dev`):** sub-tab de comida con el **mismo** contrato; subida de PDF via `MediaUpload` con `tipo:'documento'`; los seis campos pasan por `lib/menu.js`. Al ser **camino publico**, cualquier clave nueva debe estar en `CLAVES_CLIENTE` (D11) o se pierde en silencio.
+- **`api/publicar-lugar.js` (`@backend-dev`, gate):** +4 claves en `CLAVES_CLIENTE`; saneo obligatorio **antes** del merge en el POST y en el PATCH; codigos de error nuevos (D14). ASCII-safe (cero backticks).
+- **`api/admin-destinos.js`:** `normalizarFicha()` antes del merge (`:476-479`) + `avisos[]` en la respuesta.
+- **`api/utilidades.js` + `media-upload.js`:** `documento`/`application/pdf`/10 MB en los dos lados (D12). El token ya existe: **cero endpoint**.
+- **`api/destinos.js` / `api/admin.js`:** **sin cambios**. Si el directorio necesita saber si un lugar tiene menu, se resuelve en cliente con el predicado de D15, fuera de alcance.
+- **Datos:** **cero migracion**, cero DDL, cero DML, cero backfill.
+- **Documental:** `TASKS.md` y `NEXT.md` apuntan aqui por ID; el argumento vive **solo en este ADR** (ADR-084 D1).
+
+### Deuda declarada (NO se resuelve en este ADR)
+
+1. **Sin costo de envio, minimo de pedido ni horario de domicilio.** Fuera de alcance por premisa. Si se piden, entran como escalares nuevos con ADR propio (nunca como claves sueltas dentro de `domicilio_plataformas[]`).
+2. **Sin badges del lugar en el directorio de comida.** Fuera de alcance por premisa.
+3. **Los strings legacy de `domicilio_plataformas` quedan sin enlace para siempre** salvo que el dueno los reescriba. Una migracion a `{nombre,url}` exigiria DML y adivinar URLs: no se hace.
+4. **Un PDF de 10 MB sin comprimir** es la primera carga de un usuario en 3G si pulsa el enlace. Mitigacion: nunca se pre-carga, y el enlace lo dice ("Ver carta (PDF)"). Comprimir en servidor exigiria una funcion nueva: prohibido.
+5. **Sin `id` estable por plato** (D2): la edicion es por indice y dos pestanas abiertas pueden pisarse. Se anade `id` opcional el dia que haya edicion concurrente real, sin romper v2.
+6. **El saneo no valida que la URL de una plataforma EXISTA** (solo su forma): un 404 en Rappi es responsabilidad del dueno. Verificarlo exigiria `fetch` en servidor por cada guardado.
+7. **`alergenos` es texto libre**: "lactosa" y "lacteos" son dos valores distintos. Normalizar a catalogo es decision de producto posterior; hoy se muestra literal y no se agrupa.
+
+### Criterio de verificacion
+
+1. **V1 (contrato):** `node scripts/smoke_menu_contrato.js` -> **0 FAIL**, con **prueba negativa** (variante que relaja `esUrlSegura` o el tope de 60 -> el smoke **falla**). Casos minimos: plato `{nombre}` valido; `precio:"32000"` -> `32000`; `precio:"2x1"` -> `precio_texto`; `disponible` ausente -> `true`; `"Rappi"` -> `{nombre:'Rappi',url:null}`; `"javascript:alert(1)"` -> descartada; `"+57 (300) 123-4567"` -> `573001234567`; 61 platos -> `MENU_TOPE`; 11 archivos -> `CARTA_TOPE`; 9 plataformas -> `CANALES_TOPE`.
+2. **V2 (idempotencia):** `normalizar(normalizar(x))` deep-equal a `normalizar(x)` sobre las 6 fixtures del smoke.
+3. **V3 (render):** `node scripts/smoke_auditoria_pagina_destino.js` **sin regresiones** frente a `HEAD`; ficha **sin** menu -> **0** secciones de menu; ficha **legacy** (`{nombre,precio,foto,badge}`) -> plato visible en grupo "Menu"; `disponible:false` -> mismo numero de nodos `.plato` que con `true` y sello presente (I5).
+4. **V4 (seguridad):** `git grep "javascript:" -- api/ lib/menu.js` -> **0**; todo `href` del modulo con `rel="noopener noreferrer"` (grep del bloque generado en el smoke).
+5. **V5 (admin):** `git grep "data-field" -- admin.html` cubre **todos** los inputs del sub-editor, y `addMenuItem()` **no existe** o emite `data-field` en cada uno; balance de divs re-medido (antes/despues).
+6. **V6 (allowlist):** `CLAVES_CLIENTE` contiene las **7** claves (`menu_destacado`, `carta_archivos`, `carta_nota`, `domicilio_zonas`, `whatsapp_pedidos`, `domicilio_plataformas`, `domicilio`); ninguna esta en `CLAVES_SERVIDOR`.
+7. **V7 (blob):** `POST /api/utilidades?tipo=blob_upload` con `tipo=documento` emite token con `allowedContentTypes:['application/pdf']`; con un JPEG -> **400**; el tamano maximo declarado es 10 MB en `media-upload.js` y el criterio coincide en servidor (ADR-098).
+8. **V8 (presupuesto y ASCII):** `api/*.js` = **8**; `node --check` **OK** en los ficheros tocados; **0** bytes > 127 anadidos en `api/*.js` y `lib/menu.js`; `Select-String -Pattern ([char]96) -- api/*.js` -> **0** (cero backticks).
+
+### Relacion con ADRs
+
+- **ADR-001 / ADR-010:** 8/8 funciones; cero endpoint nuevo (D12, I7).
+- **ADR-002:** ASCII-safe en `api/*.js`, `lib/menu.js`, `media-upload.js`; cero backticks en serverless (V8).
+- **ADR-003:** ninguna lista se reemplaza completa ni se borra al pintar; `disponible:false` es el unico borrado logico y **no** toca el DOM (D7, D13, I5).
+- **ADR-004:** aislamiento atomico del CSS nuevo bajo el padre de la categoria (D16).
+- **ADR-008:** `onerror` con fallback en toda imagen de plato y de carta (D2, D3).
+- **ADR-006:** forma y numeros medidos contra el archivo real el 2026-11-05 (13.140 lineas / 2.151.418 B).
+- **ADR-044 / ADR-099 D4:** precedente de "una sola implementacion fisica" que D1 reutiliza (`lib/score.js`, `lib/completitud.js`).
+- **ADR-084 D1:** el argumento de este contrato se escribe **una vez** aqui; `TASKS.md` y `NEXT.md` apuntan por ID.
+- **ADR-098:** el `tipo` nuevo `documento` se anade en cliente y servidor con el mismo criterio y el mismo prefijo (D12).
+- **ADR-113 / ADR-117:** el dominio `CartasUI` es del **juego de cartas coleccionables** y **no** se toca: aqui "carta" es la carta de un restaurante y el visor es otro (D3). Sin colision de nombres por prefijo `carta_*` y `menu_*`.
+
+### Estado
+
+**ACEPTADO / PENDIENTE DE IMPLEMENTAR (2026-11-05).** ADR de contrato: **no** escribe codigo, **no** migra, **no** despliega y **no** reabre ninguna premisa del operador. Habilita la tanda de implementacion en el orden que dicta ADR-006: primero `lib/menu.js` + su smoke (V1/V2), luego `api/publicar-lugar.js` (D11/D14) para que el dato **pueda** llegar, luego el render (D7/D8/D9), luego el admin (D10) y `mi-perfil.html`, y por ultimo los topes de PDF (D12). Orden invertido = UI que guarda en el vacio, que es exactamente el defecto 1 de este ADR.
+
+### Nota de implementacion (2026-11-06, TSK-255)
+
+Las **5** resoluciones que el contrato dejaba abiertas quedaron asi: **(1)** el telefono de WhatsApp se normaliza a **10 digitos** y, si empieza por **3**, se le antepone **57**; **(2)** el tope de platos es **60 POR FICHA** (`TOPE_PLATOS` de `lib/menu.js`), no por categoria de la carta; **(3)** la categoria del plato es **texto libre** con **catalogo sugerido** en la UI y residual **"Otros"** para lo que no case con el catalogo; **(4)** el PDF de la carta se abre en **pestana nueva con el visor nativo** del navegador, **sin `pdf.js`** ni dependencia externa; **(5)** `plataformasDe` **no** inyecta `rappi`/`ifood` desde los escalares: la herencia de esos dos canales vive **solo** en `canalesDe`.
+**Ficheros nuevos:** `lib/menu.js` (contrato, saneo, topes y agrupacion) y `menu-comida.css` (silo `.tpl-comida`). **Estado:** **IMPLEMENTADO Y CERTIFICADO POR QA EN ARBOL DE TRABAJO, SIN COMMIT Y SIN DEPLOY (2026-11-06)**; la linea "PENDIENTE DE IMPLEMENTAR" de arriba se conserva como registro (ADR-003) y este parrafo la **supera**.
