@@ -9,7 +9,7 @@
 // Bloque T2  bloqueado/motivo_bloqueo    -> prioridad faccion > nivel > era
 // Bloque T3  POST ?tipo=comprar_consumible -> orden de gates y cero cobro
 // Bloque T4  sin topes de compra             -> ni por clave ni global 5/dia
-// Bloque T5  stock                       -> 409 STOCK_LLENO con tope 30 (1 sola declaracion)
+// Bloque T5  stock                       -> SIN tope (ADR-120: el tope de 30 se retiro)
 // Bloque T6  POST ?tipo=usar_consumible  -> rama faccion atomica
 // Bloque T7  consumirBonoFaccion         -> decremento condicionado + bono PLANO + ledger propio
 // Bloque T8  hooks                       -> 5 puntos + sin doble conteo
@@ -18,7 +18,7 @@
 // Bloque T11 aritmetica economica del catalogo (ROI 150)
 // Bloque T12 estado real en Neon (SOLO LECTURA, opcional si no hay DATABASE_URL)
 // Bloque T13 ventana estricta de faccion (1 activacion / 24 h) via vm por rango
-// Bloque T14 TOCTOU del tope de stock: predicado $4 en el WHERE del cobro
+// Bloque T14 cobro atomico (ADR-120): una sentencia, carreras en el WHERE
 //
 // ASCII-safe (ADR-002), CommonJS, 0 backticks.
 // Run: node scripts/smoke_057_consumibles_faccion.js
@@ -452,7 +452,11 @@ async function run() {
         rows: cfg.fac === undefined ? [] : [{ faccion: cfg.fac }] },
       { match: 'consumible_id=$2', rows: [{ n: cfg.limN || 0 }] },
       { match: 'FROM compra_consumibles WHERE usuario_id', rows: [{ n: cfg.globN || 0 }] },
-      { match: 'UPDATE usuarios SET xp_total = xp_total - $1', rows: [{ xp_total: '980' }] }
+      // ADR-120 (spec 2.2): el cobro es UNA sola sentencia con CTE y su
+      // resultado trae la columna cobrado (0 filas = no se cobro).
+      { match: 'WITH g AS (SELECT gen_random_uuid() AS cid)',
+        rows: [{ cobrado: cfg.cobrado === undefined ? 1 : cfg.cobrado,
+          compra_id: 'cccccccc-3333-4333-8333-cccccccccccc', xp_total: '980' }] }
     ];
   }
 
@@ -470,7 +474,7 @@ async function run() {
     !!(t3a._json && t3a._json.error === 'FACCION_INSUFICIENTE'
       && t3a._json.era_requerida === undefined), t3a._json);
   check('T3-3: faccion se evalua antes del cobro (0 UPDATE de xp, 0 ledger de compra)',
-    cuentaSql('xp_total = xp_total - $1') === 0
+    cuentaSql('xp_total = u.xp_total - $1') === 0
     && cuentaSql('INSERT INTO compra_consumibles') === 0);
 
   instalarMock(mockCompra({ item: itemTriple, fac: 'exploradores' }));
@@ -481,7 +485,7 @@ async function run() {
     !!(t3b._json && t3b._json.error === 'NIVEL_INSUFICIENTE'
       && t3b._json.era_requerida === undefined), t3b._json);
   check('T3-6: nivel se evalua antes del cobro (0 UPDATE de xp, 0 ledger de compra)',
-    cuentaSql('xp_total = xp_total - $1') === 0
+    cuentaSql('xp_total = u.xp_total - $1') === 0
     && cuentaSql('INSERT INTO compra_consumibles') === 0);
   check('T3-7: el 403 de nivel devuelve nivel_requerido y un nivel_actual por debajo',
     !!(t3b._json && t3b._json.nivel_requerido === 30
@@ -538,7 +542,7 @@ async function run() {
   check('T4-1: faccion con limite_diario 1 y 1 compra en 24 h -> 200 (tope por clave retirado)',
     t4a._status === 200, t4a._json || t4a._status);
   check('T4-2: esa compra se cobra igual (1 UPDATE de xp y 1 asiento de ledger)',
-    cuentaSql('xp_total = xp_total - $1') === 1
+    cuentaSql('xp_total = u.xp_total - $1') === 1
     && cuentaSql('INSERT INTO compra_consumibles') === 1);
   check('T4-3: la compra ya no consulta el tope por clave ni el contador global',
     cuentaSql('consumible_id=$2') === 0
@@ -566,10 +570,12 @@ async function run() {
     t4c._json);
 
   console.log('');
-  console.log('== T5 stock: 409 STOCK_LLENO con tope 30');
-  // El tope de stock depende de categoria = 'faccion', no del gate de faccion:
-  // se prueba con faccion_requerida NULL (estado de la 062) y un usuario de
-  // faccion distinta para aislar el gate por clave.
+  console.log('== T5 stock: SIN tope (ADR-120); el tope de 30 se retiro');
+  // ADR-120: se retiran ccStockTope, el pre-chequeo STOCK_LLENO y el
+  // predicado de stock del WHERE. La compra es ILIMITADA y el inventario
+  // solo se INCREMENTA (dentro del mismo UPDATE del cobro). Estos checks
+  // afirman la RETIRADA; siguen siendo tan estrictos como el tope: antes
+  // exigian el 409, ahora exigen el 200 y el incremento.
   instalarMock(mockCompra({
     item: { categoria: 'faccion', faccion_requerida: null, limite_diario: 1 },
     fac: 'artistas', limN: 0, globN: 0,
@@ -577,27 +583,33 @@ async function run() {
       capacidades: { consumibles: { consumible_catalejo_explorador: 30 } } }
   }));
   var t5a = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'consumible_catalejo_explorador' });
-  check('T5-1: stock 30 en faccion -> 409 STOCK_LLENO',
-    t5a._status === 409 && t5a._json && t5a._json.error === 'STOCK_LLENO', t5a._json);
-  check('T5-2: el 409 informa stock_actual 30 y stock_maximo 30',
-    !!(t5a._json && t5a._json.stock_actual === 30 && t5a._json.stock_maximo === 30), t5a._json);
-  check('T5-3: STOCK_LLENO se evalua antes del cobro', cuentaSql('xp_total = xp_total - $1') === 0);
+  check('T5-1 (ADR-120): stock 30 en faccion -> 200 (el tope de 30 se retiro)',
+    t5a._status === 200, t5a._json || t5a._status);
+  check('T5-2 (ADR-120): el api ya no declara ccStockTope ni responde STOCK_LLENO',
+    apiSrc.indexOf('ccStockTope') === -1 && apiSrc.indexOf("'STOCK_LLENO'") === -1,
+    [apiSrc.indexOf('ccStockTope'), apiSrc.indexOf("'STOCK_LLENO'")]);
+  check('T5-3 (ADR-120): no hay pre-chequeo de stock: con stock 30 la compra SI se cobra',
+    cuentaSql('xp_total = u.xp_total - $1') === 1,
+    cuentaSql('xp_total = u.xp_total - $1'));
 
   instalarMock(mockCompra({
     item: { categoria: 'faccion', faccion_requerida: null, limite_diario: 1 },
     fac: 'artistas', limN: 0, globN: 0,
     usr: { xp_total: '1000', xp_gastado_sinks: '0', nivel_max: 1,
-      capacidades: { consumibles: { consumible_catalejo_explorador: 29 } } }
+      capacidades: { consumibles: { consumible_catalejo_explorador: 30 } } }
   }));
   var t5b = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'consumible_catalejo_explorador' });
-  check('T5-4: con stock 29 la compra no bloquea (200)', t5b._status === 200, t5b._json || t5b._status);
-  check('T5-7: el tope de stock no depende del gate de faccion (faccion_requerida NULL y stock 30 -> 409)',
-    t5a._json && t5a._json.error === 'STOCK_LLENO' && t5a._json.stock_maximo === 30, t5a._json);
+  check('T5-4: con stock 30 la compra no bloquea (200)', t5b._status === 200, t5b._json || t5b._status);
 
-  var declStock = apiSrc.split('ccStockTope = 30').length - 1;
-  check('T5-5: la constante del tope de stock se declara UNA sola vez', declStock === 1, declStock);
+  var cobroT5 = llamadaSql('WITH g AS (SELECT gen_random_uuid() AS cid)');
+  var cobroT5Txt = sinComentarios(cobroT5 ? cobroT5.q : '');
+  check('T5-5 (ADR-120): el cobro INCREMENTA el inventario en el mismo UPDATE y nunca lo decrementa',
+    cobroT5Txt.indexOf("COALESCE((u.capacidades->'consumibles'->>$2::text)::int, 0) + 1") !== -1
+    && cobroT5Txt.indexOf('::int, 0) - 1') === -1, cobroT5Txt.slice(-260));
   var otrosTope = apiSrc.split('stock_maximo: 30').length - 1;
   check('T5-6: no hay un 30 duplicado en la respuesta de stock', otrosTope === 0, otrosTope);
+  check('T5-7 (ADR-120): sin gate de faccion tampoco hay tope (faccion_requerida NULL y stock 30 -> 200)',
+    t5a._status === 200 && t5a._json && t5a._json.ok === true, t5a._json);
 
   console.log('');
   console.log('== T6 usar_consumible: rama faccion');
@@ -1040,76 +1052,88 @@ async function run() {
     cuentaSql('UPDATE usuarios SET capacidades = '));
 
   // ============================================================
-  // T14 TOCTOU del tope de stock (B2): el predicado vive en el WHERE
-  // del cobro, con $4 = tope solo en faccion y NULL fuera.
+  // T14 cobro atomico (ADR-120, spec 2.2): el cobro es UNA sola
+  // sentencia y las DOS carreras viven en el WHERE (XP y flag del
+  // set). 0 filas = no se cobro. Extraccion por RANGO del codigo
+  // real + ejecucion en vm: ninguna copia a mano.
   // ============================================================
   console.log('');
-  console.log('== T14 TOCTOU de stock: predicado $4 en el WHERE del cobro');
-  var srcTope = extraerEntre(apiSrc, 'var ccStockTope = 30;',
-    '// Resta atomica + merge del inventario');
+  console.log('== T14 cobro atomico: una sentencia, 0 filas = no se cobro');
   var srcCobro = extraerEntre(apiSrc, 'var ccUpd = await sql(',
-    '// 0 filas = disponible insuficiente');
-  check('T14-0: extraidos por rango ccStockTope/ccEsFaccion y el UPDATE de cobro',
-    srcTope.indexOf('ccStockTope = 30') !== -1 && srcTope.indexOf('ccEsFaccion') !== -1
-    && srcCobro.indexOf('var ccUpd = await sql(') !== -1,
-    [srcTope.length, srcCobro.length]);
+    '// 0 filas = no se cobro');
+  check('T14-0: extraido por rango el cobro real (ccUpd) del api',
+    srcCobro.length > 0 && srcCobro.indexOf('await sql(') !== -1
+    && srcCobro.indexOf('WITH g AS (SELECT gen_random_uuid() AS cid)') !== -1,
+    srcCobro.length);
 
-  function ejecutarCobro(categoria, clave) {
+  function ejecutarCobro(clave, setSlug) {
     var capturado = null;
     var llamadas = 0;
     var sqlFake = function(q, p) {
       llamadas++;
       capturado = { q: String(q), p: p || [] };
-      return Promise.resolve([{ xp_total: 900 }]);
+      return Promise.resolve([{ cobrado: 1, compra_id: 'cccccccc-3333-4333-8333-cccccccccccc', xp_total: 980 }]);
     };
     var ctx = vm.createContext({
       sql: sqlFake, Promise: Promise, parseInt: parseInt, String: String,
       console: { warn: function() {}, log: function() {} },
-      ccPrecio: 20, ccClave: clave, usuarioId2: 'U1', ccCategoria: categoria,
-      ccCaps: { consumibles: {} }, ccXp: 1000, ccNivelAnt: 1,
-      res: { status: function() { return this; }, json: function() { return this; } }
+      ccPrecio: 20, ccClave: clave, usuarioId2: 'U1', ccSetSlug: setSlug,
+      ccDesde: '2026-11-10T00:00:00.000Z', ccCons: [{ id: 'cccccccc-4444-4444-8444-cccccccccccc' }]
     });
-    var fuente = '(async function(){' + srcTope + srcCobro
-      + 'return { filas: ccUpd.length, tope: ccStockTope, es: ccEsFaccion };})()';
+    var fuente = '(async function(){' + srcCobro
+      + 'return { filas: ccUpd.length, cobrado: ccUpd[0] ? ccUpd[0].cobrado : null };})()';
     return vm.runInContext(fuente, ctx, { filename: 'cobro-capturado.js' })
       .then(function(r) {
-        return { sql: capturado, filas: r.filas, tope: r.tope, es: r.es, llamadas: llamadas };
+        return { sql: capturado, filas: r.filas, cobrado: r.cobrado, llamadas: llamadas };
       });
   }
 
-  var facCobro = await ejecutarCobro('faccion', 'consumible_catalejo_explorador');
-  var genCobro = await ejecutarCobro('general', 'prod_cafe');
+  var facCobro = await ejecutarCobro('ancestral_base', 'ancestral_esencia');
+  var genCobro = await ejecutarCobro('prod_cafe', null);
   var facSql = sinComentarios(facCobro.sql ? facCobro.sql.q : '');
   var genSql = sinComentarios(genCobro.sql ? genCobro.sql.q : '');
 
-  check('T14-1: el UPDATE de cobro contiene el predicado de stock con $4',
-    facSql.indexOf('($4::int IS NULL') !== -1
-    && facSql.indexOf('< $4::int') !== -1, facSql.slice(-220));
-  check('T14-2: el predicado cubre las dos ramas ($4::int aparece 2 veces)',
-    facSql.split('$4::int').length - 1 === 2, facSql.split('$4::int').length - 1);
-  check('T14-3: la rama faccion pasa el tope real como $4',
-    facCobro.sql && facCobro.sql.p.length === 4 && facCobro.sql.p[3] === 30
-    && facCobro.tope === 30, facCobro.sql && facCobro.sql.p);
-  check('T14-4: fuera de faccion $4 es null (predicado inerte)',
-    genCobro.sql && genCobro.sql.p[3] === null && genCobro.es === false,
+  check('T14-1: el WHERE defiende el XP por las dos vias (xp_total y xp_gastado_sinks)',
+    facSql.indexOf('u.xp_total >= $1') !== -1
+    && facSql.indexOf('GREATEST(u.xp_total - COALESCE(u.xp_gastado_sinks, 0), 0) >= $1') !== -1,
+    facSql.slice(-260));
+  check('T14-2: la carrera del FLAG del set se resuelve en el WHERE, no en un pre-chequeo',
+    facSql.indexOf("NOT (COALESCE(u.capacidades->'sets_acceso','{}'::jsonb) ? $4::text)") !== -1,
+    facSql.slice(-260));
+  check('T14-3: cobro y asiento de compra son la MISMA sentencia (el CTE ins cuelga del cobro)',
+    facSql.indexOf('INSERT INTO compra_consumibles') !== -1
+    && facSql.indexOf('FROM cobro') !== -1
+    && facCobro.llamadas === 1 && genCobro.llamadas === 1,
+    [facCobro.llamadas, genCobro.llamadas]);
+  check('T14-4: 6 parametros en el orden pactado (precio, clave, usuario, set, desde, consumible_id)',
+    !!facCobro.sql && facCobro.sql.p.length === 6 && facCobro.sql.p[0] === 20
+    && facCobro.sql.p[1] === 'ancestral_base' && facCobro.sql.p[2] === 'U1'
+    && facCobro.sql.p[3] === 'ancestral_esencia'
+    && facCobro.sql.p[4] === '2026-11-10T00:00:00.000Z'
+    && facCobro.sql.p[5] === 'cccccccc-4444-4444-8444-cccccccccccc',
+    facCobro.sql && facCobro.sql.p);
+  check('T14-5: fuera del set $4 es null (predicado del flag inerte) y el CASE no escribe flag',
+    !!genCobro.sql && genCobro.sql.p[3] === null
+    && genSql.indexOf("CASE WHEN $4::text IS NULL THEN '{}'::jsonb") !== -1,
     genCobro.sql && genCobro.sql.p);
-  check('T14-5: el caso no-faccion genera el MISMO texto SQL, con el predicado inerte',
+  check('T14-6: el caso no-set emite el MISMO texto SQL que la rama del set',
     genSql === facSql && genSql.length > 0, [genSql.length, facSql.length]);
   var ph = facSql.match(/\$[0-9]+/g) || [];
   var phSet = {};
   ph.forEach(function(x) { phSet[x] = 1; });
   var phClaves = Object.keys(phSet).sort().join(',');
-  check('T14-6: paridad exacta placeholders/parametros = 4 y sin renumerar ($1..$4)',
-    phClaves === '$1,$2,$3,$4' && facCobro.sql.p.length === 4, [phClaves, ph.length]);
-  check('T14-7: orden de parametros intacto (precio, clave, usuario, tope)',
-    facCobro.sql.p[0] === 20 && facCobro.sql.p[1] === 'consumible_catalejo_explorador'
-    && facCobro.sql.p[2] === 'U1', facCobro.sql.p);
-  check('T14-8: $2 se sigue usando como clave del merge y $3 como id del WHERE',
-    facSql.indexOf('jsonb_build_object($2,') !== -1 && facSql.indexOf('WHERE id=$3') !== -1,
-    facSql.slice(-220));
-  check('T14-9: el cobro es UNA sola sentencia (1 llamada sql), sin doble UPDATE',
-    facCobro.llamadas === 1 && genCobro.llamadas === 1,
-    [facCobro.llamadas, genCobro.llamadas]);
+  check('T14-7: paridad exacta placeholders/parametros = 6 y sin renumerar ($1..$6)',
+    phClaves === '$1,$2,$3,$4,$5,$6' && facCobro.sql.p.length === 6, [phClaves, ph.length]);
+  check('T14-8: $1 es el precio restado y $2/$3 el merge y el WHERE del usuario',
+    facSql.indexOf('xp_total = u.xp_total - $1') !== -1
+    && facSql.indexOf('jsonb_build_object($2::text,') !== -1
+    && facSql.indexOf('WHERE u.id = $3') !== -1, facSql.slice(0, 260));
+  var srcCero = extraerEntre(apiSrc, '// 0 filas = no se cobro', 'var ccCompraId');
+  check('T14-9: 0 filas = no se cobro (409 YA_POSEES o XP insuficiente, cero escrituras)',
+    srcCero.indexOf('ccUpd[0].cobrado') !== -1
+    && srcCero.indexOf("'YA_POSEES'") !== -1
+    && srcCero.indexOf('409') !== -1
+    && srcCero.indexOf('INSERT INTO') === -1, srcCero.length);
 
   // ============================================================
   // T15 CONTRATO DE SESION (ADR-110 D5)
@@ -1174,7 +1198,7 @@ async function run() {
     t15post._status === 401 && !!t15post._json
     && t15post._json.error === 'SESION_REQUERIDA', t15post._json);
   check('T15-6: sin sesion no hay cobro ni ledger (0 escrituras)',
-    cuentaSql('xp_total = xp_total - $1') === 0
+    cuentaSql('xp_total = u.xp_total - $1') === 0
     && cuentaSql('INSERT INTO compra_consumibles') === 0);
 
   instalarMock(mockCompraFase1('artistas'));
@@ -1196,7 +1220,7 @@ async function run() {
     clave: CLAVES_FASE1[0] });
   check('T15-9: POST con body usuario_id AJENO -> 200 (el body se ignora)',
     t15ajenoPost._status === 200, t15ajenoPost._json || t15ajenoPost._status);
-  var cobroAjeno = llamadaSql('UPDATE usuarios SET xp_total = xp_total - $1');
+  var cobroAjeno = llamadaSql('xp_total = u.xp_total - $1');
   check('T15-10: el cobro se aplica al sub del token ($3 = UID_SESION) y nunca al ajeno',
     !!cobroAjeno && String(cobroAjeno.p[2]) === UID_SESION
     && String(cobroAjeno.p[2]) !== UID_AJENO, cobroAjeno && cobroAjeno.p);

@@ -353,6 +353,147 @@ function normalizarIconoConsumible(v) {
   return s;
 }
 
+// == BONO GLOBAL % Y SET ANCESTRAL (migracion 064 / ADR-120) ==============
+// Seis columnas anadidas por la 064 al catalogo de consumibles, con 4 CHECK
+// que las guardan en la tabla:
+//   bono_pct        smallint 0..100            (chk_consumibles_bono_pct)
+//   bono_tope_xp    numeric(12,2) >= 0         (chk_consumibles_bono_tope)
+//   es_permanente   boolean NOT NULL           (chk_consumibles_permanente_
+//                                               coherente: true exige set)
+//   desbloquea_set  varchar(40) slug o NULL
+//   otorga_carta    varchar(40) slug o NULL
+//   premio_set      boolean NOT NULL
+// El catalogo sigue siendo administrable (ADR-028): los 2 CHECK de coherencia
+// se validan aqui sobre el RESULTADO de la edicion y no sobre el body suelto,
+// porque un PATCH parcial (solo bono_pct, por ejemplo) podria dejar la fila
+// invalida y el constraint reventaria como 500.
+// Registro unico campo -> tipo de validacion y DEFAULT de columna, mismo
+// criterio que CAMPOS_ENTEROS_CONSUMIBLE (Regla de No-Duplicidad).
+var CAMPOS_064_CONSUMIBLE = [
+  { campo: 'bono_pct',       tipo: 'pct',  def: 0 },
+  { campo: 'bono_tope_xp',   tipo: 'xp',   def: 0 },
+  { campo: 'es_permanente',  tipo: 'bool', def: false },
+  { campo: 'otorga_carta',   tipo: 'slug', def: null },
+  { campo: 'desbloquea_set', tipo: 'slug', def: null },
+  { campo: 'premio_set',     tipo: 'bool', def: false }
+];
+// Lista literal de columnas para SELECT/RETURNING: se escribe en un solo sitio
+// para que las 3 consultas (lista, crear, editar) no se desincronicen.
+var COLS_064_CONSUMIBLE = 'bono_pct, bono_tope_xp, es_permanente, otorga_carta, desbloquea_set, premio_set';
+
+// bono_pct: entero 0..100 (smallint + CHECK BETWEEN 0 AND 100). Vacio => null
+// (el caller aplica el DEFAULT 0 de la columna); undefined => invalido
+// (decimal, negativo, fuera de rango o texto).
+function normalizarPct064Consumible(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (!s) return null;
+  if (!/^[0-9]+$/.test(s)) return undefined;
+  var x = parseInt(s, 10);
+  if (!isFinite(x) || x < 0 || x > 100) return undefined;
+  return x;
+}
+
+// bono_tope_xp: numeric(12,2) >= 0, con la misma tolerancia de coma o punto
+// que precio_xp (ADR-035). Vacio => null; undefined => invalido.
+function normalizarTope064Consumible(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (!s) return null;
+  var x = parseFloat(s.replace(',', '.'));
+  if (!isFinite(x) || x < 0) return undefined;
+  return red2(x);
+}
+
+// Booleanos ESTRICTOS de la 064: boolean nativo, 1/0 y los textos
+// 'true'/'false'/'1'/'0'. Vacio => null (DEFAULT de columna). Cualquier otro
+// valor ('si', 'on', '2') => undefined: aqui un true accidental marcaria un
+// consumible como permanente o como premio de set. NO reusa boolCarta, que es
+// tolerante a proposito porque sirve al catalogo de cartas.
+function normalizarBool064Consumible(v) {
+  if (typeof v === 'boolean') return v;
+  if (v === 1 || v === 0) return v === 1;
+  var s = String(v == null ? '' : v).trim().toLowerCase();
+  if (!s) return null;
+  if (s === '1' || s === 'true') return true;
+  if (s === '0' || s === 'false') return false;
+  return undefined;
+}
+
+// Slug de referencia de set o de carta: [a-z0-9_:-], maximo 60 caracteres
+// (las columnas son varchar(40); el margen de 60 lo fija el contrato de la
+// tarea). Vacio => null (sin vinculo); undefined => demasiado largo o con
+// caracteres fuera del vocabulario. Se pasa a minusculas para que el vinculo
+// quede canonico.
+function normalizarSlug064Consumible(v) {
+  var s = String(v == null ? '' : v).trim().toLowerCase();
+  if (!s) return null;
+  if (s.length > 60) return undefined;
+  if (!/^[a-z0-9_:-]+$/.test(s)) return undefined;
+  return s;
+}
+
+// Valida de golpe las 6 columnas de la 064 (mismo contrato que
+// validarEnterosConsumible): soloEnviados=false (crear) devuelve SIEMPRE las 6
+// claves con el DEFAULT de columna cuando el campo no viene; soloEnviados=true
+// (editar) devuelve solo las claves PRESENTES en el body, para no pisar con el
+// DEFAULT una columna que el admin no toco.
+// Respuesta: { ok:true, valores:{...} } o { ok:false, error:'<mensaje 400>' }.
+function validarCampos064Consumible(body, soloEnviados) {
+  var src = body || {};
+  var out = {};
+  for (var i = 0; i < CAMPOS_064_CONSUMIBLE.length; i++) {
+    var spec = CAMPOS_064_CONSUMIBLE[i];
+    if (soloEnviados && !(spec.campo in src)) continue;
+    var v;
+    if (spec.tipo === 'pct') v = normalizarPct064Consumible(src[spec.campo]);
+    else if (spec.tipo === 'xp') v = normalizarTope064Consumible(src[spec.campo]);
+    else if (spec.tipo === 'bool') v = normalizarBool064Consumible(src[spec.campo]);
+    else v = normalizarSlug064Consumible(src[spec.campo]);
+    if (v === undefined) {
+      var msg;
+      if (spec.tipo === 'pct') msg = spec.campo + ' debe ser un entero entre 0 y 100';
+      else if (spec.tipo === 'xp') msg = spec.campo + ' debe ser un numero mayor o igual a 0';
+      else if (spec.tipo === 'bool') msg = spec.campo + ' debe ser true o false';
+      else msg = spec.campo + ' debe ser un slug ASCII de hasta 60 caracteres ([a-z0-9_:-])';
+      return { ok:false, error: msg };
+    }
+    out[spec.campo] = (v === null) ? spec.def : v;
+  }
+  return { ok:true, valores: out };
+}
+
+// Coherencia del CHECK compuesto de la 064 sobre la PAREJA resultante:
+// bono_pct y bono_tope_xp o los dos a 0 (sin bono) o los dos mayores que 0.
+// Devuelve '' si la pareja es valida; si no, el motivo para el 400.
+function coherenciaBono064Consumible(pct, tope) {
+  var p = Number(pct == null ? 0 : pct);
+  var tp = Number(tope == null ? 0 : tope);
+  if (p === 0 && tp === 0) return '';
+  if (p > 0 && tp > 0) return '';
+  return 'bono_pct y bono_tope_xp van juntos: o los dos a 0 (sin bono) o los dos mayores que 0';
+}
+
+// Coherencia de es_permanente: chk_consumibles_permanente_coherente exige
+// desbloquea_set cuando la carta es permanente. '' si es coherente.
+function coherenciaPermanente064Consumible(esPermanente, desbloqueaSet) {
+  if (esPermanente !== true) return '';
+  if (desbloqueaSet) return '';
+  return 'es_permanente=true exige desbloquea_set no vacio';
+}
+
+// Normaliza las 6 columnas de la 064 en una fila devuelta por Neon (numeric
+// llega como string, smallint como number y boolean como boolean). Si la fila
+// viene de una lista degradada (sin las columnas) se aplican los DEFAULT de
+// columna para que el formulario del admin nunca reciba undefined.
+function normalizarFila064Consumible(fila) {
+  fila.bono_pct = fila.bono_pct == null ? 0 : Number(fila.bono_pct);
+  fila.bono_tope_xp = red2(numXp(fila.bono_tope_xp));
+  fila.es_permanente = fila.es_permanente === true;
+  fila.otorga_carta = fila.otorga_carta || null;
+  fila.desbloquea_set = fila.desbloquea_set || null;
+  fila.premio_set = fila.premio_set === true;
+  return fila;
+}
+
 // == CARTAS DE TERRITORIO (ADR-062, migraciones 040/041) ==================
 // Catalogo administrable cartas_catalogo. El vocabulario de rareza es el
 // mismo de cromos_catalogo y el CHECK de la tabla lo fija: comun|raro|
@@ -875,6 +1016,11 @@ module.exports = async function handler(req, res) {
   // precio_xp aqui solo afecta compras futuras, nunca el historial.
   // Cero Borrado Logico: no existe DELETE; el estado se controla con
   // consumibles_toggle (activo = NOT activo).
+  // Migracion 064 (ADR-120): las 6 columnas de bono global % / set ancestral
+  // (bono_pct, bono_tope_xp, es_permanente, otorga_carta, desbloquea_set,
+  // premio_set) entran en la lista blanca con validacion explicita: pct 0..100,
+  // tope >= 0, booleanos estrictos, slugs ASCII de hasta 60 ([a-z0-9_:-]) y los
+  // 2 CHECK de coherencia validados sobre el resultado de la edicion.
   if (recurso === 'consumibles') {
     if (!auth(req)) return denegar(res, 'admin');
 
@@ -885,14 +1031,24 @@ module.exports = async function handler(req, res) {
       // Degradacion en cascada, del esquema mas nuevo al mas viejo. El catch
       // devuelve null solo ante error; un [] legitimo es truthy y no
       // reintenta:
-      //   1. 057 aplicada: las 8 columnas de efecto de faccion.
-      //   2. 057/035 sin aplicar: catalogo clasico (sin era_exclusiva).
+      //   1. 064 aplicada: las 8 columnas de efecto de la 057 + las 6 de la 064.
+      //   2. 057 aplicada sin 064: solo las 8 columnas de efecto de faccion.
+      //   3. 057/035 sin aplicar: catalogo clasico (sin era_exclusiva).
       var filasC = await sql(
         'SELECT id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, creado_en, '
         + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, '
-        + 'bono_accion, bono_xp_fijo, limite_diario, icono '
+        + 'bono_accion, bono_xp_fijo, limite_diario, icono, '
+        + COLS_064_CONSUMIBLE + ' '
         + 'FROM consumibles ORDER BY activo DESC, precio_xp ASC, clave ASC'
       ).catch(function(){ return null; });
+      if (!filasC) {
+        filasC = await sql(
+          'SELECT id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, creado_en, '
+          + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, '
+          + 'bono_accion, bono_xp_fijo, limite_diario, icono '
+          + 'FROM consumibles ORDER BY activo DESC, precio_xp ASC, clave ASC'
+        ).catch(function(){ return null; });
+      }
       if (!filasC) {
         filasC = await sql(
           'SELECT id, clave, nombre, descripcion, precio_xp, categoria, activo, creado_en '
@@ -913,6 +1069,7 @@ module.exports = async function handler(req, res) {
         c.bono_xp_fijo = red2(numXp(c.bono_xp_fijo));
         c.limite_diario = c.limite_diario == null ? 0 : Number(c.limite_diario);
         c.icono = c.icono || null;
+        normalizarFila064Consumible(c);
         return c;
       });
       return res.status(200).json({ ok:true, data: filasC, total: filasC.length });
@@ -968,23 +1125,55 @@ module.exports = async function handler(req, res) {
       if (icoC === undefined) {
         return res.status(400).json({ ok:false, error:'icono debe ser una entidad HTML ASCII de hasta 24 caracteres' });
       }
+      // Migracion 064 (ADR-120): bono global % y set ancestral. Los 6 campos
+      // se validan con el registro CAMPOS_064_CONSUMIBLE y se escriben
+      // EXPLICITOS campo a campo, con el DEFAULT de columna cuando el campo no
+      // viene (bono_pct/bono_tope_xp 0, booleanos false, slugs NULL). Los 2
+      // CHECK de coherencia se comprueban aqui para responder 400 legible.
+      var c64C = validarCampos064Consumible(body, false);
+      if (!c64C.ok) return res.status(400).json({ ok:false, error: c64C.error });
+      var inco64C = coherenciaBono064Consumible(c64C.valores.bono_pct, c64C.valores.bono_tope_xp);
+      if (inco64C) return res.status(400).json({ ok:false, error: inco64C });
+      var perm64C = coherenciaPermanente064Consumible(c64C.valores.es_permanente, c64C.valores.desbloquea_set);
+      if (perm64C) return res.status(400).json({ ok:false, error: perm64C });
       var existC = await sql('SELECT 1 FROM consumibles WHERE clave=$1 LIMIT 1',[claveN]);
       if (existC.length) {
         return res.status(409).json({ ok:false, error:'Ya existe un consumible con esa clave' });
       }
-      var insC = await sql(
-        'INSERT INTO consumibles (clave, nombre, descripcion, precio_xp, precio_xp_base, categoria, era_exclusiva, '
-        + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, '
-        + 'bono_accion, bono_xp_fijo, limite_diario, icono) '
-        + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) '
-        + 'RETURNING id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, creado_en, '
-        + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, bono_accion, bono_xp_fijo, limite_diario, icono',
-        [claveN, nombreN, descN, precioN, precioN, catN, eraN,
-         facN, entC.valores.nivel_requerido, entC.valores.cargas, entC.valores.duracion_horas,
-         bonoC, bxC, entC.valores.limite_diario, icoC]
-      );
+      // Degradacion: si la 064 (o la 057) no esta aplicada, Neon responde
+      // 42703/42P01 y aqui se devuelve 503 SCHEMA_NOT_MIGRATED explicito en vez
+      // de un 500 ciego (patron BUG-021). Un 23514 de los CHECK se mapea a 400.
+      var insC;
+      try {
+        insC = await sql(
+          'INSERT INTO consumibles (clave, nombre, descripcion, precio_xp, precio_xp_base, categoria, era_exclusiva, '
+          + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, '
+          + 'bono_accion, bono_xp_fijo, limite_diario, icono, '
+          + COLS_064_CONSUMIBLE + ') '
+          + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) '
+          + 'RETURNING id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, creado_en, '
+          + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, bono_accion, bono_xp_fijo, limite_diario, icono, '
+          + COLS_064_CONSUMIBLE,
+          [claveN, nombreN, descN, precioN, precioN, catN, eraN,
+           facN, entC.valores.nivel_requerido, entC.valores.cargas, entC.valores.duracion_horas,
+           bonoC, bxC, entC.valores.limite_diario, icoC,
+           c64C.valores.bono_pct, c64C.valores.bono_tope_xp, c64C.valores.es_permanente,
+           c64C.valores.otorga_carta, c64C.valores.desbloquea_set, c64C.valores.premio_set]
+        );
+      } catch (eIns) {
+        if (esquemaAusente(eIns)) {
+          return res.status(503).json({ ok:false, error:'SCHEMA_NOT_MIGRATED',
+            detalle:'A consumibles le faltan columnas de las migraciones 057/064. Aplicalas en Neon antes de crear consumibles.' });
+        }
+        if (eIns && eIns.code === '23514') {
+          return res.status(400).json({ ok:false, error:'CHECK_VIOLADO',
+            detalle: (eIns && eIns.message) || 'Un CHECK de consumibles rechazo los valores enviados' });
+        }
+        throw eIns;
+      }
       insC[0].precio_xp = red2(numXp(insC[0].precio_xp));
       insC[0].bono_xp_fijo = red2(numXp(insC[0].bono_xp_fijo));
+      normalizarFila064Consumible(insC[0]);
       return res.status(201).json({ ok:true, data: insC[0], mensaje:'Consumible creado' });
     }
 
@@ -1063,19 +1252,68 @@ module.exports = async function handler(req, res) {
         }
         setsC.push('icono=$'+piC++); paramsC.push(icoE);
       }
+      // Migracion 064 (ADR-120): bono global % y set ancestral. Igual que el
+      // bloque 057, solo se tocan las columnas PRESENTES en el body. Los 2
+      // CHECK de coherencia se validan sobre el RESULTADO (el valor enviado o,
+      // si no viene, el que ya tiene la fila): un PATCH parcial podria dejar la
+      // fila invalida. Si la 064 no esta aplicada se responde 503 explicito.
+      var c64E = validarCampos064Consumible(body, true);
+      if (!c64E.ok) return res.status(400).json({ ok:false, error: c64E.error });
+      var claves64E = Object.keys(c64E.valores);
+      if (claves64E.length) {
+        var act64 = await sql(
+          'SELECT bono_pct, bono_tope_xp, es_permanente, desbloquea_set FROM consumibles WHERE id=$1 LIMIT 1',
+          [body.id]
+        ).catch(function(e64){
+          if (esquemaAusente(e64)) return 'SIN_064';
+          throw e64;
+        });
+        if (act64 === 'SIN_064') {
+          return res.status(503).json({ ok:false, error:'SCHEMA_NOT_MIGRATED',
+            detalle:'La migracion 064 no esta aplicada: faltan bono_pct, bono_tope_xp, es_permanente, otorga_carta, desbloquea_set o premio_set en consumibles.' });
+        }
+        if (!act64.length) return res.status(404).json({ ok:false, error:'Consumible no encontrado' });
+        var pct64F = ('bono_pct' in c64E.valores) ? c64E.valores.bono_pct : Number(act64[0].bono_pct || 0);
+        var tope64F = ('bono_tope_xp' in c64E.valores) ? c64E.valores.bono_tope_xp : numXp(act64[0].bono_tope_xp);
+        var inco64E = coherenciaBono064Consumible(pct64F, tope64F);
+        if (inco64E) return res.status(400).json({ ok:false, error: inco64E });
+        var perm64F = ('es_permanente' in c64E.valores) ? c64E.valores.es_permanente : (act64[0].es_permanente === true);
+        var set64F = ('desbloquea_set' in c64E.valores) ? c64E.valores.desbloquea_set : (act64[0].desbloquea_set || null);
+        var perm64E = coherenciaPermanente064Consumible(perm64F, set64F);
+        if (perm64E) return res.status(400).json({ ok:false, error: perm64E });
+        for (var i64 = 0; i64 < claves64E.length; i64++) {
+          setsC.push(claves64E[i64] + '=$' + piC++);
+          paramsC.push(c64E.valores[claves64E[i64]]);
+        }
+      }
       if (!setsC.length) {
-        return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, descripcion, precio_xp, categoria, era_exclusiva, faccion_requerida, nivel_requerido, cargas, duracion_horas, bono_accion, bono_xp_fijo, limite_diario o icono' });
+        return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, descripcion, precio_xp, categoria, era_exclusiva, faccion_requerida, nivel_requerido, cargas, duracion_horas, bono_accion, bono_xp_fijo, limite_diario, icono, bono_pct, bono_tope_xp, es_permanente, otorga_carta, desbloquea_set o premio_set' });
       }
       paramsC.push(body.id);
-      var updC = await sql(
-        'UPDATE consumibles SET '+setsC.join(', ')+' WHERE id=$'+piC
-        + ' RETURNING id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, '
-        + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, bono_accion, bono_xp_fijo, limite_diario, icono',
-        paramsC
-      );
+      var updC;
+      try {
+        updC = await sql(
+          'UPDATE consumibles SET '+setsC.join(', ')+' WHERE id=$'+piC
+          + ' RETURNING id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, '
+          + 'faccion_requerida, nivel_requerido, cargas, duracion_horas, bono_accion, bono_xp_fijo, limite_diario, icono, '
+          + COLS_064_CONSUMIBLE,
+          paramsC
+        );
+      } catch (eUpd) {
+        if (esquemaAusente(eUpd)) {
+          return res.status(503).json({ ok:false, error:'SCHEMA_NOT_MIGRATED',
+            detalle:'A consumibles le faltan columnas de las migraciones 057/064. Aplicalas en Neon antes de editar consumibles.' });
+        }
+        if (eUpd && eUpd.code === '23514') {
+          return res.status(400).json({ ok:false, error:'CHECK_VIOLADO',
+            detalle: (eUpd && eUpd.message) || 'Un CHECK de consumibles rechazo los valores enviados' });
+        }
+        throw eUpd;
+      }
       if (!updC.length) return res.status(404).json({ ok:false, error:'Consumible no encontrado' });
       updC[0].precio_xp = red2(numXp(updC[0].precio_xp));
       updC[0].bono_xp_fijo = red2(numXp(updC[0].bono_xp_fijo));
+      normalizarFila064Consumible(updC[0]);
       return res.status(200).json({ ok:true, data: updC[0], mensaje:'Consumible actualizado' });
     }
 

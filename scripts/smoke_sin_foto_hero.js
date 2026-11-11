@@ -35,6 +35,7 @@ function cargarBuildHTML() {
   };
   function requireStub(nombre) {
     if (nombre === '@neondatabase/serverless') return { neon: neonStub };
+    if (nombre === '../lib/menu.js') return require(path.join(ROOT, 'lib', 'menu.js'));
     return {};
   }
   var consolaSilenciosa = { log: function () {}, error: function () {}, warn: function () {}, info: function () {} };

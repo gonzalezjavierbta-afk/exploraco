@@ -79,8 +79,8 @@ for (var i = 0; i < LAMINAS.length; i++) {
 check('window.CartasArte definido', !!Arte);
 check('RATIO expuesto', !!Arte);
 check('RATIO == 1086/1448 (tolerancia 1e-9)', !!Arte && Math.abs(Arte.RATIO - 0.75) <= 1e-9);
-check('ARTE con 8 claves', !!Arte && Object.keys(Arte.ARTE).length === 8);
-check('EDITORIAL con 8 claves', !!Arte && Object.keys(Arte.EDITORIAL).length === 8);
+check('ARTE con 9 claves', !!Arte && Object.keys(Arte.ARTE).length === 9);
+check('EDITORIAL con 9 claves', !!Arte && Object.keys(Arte.EDITORIAL).length === 9);
 
 // --- 4. Resolucion por clave y por marca ------------------------------
 var cat = Arte && Arte.arteDe({ clave: 'consumible_catalejo_explorador' });
@@ -118,6 +118,19 @@ var skuFuturo = Arte && Arte.arteDe({ clave: 'ancestral_x_futuro' });
 check('arteDe(SKU futuro) resuelve por prefijo de marca',
   !!skuFuturo && skuFuturo.archivo === 'assets/cartas/marca_ancestral.png');
 check('arteDe(SKU futuro).familia == M', !!skuFuturo && skuFuturo.familia === 'M');
+
+// 064: la carta BASE del set Ancestral comparte la lamina de marca y el perfil
+// editorial de 'marca:ancestral' (numero 5, MARCA, M). Se declara explicita.
+var baseAnc = Arte && Arte.arteDe({ clave: 'ancestral_base' });
+check('arteDe(ancestral_base).archivo == marca_ancestral.png',
+  !!baseAnc && baseAnc.archivo === 'assets/cartas/marca_ancestral.png');
+check('arteDe(ancestral_base) == perfil de marca:ancestral',
+  !!baseAnc && baseAnc.numero === 5 && baseAnc.tipo === 'MARCA' && baseAnc.familia === 'M');
+var marcaDirecta = Arte && Arte.arteDe({ clave: 'marca:ancestral' });
+check('ancestral_base y marca:ancestral comparten lamina y perfil',
+  !!baseAnc && !!marcaDirecta && baseAnc.archivo === marcaDirecta.archivo
+  && baseAnc.numero === marcaDirecta.numero && baseAnc.tipo === marcaDirecta.tipo
+  && baseAnc.familia === marcaDirecta.familia);
 
 check('el prefijo no absorbe claves ajenas (consumible_inexistente sigue null)',
   !!Arte && Arte.arteDe({ clave: 'consumible_inexistente' }) === null);

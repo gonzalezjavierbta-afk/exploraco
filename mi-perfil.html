@@ -243,6 +243,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-fac .fac-nombre{flex:1;min-width:0;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff;overflow:hidden;text-overflow:ellipsis}
 .pf-fac .fac-stock{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;color:var(--gold);background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.3);border-radius:999px;padding:1px 7px;white-space:nowrap}
 .pf-fac .fac-desc{font-size:11px;line-height:1.45;color:rgba(255,255,255,.55)}
+/* ADR-120 (064): el bono +% y su tope son el dato que decide la compra. Va en
+   linea propia, por encima de la descripcion, para que se lea antes del texto
+   largo. Cuelga del silo .pf-fac (ADR-004): nada suelto en :root. */
+.pf-fac .fac-bono{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:.4px;color:#22C55E}
 .pf-fac .fac-precio{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:900;color:var(--gold);line-height:1}
 .pf-fac .fac-rent{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:6px 8px;font-size:11px;color:rgba(255,255,255,.62)}
 .pf-fac .fac-neto{font-weight:900;color:#22C55E;white-space:nowrap}
@@ -2898,10 +2902,13 @@ function cargarInventario(uid) {
    (nombreConsumible, fmtXp, esc) y el mismo toast de la pagina (nunca alert).
    Solo es propio lo que el catalogo clasico no tenia: desglose de
    rentabilidad CALCULADO desde cargas x bono_xp_fijo - precio_xp, candado por
-   faccion/nivel/era, stock por clave y efecto vigente con cuenta atras.
-   El GATE no se decide aqui: el motor manda bloqueado + motivo_bloqueo. */
-var PF_FAC_TOPE = 30;
-var PF_FAC_ESTADO = { cat: null, stock: {}, efecto: null, reloj: null };
+   faccion/nivel/era, stock por clave y el estado de efecto POR CARTA.
+   El GATE no se decide aqui: el motor manda bloqueado + motivo_bloqueo.
+   ADR-120 (064): el efecto dejo de ser UNO global. Vive en el mapa
+   capacidades->'consumible_efectos' (una entrada por clave, cooldown de 24 h
+   por carta) y la compra ya no tiene tope de stock: el objeto antiguo
+   'consumible_efecto' se conserva SOLO como lectura de compatibilidad. */
+var PF_FAC_ESTADO = { cat: null, stock: {}, efecto: null, efectos: [], mapa: false, reloj: null };
 /* Codigo -> texto legible. El motor manda la forma larga
    ('FACCION_INSUFICIENTE') y el contrato corto la forma corta ('faccion'):
    las dos caen al mismo texto via pfFacMotivoClave, de modo que un cambio de
@@ -2911,10 +2918,17 @@ var PF_FAC_ERR = {
   NIVEL_INSUFICIENTE: 'Tu nivel todavia no alcanza para este consumible',
   ERA_INSUFICIENTE: 'Este consumible pertenece a otra era',
   LIMITE_DIARIO: 'Alcanzaste el limite diario de este consumible',
-  STOCK_LLENO: 'Ya tienes el maximo de este consumible (' + PF_FAC_TOPE + ')',
   SIN_STOCK: 'No te quedan unidades de este consumible',
-  EFECTO_YA_ACTIVO: 'Ya tienes un bono de faccion vigente: espera a que termine'
+  /* ADR-120 (064): la carta base es un ACCESO permanente (no se usa ni se
+     consume) y la posesion de un set la decide el motor (YA_POSEES). Aqui solo
+     se nombra el estado; ningun acceso se calcula en cliente. */
+  CONSUMIBLE_PERMANENTE: 'Esta carta es un acceso permanente: no se usa ni se consume',
+  YA_POSEES: 'Ya tienes el acceso a este set'
 };
+/* EFECTO_YA_ACTIVO no tiene texto fijo: se refiere a UNA carta concreta
+   (el motor devuelve efecto.clave), asi que lo compone pfFacTxtEfectoActivo.
+   El tope de 30 unidades y su mensaje de stock lleno se retiraron con el bono
+   de 064: la compra es ilimitada y el unico freno es el gate del motor. */
 function pfFacNum(n) {
   var v = Number(n);
   if (!isFinite(v)) v = 0;
@@ -2939,9 +2953,34 @@ function pfFacMotivoClave(motivo) {
 }
 function pfFacErr(codigo, res) {
   var c = String(codigo || '').trim().toUpperCase();
+  /* Los dos codigos que dependen del DATO devuelto se componen, no se copian:
+     EFECTO_YA_ACTIVO nombra la carta que esta activa; YA_POSEES, el set. */
+  if (c === 'EFECTO_YA_ACTIVO') return pfFacTxtEfectoActivo(res);
+  if (c === 'YA_POSEES') return pfFacTxtPosees(res);
   if (PF_FAC_ERR[c]) return PF_FAC_ERR[c];
   if (PF_FAC_ERR[c.replace(/^.*_/, '')]) return PF_FAC_ERR[c.replace(/^.*_/, '')];
   return (res && res.error) ? String(res.error) : 'No se pudo completar la accion';
+}
+/* Nombre publico del set a partir del slug del motor ('ancestral_esencia' ->
+   'Ancestral'). Solo copy: el acceso lo decide el backend. */
+function pfFacSetNombre(set) {
+  var s = String(set || '').trim();
+  if (!s) return '';
+  if (s.indexOf('ancestral') === 0) return 'Ancestral';
+  return s.replace(/_/g, ' ');
+}
+function pfFacTxtEfectoActivo(res) {
+  var ef = (res && res.efecto && typeof res.efecto === 'object') ? res.efecto : null;
+  var clave = String((ef && ef.clave) || (res && res.clave) || '');
+  var nom = clave ? pfFacNombre(clave) : 'esa carta';
+  var bono = pfFacBonoTxt(ef);
+  return 'Ya tienes el bono de ' + nom + ' activo'
+    + (bono ? ' (' + bono + ')' : '') + ': espera a que termine esa carta.';
+}
+function pfFacTxtPosees(res) {
+  var set = String((res && res.desbloquea_set) || '').trim();
+  var nom = pfFacSetNombre(set);
+  return nom ? ('Ya tienes el acceso al set ' + nom) : 'Ya tienes el acceso a este set';
 }
 function pfFacLista() {
   var cat = PF_FAC_ESTADO.cat || {};
@@ -3002,6 +3041,90 @@ function pfFacStock(clave) {
   var n = parseInt(PF_FAC_ESTADO.stock[String(clave || '')], 10);
   return (isFinite(n) && n > 0) ? n : 0;
 }
+/* ---- ESTADO POR CARTA (ADR-120 / 064) ---------------------------------
+   Fuente UNICA: lo que manda el motor. Se lee el mapa
+   capacidades->'consumible_efectos' en las formas que el contrato puede
+   publicar (inv.consumible_efectos, inv.capacidades.consumible_efectos o
+   inv.efectos); si NINGUNA viene, se cae al objeto antiguo inv.efecto, que es
+   el unico que viaja hoy en ?tipo=inventario. Prohibido inventar estado: lo
+   que no llega no se pinta y no se da por activo. */
+function pfFacEfHoras(ef) {
+  var a = Date.parse((ef && ef.activo_desde) ? ef.activo_desde : '');
+  var b = Date.parse((ef && ef.expira_en) ? ef.expira_en : '');
+  if (!isFinite(a) || !isFinite(b) || b <= a) return 0;
+  return Math.round((b - a) / 3600000);
+}
+function pfFacEfNormal(ef, clave) {
+  if (!ef || typeof ef !== 'object') return null;
+  var out = {
+    clave: String(ef.clave || clave || '') || null,
+    expira_en: ef.expira_en || null
+  };
+  var pct = Number(ef.bono_pct);
+  if (isFinite(pct) && pct > 0) out.bono_pct = pct;
+  var tope = Number(ef.bono_tope_xp);
+  if (isFinite(tope) && tope > 0) out.bono_tope_xp = tope;
+  var acum = Number(ef.bono_acumulado_xp);
+  if (isFinite(acum) && acum >= 0 && out.bono_tope_xp) {
+    out.bono_acumulado_xp = acum;
+    out.restante = Math.max(0, out.bono_tope_xp - acum);
+  }
+  var horas = pfFacEfHoras(ef);
+  if (horas > 0) out.duracion_horas = horas;
+  var cargas = parseInt(ef.cargas_restantes, 10);
+  if (isFinite(cargas)) out.cargas_restantes = cargas;
+  var fijo = Number(ef.bono_xp_fijo);
+  if (isFinite(fijo) && fijo > 0) out.bono_xp_fijo = fijo;
+  return out.clave ? out : null;
+}
+function pfFacEfVigente(ef) {
+  if (!ef) return false;
+  if (ef.expira_en) {
+    var fin = Date.parse(ef.expira_en);
+    if (isFinite(fin) && fin <= Date.now()) return false;
+  }
+  if (ef.cargas_restantes !== undefined && !(ef.cargas_restantes > 0)) return false;
+  return true;
+}
+function pfFacEfLista(mapa, esArray) {
+  var out = [];
+  var k;
+  if (esArray) {
+    for (k = 0; k < mapa.length; k++) {
+      var n = pfFacEfNormal(mapa[k], null);
+      if (n && pfFacEfVigente(n)) out.push(n);
+    }
+    return out;
+  }
+  var claves = Object.keys(mapa);
+  for (k = 0; k < claves.length; k++) {
+    var ef = pfFacEfNormal(mapa[claves[k]], claves[k]);
+    if (ef && pfFacEfVigente(ef)) out.push(ef);
+  }
+  return out;
+}
+function pfFacEfectosDe(inv) {
+  if (!inv || typeof inv !== 'object') return [];
+  var mapa = inv.consumible_efectos
+    || (inv.capacidades && inv.capacidades.consumible_efectos)
+    || inv.efectos || null;
+  if (Array.isArray(mapa)) return pfFacEfLista(mapa, true);
+  if (mapa && typeof mapa === 'object') return pfFacEfLista(mapa, false);
+  var leg = pfFacEfNormal(inv.efecto, null);
+  if (leg && pfFacEfVigente(leg)) {
+    leg.legacy = true;
+    return [leg];
+  }
+  return [];
+}
+function pfFacEfectoDe(clave) {
+  var k = String(clave || '');
+  var lista = PF_FAC_ESTADO.efectos || [];
+  for (var i = 0; i < lista.length; i++) {
+    if (String(lista[i].clave || '') === k) return lista[i];
+  }
+  return null;
+}
 function pfFacAcciones(v) {
   if (!v) return [];
   var arr = Array.isArray(v) ? v : String(v).replace(/[{}"]/g, '').split(',');
@@ -3038,6 +3161,21 @@ function pfFacRentabilidad(item) {
     + (neto < 0 ? '\u2212 ' : '+ ') + pfFacNum(Math.abs(neto)) + ' XP neto</span>'
     + '</div>';
 }
+/* Bono +% (064): '+15% XP durante 24 h - tope 400 XP'. Se compone SOLO con lo
+   que trae el dato: bono_pct, bono_tope_xp y duracion_horas (o la ventana
+   activo_desde..expira_en del mapa). Sin bono_pct no hay cifra y el llamador
+   degrada a item.descripcion, que es el texto editorial del catalogo. */
+function pfFacBonoTxt(o) {
+  if (!o) return '';
+  var pct = Number(o.bono_pct);
+  if (!isFinite(pct) || pct <= 0) return '';
+  var txt = '+' + pfFacNum(pct) + '% XP';
+  var horas = parseInt(o.duracion_horas, 10);
+  if (isFinite(horas) && horas > 0) txt += ' durante ' + horas + ' h';
+  var tope = Number(o.bono_tope_xp);
+  if (isFinite(tope) && tope > 0) txt += ' - tope ' + pfFacNum(tope) + ' XP';
+  return txt;
+}
 /* Candado: texto derivado de faccion_requerida / nivel_requerido contra el
    valor ACTUAL que manda el motor (faccion_usuario / nivel_usuario). Reutiliza
    el patron de candado del perfil: chip con el motivo, tarjeta atenuada. */
@@ -3066,32 +3204,41 @@ function pfFacCardHtml(item) {
   var clave = String(item.clave || '');
   var stock = pfFacStock(clave);
   var bloq = !!item.bloqueado;
-  var lleno = stock >= PF_FAC_TOPE;
   var candado = pfFacCandado(item);
-  var conEfecto = !!PF_FAC_ESTADO.efecto;
-  var usarBloq = stock < 1 || conEfecto;
-  var motivoCompra = bloq ? candado
-    : (lleno ? 'Ya tienes el maximo de este consumible (' + PF_FAC_TOPE + ')' : '');
-  var motivoUso = conEfecto ? 'Ya tienes un bono de faccion vigente'
-    : (stock < 1 ? 'No te quedan unidades de este consumible' : '');
+  /* ADR-120 (064): sin tope de stock y con efecto POR CARTA. La compra ya no
+     se frena por unidades; el uso se frena por ESTA carta (cooldown de 24 h
+     por clave: otra carta activa no bloquea) o porque el articulo es acceso
+     permanente (la carta base no se usa). */
+  var ef = pfFacEfectoDe(clave);
+  var perm = item.es_permanente === true;
+  var posee = perm && stock > 0;
+  var usarBloq = stock < 1 || perm || !!ef;
+  var motivoCompra = bloq ? candado : (posee ? PF_FAC_ERR.YA_POSEES : '');
+  var motivoUso = perm ? PF_FAC_ERR.CONSUMIBLE_PERMANENTE
+    : (ef ? pfFacTxtEfectoActivo({ efecto: ef })
+      : (stock < 1 ? PF_FAC_ERR.SIN_STOCK : ''));
   var ops = pfFacAcciones(item.bono_accion);
+  var bono = pfFacBonoTxt(item);
   return '<div class="fac-card' + (bloq ? ' bloqueada' : '') + '">'
     + '<div class="fac-top">'
     + '<span class="fac-ico" aria-hidden="true">' + pfFacIcono(item) + '</span>'
     + '<span class="fac-nombre">' + esc(item.nombre || nombreConsumible(clave)) + '</span>'
     + '<span class="fac-stock" title="Unidades en tu inventario">x' + stock + '</span>'
     + '</div>'
+    + (bono ? '<div class="fac-bono">' + esc(bono) + '</div>' : '')
     + '<div class="fac-desc">' + esc(item.descripcion || '') + '</div>'
     + '<div class="fac-precio">' + pfFacNum(item.precio_xp) + ' XP</div>'
     + pfFacRentabilidad(item)
     + (ops.length ? '<div class="fac-ops">Bono en: ' + esc(ops.join(', ')) + '</div>' : '')
     + (candado ? '<div class="fac-lock"><span aria-hidden="true">\uD83D\uDD12</span>'
         + '<span>' + esc(candado) + '</span></div>' : '')
+    + (posee ? '<div class="fac-lock"><span aria-hidden="true">\u2714</span>'
+        + '<span>' + esc(PF_FAC_ERR.YA_POSEES) + '</span></div>' : '')
     + '<div class="fac-acts">'
     + '<button type="button" class="fac-btn"'
     + ' onclick="pfFacComprar(\'' + esc(clave) + '\',this)"'
-    + (bloq || lleno ? ' disabled title="' + esc(motivoCompra) + '"' : '')
-    + '>' + (lleno && !bloq ? 'Stock lleno' : 'Comprar') + '</button>'
+    + (bloq || posee ? ' disabled title="' + esc(motivoCompra) + '"' : '')
+    + '>Comprar</button>'
     + '<button type="button" class="fac-btn ghost"'
     + ' onclick="pfFacUsar(\'' + esc(clave) + '\',this)"'
     + (usarBloq ? ' disabled title="' + esc(motivoUso) + '"' : '')
@@ -3100,16 +3247,38 @@ function pfFacCardHtml(item) {
     + '</div>';
 }
 function pfFacEfectoHtml() {
-  var ef = PF_FAC_ESTADO.efecto;
-  if (!ef) return '';
-  var cargas = parseInt(ef.cargas_restantes, 10);
-  if (!isFinite(cargas)) cargas = 0;
-  return '<div class="fac-efecto">'
-    + '<span class="fac-efecto-ico" aria-hidden="true">\u26A1</span>'
-    + '<span class="fac-efecto-txt"><b>' + esc(pfFacNombre(ef.clave)) + '</b> activo.'
-    + ' Cargas restantes: <b id="pf-fac-cargas">' + cargas + '</b></span>'
-    + '<span class="fac-reloj" id="pf-fac-reloj">-- h -- m</span>'
-    + '</div>';
+  var lista = PF_FAC_ESTADO.efectos || [];
+  if (!lista.length) return '';
+  /* El id #pf-fac-reloj y el #pf-fac-cargas se conservan (ADR-003): se ponen
+     en la PRIMERA fila que lleva ese dato, que es la unica cuando hay un solo
+     efecto, igual que antes del mapa. */
+  var relojPuesto = false;
+  var cargasPuesto = false;
+  var filas = [];
+  for (var i = 0; i < lista.length; i++) {
+    var ef = lista[i] || {};
+    var partes = '<b>' + esc(pfFacNombre(ef.clave)) + '</b> activo.';
+    var bono = pfFacBonoTxt(ef);
+    if (bono) partes += ' ' + esc(bono) + '.';
+    var cargas = parseInt(ef.cargas_restantes, 10);
+    if (isFinite(cargas)) {
+      var idCargas = '';
+      if (!cargasPuesto) { idCargas = ' id="pf-fac-cargas"'; cargasPuesto = true; }
+      partes += ' Cargas restantes: <b' + idCargas + '>' + cargas + '</b>';
+    }
+    if (ef.restante !== undefined && ef.restante !== null) {
+      partes += ' Restante del tope: <b>' + pfFacNum(ef.restante) + ' XP</b>';
+    }
+    var idReloj = '';
+    if (!relojPuesto) { idReloj = ' id="pf-fac-reloj"'; relojPuesto = true; }
+    filas.push('<div class="fac-efecto">'
+      + '<span class="fac-efecto-ico" aria-hidden="true">\u26A1</span>'
+      + '<span class="fac-efecto-txt">' + partes + '</span>'
+      + '<span class="fac-reloj"' + idReloj
+      + ' data-pf-fin="' + esc(ef.expira_en || '') + '">-- h -- m</span>'
+      + '</div>');
+  }
+  return filas.join('');
 }
 /* ADR-110: este contenedor ya NO pinta catalogo. Muestra el efecto vigente
    (cargas + cuenta atras) y un aviso con enlace al Mercado de Comunidad, que
@@ -3123,32 +3292,46 @@ function pfFacPintar() {
     + ' <a class="fac-aviso-lnk" href="comunidad.html#mercado">Ir al Mercado</a></div>';
   pfFacReloj();
 }
-/* Cuenta atras propia del efecto ('12 h 04 m') sin recargar: un solo
-   intervalo vivo, se mata al re-pintar o al llegar a 0. Al expirar se relee la
-   seccion para que el stock y los botones reflejen el estado real del motor. */
+/* Cuenta atras propia de CADA efecto ('12 h 04 m') sin recargar: un solo
+   intervalo vivo, se mata al re-pintar o cuando ya no queda ninguna fila. Al
+   expirar TODAS se relee la seccion para que stock y botones reflejen el estado
+   real del motor. Los nodos se localizan por data-pf-fin, asi el mapa de
+   efectos POR CARTA no necesita un reloj por carta. */
 function pfFacReloj() {
   if (PF_FAC_ESTADO.reloj) { clearInterval(PF_FAC_ESTADO.reloj); PF_FAC_ESTADO.reloj = null; }
-  var ef = PF_FAC_ESTADO.efecto;
-  if (!ef || !ef.expira_en) return;
-  var fin = Date.parse(ef.expira_en);
-  if (!isFinite(fin)) return;
-  function tic() {
-    var nodo = document.getElementById('pf-fac-reloj');
-    if (!nodo) {
-      if (PF_FAC_ESTADO.reloj) { clearInterval(PF_FAC_ESTADO.reloj); PF_FAC_ESTADO.reloj = null; }
-      return;
-    }
+  var nodos = [];
+  var cont = document.getElementById('pf-fac-tienda');
+  if (!cont || !cont.querySelectorAll) return;
+  nodos = cont.querySelectorAll('[data-pf-fin]');
+  if (!nodos || !nodos.length) return;
+  function pintar(n) {
+    var fin = Date.parse(n.getAttribute('data-pf-fin') || '');
+    if (!isFinite(fin)) { n.textContent = '-- h -- m'; return null; }
     var ms = fin - Date.now();
-    if (ms <= 0) {
-      nodo.textContent = 'expirado';
-      if (PF_FAC_ESTADO.reloj) { clearInterval(PF_FAC_ESTADO.reloj); PF_FAC_ESTADO.reloj = null; }
-      var u = sesion();
-      if (u && u.id) pfFacCargar(u.id);
-      return;
-    }
+    if (ms <= 0) { n.textContent = 'expirado'; return false; }
     var h = Math.floor(ms / 3600000);
     var m = Math.floor((ms % 3600000) / 60000);
-    nodo.textContent = h + ' h ' + (m < 10 ? '0' + m : String(m)) + ' m';
+    n.textContent = h + ' h ' + (m < 10 ? '0' + m : String(m)) + ' m';
+    return true;
+  }
+  function tic() {
+    var presentes = 0;
+    var expiro = false;
+    for (var i = 0; i < nodos.length; i++) {
+      if (!nodos[i] || !nodos[i].parentNode) continue;
+      presentes++;
+      if (pintar(nodos[i]) === false) expiro = true;
+    }
+    if (!presentes) {
+      if (PF_FAC_ESTADO.reloj) { clearInterval(PF_FAC_ESTADO.reloj); PF_FAC_ESTADO.reloj = null; }
+      return;
+    }
+    /* Con una sola fila expirada ya hay estado que releer: el mapa del motor
+       es la fuente y el cliente no lo edita a mano. */
+    if (!expiro) return;
+    if (PF_FAC_ESTADO.reloj) { clearInterval(PF_FAC_ESTADO.reloj); PF_FAC_ESTADO.reloj = null; }
+    var u = sesion();
+    if (u && u.id) pfFacCargar(u.id);
   }
   tic();
   PF_FAC_ESTADO.reloj = setInterval(tic, 30000);
@@ -3156,7 +3339,11 @@ function pfFacReloj() {
 /* ADR-110: el GET pasa por fetchConJwt porque el motor deriva la identidad
    del Bearer; sin el, los gates llegan nulos. Tampoco se pide ya el catalogo
    (?tipo=consumibles): el bloque solo necesita el estado del usuario, y tanto
-   el efecto vigente como el stock salen de ?tipo=inventario. */
+   el efecto vigente como el stock salen de ?tipo=inventario.
+   HUECO CONOCIDO (ADR-120): ese contrato todavia NO publica el mapa
+   capacidades->'consumible_efectos'; solo el objeto antiguo data.efecto. Por
+   eso pfFacEfectosDe conserva el fallback y el bloque muestra UN efecto hasta
+   que el motor exponga el mapa (no se inventa el estado de las demas cartas). */
 function pfFacCargar(uid) {
   var el = document.getElementById('pf-fac-tienda');
   if (!el) return;
@@ -3172,7 +3359,13 @@ function pfFacCargar(uid) {
         return;
       }
       PF_FAC_ESTADO.stock = pfFacStockMap(inv);
-      PF_FAC_ESTADO.efecto = inv.efecto ? inv.efecto : null;
+      /* Mapa por carta si el contrato lo publica; si no, el objeto antiguo.
+         pfFacEfectosDe ya resuelve el orden y no inventa nada. */
+      PF_FAC_ESTADO.mapa = !!(inv.consumible_efectos
+        || (inv.capacidades && inv.capacidades.consumible_efectos)
+        || inv.efectos);
+      PF_FAC_ESTADO.efectos = pfFacEfectosDe(inv);
+      PF_FAC_ESTADO.efecto = PF_FAC_ESTADO.efectos.length ? PF_FAC_ESTADO.efectos[0] : null;
       pfFacPintar();
     })
     .catch(function() {
@@ -3199,7 +3392,10 @@ function pfFacXpSync(res) {
   if (bf && Number(bf.xp) > 0) {
     showToast('+' + pfFacNum(bf.xp) + ' XP de ' + pfFacNombre(bf.clave), '#22C55E');
     var cargas = parseInt(bf.cargas_restantes, 10);
-    if (isFinite(cargas) && PF_FAC_ESTADO.efecto) PF_FAC_ESTADO.efecto.cargas_restantes = cargas;
+    var efFac = pfFacEfectoDe(bf.clave);
+    if (isFinite(cargas) && efFac && efFac.cargas_restantes !== undefined) {
+      efFac.cargas_restantes = cargas;
+    }
   }
 }
 /* Un solo POST para compra y uso: mismo body (usuario_id + clave), mismo
@@ -3232,8 +3428,14 @@ function pfFacPost(tipo, clave, btn, verbo, listo) {
 }
 function pfFacComprar(clave, btn) {
   var item = pfFacItem(clave);
-  if (item && (item.bloqueado || pfFacStock(clave) >= PF_FAC_TOPE)) {
-    showToast(pfFacCandado(item) || 'Ya tienes el maximo de este consumible', '#fcd34d');
+  if (item && item.bloqueado) {
+    showToast(pfFacCandado(item) || 'Bloqueado para tu cuenta', '#fcd34d');
+    return;
+  }
+  /* Acceso permanente ya poseido: el texto se anticipa con el stock real; el
+     veredicto final sigue siendo del motor (409 YA_POSEES). */
+  if (item && item.es_permanente === true && pfFacStock(clave) > 0) {
+    showToast(PF_FAC_ERR.YA_POSEES, '#fcd34d');
     return;
   }
   pfFacPost('comprar_consumible', clave, btn, 'Comprar', function(res) {
@@ -3244,11 +3446,18 @@ function pfFacComprar(clave, btn) {
 }
 function pfFacUsar(clave, btn) {
   if (pfFacStock(clave) < 1) {
-    showToast('No te quedan unidades de este consumible', '#fcd34d');
+    showToast(PF_FAC_ERR.SIN_STOCK, '#fcd34d');
     return;
   }
-  if (PF_FAC_ESTADO.efecto) {
-    showToast('Ya tienes un bono de faccion vigente: espera a que termine', '#fcd34d');
+  var item = pfFacItem(clave);
+  if (item && item.es_permanente === true) {
+    showToast(PF_FAC_ERR.CONSUMIBLE_PERMANENTE, '#fcd34d');
+    return;
+  }
+  /* Cooldown POR CARTA (064): el bono de otra carta no impide usar esta. */
+  var ya = pfFacEfectoDe(clave);
+  if (ya) {
+    showToast(pfFacTxtEfectoActivo({ efecto: ya }), '#fcd34d');
     return;
   }
   pfFacPost('usar_consumible', clave, btn, 'Usar', function() {

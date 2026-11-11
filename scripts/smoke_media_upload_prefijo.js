@@ -47,8 +47,22 @@ check("servidor usa prefijo usuarios/<sub>/", fuenteServidor.indexOf("prefijo = 
 check("servidor usa prefijo publico/destino/", fuenteServidor.indexOf("prefijo = 'publico/destino/';") !== -1);
 check("servidor exige pathname con prefijo + tipo + /",
   fuenteServidor.indexOf("indexOf(prefijo + tipo + '/') !== 0") !== -1);
-check("servidor exige foto + contexto destino en el modo publico",
-  fuenteServidor.indexOf("if (tipo !== 'foto' || String(pl.contexto || '') !== 'destino')") !== -1);
+// La regla del modo publico vive en DOS piezas del mismo bloque:
+//   1) el predicado de tipos que pueden ir a publico/destino/
+//      -> var esMedioPublico = (tipo === 'foto' || ...);
+//   2) el rechazo cuando no hay medio publico o el contexto no es destino
+//      -> if (!esMedioPublico || String(pl.contexto || '') !== 'destino') throw ...
+// Se afirma la DISYUNCION de igualdades (incluida 'foto'), no la lista cerrada,
+// para que anadir tipos (ADR-119 sumo 'documento') no rompa el smoke y para que
+// debilitar el predicado (p.ej. cambiar || por &&, o quitar 'foto') si lo rompa.
+var reMedioPublico = /var esMedioPublico = \(\s*tipo === '[^']+'(?:\s*\|\|\s*tipo === '[^']+')*\s*\);/;
+var mMedioPublico = reMedioPublico.exec(fuenteServidor);
+var medioPublicoOk = !!mMedioPublico && mMedioPublico[0].indexOf("tipo === 'foto'") !== -1;
+var reContextoDestino = /if \(!esMedioPublico \|\| String\(pl\.contexto \|\| ''\) !== 'destino'\) throw blobErrorDe\('SESION_REQUERIDA'\);/;
+var contextoDestinoOk = reContextoDestino.test(fuenteServidor);
+check("servidor exige medio publico + contexto destino en el modo publico",
+  medioPublicoOk && contextoDestinoOk,
+  "esMedioPublico=" + (medioPublicoOk ? "ok" : "NO") + " contextoDestino=" + (contextoDestinoOk ? "ok" : "NO"));
 check("servidor compara usuario_id con el sub del jwt",
   fuenteServidor.indexOf("String(pl.usuario_id) !== String(sesion.sub)") !== -1);
 

@@ -2038,6 +2038,11 @@ async function registrarXpLedger(sql, datos) {
       + ' VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)',
       valoresBase.concat([multOrigen, origenTier, ctxJson])
     );
+    // ADR-120 (064): hook UNICO del bono % de consumibles. Va aqui y no
+    // en calcularXpAcreditado (que solo CALCULA: acreditaria dinero
+    // aunque el caller no persista la accion). Best-effort y sin
+    // propagacion: acreditarBonoGlobal nunca lanza.
+    await acreditarBonoGlobal(sql, d);
   } catch (eLed) {
     if (eLed && eLed.code === '42703') {
       // Migracion 038 pendiente (columnas mult_origen/origen_tier ausentes):
@@ -3320,6 +3325,118 @@ function acreditarInventario(sql, usuarioId, clave, cantidad) {
   );
 }
 
+// ADR-120 (064/065): set al que pertenece un SKU para el premio 4/4.
+// desbloquea_set solo lo lleva el SKU base; los SKU de volumen se resuelven
+// por la carta que otorgan (otorga_carta -> cartas_catalogo.set_slug).
+// Best-effort: null si no hay set o si 064/065 no estan aplicadas.
+function setSlugDeConsumible(sql, clave) {
+  if (!clave) return Promise.resolve(null);
+  return sql(
+    'SELECT COALESCE(k.desbloquea_set, c.set_slug) AS set_slug'
+    + ' FROM consumibles k'
+    + ' LEFT JOIN cartas_catalogo c ON c.id = k.otorga_carta'
+    + ' WHERE k.clave = $1 LIMIT 1',
+    [String(clave)]
+  ).then(function(rows) {
+    if (!rows || !rows.length || !rows[0].set_slug) return null;
+    return String(rows[0].set_slug);
+  }).catch(function(eSet) {
+    console.warn('[interacciones] set del consumible no resuelto: '
+      + (eSet && eSet.message));
+    return null;
+  });
+}
+
+// ADR-120 (065): premio del set completo (4/4) en UNA SOLA sentencia con CTE.
+// El INSERT del canje (ins) y el abono de la unidad en la billetera (ab)
+// cuelgan del RETURNING de ins: si el set esta incompleto, o si el premio ya
+// se otorgo antes, ins vuelve vacio y ab NO escribe (no hay doble abono ni
+// doble premio). La idempotencia de verdad la da el UNIQUE de la 058 sobre
+// canjes_tienda.clave_idempotencia, derivada del set + usuario.
+// El premio real es la fila de canjes_tienda ('premio_set', 0 XP, pendiente):
+// es la orden de entrega del SKU fisico. La unidad abonada en
+// capacidades.consumibles es obligatoria porque consumible_entregar cierra el
+// canje fail-closed contra ese stock (D13).
+// billetera_id puede quedar NULL (LEFT JOIN billeteras): la entrega posterior
+// lo exige, pero el premio no se pierde por no tener billetera aun.
+// Best-effort: el llamador la envuelve en try/catch; nunca revierte la compra
+// ni la entrega ya hechas.
+// Placeholders: $1 usuario uuid, $2 set_slug, $3 cartas exigidas (4).
+async function otorgarPremioSetSiCompleto(sql, usuarioId, setSlug, requeridas) {
+  if (!usuarioId || !setSlug) return null;
+  var slug = String(setSlug);
+  var req = parseInt(requeridas, 10);
+  if (!isFinite(req) || req < 1) req = 4;
+  var rows = await sql(
+    'WITH cuenta AS ('
+    + ' SELECT COUNT(DISTINCT uc.carta_id)::int AS n'
+    + '   FROM usuarios_cartas uc'
+    + '   JOIN cartas_catalogo c ON c.id = uc.carta_id'
+    + '  WHERE uc.usuario_id = $1::uuid'
+    + '    AND c.set_slug = $2::text'
+    + '    AND c.activo = true'
+    + '    AND uc.activo = true'
+    + '    AND uc.cantidad >= 1'
+    + '), prem AS ('
+    + ' SELECT k.id, k.clave, k.marca_id'
+    + '   FROM consumibles k'
+    + '  WHERE k.premio_set = true AND k.activo = true'
+    + '  ORDER BY k.clave ASC LIMIT 1'
+    + '), ins AS ('
+    + '  INSERT INTO canjes_tienda (usuario_id, marca_id, billetera_id,'
+    + '         codigo_publico_snapshot, consumible_id, consumible_clave,'
+    + '         cantidad, precio_xp_unitario, xp_total,'
+    + '         origen, estado, contexto, clave_idempotencia)'
+    + '  SELECT $1::uuid, p.marca_id, w.id, COALESCE(w.codigo_publico, \'\'),'
+    + '         p.id, p.clave, 1, 0, 0,'
+    + '         \'premio_set\', \'pendiente\','
+    + '         jsonb_build_object(\'set_slug\', $2::text, \'premio_set\', p.clave),'
+    + '         \'premio_set:\' || $2::text || \':\' || $1::text'
+    + '    FROM prem p CROSS JOIN cuenta c'
+    + '    LEFT JOIN billeteras w ON w.usuario_id = $1::uuid'
+    + '   WHERE c.n >= $3::int'
+    + '     AND p.marca_id IS NOT NULL'
+    + '  ON CONFLICT (clave_idempotencia) DO NOTHING'
+    + '  RETURNING consumible_clave, cantidad'
+    + '), ab AS ('
+    + '  UPDATE usuarios u SET capacidades ='
+    + '         COALESCE(u.capacidades,\'{}\'::jsonb)'
+    + '      || jsonb_build_object(\'consumibles\','
+    + '           COALESCE(u.capacidades->\'consumibles\',\'{}\'::jsonb)'
+    + '           || jsonb_build_object((SELECT consumible_clave FROM ins),'
+    + '                COALESCE((u.capacidades->\'consumibles\'->>(SELECT consumible_clave FROM ins))::int, 0)'
+    + '                + (SELECT cantidad FROM ins)))'
+    + '   WHERE u.id = $1::uuid'
+    + '     AND EXISTS (SELECT 1 FROM ins)'
+    + '   RETURNING u.xp_total'
+    + ')'
+    + ' SELECT (SELECT count(*) FROM ins)::int AS premio_insertado,'
+    + '        (SELECT count(*) FROM ab)::int  AS abonado,'
+    + '        (SELECT clave FROM prem)        AS premio_clave,'
+    + '        (SELECT ct.estado FROM canjes_tienda ct'
+    + '          WHERE ct.clave_idempotencia = \'premio_set:\' || $2::text'
+    + '            || \':\' || $1::text LIMIT 1) AS premio_estado',
+    [usuarioId, slug, req]
+  );
+  var r0 = (rows && rows.length) ? rows[0] : {};
+  var insertado = parseInt(r0.premio_insertado, 10) || 0;
+  var abonado = parseInt(r0.abonado, 10) || 0;
+  var clave = r0.premio_clave ? String(r0.premio_clave) : null;
+  // OJO: prem siempre devuelve la clave del SKU premio aunque el set este
+  // incompleto. Lo que decide si hay premio es el ESTADO de la fila del canje
+  // (o el INSERT de esta llamada). Sin estado no se informa nada: el set no
+  // se completo o el premio no existe.
+  var estado = r0.premio_estado
+    ? String(r0.premio_estado)
+    : (insertado > 0 ? 'pendiente' : null);
+  if (!estado) return null;
+  return {
+    clave: clave, estado: estado,
+    insertado: insertado, abonado: abonado,
+    set_slug: slug, idempotencia: 'premio_set:' + slug + ':' + String(usuarioId)
+  };
+}
+
 // Regalias pasivas (migracion 037): resuelve el autor de un recurso de
 // media/espacio. Devuelve un uuid en texto o null. Best-effort total:
 // cualquier fallo degrada a null registrando el motivo (nunca lanza,
@@ -4397,6 +4514,75 @@ var MISIONES = [
        .catch(function(){ return false; });
     },
   },
+  // -- Set Ancestral (ADR-120, 064/065) ---------------------------------
+  // Las 4 misiones del set viven en 'general' (evita un acordeon huerfano
+  // en mi-perfil.html) y declaran requiere_set: NO se sirven ni se
+  // evaluan sin el flag capacidades.sets_acceso.ancestral_esencia.
+  // El filtro del GET es de presentacion; el gate de evaluarMisiones es
+  // el de seguridad (sin el, un jugador sin acceso completaria la mision
+  // oculta y cobraria XP real por la accion 'mision').
+  {
+    id: 'mis_ancestral_acceso', grupo: 'general', requiere: [],
+    requiere_set: 'ancestral_esencia',
+    nombre: 'Acceso a la Casa Ancestral', xp: 50,
+    desc: 'Abre la Casa Ancestral con la esencia del set y sella tu pasaporte.',
+    check: function(ctx) { return Promise.resolve(ctx.accesoAncestral === true); },
+  },
+  {
+    id: 'mis_ancestral_guarda', grupo: 'general', requiere: [],
+    requiere_set: 'ancestral_esencia',
+    nombre: 'Guarda un destino con la Casa Ancestral', xp: 60,
+    desc: 'Guarda 3 destinos con la Casa Ancestral activa para abrir tu ruta.',
+    check: function(ctx) {
+      // Guardados ACTIVOS (nunca el contador historico): el tope es 3.
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM interacciones'
+        + ' WHERE usuario_id=$1 AND tipo=\'guardado\' AND activo=true',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && parseInt(r[0].n, 10) >= 3); })
+       .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'mis_ancestral_resena', grupo: 'general', requiere: [],
+    requiere_set: 'ancestral_esencia',
+    nombre: 'Resena desde la Casa Ancestral', xp: 80,
+    desc: 'Publica una resena con foto de un destino ANCESTRAL.',
+    check: function(ctx) {
+      // Resena ACTIVA + al menos una foto ACTIVA del mismo destino: el
+      // "con foto" se comprueba por la interaccion tipo='foto' del mismo
+      // destino (no existe columna de fotos en interacciones; la media
+      // unificada de viajero es tipo='foto').
+      return ctx.sql(
+        'SELECT i.id FROM interacciones i'
+        + ' WHERE i.usuario_id=$1 AND i.tipo=\'resena\' AND i.activo=true'
+        + '   AND i.destino_id IS NOT NULL'
+        + '   AND EXISTS (SELECT 1 FROM interacciones f'
+        + '                WHERE f.usuario_id=$1 AND f.tipo=\'foto\' AND f.activo=true'
+        + '                  AND f.destino_id = i.destino_id)'
+        + ' LIMIT 1',
+        [ctx.usuarioId]
+      ).then(function(r){ return r.length > 0; })
+       .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'mis_ancestral_canje', grupo: 'general', requiere: [],
+    requiere_set: 'ancestral_esencia',
+    nombre: 'Canjea un volumen del set', xp: 100,
+    desc: 'Canjea cualquiera de los 3 volumenes de la Casa Ancestral.',
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT id FROM canjes_tienda'
+        + ' WHERE usuario_id=$1 AND estado=\'entregado\''
+        + '   AND consumible_clave IN'
+        + ' (\'ancestral_pocima_50ml\',\'ancestral_media_375ml\',\'ancestral_botella_750ml\')'
+        + ' LIMIT 1',
+        [ctx.usuarioId]
+      ).then(function(r){ return r.length > 0; })
+       .catch(function(){ return false; });
+    },
+  },
 ];
 
 // -- Catalogo de logros (v5, estilo consola + Upland) ---------------
@@ -4878,6 +5064,200 @@ function ventanaFaccionAbierta(caps) {
   return ef;
 }
 
+// ============================================================
+// ADR-120 (migracion 064): bono PORCENTUAL global de los
+// consumibles de faccion. El estado vive en el MAPA
+// usuarios.capacidades->'consumible_efectos' (una entrada por
+// clave) con la forma { clave, activo_desde, expira_en, bono_pct,
+// bono_tope_xp, bono_acumulado_xp }. El objeto antiguo
+// capacidades.consumible_efecto (un solo efecto) se sigue LEYENDO
+// por compatibilidad: no se migran datos ni se borra nada.
+// El bono se calcula sobre el XP BASE del ledger y se acredita en
+// un asiento propio (bono_consumible_24h, exento), nunca dentro de
+// la accion madre.
+// ============================================================
+
+// Capa 2: allowlist MEDIDA. Solo lo que aparece aqui puede cobrar el
+// bono; una accion no clasificada NO cobra (el default es NEGAR, no
+// conceder: un faucet silencioso no se detecta, un bono que falta si).
+var BONO_APLICA = {
+  voto_media: true, chat_comentario: true, ao_proponer: true, ao_votar: true,
+  ao_checkin: true, plan_crear: true, plan_unirse: true, foto_viajero: true,
+  album_foto: true, album_crear: true, album_foto_autor: true,
+  album_guardado: true, album_guardado_autor: true, compartir: true,
+  spot_atributos: true, publicar_lugar: true, resena_corta: true,
+  resena_larga: true, guardado: true, visita: true, rating: true
+};
+
+// Capa 3: lista negra EXPLICITA por accion. Documenta la semantica y
+// frena un alta accidental en BONO_APLICA. Nombres exactos (sin
+// prefijos dinamicos) mas las 3 familias que el sistema nombra con
+// prefijo. Misiones, logros, referidos, ajustes de admin, compras,
+// mercado y asientos propios NUNCA reciben bono.
+var BONO_EXCLUIDAS = {
+  mision: true, logro: true, referido: true, referidos_directos: true,
+  admin_xp: true, ajuste_xp: true, ajuste_admin: true, compra_consumible: true,
+  bono_faccion_era1: true, bono_consumible_24h: true,
+  dm_nuevo: true, tithe_parche: true, pandilla_reto: true,
+  carta_evento: true, carta_fusion: true, carta_venta_debito: true,
+  carta_venta_credito: true, orden_compra_escrow: true, orden_match_venta: true,
+  mercado_compra: true, mercado_venta: true, mercado_producir: true,
+  contrato_escrow: true, contrato_pago: true, contrato_devolucion: true,
+  reclamar_regalias: true, spot_dividendo_debito: true,
+  spot_dividendo_credito: true, spot_dividendo_manual: true
+};
+
+// Predicado de las 3 capas: exento descartado por el caller, accion
+// desconocida -> false. Nunca lanza.
+function accionConBono(accion) {
+  var a = String(accion || '').trim().toLowerCase();
+  if (!a) return false;
+  if (BONO_EXCLUIDAS[a] === true) return false;
+  return BONO_APLICA[a] === true;
+}
+
+// Ventana ABIERTA de UN efecto de bono: solo expira_en en el futuro
+// (las cargas no existen en este modelo). Mismo criterio de fecha que
+// ventanaFaccionAbierta.
+function ventanaBonoAbierta(ef) {
+  if (!ef || typeof ef !== 'object') return null;
+  var hasta = ef.expira_en ? new Date(ef.expira_en).getTime() : 0;
+  if (!isFinite(hasta) || hasta <= Date.now()) return null;
+  return ef;
+}
+
+// Efecto de bono % VIGENTE: ventana abierta, bono_pct > 0, tope > 0 y
+// acumulado por debajo del tope. Al agotar el tope la entrada se
+// CONSERVA (ADR-003) pero deja de pagar.
+function efectoBonoVigente(ef) {
+  if (!ventanaBonoAbierta(ef)) return null;
+  if (!(numXp(ef.bono_pct) > 0)) return null;
+  if (!(numXp(ef.bono_tope_xp) > 0)) return null;
+  if (numXp(ef.bono_acumulado_xp) >= numXp(ef.bono_tope_xp)) return null;
+  return ef;
+}
+
+// Efecto GANADOR del bono. NO se apilan: con varios activos cuenta el
+// mayor bono_pct y el tope de ESE efecto; el resto no suma. Desempate
+// estable: mas tope restante y, si empatan, la clave menor. El objeto
+// antiguo consumible_efecto participa solo si trae bono_pct y NO trae
+// bono plano (ese ya lo paga consumirBonoFaccion: anti-doble-pago).
+function normalizarBono(ef, clave, slot) {
+  return {
+    clave: String(clave || ''),
+    expira_en: ef.expira_en ? String(ef.expira_en) : '',
+    bono_pct: numXp(ef.bono_pct),
+    bono_tope_xp: red2(numXp(ef.bono_tope_xp)),
+    bono_acumulado_xp: red2(numXp(ef.bono_acumulado_xp)),
+    restante: red2(numXp(ef.bono_tope_xp) - numXp(ef.bono_acumulado_xp)),
+    slot: slot
+  };
+}
+
+function efectoBonoGanador(caps) {
+  if (!caps || typeof caps !== 'object') return null;
+  var mejor = null;
+  function considerar(cand) {
+    if (!cand || !cand.clave) return;
+    if (mejor === null || cand.bono_pct > mejor.bono_pct
+      || (cand.bono_pct === mejor.bono_pct && cand.restante > mejor.restante)
+      || (cand.bono_pct === mejor.bono_pct && cand.restante === mejor.restante
+        && cand.clave < mejor.clave)) {
+      mejor = cand;
+    }
+  }
+  var mapa = caps.consumible_efectos;
+  if (mapa && typeof mapa === 'object' && !Array.isArray(mapa)) {
+    Object.keys(mapa).forEach(function(k) {
+      var ef = mapa[k];
+      if (!efectoBonoVigente(ef)) return;
+      considerar(normalizarBono(ef, (ef.clave ? ef.clave : k), 'mapa'));
+    });
+  }
+  var leg = caps.consumible_efecto;
+  if (efectoBonoVigente(leg) && !(numXp(leg.bono_xp_fijo) > 0)) {
+    var claveLeg = leg.clave ? String(leg.clave) : '';
+    if (claveLeg && !(mapa && typeof mapa === 'object' && mapa[claveLeg])) {
+      considerar(normalizarBono(leg, claveLeg, 'legacy'));
+    }
+  }
+  return mejor;
+}
+
+// Acredita el bono % de UN ledger ya escrito. Se llama desde
+// registrarXpLedger (punto unico: toda acreditacion por codigo pasa
+// por ahi) y NUNCA lanza: el bono jamas puede tumbar el ledger.
+// Un solo UPDATE condicionado por la MISMA fecha leida (texto) y por
+// el tope: 0 filas = no se acredita (jamas se duplica). El asiento
+// hijo es exento y lleva bono_de para cortar la recursion.
+async function acreditarBonoGlobal(sql, d) {
+  if (!d || typeof d !== 'object') return null;
+  if (d.bono_de) return null;
+  if (d.es_exento === true) return null;
+  if (!d.usuario_id) return null;
+  if (!(numXp(d.xp_final) > 0)) return null;
+  if (!accionConBono(d.accion)) return null;
+  try {
+    var caps = await leerCapacidades(sql, d.usuario_id);
+    var gan = efectoBonoGanador(caps);
+    if (!gan) return null;
+    // Bono sobre el XP BASE del ledger (nunca sobre el resultado del
+    // stack), acotado por lo que queda del tope del efecto ganador.
+    var bono = red2(Math.min(numXp(d.xp_base) * gan.bono_pct / 100, gan.restante));
+    if (!(bono > 0)) return null;
+    var upd;
+    if (gan.slot === 'legacy') {
+      upd = await sql(
+        'UPDATE usuarios SET xp_total = xp_total + $2::numeric, '
+        + "capacidades = jsonb_set(COALESCE(capacidades,'{}'::jsonb), "
+        + "ARRAY['consumible_efecto','bono_acumulado_xp'], "
+        + "to_jsonb(COALESCE(NULLIF(capacidades->'consumible_efecto'->>'bono_acumulado_xp','')::numeric,0) + $2::numeric), "
+        + 'true) '
+        + 'WHERE id=$1::uuid '
+        + "AND COALESCE(capacidades->'consumible_efecto'->>'expira_en','') = $3::text "
+        + "AND COALESCE(NULLIF(capacidades->'consumible_efecto'->>'bono_acumulado_xp','')::numeric,0) < $4::numeric "
+        + "RETURNING (capacidades->'consumible_efecto'->>'bono_acumulado_xp') AS bono_acumulado_xp",
+        [d.usuario_id, bono, gan.expira_en, gan.bono_tope_xp]
+      );
+    } else {
+      upd = await sql(
+        'UPDATE usuarios SET xp_total = xp_total + $3::numeric, '
+        + "capacidades = jsonb_set(COALESCE(capacidades,'{}'::jsonb), "
+        + "ARRAY['consumible_efectos', $2::text, 'bono_acumulado_xp'], "
+        + "to_jsonb(COALESCE(NULLIF(capacidades->'consumible_efectos'->$2::text->>'bono_acumulado_xp','')::numeric,0) + $3::numeric), "
+        + 'true) '
+        + 'WHERE id=$1::uuid '
+        + "AND COALESCE(capacidades->'consumible_efectos'->$2::text->>'expira_en','') = $4::text "
+        + "AND COALESCE(NULLIF(capacidades->'consumible_efectos'->$2::text->>'bono_acumulado_xp','')::numeric,0) < $5::numeric "
+        + "RETURNING (capacidades->'consumible_efectos'->$2::text->>'bono_acumulado_xp') AS bono_acumulado_xp",
+        [d.usuario_id, gan.clave, bono, gan.expira_en, gan.bono_tope_xp]
+      );
+    }
+    if (!upd || !upd.length) return null;
+    var acumulado = red2(numXp(upd[0].bono_acumulado_xp));
+    // Asiento PROPIO y exento: xp_base 0 y todo el monto en
+    // bonos_planos (el bono no entra en calcularXpFinal ni en los caps).
+    await registrarXpLedger(sql, {
+      usuario_id: d.usuario_id, accion: 'bono_consumible_24h',
+      xp_base: 0, mult_nivel: 1, mult_stack: 1, mult_final: 1,
+      cap_aplicado: 'ninguno', bonos_planos: bono, xp_final: bono,
+      es_exento: true, bono_de: gan.clave,
+      contexto: {
+        consumible_clave: gan.clave,
+        accion_origen: String(d.accion || ''),
+        bono_pct: gan.bono_pct,
+        bono_acumulado_xp: acumulado
+      }
+    });
+    return { acreditado: true, xp: bono, clave: gan.clave, bono_acumulado_xp: acumulado };
+  } catch (eBonoGlobal) {
+    console.warn('[interacciones] bono global no acreditado ('
+      + (eBonoGlobal && eBonoGlobal.code ? eBonoGlobal.code + ' ' : '')
+      + (eBonoGlobal && eBonoGlobal.message ? eBonoGlobal.message : String(eBonoGlobal)) + ')');
+    return null;
+  }
+}
+
 // Consume UNA carga del efecto de faccion vigente y acredita el bono
 // PLANO de esa accion. ADR-038: NO pasa por calcularXpFinal, NO aplica
 // mult_nivel ni el multiplicador de Origen/lejania (es bono plano).
@@ -4895,6 +5275,13 @@ async function consumirBonoFaccion(sql, usuarioId, accion, ctxExtra) {
   if (!accionOk) return salida;
   try {
     var caps = await leerCapacidades(sql, usuarioId);
+    // ADR-120: la clave vive en el mapa nuevo -> el pago porcentual lo hace
+    // acreditarBonoGlobal (anti-doble-pago). Un efecto plano sellado antes
+    // de 064 se sigue pagando aqui; si la misma clave ya tiene entrada en
+    // el mapa, este helper no paga nada.
+    var efPrevio = (caps && typeof caps === 'object') ? caps.consumible_efecto : null;
+    var clavePrevia = (efPrevio && efPrevio.clave) ? String(efPrevio.clave) : '';
+    if (clavePrevia && caps.consumible_efectos && caps.consumible_efectos[clavePrevia]) return null;
     var ef = efectoFaccionVigente(caps);
     if (!ef) return salida;
     if (accionesBonoFaccion(ef.bono_accion).indexOf(accionOk) === -1) return salida;
@@ -5588,13 +5975,26 @@ function coordsFallbackAutor(sqlFn, usuarioId) {
 // Evalua el catalogo completo para un usuario y persiste lo nuevo que se
 // haya completado. Nunca lanza: un fallo aqui no debe tumbar la accion
 // principal (resena/guardado/visita) que ya se registro con exito.
+// ADR-120 (064): acceso permanente a un set de cartas. El flag vive en
+// usuarios.capacidades->'sets_acceso'-><set_slug> y lo escribe SOLO la
+// compra del consumible base (comprar_consumible, en el mismo UPDATE del
+// cobro). Sin flag no hay acceso: cualquier forma inesperada degrada a
+// false (nunca lanza).
+function tieneAccesoSet(caps, setSlug) {
+  if (!caps || !setSlug) return false;
+  var sets = caps.sets_acceso;
+  if (!sets || typeof sets !== 'object') return false;
+  return !!sets[String(setSlug)];
+}
+
 function evaluarMisiones(sql, usuarioId) {
   return sql(
-    'SELECT xp_total, total_guardados, total_visitas, progreso_misiones FROM usuarios WHERE id=$1',
+    'SELECT xp_total, total_guardados, total_visitas, progreso_misiones, capacidades FROM usuarios WHERE id=$1',
     [usuarioId]
   ).then(function(rows) {
     if (!rows.length) return [];
     var u = rows[0];
+    var capsM = u.capacidades || {};
     var progreso = u.progreso_misiones || {};
     var visitasActivasM = sql(
       'SELECT COUNT(*)::int AS n FROM interacciones WHERE usuario_id=$1 AND tipo=\'visita\' AND activo=true',
@@ -5608,6 +6008,10 @@ function evaluarMisiones(sql, usuarioId) {
       totalGuardados: parseInt(u.total_guardados) || 0,
       totalVisitas: parseInt(u.total_visitas) || 0,
       visitasActivas: visitasActivasM,
+      // ADR-120 (064): capacidades leidas en el mismo SELECT + acceso al
+      // set Ancestral derivado del flag permanente.
+      caps: capsM,
+      accesoAncestral: tieneAccesoSet(capsM, 'ancestral_esencia'),
     };
     var completadas = {};
     Object.keys(progreso).forEach(function(k) {
@@ -5619,6 +6023,11 @@ function evaluarMisiones(sql, usuarioId) {
     MISIONES.forEach(function(m) {
       cadena = cadena.then(function() {
         if (completadas[m.id]) return;
+        // ADR-120 (064): GATE de seguridad del set. Sin acceso, la mision
+        // no se evalua NI se completa (su check podria cumplirse igual y
+        // pagaria XP real por la accion exenta 'mision'). El filtro del
+        // GET es solo presentacion; este es el de seguridad.
+        if (m.requiere_set && !tieneAccesoSet(ctx.caps, m.requiere_set)) return;
         var okRequisitos = m.requiere.every(function(r){ return completadas[r]; });
         if (!okRequisitos) return;
         return m.check(ctx).then(function(cumplida) {
@@ -7377,7 +7786,7 @@ module.exports = async function handler(req, res) {
       // evaluarMisiones() antes de leer el progreso persistido.
       if (tipo === 'misiones' && usuarioId) {
         var usrMis = await sql(
-          'SELECT progreso_misiones FROM usuarios WHERE id=$1',
+          'SELECT progreso_misiones, capacidades FROM usuarios WHERE id=$1',
           [usuarioId]
         );
         if (!usrMis.length)
@@ -7390,10 +7799,19 @@ module.exports = async function handler(req, res) {
           [usuarioId]
         );
         var progresoMisiones = usrMis2[0].progreso_misiones || {};
+        // ADR-120 (064): el filtro del set va sobre el CATALOGO, ANTES de
+        // entregarCatalogo, que whitelistea campos y descarta requiere_set
+        // (H8): filtrar su salida no podria ver el campo. Para quien NO
+        // tiene el set, el payload queda identico al de hoy: mismas
+        // misiones, mismo total, ningun campo nuevo.
+        var misCaps = usrMis[0].capacidades || {};
+        var catalogoMisionesVis = MISIONES.filter(function(m) {
+          return !m.requiere_set || tieneAccesoSet(misCaps, m.requiere_set);
+        });
         // ADR-040 (B, v22): campos ADITIVOS de nivel/gate para el acordeon.
         // gate_nivel y nivel = gate efectivo (catalogo o MISION_GATE_XP);
         // desbloquea ya viaja en la fila base de entregarCatalogo.
-        var resMisiones = entregarCatalogo(MISIONES, progresoMisiones, function(fila, m) {
+        var resMisiones = entregarCatalogo(catalogoMisionesVis, progresoMisiones, function(fila, m) {
           var nivel = nivelDeMisionServidor(m);
           fila.gate_nivel = nivel;
           fila.nivel = nivel;
@@ -7402,7 +7820,7 @@ module.exports = async function handler(req, res) {
           ok: true,
           data: resMisiones.data,
           desbloqueadas: resMisiones.desbloqueados,
-          total: MISIONES.length,
+          total: resMisiones.data.length,
         });
       }
 
@@ -9828,36 +10246,60 @@ module.exports = async function handler(req, res) {
       if (tipo === 'consumibles') {
         var catCons = String(req.query.categoria || '').trim().toLowerCase().slice(0, 30);
         var catalogoConsumibles = [];
+        // Columnas del contrato base (018/035/057). El fragmento se compone
+        // desde UNA sola lista para que el orden no derive entre escalones.
+        var catConsColsBase = 'clave, nombre, descripcion, precio_xp, categoria, era_exclusiva,'
+          + ' faccion_requerida, nivel_requerido, cargas, duracion_horas,'
+          + ' bono_accion, bono_xp_fijo, limite_diario, icono';
+        // Columnas de efecto de la 064 (bono % global, permanencia, set y
+        // carta). Se piden ADEMAS del contrato base, nunca en su lugar: si
+        // la migracion no corrio, la columna no existe y el escalon de abajo
+        // reintenta sin ellas. El orden conserva intactos los dos fragmentos
+        // que los smokes cuentan por texto (ver T1-4 de 057).
+        var catConsCols064 = 'clave, nombre, descripcion, precio_xp, categoria, era_exclusiva,'
+          + ' faccion_requerida, nivel_requerido, cargas, duracion_horas,'
+          + ' bono_pct, bono_tope_xp, es_permanente, desbloquea_set, otorga_carta,'
+          + ' bono_accion, bono_xp_fijo, limite_diario, icono';
+        var catConsCuerpo = ' FROM consumibles'
+          + ' WHERE activo = true AND ($1::text IS NULL OR categoria = $1::text)'
+          + ' ORDER BY precio_xp ASC, clave ASC';
         try {
           catalogoConsumibles = await sql(
-            'SELECT clave, nombre, descripcion, precio_xp, categoria, era_exclusiva,'
-            + ' faccion_requerida, nivel_requerido, cargas, duracion_horas,'
-            + ' bono_accion, bono_xp_fijo, limite_diario, icono FROM consumibles'
-            + ' WHERE activo = true AND ($1::text IS NULL OR categoria = $1::text)'
-            + ' ORDER BY precio_xp ASC, clave ASC',
+            'SELECT ' + catConsCols064 + catConsCuerpo,
             [catCons || null]
           );
-        } catch (eCatCons) {
-          // Degradacion escalonada (cero rotura). Escalon 1: faltan las
-          // columnas de efecto de la 057 -> se reintenta con el contrato
-          // 018/035, que es EXACTAMENTE el comportamiento previo (filtro por
-          // categoria + era_exclusiva). Escalon 2: sin 018/035 -> catalogo
-          // minimo completo (sin filtro, como antes).
-          console.warn('TRACE: GET consumibles sin columnas de efecto 057: ' + (eCatCons && eCatCons.message));
+        } catch (eCatCons064) {
+          // Escalon 0 -> escalon 1: columnas de la 064 ausentes (42703). El
+          // catalogo vuelve EXACTAMENTE al contrato previo y responde.
+          console.warn('TRACE: GET consumibles sin columnas de bono 064: '
+            + (eCatCons064 && eCatCons064.message));
           try {
             catalogoConsumibles = await sql(
-              'SELECT clave, nombre, descripcion, precio_xp, categoria, era_exclusiva FROM consumibles'
-              + ' WHERE activo = true AND ($1::text IS NULL OR categoria = $1::text)'
-              + ' ORDER BY precio_xp ASC, clave ASC',
+              'SELECT ' + catConsColsBase + catConsCuerpo,
               [catCons || null]
             );
-          } catch (eCatCons035) {
-            console.warn('TRACE: GET consumibles sin categoria: ' + (eCatCons035 && eCatCons035.message));
-            catalogoConsumibles = await sql(
-              'SELECT clave, nombre, descripcion, precio_xp FROM consumibles'
-              + ' WHERE activo = true ORDER BY precio_xp ASC, clave ASC',
-              []
-            ).catch(function(){ return []; });
+          } catch (eCatCons) {
+            // Degradacion escalonada (cero rotura). Escalon 2: faltan las
+            // columnas de efecto de la 057 -> se reintenta con el contrato
+            // 018/035, que es EXACTAMENTE el comportamiento previo (filtro por
+            // categoria + era_exclusiva). Escalon 3: sin 018/035 -> catalogo
+            // minimo completo (sin filtro, como antes).
+            console.warn('TRACE: GET consumibles sin columnas de efecto 057: ' + (eCatCons && eCatCons.message));
+            try {
+              catalogoConsumibles = await sql(
+                'SELECT clave, nombre, descripcion, precio_xp, categoria, era_exclusiva FROM consumibles'
+                + ' WHERE activo = true AND ($1::text IS NULL OR categoria = $1::text)'
+                + ' ORDER BY precio_xp ASC, clave ASC',
+                [catCons || null]
+              );
+            } catch (eCatCons035) {
+              console.warn('TRACE: GET consumibles sin categoria: ' + (eCatCons035 && eCatCons035.message));
+              catalogoConsumibles = await sql(
+                'SELECT clave, nombre, descripcion, precio_xp FROM consumibles'
+                + ' WHERE activo = true ORDER BY precio_xp ASC, clave ASC',
+                []
+              ).catch(function(){ return []; });
+            }
           }
         }
         // Era ganada del usuario (ADR-053/ADR-056). ADR-110 R1: la autoridad de
@@ -9918,6 +10360,15 @@ module.exports = async function handler(req, res) {
             ? 24 : (parseInt(c.duracion_horas, 10) || 24);
           c.bono_accion = c.bono_accion || null;
           c.bono_xp_fijo = red2(numXp(c.bono_xp_fijo));
+          // Efecto del contrato 064 (aditivo): bono % con tope, permanencia,
+          // set que desbloquea y carta que otorga. Si la columna no existe
+          // (escalon 1/2/3) todos salen null/false y ninguna fila cambia de
+          // comportamiento respecto al contrato anterior.
+          c.bono_pct = red2(numXp(c.bono_pct));
+          c.bono_tope_xp = red2(numXp(c.bono_tope_xp));
+          c.es_permanente = c.es_permanente === true;
+          c.desbloquea_set = c.desbloquea_set || null;
+          c.otorga_carta = c.otorga_carta || null;
           c.limite_diario = parseInt(c.limite_diario, 10) || 0;
           c.icono = c.icono || null;
           // Bloqueo con prioridad faccion > nivel > era. Mismo contrato que el
@@ -10135,12 +10586,65 @@ module.exports = async function handler(req, res) {
           console.warn('[interacciones] inventario efecto no leido: ' + (eInvEfecto && eInvEfecto.message));
           invEfecto = null;
         }
+        // MAPA de efectos por clave (064): el campo antiguo consumible_efecto
+        // guarda UN SOLO efecto, asi que con 2+ cartas activas el cliente solo
+        // veia una. Se expone el mapa COMPLETO ademas del campo antiguo (que
+        // NO se elimina: compatibilidad), con el mismo shape normalizado del
+        // motor (normalizarBono) mas 'vigente' y 'activo_desde'. Nunca lanza:
+        // una entrada que no sea objeto se omite y el resto sigue.
+        var invEfectosMapa = {};
+        try {
+          var invEfectosCrudo = capsInv.consumible_efectos;
+          if (invEfectosCrudo && typeof invEfectosCrudo === 'object'
+            && !Array.isArray(invEfectosCrudo)) {
+            Object.keys(invEfectosCrudo).forEach(function(k) {
+              var efMapa = invEfectosCrudo[k];
+              if (!efMapa || typeof efMapa !== 'object' || Array.isArray(efMapa)) return;
+              var efNorm = normalizarBono(efMapa, (efMapa.clave ? efMapa.clave : k), 'mapa');
+              efNorm.activo_desde = efMapa.activo_desde ? String(efMapa.activo_desde) : '';
+              efNorm.vigente = !!efectoBonoVigente(efMapa);
+              invEfectosMapa[k] = efNorm;
+            });
+          }
+        } catch (eInvEfectosMapa) {
+          console.warn('[interacciones] inventario mapa de efectos no leido: '
+            + (eInvEfectosMapa && eInvEfectosMapa.message));
+          invEfectosMapa = {};
+        }
+        // sets_acceso (ADR-120 / 065): sets de cartas desbloqueados de forma
+        // permanente. La unica escritora es comprar_consumible y aqui se
+        // expone SOLO LECTURA como mapa set -> { desde, compra_id } para que
+        // el cliente marque "ya lo tienes" y no vuelva a ofrecer la compra.
+        // No se expone en el catalogo publico (solo en el inventario propio).
+        var invSetsAcceso = {};
+        try {
+          var invSetsCrudo = capsInv.sets_acceso;
+          if (invSetsCrudo && typeof invSetsCrudo === 'object'
+            && !Array.isArray(invSetsCrudo)) {
+            Object.keys(invSetsCrudo).forEach(function(k) {
+              var invSet = invSetsCrudo[k];
+              if (!invSet || typeof invSet !== 'object' || Array.isArray(invSet)) return;
+              invSetsAcceso[k] = {
+                desde: invSet.desde ? String(invSet.desde) : null,
+                compra_id: invSet.compra_id ? String(invSet.compra_id) : null,
+              };
+            });
+          }
+        } catch (eInvSets) {
+          console.warn('[interacciones] inventario sets_acceso no leido: '
+            + (eInvSets && eInvSets.message));
+          invSetsAcceso = {};
+        }
         return res.status(200).json({
           ok: true,
           data: {
             consumibles: inventarioCons,
             stock: invStock,
             efecto: invEfecto,
+            capacidades: {
+              consumible_efectos: invEfectosMapa,
+              sets_acceso: invSetsAcceso,
+            },
             nivel: invNivel.nivel,
             xp_total: invXp,
             era: invEra,
@@ -14046,6 +14550,25 @@ module.exports = async function handler(req, res) {
         }
         if (!ccCons.length)
           return res.status(503).json({ ok: false, error: 'Consumibles no disponibles (migracion 010 pendiente?)' });
+        // ADR-120 (064): columnas del set Ancestral. Consulta propia con
+        // try/catch (mismo patron que el catalogo de usar_consumible): si la
+        // 064 no esta aplicada, no hay desbloquea_set ni otorga_carta y la
+        // compra se comporta exactamente como antes (cero regresion).
+        var ccSetCols = null;
+        try {
+          var ccSetRows = await sql(
+            'SELECT desbloquea_set, otorga_carta FROM consumibles WHERE id=$1::uuid LIMIT 1',
+            [ccCons[0].id]
+          );
+          if (ccSetRows && ccSetRows.length) ccSetCols = ccSetRows[0];
+        } catch (eCcSet) {
+          console.warn('[interacciones] comprar_consumible set no leido: '
+            + (eCcSet && eCcSet.message));
+        }
+        var ccSetSlug = (ccSetCols && ccSetCols.desbloquea_set)
+          ? String(ccSetCols.desbloquea_set) : null;
+        var ccCartaId = (ccSetCols && ccSetCols.otorga_carta)
+          ? String(ccSetCols.otorga_carta) : null;
         // Descuento del nodo 5 del Arbol de Clases (WP-4): 10% si el
         // usuario alcanzo el nodo 5 de una rama cuyo efecto descuenta la
         // categoria del consumible. Si el calculo degrada, no hay
@@ -14124,19 +14647,10 @@ module.exports = async function handler(req, res) {
         if (ccClave === 'amuleto_x2' && (parseInt(ccCaps.multiplicador_x2_usos, 10) || 0) > 0)
           return res.status(409).json({ ok: false, error: 'Ya tienes un amuleto x2 activo' });
         var ccNivelAnt = calcularNivelLocal(ccXp).nivel;
-        // Gate 7 (migracion 057): STOCK. Solo categoria 'faccion': si el stock
-        // de esa clave en capacidades->'consumibles' ya llego al tope de 30 no
-        // se cobra ni se incrementa.
-        var ccStockTope = 30;
-        var ccStockAct = parseInt((ccCaps.consumibles || {})[ccClave], 10) || 0;
-        // Normalizado (mismo patron que usar_consumible): el predicado de
-        // stock del WHERE no depende del casing que traiga la fila.
-        var ccEsFaccion = String(ccCategoria || '').trim().toLowerCase() === 'faccion';
-        if (ccCategoria === 'faccion' && ccStockAct >= ccStockTope)
-          return res.status(409).json({
-            ok: false, error: 'STOCK_LLENO',
-            stock_actual: ccStockAct, stock_maximo: ccStockTope
-          });
+        // ADR-120 (064): SIN tope de stock. Se retira el tope de 30 y su
+        // pre-chequeo STOCK_LLENO: la compra es ILIMITADA (el set de 4
+        // cartas y las cartas base conviven en el mismo inventario) y el
+        // precio es la unica defensa. El inventario solo se INCREMENTA.
         // Resta atomica + merge del inventario (nunca deja xp negativo:
         // el WHERE de disponible >= $1 protege la escritura).
         // El incremento de stock va DENTRO de este mismo UPDATE, con la misma
@@ -14145,38 +14659,106 @@ module.exports = async function handler(req, res) {
         // aparte a actualizarCapacidad porque toma un valor literal y
         // reemplazaria el objeto entero de consumibles (rompe ADR-003 y abre
         // carrera); esta forma es el incremento en UNA sola operacion.
-        // TOCTOU (tope de stock 30): el pre-chequeo de arriba es solo una
-        // cortesia; el tope REAL va en el WHERE. $4 lleva el tope cuando la
-        // categoria es 'faccion' y NULL en cualquier otra (predicado inerte:
-        // $4::int IS NULL). Se reutiliza $2 como clave, sin placeholders
-        // nuevos de clave ni renumeracion: siguen siendo 4 placeholders y 4
-        // parametros en el mismo orden.
+        // ADR-120 (064 + ADR-003): COBRO + FLAG DEL SET + LEDGER en UNA SOLA
+        // sentencia con CTE. El CTE g genera el id de la compra ANTES del
+        // INSERT (compra_consumibles.id es uuid DEFAULT gen_random_uuid()),
+        // asi el flag capacidades.sets_acceso[<set>] queda auditable con
+        // compra_id sin un segundo UPDATE y sin RETURNING id.
+        // La CARRERA del flag va en el WHERE (no en un pre-chequeo TOCTOU):
+        // si el set ya esta en sets_acceso, 0 filas y no se cobra.
+        // El CTE ins CUELGA de cobro (patron H26): sin cobro no hay fila de
+        // ledger. Se retira el par cobro/ledger en dos pasos.
+        // Placeholders: $1 precio, $2 clave, $3 usuario, $4 desbloquea_set
+        // (o null), $5 desde ISO (o null), $6 consumible_id uuid. Ninguno
+        // cambia de sitio: $1/$2/$3 conservan su orden historico.
+        var ccDesde = new Date().toISOString();
         var ccUpd = await sql(
-          'UPDATE usuarios SET xp_total = xp_total - $1,'
-          + " capacidades = COALESCE(capacidades,'{}'::jsonb)"
-          + " || jsonb_build_object('consumibles', COALESCE(capacidades->'consumibles','{}'::jsonb)"
-          + ' || jsonb_build_object($2, COALESCE((capacidades->\'consumibles\'->>$2)::int, 0) + 1))'
-          + ' WHERE id=$3 AND xp_total >= $1'
-          + ' AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $1'
-          + ' AND ($4::int IS NULL'
-          + ' OR COALESCE((capacidades->\'consumibles\'->>$2)::int, 0) < $4::int)'
-          + ' RETURNING xp_total',
-          [ccPrecio, ccClave, usuarioId2, ccEsFaccion ? ccStockTope : null]
+          'WITH g AS (SELECT gen_random_uuid() AS cid)'
+          + ', cobro AS ('
+          + '    UPDATE usuarios u SET'
+          + '      xp_total = u.xp_total - $1,'
+          + "      capacidades = COALESCE(u.capacidades,'{}'::jsonb)"
+          + "        || jsonb_build_object('consumibles',"
+          + "             COALESCE(u.capacidades->'consumibles','{}'::jsonb)"
+          + '             || jsonb_build_object($2::text,'
+          + "                  COALESCE((u.capacidades->'consumibles'->>$2::text)::int, 0) + 1))"
+          + "        || CASE WHEN $4::text IS NULL THEN '{}'::jsonb"
+          + "                ELSE jsonb_build_object('sets_acceso',"
+          + "                     COALESCE(u.capacidades->'sets_acceso','{}'::jsonb)"
+          + '                     || jsonb_build_object($4::text, jsonb_build_object('
+          + "                          'desde', $5::text, 'origen', 'compra',"
+          + "                          'compra_id', g.cid, 'consumible', $2::text,"
+          + "                          'xp_pagado', $1)))"
+          + '           END'
+          + '      FROM g'
+          + '     WHERE u.id = $3'
+          + '       AND u.xp_total >= $1'
+          + '       AND GREATEST(u.xp_total - COALESCE(u.xp_gastado_sinks, 0), 0) >= $1'
+          + '       AND ($4::text IS NULL'
+          + "            OR NOT (COALESCE(u.capacidades->'sets_acceso','{}'::jsonb) ? $4::text))"
+          + '     RETURNING u.xp_total, u.capacidades, g.cid'
+          + '), ins AS ('
+          + '    INSERT INTO compra_consumibles (id, usuario_id, consumible_id, xp_pagado)'
+          + '    SELECT cobro.cid, $3, $6::uuid, $1 FROM cobro'
+          + '    RETURNING id'
+          + ')'
+          + ' SELECT (SELECT count(*) FROM cobro)::int            AS cobrado,'
+          + '        (SELECT cid::text FROM cobro LIMIT 1)        AS compra_id,'
+          + '        (SELECT xp_total FROM cobro LIMIT 1)         AS xp_total',
+          [ccPrecio, ccClave, usuarioId2, ccSetSlug, ccDesde, ccCons[0].id]
         ).catch(function(eCcUpd){
           console.warn('[interacciones] comprar_consumible UPDATE no ejecutado: '
             + (eCcUpd && eCcUpd.message));
           return [];
         });
-        // 0 filas = disponible insuficiente o (carrera) stock ya en el tope:
-        // el pre-chequeo de stock cubre el caso no concurrente, y el WHERE
-        // lo cubre siempre. Se conserva el texto historico del contrato.
-        if (!ccUpd.length)
+        // 0 filas = no se cobro (el WHERE es la defensa, no un pre-chequeo).
+        // El texto del 409 se elige con un SELECT capacidades POSTERIOR y
+        // SOLO diagnostico: ese SELECT nunca decide si se cobra.
+        if (!ccUpd.length || !(parseInt(ccUpd[0].cobrado, 10) > 0)) {
+          var ccDiagCaps = await leerCapacidades(sql, usuarioId2);
+          var ccDiagSets = (ccDiagCaps && ccDiagCaps.sets_acceso) ? ccDiagCaps.sets_acceso : {};
+          if (ccSetSlug && ccDiagSets[ccSetSlug])
+            return res.status(409).json({
+              ok: false, error: 'YA_POSEES', desbloquea_set: ccSetSlug
+            });
           return res.status(409).json({ ok: false, error: 'XP insuficiente para la compra' });
-        // Ledger append-only
-        await sql(
-          'INSERT INTO compra_consumibles (usuario_id, consumible_id, xp_pagado) VALUES ($1,$2,$3)',
-          [usuarioId2, ccCons[0].id, ccPrecio]
-        ).catch(function(){});
+        }
+        var ccCompraId = ccUpd[0].compra_id ? String(ccUpd[0].compra_id) : null;
+        // Efecto post-cobro TOLERANTE A FALLO (nunca revierte la compra ya
+        // cobrada): entrega de la carta del set. Upsert idempotente por la PK
+        // de 3 columnas; S-15 lo repara si esta escritura falla.
+        var ccCartaOk = false;
+        if (ccCartaId) {
+          try {
+            await sql(
+              'INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo)'
+              + " VALUES ($1::uuid, $2::text, 'base', 1, true)"
+              + ' ON CONFLICT (usuario_id, carta_id, variante)'
+              + ' DO UPDATE SET cantidad = usuarios_cartas.cantidad + 1, activo = true',
+              [usuarioId2, ccCartaId]
+            );
+            ccCartaOk = true;
+          } catch (eCcCarta) {
+            console.warn('[interacciones] comprar_consumible carta no otorgada: '
+              + (eCcCarta && eCcCarta.message) + ' compra_id=' + String(ccCompraId));
+          }
+        }
+        // ADR-120 (065): premio 4/4 del set. Se evalua DESPUES de entregar la
+        // carta (la 4a compra es la que puede completar el set) y es
+        // best-effort: si falla, la compra ya cobrada NO se revierte. El slug
+        // se resuelve por desbloquea_set o por la carta del SKU, porque los
+        // SKU de volumen no llevan desbloquea_set.
+        var ccPremioSet = null;
+        try {
+          var ccPremioSlug = ccSetSlug || await setSlugDeConsumible(sql, ccClave);
+          if (ccPremioSlug) {
+            ccPremioSet = await otorgarPremioSetSiCompleto(
+              sql, usuarioId2, ccPremioSlug, 4);
+          }
+        } catch (eCcPremio) {
+          console.warn('[interacciones] comprar_consumible premio set no evaluado: '
+            + (eCcPremio && eCcPremio.message) + ' compra_id=' + String(ccCompraId));
+        }
         var ccXpNuevo = numXp(ccUpd[0].xp_total);
         var ccNivelNuevo = calcularNivelLocal(ccXpNuevo).nivel;
         // ADR-053 (v25): las COMPRAS restan XP -> fila EXENTA con xp_final
@@ -14196,6 +14778,19 @@ module.exports = async function handler(req, res) {
           nivel_anterior: ccNivelAnt,
           nivel_nuevo: ccNivelNuevo,
           bajo_nivel: ccNivelNuevo < ccNivelAnt,
+          // ADR-120 (064): campos ADITIVOS del set Ancestral. El resto del
+          // contrato (los 7 campos) queda intacto.
+          otorga_carta: ccCartaId,
+          desbloquea_set: ccSetSlug,
+          carta_otorgada: ccCartaOk,
+          acceso_set: ccSetSlug,
+          // ADR-120 (065): premio 4/4 real. Se informa cuando el CTE lo
+          // acaba de entregar (estado 'pendiente') o cuando ya existia
+          // (p. ej. 'entregado'); null si el set no esta completo o el SKU
+          // no pertenece a ningun set.
+          premio_set: (ccPremioSet && ccPremioSet.clave)
+            ? { clave: ccPremioSet.clave, estado: ccPremioSet.estado || 'pendiente' }
+            : null,
         });
       }
 
@@ -14231,6 +14826,115 @@ module.exports = async function handler(req, res) {
         } catch (eUcFac) {
           console.warn('[interacciones] usar_consumible catalogo de faccion no leido: '
             + (eUcFac && eUcFac.message));
+        }
+        // ADR-120 (064): catalogo del bono PORCENTUAL global. Consulta
+        // propia con try/catch (mismo patron que el SELECT de faccion): si
+        // 064 no esta aplicada, ucBonoCat queda null y el flujo sigue
+        // exactamente como antes. Es tambien el ucNew de la spec 2.3
+        // (es_permanente + bono_pct + bono_tope_xp + duracion_horas):
+        // una sola consulta cubre los dos usos.
+        var ucBonoCat = null;
+        try {
+          var ucBonoRows = await sql(
+            'SELECT es_permanente, bono_pct, bono_tope_xp, duracion_horas'
+            + ' FROM consumibles WHERE id=$1::uuid LIMIT 1',
+            [ucCons[0].id]
+          );
+          if (ucBonoRows && ucBonoRows.length) ucBonoCat = ucBonoRows[0];
+        } catch (eUcBono) {
+          console.warn('[interacciones] usar_consumible catalogo de bono no leido: '
+            + (eUcBono && eUcBono.message));
+        }
+        // ADR-120 (064): CANDADO de la carta/base permanente. Va ANTES de
+        // cualquier rama, porque un flag en JSONB no puede frenar el
+        // descuento de stock de las ramas clasicas: el candado tiene que
+        // estar en el dato del catalogo, que es lo que la rama lee.
+        if (ucBonoCat && ucBonoCat.es_permanente === true)
+          return res.status(409).json({
+            ok: false, error: 'CONSUMIBLE_PERMANENTE', clave: ucClave
+          });
+        // Rama del bono %: PREFERENTE sobre categoria='faccion' (esa rama
+        // se queda como via de rollback y de efectos planos legacy).
+        if (ucBonoCat && numXp(ucBonoCat.bono_pct) > 0) {
+          if (ucQty < 1)
+            return res.status(409).json({ ok: false, error: 'SIN_STOCK' });
+          var ucBonoPct = red2(numXp(ucBonoCat.bono_pct));
+          var ucBonoTope = red2(numXp(ucBonoCat.bono_tope_xp));
+          var ucBonoHoras = parseInt(ucBonoCat.duracion_horas, 10);
+          if (!isFinite(ucBonoHoras) || ucBonoHoras < 1) ucBonoHoras = 24;
+          var ucBonoAhoraMs = Date.now();
+          var ucBonoActivo = new Date(ucBonoAhoraMs).toISOString();
+          var ucBonoExpira = new Date(ucBonoAhoraMs + (ucBonoHoras * 3600000)).toISOString();
+          var ucBonoEntrada = {
+            clave: ucClave,
+            activo_desde: ucBonoActivo,
+            expira_en: ucBonoExpira,
+            bono_pct: ucBonoPct,
+            bono_tope_xp: ucBonoTope,
+            bono_acumulado_xp: 0
+          };
+          // ATOMICO (ADR-003): stock y sello de la entrada del MAPA en el
+          // MISMO UPDATE, con merge jsonb_build_object sobre COALESCE
+          // (nunca se reemplaza capacidades entero). La VENTANA de reuso va
+          // en el WHERE, no en un pre-chequeo (seria TOCTOU), y mira SOLO
+          // la MISMA clave: otra clave si se puede activar porque el mapa
+          // es aditivo y no se pisa. Todos los expira_en de este mapa los
+          // escribe este codigo en ISO (24 caracteres), luego la
+          // comparacion lexicografica de texto es exacta. 0 filas -> 409.
+          var ucBonoUpd = await sql(
+            'UPDATE usuarios SET capacidades = '
+            + "COALESCE(capacidades,'{}'::jsonb)"
+            + " || jsonb_build_object('consumibles',"
+            + "   COALESCE(capacidades->'consumibles','{}'::jsonb)"
+            + "   || jsonb_build_object($2::text,"
+            + "        COALESCE(NULLIF(capacidades->'consumibles'->>$2::text,'')::int,0) - 1),"
+            + "   'consumible_efectos',"
+            + "   COALESCE(capacidades->'consumible_efectos','{}'::jsonb)"
+            + "   || jsonb_build_object($2::text, $4::jsonb))"
+            + ' WHERE id=$1::uuid'
+            + " AND COALESCE(NULLIF(capacidades->'consumibles'->>$2::text,'')::int,0) >= 1"
+            + " AND COALESCE(capacidades->'consumible_efectos'->$2::text->>'expira_en','') <= $3::text"
+            + " AND NOT (COALESCE(capacidades->'consumible_efecto'->>'clave','') = $2::text"
+            + "   AND COALESCE(capacidades->'consumible_efecto'->>'expira_en','') > $3::text)"
+            + ' RETURNING capacidades',
+            [usuarioId2, ucClave, ucBonoActivo, JSON.stringify(ucBonoEntrada)]
+          );
+          if (!ucBonoUpd || !ucBonoUpd.length) {
+            // Diagnostico POSTERIOR y solo informativo: ningun pre-chequeo
+            // decide si se descuenta stock.
+            var ucBonoDiag = await leerCapacidades(sql, usuarioId2);
+            var ucBonoPrev = null;
+            if (ucBonoDiag && ucBonoDiag.consumible_efectos) {
+              ucBonoPrev = ucBonoDiag.consumible_efectos[ucClave] || null;
+            }
+            if (!ucBonoPrev && ucBonoDiag && ucBonoDiag.consumible_efecto
+              && String(ucBonoDiag.consumible_efecto.clave || '') === ucClave) {
+              ucBonoPrev = ucBonoDiag.consumible_efecto;
+            }
+            if (ucBonoPrev && ventanaBonoAbierta(ucBonoPrev))
+              return res.status(409).json({
+                ok: false, error: 'EFECTO_YA_ACTIVO',
+                efecto: {
+                  clave: ucClave,
+                  expira_en: ucBonoPrev.expira_en || null,
+                  bono_pct: numXp(ucBonoPrev.bono_pct),
+                  bono_tope_xp: red2(numXp(ucBonoPrev.bono_tope_xp)),
+                  bono_acumulado_xp: red2(numXp(ucBonoPrev.bono_acumulado_xp))
+                }
+              });
+            return res.status(409).json({ ok: false, error: 'SIN_STOCK' });
+          }
+          // Ledger append-only, DESPUES y condicionado a que el UPDATE
+          // escribio (nunca antes: si el sello no entra, no hay rastro).
+          await sql(
+            'INSERT INTO consumo_consumibles (usuario_id, consumible_id, efecto_detalle)'
+            + ' VALUES ($1,$2,$3::jsonb)',
+            [usuarioId2, ucCons[0].id, JSON.stringify(ucBonoEntrada)]
+          ).catch(function(eUcBonoIns){
+            console.warn('[interacciones] consumo_consumibles (bono) no registrado: '
+              + (eUcBonoIns && eUcBonoIns.message));
+          });
+          return res.status(200).json({ ok: true, efecto: ucBonoEntrada });
         }
         if (ucFacCat && String(ucFacCat.categoria || '').toLowerCase() === 'faccion') {
           if (ucQty < 1)
@@ -16923,6 +17627,28 @@ module.exports = async function handler(req, res) {
         }
 
         var ceR0 = ceRes[0] || {};
+        // ADR-120 (065): el premio 4/4 se evalua tras una entrega REAL (cierre
+        // del premio o canje de mostrador), nunca tras un duplicado ni tras
+        // una carrera perdida. Best-effort: la entrega ya hecha NO se revierte
+        // y el CTE es idempotente por set + usuario.
+        var ceEntrego = (Number(ceR0.premio_cerrado) === 1)
+          || (Number(ceR0.creado) === 1 && Number(ceR0.descontado) === 1);
+        if (ceEntrego) {
+          try {
+            var cePremioSlug = await setSlugDeConsumible(sql, ceClave);
+            if (cePremioSlug) {
+              var cePremioRes = await otorgarPremioSetSiCompleto(
+                sql, ceUid, cePremioSlug, 4);
+              if (cePremioRes && cePremioRes.insertado) {
+                console.info('[interacciones] consumible_entregar premio set '
+                  + cePremioSlug + ' otorgado clave=' + String(cePremioRes.clave));
+              }
+            }
+          } catch (eCePremio) {
+            console.warn('[interacciones] consumible_entregar premio set no evaluado: '
+              + (eCePremio && eCePremio.message));
+          }
+        }
         // Cierre del premio semanal sobre SU MISMA fila: no se crea canje de
         // mostrador, pero SI se descuenta usuarios.capacidades (D13), porque
         // el premio se acredito ahi al otorgarse y el cliente se lleva el

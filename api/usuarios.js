@@ -993,26 +993,36 @@ module.exports = async (req, res) => {
           // El LEFT JOIN LATERAL + jsonb_agg garantiza UNA fila por carta: un
           // JOIN plano por carta_id multiplicaba filas desde la 061 (una fila
           // por variante base/shiny).
-          cmCartas = await sql(
-            'SELECT c.id, c.nombre, c.set_slug, c.rareza, c.nivel_gate, c.es_evento,'
-            + ' c.imagen_url, c.emisor_tipo, c.emisor_id, c.marca_id,'
-            + ' m.nombre AS marca_nombre, c.descripcion, c.stats_json,'
-            + ' c.es_canjeable_qr, c.fusionable,'
-            + ' COALESCE(uc.inv, \'[]\'::jsonb) AS variantes'
-            + ' FROM cartas_catalogo c'
-            + ' LEFT JOIN marcas m ON m.id = c.marca_id'
-            + ' LEFT JOIN LATERAL ('
-            + '   SELECT jsonb_agg(jsonb_build_object('
-            + '     \'variante\', u2.variante, \'cantidad\', u2.cantidad,'
-            + '     \'en_museo\', u2.en_museo, \'orden_museo\', u2.orden_museo,'
-            + '     \'activa\', u2.activo) ORDER BY u2.variante) AS inv'
-            + '   FROM usuarios_cartas u2'
-            + '   WHERE u2.usuario_id = $1 AND u2.carta_id = c.id'
-            + ' ) uc ON true'
-            + ' WHERE c.activo = true'
-            + ' ORDER BY c.set_slug ASC, c.nivel_gate ASC NULLS LAST, c.id ASC',
-            [cmId]
-          );
+          // ADR-120 (065): set_coleccion marca las cartas del set Ancestral.
+          // Va con reintento degradado: sin la 065 (42703) se repite la
+          // consulta sin la columna y el contrato historico queda intacto.
+          var cmSqlCartas = function (conSet) {
+            return 'SELECT c.id, c.nombre, c.set_slug, c.rareza, c.nivel_gate, c.es_evento,'
+              + ' c.imagen_url, c.emisor_tipo, c.emisor_id, c.marca_id,'
+              + ' m.nombre AS marca_nombre, c.descripcion, c.stats_json,'
+              + ' c.es_canjeable_qr, c.fusionable,'
+              + (conSet ? ' c.set_coleccion,' : '')
+              + ' COALESCE(uc.inv, \'[]\'::jsonb) AS variantes'
+              + ' FROM cartas_catalogo c'
+              + ' LEFT JOIN marcas m ON m.id = c.marca_id'
+              + ' LEFT JOIN LATERAL ('
+              + '   SELECT jsonb_agg(jsonb_build_object('
+              + '     \'variante\', u2.variante, \'cantidad\', u2.cantidad,'
+              + '     \'en_museo\', u2.en_museo, \'orden_museo\', u2.orden_museo,'
+              + '     \'activa\', u2.activo) ORDER BY u2.variante) AS inv'
+              + '   FROM usuarios_cartas u2'
+              + '   WHERE u2.usuario_id = $1 AND u2.carta_id = c.id'
+              + ' ) uc ON true'
+              + ' WHERE c.activo = true'
+              + ' ORDER BY c.set_slug ASC, c.nivel_gate ASC NULLS LAST, c.id ASC';
+          };
+          try {
+            cmCartas = await sql(cmSqlCartas(true), [cmId]);
+          } catch (eCmSet) {
+            if (!eCmSet || eCmSet.code !== '42703') throw eCmSet;
+            console.warn('[usuarios] cartas_mias sin 065: ' + eCmSet.message);
+            cmCartas = await sql(cmSqlCartas(false), [cmId]);
+          }
           cmGates = await sql(
             'SELECT nivel_gate, set_slug, consumido_en FROM cartas_gates'
             + ' WHERE usuario_id = $1 ORDER BY nivel_gate ASC',
@@ -1021,16 +1031,36 @@ module.exports = async (req, res) => {
           // El requisito por set cuenta CARTAS DISTINTAS (COUNT DISTINCT), no
           // filas: con variantes, contar filas inflaba el denominador. "Obtenida"
           // = alguna variante en posesion con cantidad >= 1.
-          cmReq = await sql(
-            'SELECT c.set_slug, c.nivel_gate, COUNT(DISTINCT c.id)::int AS total,'
-            + ' COUNT(DISTINCT c.id) FILTER (WHERE uc.activo = true'
-            + ' AND uc.cantidad >= 1)::int AS obtenidas'
-            + ' FROM cartas_catalogo c'
-            + ' LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1'
-            + ' WHERE c.activo = true AND c.nivel_gate IN (10,14,20,25)'
-            + ' GROUP BY c.set_slug, c.nivel_gate ORDER BY c.nivel_gate ASC',
-            [cmId]
-          );
+          // ADR-120 (065): tambien se emite el progreso de los sets de
+          // coleccion (set_coleccion = true). No tienen nivel_gate: viajan con
+          // nivel_gate NULL y su total (4 en ancestral_esencia), sin inventar
+          // un nivel. Reintento degradado sin la 065 (42703).
+          try {
+            cmReq = await sql(
+              'SELECT c.set_slug, c.nivel_gate, COUNT(DISTINCT c.id)::int AS total,'
+              + ' COUNT(DISTINCT c.id) FILTER (WHERE uc.activo = true'
+              + ' AND uc.cantidad >= 1)::int AS obtenidas'
+              + ' FROM cartas_catalogo c'
+              + ' LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1'
+              + ' WHERE c.activo = true'
+              + ' AND (c.nivel_gate IN (10,14,20,25) OR c.set_coleccion = true)'
+              + ' GROUP BY c.set_slug, c.nivel_gate'
+              + ' ORDER BY c.nivel_gate ASC NULLS LAST, c.set_slug ASC',
+              [cmId]
+            );
+          } catch (eCmReqSet) {
+            if (!eCmReqSet || eCmReqSet.code !== '42703') throw eCmReqSet;
+            cmReq = await sql(
+              'SELECT c.set_slug, c.nivel_gate, COUNT(DISTINCT c.id)::int AS total,'
+              + ' COUNT(DISTINCT c.id) FILTER (WHERE uc.activo = true'
+              + ' AND uc.cantidad >= 1)::int AS obtenidas'
+              + ' FROM cartas_catalogo c'
+              + ' LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1'
+              + ' WHERE c.activo = true AND c.nivel_gate IN (10,14,20,25)'
+              + ' GROUP BY c.set_slug, c.nivel_gate ORDER BY c.nivel_gate ASC',
+              [cmId]
+            );
+          }
           // Museo equipado, solo lectura (ADR-003: nada se borra, se desequipa).
           cmMuseo = await sql(
             'SELECT c.id, c.nombre, c.set_slug, c.rareza, c.imagen_url,'
@@ -1091,6 +1121,9 @@ module.exports = async (req, res) => {
             stats_json: c.stats_json || null,
             es_canjeable_qr: c.es_canjeable_qr === true,
             fusionable: c.fusionable === true,
+            // ADR-120 (065): el cliente no debe ofrecer intercambio de una
+            // carta de set (el 4/4 se perderia para siempre).
+            set_coleccion: c.set_coleccion === true,
             fusion_coste_xp: CARTA_FUSION_XP,
             variantes: vNorm
           };

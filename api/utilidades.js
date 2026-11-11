@@ -18,7 +18,7 @@ const { esFalloEsquema } = require('../lib/score.js');
 // HMAC en este fichero; blobVerificarJwt es anterior y solo sirve a blob).
 const sesion = require('../lib/sesion.js');
 
-var BASE = process.env.SITE_BASE_URL || 'https://latawel.com';
+var BASE = 'https://latawel.com';
 var OG_IMAGE = process.env.OG_IMAGE_URL || (BASE + '/assets/brand/og/latawel-og-1200x630.png');
 var STATIC_PAGES = [
   { loc:'/',                        priority:'1.0', freq:'daily'   },
@@ -934,7 +934,7 @@ if (tipo === 'blog-lista') {
       var bNoResults = '<div class="bempty" id="bl-empty" style="display:none">'
         + 'Sin coincidencias para tu busqueda. Prueba otro termino o quita los filtros de tema.</div>';
 
-      var blJson = JSON.stringify(bJSON).replace(/</g,'\\u003c');
+      var blJson = JSON.stringify(bJSON).replace(/</g, String.fromCharCode(92) + 'u003c');
 
       var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
         + '<meta charset="UTF-8">\n'
@@ -1003,7 +1003,7 @@ if (tipo === 'blog-lista') {
         + '<script>'
         + 'var BLDATA='+blJson+';'
         + 'var BLCHIP="";var BLQ="";'
-        + 'function blNorm(s){return String(s==null?"":s).toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"");}'
+        + 'function blNorm(s){var bs=String.fromCharCode(92);return String(s==null?"":s).toLowerCase().normalize("NFD").replace(new RegExp("["+bs+"u0300-"+bs+"u036f]","g"),"");}'
         + 'function blTemaActive(){var c=document.querySelector("#bl-chips .on");return c?c.getAttribute("data-tema"):"";}'
         + 'function blMatch(p){'
         + '  var q=blNorm(BLQ).trim();'

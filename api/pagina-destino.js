@@ -20,7 +20,7 @@ const { neon } = require('@neondatabase/serverless');
 // consume ninguna de las 8/8 funciones serverless. El motor solo pinta.
 const ECMenu = require('../lib/menu.js');
 
-var BASE = process.env.SITE_BASE_URL || 'https://latawel.com';
+var BASE = 'https://latawel.com';
 var CAT_LABEL = { hostal:'Hospedaje', comida:'Comida & Restaurantes', sitio:'Lugares & Sitios', evento:'Eventos', blog:'Inspirate' };
 var CAT_DIR   = { hostal:'directorio-hostal.html', comida:'directorio-comida.html', sitio:'directorio-sitio.html', evento:'directorio-evento.html', blog:'index.html#inspirate-section' };
 var CAT_GRAD  = { hostal:'linear-gradient(135deg,#1a3a5c,#2a4a7c)', comida:'linear-gradient(135deg,#3a1a0a,#4a2a1a)', sitio:'linear-gradient(135deg,#0a2a1a,#1a3a2a)', evento:'linear-gradient(135deg,#1a051a,#3a1a3a)', blog:'linear-gradient(135deg,#3a0a1a,#4a1a2a)' };

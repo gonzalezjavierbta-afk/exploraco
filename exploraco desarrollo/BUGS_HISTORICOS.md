@@ -2701,6 +2701,33 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 - **Fix:** ninguno adicional: es la **limpieza** que se buscaba, y al guardar el array queda sin el objeto invalido.
 - **Estado:** cerrado por comportamiento; el dato huerfano en Neon se limpia (o no) por decision del operador.
 
+## BUG-153: el smoke de subida con prefijo busca una condicion que ya no existe -- needle desalineado con la regla real de `api/utilidades.js` -- **CERRADO (2026-11-10, pase final R2; era PRE-EXISTENTE, detectado durante TSK-256 / ADR-120, no lo introdujo esa tanda)**
+
+- **Severidad:** BAJA para el producto, **ALTA para la medicion** (es un FAIL permanente que tapa el estado real de `npm run test`).
+- **Sintoma:** el smoke da FAIL en el aserto del origen de la subida aunque el comportamiento del servidor sea el correcto.
+- **Evidencia (archivos reales, ADR-006):** `scripts/smoke_media_upload_prefijo.js:51` busca el literal `if (tipo !== 'foto' || String(pl.contexto || '') !== 'destino')`; la regla vive hoy en `api/utilidades.js:173` como `if (!esMedioPublico || String(pl.contexto || '') !== 'destino')`, con `esMedioPublico` declarado en `:172` (`tipo === 'foto' || tipo === 'documento'`).
+- **Causa:** la allowlist de tipos publicos se amplio a **`documento`** (PDF de carta, **ADR-119 / TSK-255**) y el smoke siguio con el predicado anterior. Es el patron **BUG-098** (*producto correcto, instrumentacion incorrecta*).
+- **Pre-existencia verificada:** el needle **tampoco** estaba en `HEAD` antes de la tanda de ADR-120: **no** es una regresion de esta entrega.
+- **Fix:** actualizar el **needle del arnes** (o, mejor, asertar contra `esMedioPublico` en vez de contra una condicion literal). **No se toca `api/utilidades.js`: el producto esta bien.** Dueno `@js-silo-dev` (sin gate).
+- **CIERRE (2026-11-10, pase final R2).** El needle se reapunto a la **forma real** de la regla, en **dos** asertos expresados como expresion regular sobre el codigo fuente: `var esMedioPublico = (tipo === '...' [|| tipo === '...']);` (`scripts/smoke_media_upload_prefijo.js:58`) y `if (!esMedioPublico || String(pl.contexto || '') !== 'destino') ...` (`:61`). **`api/utilidades.js` no se modifico** (`esMedioPublico` en `:172`, guarda en `:173`): la correccion es **solo del arnes**, como estaba prescrito.
+- **Verificacion del cierre:** **46/46** PASS en `scripts/smoke_media_upload_prefijo.js` (antes 45/46, el FAIL que arrastraba `npm run test`), **test de mutacion 8/8** (al revertir la forma del needle el aserto **cae**, luego el smoke no es ciego) y **`npm run test` EXIT 0**. Patron **BUG-098** confirmado y cerrado: *producto correcto, instrumentacion incorrecta*.
+- **Nota de metodo (para el proximo arnes):** el needle se ancla a la **forma declarativa** (`var X = (...)` + `if (!X || ...)`), no al nombre del helper. Renombrar `esMedioPublico` **vuelve a romper** el smoke aunque el comportamiento sea correcto -- es aceptable porque ese renombre es un cambio de contrato que merece revision, pero conviene saberlo antes de tocarlo.
+
+## BUG-154: zona de escapado JSON-LD de `api/utilidades.js` y `api/pagina-destino.js` con cambios previos sin commit y **sin smoke especifico** -- **RIESGO DECLARADO / ABIERTO (2026-11-10, TSK-256 / ADR-120)**
+
+- **Severidad:** MEDIA (el impacto es SEO/HTML, no de datos; el riesgo es que **nadie lo mide**).
+- **Naturaleza:** **no es un defecto medido**: es un **riesgo pre-existente** que se registra para que no se lea como parte de la tanda de ADR-120.
+- **Hecho:** ambos ficheros arrastran cambios **sin commit** en la zona de escapado del JSON-LD y **no existe un smoke especifico** de esa zona. Lo que no se prueba no se puede afirmar.
+- **Riesgo concreto:** un escapado defectuoso **no rompe la pagina de forma visible** -- degrada el JSON-LD o inyecta markup en el `<script>`; el sintoma aparece en buscadores, no en pantalla, y ningun aserto lo grita.
+- **Mitigacion propuesta:** smoke de escapado (comillas, `<`, `</script`, unicode) sobre `buildHTML()` y sobre el serializador de `utilidades.js`; hasta entonces **no se afirma** que esa zona sea correcta. Dueno `@renderer-dev` + `@backend-dev` (**GATE**).
+
+### Nota de registro: el cleanup `007_desactivar_consumibles_predeploy_064.sql` **no** genera BUG (2026-11-10, pase final R2)
+
+- **Que es:** `db/cleanups/007_desactivar_consumibles_predeploy_064.sql` (**4.620 B**) pone `activo=false` en **6** filas de `public.consumibles` mientras el backend desplegado no lee los campos nuevos: las **4** cartas de faccion de la 057, `ancestral_base` y **`ancestral_premio_set`**, que era **comprable por 0 XP** porque el codigo desplegado solo filtra `activo=true` y lee `precio_xp`.
+- **Por que no es un BUG:** no hay defecto de producto ni de dato; es **riesgo declarado** en **ADR-120** (esquema por delante del codigo) y se mitiga **por dato**, de forma **reversible** y **sin borrar filas** (ADR-003). Deja **38** activos de **44** totales; las **3 botellas** siguen activas.
+- **Condicion de salida:** tras el deploy hay que ejecutar el bloque de **REACTIVACION** del mismo fichero (mismo `IN (...)` sobre `activo=false`). **Si se olvida, el set 4/4 queda incomprable y las 4 cartas de faccion desaparecen del mercado sin ningun error visible** -- el sintoma es **ausencia**, no fallo, y por eso queda escrito aqui y en `TASKS.md` TSK-256.
+
+
 
 
 

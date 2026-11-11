@@ -2286,6 +2286,30 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Icono</div>
           <input class="form-input" id="consumible-icono" maxlength="24" placeholder="&amp;#128301;" title="Entidad HTML ASCII, máximo 24 caracteres." style="width:100%">
         </div>
+        <div style="flex:0 0 100px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Bono %</div>
+          <input class="form-input" id="consumible-bonopct" type="number" min="0" max="100" step="1" value="0" title="Porcentaje de XP extra en TODAS las acciones (0-100). 0 = sin bono porcentual." style="width:100%">
+        </div>
+        <div style="flex:0 0 120px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Tope bono XP</div>
+          <input class="form-input" id="consumible-bonotope" type="number" min="0" step="0.01" value="0" title="Tope de XP bonificada por ventana. 0 = sin bono porcentual. Si Bono % es mayor que 0, este tope tambien debe serlo." style="width:100%">
+        </div>
+        <div style="flex:0 0 130px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Permanente</div>
+          <label class="srv-check" style="font-size:11px" title="Compra unica que no se consume nunca. Exige un set desbloqueado."><input type="checkbox" id="consumible-permanente"><span>No se consume</span></label>
+        </div>
+        <div style="flex:1 1 190px;min-width:170px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Desbloquea set</div>
+          <input class="form-input" id="consumible-desbloqueaset" maxlength="60" placeholder="ancestral_esencia" title="Slug ASCII del set que abre (a-z, 0-9, guion bajo, dos puntos, guion). Vacio = sin set." style="width:100%">
+        </div>
+        <div style="flex:1 1 190px;min-width:170px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Otorga carta</div>
+          <input class="form-input" id="consumible-otorgacarta" maxlength="60" placeholder="cta_ancestral_01" title="Slug ASCII del id de carta que entrega al comprarlo. Vacio = sin carta." style="width:100%">
+        </div>
+        <div style="flex:0 0 130px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Premio set</div>
+          <label class="srv-check" style="font-size:11px" title="Puntero del premio del set: se entrega una sola vez al completarlo."><input type="checkbox" id="consumible-premioset"><span>Es premio</span></label>
+        </div>
         <button class="btn btn-gold" onclick="crearConsumible()" style="white-space:nowrap">＋ Crear</button>
       </div>
     </div>
@@ -2932,7 +2956,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div style="color:#fff;font-weight:700;font-size:13px">✏️ Editar consumible</div>
       <button onclick="cerrarConsumibleModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1">✕</button>
     </div>
-    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14p;max-height:calc(100vh - 170px);overflow-y:auto">
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Clave (identidad, no editable)</div>
         <input class="form-input" id="consumible-edit-clave" readonly style="width:100%;background:var(--bg2)">
@@ -3008,6 +3032,30 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Icono (entidad HTML)</div>
         <input class="form-input" id="consumible-edit-icono" maxlength="24" placeholder="&amp;#128301;" title="Entidad HTML ASCII, máximo 24 caracteres." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Bono % (0-100)</div>
+        <input class="form-input" id="consumible-edit-bonopct" type="number" min="0" max="100" step="1" title="Porcentaje de XP extra en TODAS las acciones. 0 = sin bono porcentual." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Tope bono XP</div>
+        <input class="form-input" id="consumible-edit-bonotope" type="number" min="0" step="0.01" title="Tope de XP bonificada por ventana. Va junto con Bono %: o los dos a 0 o los dos mayores que 0." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Permanente</div>
+        <label class="srv-check" style="font-size:11px" title="Compra unica que no se consume nunca. Exige un set desbloqueado."><input type="checkbox" id="consumible-edit-permanente"><span>No se consume nunca</span></label>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Desbloquea set (slug)</div>
+        <input class="form-input" id="consumible-edit-desbloqueaset" maxlength="60" placeholder="ancestral_esencia" title="Slug ASCII del set que abre. Vacio = sin set." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Otorga carta (slug)</div>
+        <input class="form-input" id="consumible-edit-otorgacarta" maxlength="60" placeholder="cta_ancestral_01" title="Slug ASCII del id de carta que entrega. Vacio = sin carta." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Premio set</div>
+        <label class="srv-check" style="font-size:11px" title="Puntero del premio del set: se entrega una sola vez al completarlo."><input type="checkbox" id="consumible-edit-premioset"><span>Es premio de set</span></label>
       </div>
       <div style="font-size:11px;color:var(--muted);line-height:1.5">💡 Editar el precio no corrompe historial: el ledger compra_consumibles guarda xp_pagado como snapshot de cada compra.</div>
     </div>
@@ -10195,6 +10243,14 @@ function _numConsumible(id) {
   var n = parseFloat(s.replace(',', '.'));
   return isFinite(n) ? n : null;
 }
+// Migracion 064: checkbox del formulario de consumibles. Devuelve siempre un
+// boolean nativo, porque el backend valida booleanos ESTRICTOS (sin tolerancia
+// a texto): un checkbox ausente viaja como false y nunca como undefined.
+function _boolConsumible(id) {
+  var el = document.getElementById(id);
+  return !!(el && el.checked === true);
+}
+
 
 async function crearConsumible() {
   var clave = document.getElementById('consumible-clave').value.trim().toLowerCase();
@@ -10216,10 +10272,23 @@ async function crearConsumible() {
   var bonoXp = _numConsumible('consumible-bonoxp');
   var bonoAccion = String((document.getElementById('consumible-bonoaccion') || {}).value || '').trim();
   var icono = String((document.getElementById('consumible-icono') || {}).value || '').trim();
+  // Migracion 064: bono global % y set ancestral (6 columnas de la 064).
+  var bonoPct = _numConsumible('consumible-bonopct');
+  var bonoTope = _numConsumible('consumible-bonotope');
+  var esPermanente = _boolConsumible('consumible-permanente');
+  var desbloqueaSet = String((document.getElementById('consumible-desbloqueaset') || {}).value || '').trim();
+  var otorgaCarta = String((document.getElementById('consumible-otorgacarta') || {}).value || '').trim();
+  var premioSet = _boolConsumible('consumible-premioset');
 
   if (!clave || !nombre) { showAdminToast('Clave y nombre son obligatorios', 'error'); return; }
   if (!/^[a-z0-9_]+$/.test(clave)) { showAdminToast('Clave: solo minúsculas, números y guion bajo', 'error'); return; }
   if (!isFinite(precio) || precio <= 0) { showAdminToast('Precio debe ser un número mayor que 0', 'error'); return; }
+
+  // Migracion 064: la UI avisa antes de gastar una llamada. El backend valida
+  // lo mismo y ademas responde 400/503 con el motivo exacto.
+  if (bonoPct != null && (bonoPct < 0 || bonoPct > 100)) { showAdminToast('Bono % debe ser un entero entre 0 y 100', 'error'); return; }
+  if ((bonoPct || 0) > 0 && !(bonoTope > 0)) { showAdminToast('Si Bono % es mayor que 0, el Tope bono XP tambien debe serlo', 'error'); return; }
+  if (esPermanente && !desbloqueaSet) { showAdminToast('Permanente exige un set que desbloquee', 'error'); return; }
 
   try {
     var resp = await fetch('/api/admin?recurso=consumibles&tipo=consumibles_crear', {
@@ -10235,7 +10304,13 @@ async function crearConsumible() {
         limite_diario: limite,
         bono_xp_fijo: bonoXp == null ? 0 : bonoXp,
         bono_accion: bonoAccion ? bonoAccion : null,
-        icono: icono ? icono : null
+        icono: icono ? icono : null,
+        bono_pct: bonoPct == null ? 0 : bonoPct,
+        bono_tope_xp: bonoTope == null ? 0 : bonoTope,
+        es_permanente: esPermanente,
+        otorga_carta: otorgaCarta ? otorgaCarta : null,
+        desbloquea_set: desbloqueaSet ? desbloqueaSet : null,
+        premio_set: premioSet
       })
     });
     var data = await resp.json();
@@ -10254,6 +10329,12 @@ async function crearConsumible() {
     document.getElementById('consumible-bonoxp').value = '0';
     document.getElementById('consumible-bonoaccion').value = '';
     document.getElementById('consumible-icono').value = '';
+    document.getElementById('consumible-bonopct').value = '0';
+    document.getElementById('consumible-bonotope').value = '0';
+    document.getElementById('consumible-permanente').checked = false;
+    document.getElementById('consumible-desbloqueaset').value = '';
+    document.getElementById('consumible-otorgacarta').value = '';
+    document.getElementById('consumible-premioset').checked = false;
     showAdminToast('✅ ' + (data.mensaje || 'Consumible creado'), 'success');
     loadConsumibles();
   } catch (e) {
@@ -10282,6 +10363,15 @@ function abrirEditarConsumible(id) {
   document.getElementById('consumible-edit-bonoxp').value = c.bono_xp_fijo == null ? 0 : c.bono_xp_fijo;
   document.getElementById('consumible-edit-bonoaccion').value = c.bono_accion || '';
   document.getElementById('consumible-edit-icono').value = c.icono || '';
+  // Migracion 064: precarga de las 6 columnas de bono global / set ancestral.
+  // Si la lista vino degradada (064 sin aplicar) normalizarFila064Consumible ya
+  // dejo los DEFAULT de columna, asi que aqui no hay undefined.
+  document.getElementById('consumible-edit-bonopct').value = c.bono_pct == null ? 0 : c.bono_pct;
+  document.getElementById('consumible-edit-bonotope').value = c.bono_tope_xp == null ? 0 : c.bono_tope_xp;
+  document.getElementById('consumible-edit-permanente').checked = c.es_permanente === true;
+  document.getElementById('consumible-edit-desbloqueaset').value = c.desbloquea_set || '';
+  document.getElementById('consumible-edit-otorgacarta').value = c.otorga_carta || '';
+  document.getElementById('consumible-edit-premioset').checked = c.premio_set === true;
   document.getElementById('consumible-modal').style.display = 'flex';
 }
 
@@ -10306,9 +10396,22 @@ async function guardarEdicionConsumible() {
   var bonoXp = _numConsumible('consumible-edit-bonoxp');
   var bonoAccion = String((document.getElementById('consumible-edit-bonoaccion') || {}).value || '').trim();
   var icono = String((document.getElementById('consumible-edit-icono') || {}).value || '').trim();
+  // Migracion 064: bono global % y set ancestral (6 columnas de la 064).
+  var bonoPct = _numConsumible('consumible-edit-bonopct');
+  var bonoTope = _numConsumible('consumible-edit-bonotope');
+  var esPermanente = _boolConsumible('consumible-edit-permanente');
+  var desbloqueaSet = String((document.getElementById('consumible-edit-desbloqueaset') || {}).value || '').trim();
+  var otorgaCarta = String((document.getElementById('consumible-edit-otorgacarta') || {}).value || '').trim();
+  var premioSet = _boolConsumible('consumible-edit-premioset');
 
   if (!nombre) { showAdminToast('El nombre no puede quedar vacío', 'error'); return; }
   if (!isFinite(precio) || precio < 0) { showAdminToast('Precio debe ser un número mayor o igual a 0', 'error'); return; }
+
+  // Migracion 064: la UI avisa antes de gastar una llamada. El backend valida
+  // lo mismo y ademas responde 400/503 con el motivo exacto.
+  if (bonoPct != null && (bonoPct < 0 || bonoPct > 100)) { showAdminToast('Bono % debe ser un entero entre 0 y 100', 'error'); return; }
+  if ((bonoPct || 0) > 0 && !(bonoTope > 0)) { showAdminToast('Si Bono % es mayor que 0, el Tope bono XP tambien debe serlo', 'error'); return; }
+  if (esPermanente && !desbloqueaSet) { showAdminToast('Permanente exige un set que desbloquee', 'error'); return; }
 
   try {
     // La clave NO se envía al backend: es identidad y no se edita (contrato ADR-018).
@@ -10325,7 +10428,13 @@ async function guardarEdicionConsumible() {
         limite_diario: limite,
         bono_xp_fijo: bonoXp == null ? 0 : bonoXp,
         bono_accion: bonoAccion ? bonoAccion : null,
-        icono: icono ? icono : null
+        icono: icono ? icono : null,
+        bono_pct: bonoPct == null ? 0 : bonoPct,
+        bono_tope_xp: bonoTope == null ? 0 : bonoTope,
+        es_permanente: esPermanente,
+        otorga_carta: otorgaCarta ? otorgaCarta : null,
+        desbloquea_set: desbloqueaSet ? desbloqueaSet : null,
+        premio_set: premioSet
       })
     });
     var data = await resp.json();

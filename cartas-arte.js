@@ -30,6 +30,11 @@
     // GET /api/interacciones?tipo=consumibles no entrega marca_nombre, asi que
     // el manifiesto (estatico por ADR-112) mapea SKU -> lamina de marca aqui:
     // sin backend nuevo ni migracion.
+    // ancestral_base (064): la carta base del set tampoco entrega marca_nombre
+    // y si resuelve por el prefijo 'ancestral_', pero se declara EXPLICITA por
+    // el mismo criterio que los 3 SKU: el inventario de faltantes y los filtros
+    // leen el mapa tal cual, sin abrir la imagen ni ejecutar porPrefijo().
+    ancestral_base: 'assets/cartas/marca_ancestral.png',
     ancestral_pocima_50ml: 'assets/cartas/marca_ancestral.png',
     ancestral_media_375ml: 'assets/cartas/marca_ancestral.png',
     ancestral_botella_750ml: 'assets/cartas/marca_ancestral.png'
@@ -49,6 +54,7 @@
     // explicitas, no un helper de prefijo) para que el mapa sea legible tal cual
     // lo consume el inventario de faltantes; los SKU futuros de la marca caen a
     // 'marca:ancestral' porque claveDe() ya normaliza el prefijo.
+    ancestral_base: { numero: 5, tipo: 'MARCA', familia: 'M' },
     ancestral_pocima_50ml: { numero: 5, tipo: 'MARCA', familia: 'M' },
     ancestral_media_375ml: { numero: 5, tipo: 'MARCA', familia: 'M' },
     ancestral_botella_750ml: { numero: 5, tipo: 'MARCA', familia: 'M' }

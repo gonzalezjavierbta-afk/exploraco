@@ -47,6 +47,10 @@ const FILA_USUARIO = {
     logr_critico_10: { estado: 'completada', en: '2026-09-02T10:00:00.000Z' },
     logr_coleccionista_10: { estado: 'completada', en: '2026-09-03T10:00:00.000Z' },
   },
+  // ADR-120 (064): con el flag del set Ancestral el catalogo se sirve
+  // ENTERO (las 4 misiones del set incluidas). Sin el flag, el GET
+  // ?tipo=misiones las omite y este harness deberia esperar n-4.
+  capacidades: { sets_acceso: { ancestral_esencia: { desde: '2026-10-01T10:00:00.000Z', origen: 'compra' } } },
 };
 
 function mockConUsuario() {

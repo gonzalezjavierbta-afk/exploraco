@@ -95,7 +95,6 @@
      * POST comprar_consumible. No se inventa ninguno. */
     FACCION_INSUFICIENTE: 'Ese articulo es de otra faccion.',
     ERA_INSUFICIENTE: 'Ese articulo es de otra era.',
-    STOCK_LLENO: 'Ya tienes el tope de unidades de ese articulo.',
     PUNTOS_INSUFICIENTES: 'No te alcanza el XP para esta operacion.',
     USUARIO_ID_INVALIDO: 'Tu sesion no es valida. Vuelve a entrar.',
     /* Estos dos NO son codigos del motor: son los textos literales que
@@ -594,6 +593,8 @@
         '#cpanel-mercado .mk-cat-t.tienes{background:rgba(34,197,94,.14);border:1px solid rgba(34,197,94,.45);color:#22C55E}',
         '#cpanel-mercado .mk-cat-t.falta{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.55)}',
         '#cpanel-mercado .mk-cat-t.bloq{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fca5a5;margin-left:5px}',
+        '#cpanel-mercado .mk-cat-t.bono{background:rgba(34,197,94,.14);border:1px solid rgba(34,197,94,.45);color:#22C55E}',
+        '#cpanel-mercado .mk-cat-t.set{background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.38);color:var(--gold);margin-left:5px}',
         '#cpanel-mercado .mk-nota{font-size:10px;color:rgba(255,255,255,.35);padding:8px 2px;line-height:1.5}',
         '@media(max-width:540px){#cpanel-mercado .mk-cat{grid-template-columns:1fr}}'
       ].join('');
@@ -928,8 +929,83 @@
     var nota = String(c.categoria || '').trim();
     var fac = String(c.faccion_requerida || '').trim();
     if (fac) nota += (nota ? ' - ' : '') + 'Faccion: ' + nombreFaccion(fac);
+    /* ADR-120 (064): la ficha de CartasUI es el unico sitio con espacio para
+     * la mejora y para el acceso al set; se reutiliza, no hay componente
+     * nuevo. Sin dato no se anade nada. */
+    var bono = bonoTxt(c, true);
+    if (bono) nota += (nota ? ' - ' : '') + bono;
+    var set = setDe(c);
+    if (set) nota += (nota ? ' - ' : '') + (SET_TXT[set] || ('Set ' + setNombre(set)));
     if (nota) o.nota = nota;
     return o;
+  }
+  /* ---- Bono 24 h y acceso a set (ADR-120 / migracion 064) --------------
+   * duracion_horas SI viaja en ?tipo=consumibles; bono_pct, bono_tope_xp,
+   * desbloquea_set, otorga_carta y es_permanente dependen de que el SELECT del
+   * motor los exponga. Sin esos campos NO se inventa la cifra: la tarjeta
+   * declara la ventana solo si la descripcion del propio producto ya la dice y
+   * la ficha llevan el texto editorial completo. Nada de esto concede acceso:
+   * el candado (motivo_bloqueo) y la posesion (YA_POSEES) son del backend. */
+  function bonoTxt(c, sinHoras) {
+    var pct = num(c && c.bono_pct);
+    if (pct <= 0) return '';
+    var t = '+' + fmt(pct) + '% XP';
+    var horas = parseInt(c && c.duracion_horas, 10);
+    if (!sinHoras && isFinite(horas) && horas > 0) t += ' durante ' + horas + ' h';
+    var tope = num(c && c.bono_tope_xp);
+    if (tope > 0) t += ' - tope ' + fmt(tope) + ' XP';
+    return t;
+  }
+  function bonoChipHtml(c) {
+    var txt = bonoTxt(c, false);
+    if (!txt) {
+      /* Sin bono_pct: se declara la VENTANA, y solo si la descripcion del
+       * producto la declara. Asi las cartas de bono se leen como mejora 24 h
+       * sin fabricar un porcentaje que el catalogo no mando. */
+      var horas = parseInt(c && c.duracion_horas, 10);
+      var desc = String((c && c.descripcion) || '').toLowerCase();
+      if (isFinite(horas) && horas > 0 && desc.indexOf(horas + ' h') !== -1) {
+        txt = 'Bono ' + horas + ' h';
+      }
+    }
+    if (!txt) return '';
+    return '<span class="mk-cat-t bono" title="Bono de XP global por tiempo limitado">'
+      + esc(txt) + '</span>';
+  }
+  /* El slug del set y la clave de la carta base son estables en el catalogo,
+   * asi que el respaldo por clave es COPY (la columna aun no viaja), nunca un
+   * permiso. Las 3 botellas comparten el set y la misma lamina de marca. */
+  var SET_ACCESO = { ancestral_base: 'ancestral_esencia' };
+  var SET_PIEZAS = {
+    ancestral_pocima_50ml: 'ancestral_esencia',
+    ancestral_media_375ml: 'ancestral_esencia',
+    ancestral_botella_750ml: 'ancestral_esencia'
+  };
+  var SET_TXT = {
+    ancestral_esencia: 'Acceso al set Ancestral: 4 cartas, misiones y premio'
+  };
+  function setDe(c) {
+    var clave = String((c && c.clave) || '');
+    var set = String((c && c.desbloquea_set) || '').trim();
+    if (set) return set;
+    return SET_ACCESO[clave] || '';
+  }
+  function setNombre(set) {
+    return capitalizar(String(set || '').replace(/_/g, ' '));
+  }
+  function setChipHtml(c) {
+    var clave = String((c && c.clave) || '');
+    var set = setDe(c);
+    if (!set) {
+      var pieza = SET_PIEZAS[clave] || '';
+      if (!pieza) return '';
+      return '<span class="mk-cat-t set" title="Misma marca y mismo set">'
+        + esc('Set ' + setNombre(pieza)) + '</span>';
+    }
+    var txt = SET_TXT[set] || ('Acceso al set ' + setNombre(set));
+    if (c && c.es_permanente === true) txt += ' - compra unica, no se consume';
+    return '<span class="mk-cat-t set" title="Acceso permanente al set ' + esc(set) + '">'
+      + esc(txt) + '</span>';
   }
   function catalogoHtml() {
     var todo = _catalogo || [];
@@ -1003,6 +1079,10 @@
           + esc(motivoTxt || 'Bloqueado') + '</span>';
       }
       tags += gatesCatalogoHtml(c);
+      /* ADR-120 (064): mejora 24 h de las cartas de bono y acceso al set de la
+       * carta base. Sin dato en el catalogo los dos helpers devuelven '' y la
+       * tarjeta queda EXACTAMENTE como antes (ADR-008). */
+      tags += bonoChipHtml(c) + setChipHtml(c);
       var sinPrecio = (c.precio_xp === null || c.precio_xp === undefined);
       var comprable = !c.bloqueado && !sinPrecio;
       var titulo = c.bloqueado

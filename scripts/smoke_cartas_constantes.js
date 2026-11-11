@@ -147,9 +147,18 @@ assert(!/museo_publico/.test(tUsu), USU + ' NO contiene el nombre antiguo museo_
   'quedan ' + cuenta(tUsu, /museo_publico/g) + ' ocurrencia(s)');
 
 // --- (e) Invariancia del upsert de inventario ------------------------------
+// ADR-120: el numero de upserts NO es una constante (una rama nueva de compra
+// anade un INSERT mas). Lo que SI es invariante: TODO INSERT INTO usuarios_cartas
+// declara el conflicto de 3 columnas. El conteo es dinamico contra el numero
+// real de INSERT, para que una rama nueva no rompa el gate y una regresion a 2
+// columnas si lo rompa.
+var nInsCartas = cuenta(tInter, /INSERT INTO usuarios_cartas/g);
 var nTresCol = cuenta(tInter, /ON CONFLICT \(usuario_id, carta_id, variante\)/g);
-assert(nTresCol === 5, INTER + ' tiene 5 upserts con ON CONFLICT (usuario_id, carta_id, variante)',
-  'encontrados ' + nTresCol);
+assert(nInsCartas >= 1, INTER + ' conserva al menos un INSERT INTO usuarios_cartas',
+  'encontrados ' + nInsCartas);
+assert(nTresCol === nInsCartas,
+  INTER + ' tiene 1 upsert de 3 columnas por cada INSERT INTO usuarios_cartas',
+  'INSERT ' + nInsCartas + ' vs ON CONFLICT (usuario_id, carta_id, variante) ' + nTresCol);
 var nDosCol = cuenta(tInter, /ON CONFLICT \(usuario_id, carta_id\)/g);
 assert(nDosCol === 0, INTER + ' no conserva ningun ON CONFLICT de 2 columnas',
   'encontrados ' + nDosCol);
