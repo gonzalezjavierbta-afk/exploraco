@@ -1127,6 +1127,536 @@
     return !!(host && host.classList.contains('open'));
   }
 
+  /* ==================================================================
+     CATALOGO -- vitrina de cartas que el usuario NO posee
+     ------------------------------------------------------------------
+     Consume GET /api/usuarios?tipo=cartas_catalogo (canal de adquisicion
+     ya desplegado). La UI NO decide precio ni stock: pinta el `poder`,
+     `restantes` y `precio_xp` que manda el servidor, y la compra va por
+     el handler YA existente (acunarCarta / acunarDesdeBoton): el boton
+     de la tarjeta usa los mismos data-* que la ficha.
+     `restantes === null` = tirada abierta (nunca se inventa un stock).
+     El panel solo se monta si la pagina trae el host #catalogo-panel,
+     asi que comunidad.html y perfil.html no pagan nada por cargarlo.
+     ================================================================== */
+  var CATALOGO_LIMIT = 24;
+  var CATALOGO_FAMILIAS = ['lugar', 'personaje', 'marca', 'artista', 'cosmetica'];
+  var CATALOGO_RAREZAS = ['comun', 'raro', 'epico', 'dorado'];
+
+  function catalogoEstadoBase() {
+    return {
+      q: '', familia: '', rareza: '', page: 0,
+      filas: [], total: null, cargando: false, error: ''
+    };
+  }
+
+  /* URL del canal de adquisicion. Los filtros vacios NO viajan: el backend
+     trata igual "" que ausente, pero la URL queda legible y cacheable. */
+  function catalogoUrl(estado, page) {
+    var e = estado || {};
+    var p = safeNum(page, 1);
+    if (p < 1) p = 1;
+    var partes = ['tipo=cartas_catalogo', 'limit=' + CATALOGO_LIMIT];
+    var fam = fichaTexto(e.familia).toLowerCase();
+    if (fam) partes.push('familia=' + encodeURIComponent(fam));
+    var rar = fichaTexto(e.rareza).toLowerCase();
+    if (rar) partes.push('rareza=' + encodeURIComponent(rar));
+    var q = fichaTexto(e.q);
+    if (q) partes.push('q=' + encodeURIComponent(q));
+    partes.push('page=' + p);
+    return '/api/usuarios?' + partes.join('&');
+  }
+
+  /* Error tipado del catalogo. 503 (schema pendiente) degrada a un aviso
+     corto: la pagina no se rompe ni se volca JSON crudo. */
+  function catalogoError(status, code) {
+    var st = safeNum(status, 0);
+    var c = fichaTexto(code) || 'SERVIDOR';
+    if (st === 503 || c === 'NO_DISPONIBLE' || c === 'SCHEMA_PENDIENTE') {
+      return { ok: false, error: 'NO_DISPONIBLE', mensaje: 'Catalogo no disponible.' };
+    }
+    if (c === 'CONEXION') {
+      return {
+        ok: false, error: 'CONEXION',
+        mensaje: 'Sin conexion. Revisa tu red e intenta de nuevo.'
+      };
+    }
+    return { ok: false, error: 'SERVIDOR', mensaje: 'No se pudo cargar el catalogo. Intenta de nuevo.' };
+  }
+
+  function catalogoNormalizar(json, page, status) {
+    if (!json || json.ok !== true) {
+      return catalogoError(status, json && json.error);
+    }
+    var filas = json.data;
+    if (!filas || typeof filas.length !== 'number') filas = [];
+    return {
+      ok: true,
+      filas: filas,
+      total: safeNum(json.total, filas.length),
+      page: safeNum(json.page, safeNum(page, 1))
+    };
+  }
+
+  /* GET sin rechazo: siempre resuelve {ok:true,...} o {ok:false,error,mensaje}. */
+  function catalogoPedir(estado, page) {
+    return Promise.resolve().then(function () {
+      return fetch(catalogoUrl(estado, page), {
+        method: 'GET',
+        credentials: 'same-origin',
+        /* Mismo constructor de cabeceras que el resto del modulo: sin el
+           Bearer, el backend no puede rellenar `posee`/`cantidad` (la rama
+           sigue siendo publica, pero el catalogo no sabria que ya es tuyo). */
+        headers: cabecerasPost()
+      });
+    }).then(function (res) {
+      var st = safeNum(res && res.status, 0);
+      return leerCuerpo(res).then(function (j) {
+        return catalogoNormalizar(j, page, st);
+      }, function () {
+        return catalogoError(st, 'SERVIDOR');
+      });
+    }, function () {
+      return catalogoError(0, 'CONEXION');
+    });
+  }
+
+  /* Estado de la tarjeta: 'posee' manda sobre todo lo demas. */
+  function catalogoEstadoCarta(carta) {
+    if (!carta || typeof carta !== 'object') return 'vacia';
+    var cant = safeNum(carta.cantidad, null);
+    if (fichaSi(carta.posee) || (cant !== null && cant > 0)) return 'posee';
+    var rest = safeNum(carta.restantes, null);
+    if (rest !== null && rest <= 0) return 'agotada';
+    return 'libre';
+  }
+
+  /* Tirada compacta: reutiliza el formateo de la ficha sin su prefijo de
+     edicion. Sin ningun dato de tirada, "Tirada abierta" (restantes null). */
+  function catalogoTirada(carta) {
+    var t = fichaTirada(carta);
+    if (!t) return 'Tirada abierta';
+    var i = t.indexOf(' - ');
+    if (t.indexOf('Edicion ') === 0 && i > 0) return t.slice(i + 3);
+    return t;
+  }
+
+  function catalogoChipRareza(carta) {
+    var k = fichaTexto(carta && carta.rareza).toLowerCase();
+    var r = RAREZAS[k];
+    if (!r) return '';
+    return '<span class="c-cat-rar ' + r.clase + '">' + esc(r.label) + '</span>';
+  }
+
+  function catalogoInicial(nombre) {
+    var s = fichaTexto(nombre);
+    return s ? s.charAt(0).toUpperCase() : '?';
+  }
+
+  /* Atributo seguro: esc() no toca las comillas dobles y un src/alt con "
+     romperia el atributo. Solo para VALORES de atributo. */
+  function catalogoAttr(v) {
+    return esc(v).replace(/"/g, '&quot;');
+  }
+
+  /* Accion de la tarjeta. Nunca "Acunar" en una carta que ya es tuya: la
+     copia extra se compra desde la ficha de la coleccion, no aqui. */
+  function catalogoAccionHtml(carta, estado, precio) {
+    if (estado === 'posee') {
+      var cant = safeNum(carta.cantidad, null);
+      return '<div class="c-cat-acc"><span class="c-cat-nota">Ya la tienes'
+        + (cant !== null ? ' <b>' + esc(miles(cant)) + '</b>' : '') + '</span></div>';
+    }
+    if (estado === 'agotada') {
+      return '<div class="c-cat-acc"><span class="c-cat-nota c-cat-nota--agotada">Agotada</span></div>';
+    }
+    if (precio === null || precio <= 0) {
+      return '<div class="c-cat-acc"><span class="c-cat-nota">No disponible</span></div>';
+    }
+    return '<div class="c-cat-acc c-acunar">'
+      + '<button type="button" class="c-acunar-btn" data-c-acunar="1"'
+      + ' data-carta-id="' + catalogoAttr(fichaTexto(carta.id)) + '" data-variante="base"'
+      + ' data-precio="' + catalogoAttr(precio) + '">Acunar'
+      + ' <span class="c-acunar-xp">' + esc(miles(precio)) + ' XP</span></button>'
+      + '<span class="c-acunar-msg"></span></div>';
+  }
+
+  /* Tarjeta compacta del catalogo. Todo dato de servidor pasa por esc. */
+  function catalogoCartaHtml(carta) {
+    if (!carta || typeof carta !== 'object') return '';
+    var id = fichaTexto(carta.id);
+    var nombre = fichaTexto(carta.nombre) || id || 'Carta';
+    var estado = catalogoEstadoCarta(carta);
+    var precio = safeNum(carta.precio_xp, null);
+    var poder = safeNum(carta.poder, null);
+    var img = fichaTexto(carta.imagen_url);
+    var html = '<article class="c-cat-card" data-c-cat-id="' + catalogoAttr(id)
+      + '" data-c-cat-estado="' + estado + '">';
+    html += '<div class="c-cat-arte">'
+      + '<span class="c-cat-fallo" aria-hidden="true">' + esc(catalogoInicial(nombre)) + '</span>';
+    if (img) {
+      html += '<img class="c-cat-img" src="' + catalogoAttr(img) + '" alt="' + catalogoAttr(nombre)
+        + '" loading="lazy" onerror="this.style.display=\'none\'">';
+    }
+    html += '</div>';
+    html += '<div class="c-cat-top"><span class="c-cat-n">' + esc(nombre) + '</span>'
+      + catalogoChipRareza(carta) + '</div>';
+    html += '<div class="c-cat-meta">' + chipFamilia(carta);
+    if (poder !== null) {
+      html += '<span class="c-meta-poder" title="Poder de la carta"><b>'
+        + esc(miles(poder)) + '</b> poder</span>';
+    }
+    html += '</div>';
+    html += '<div class="c-cat-datos"><span data-c-cat-stock="1">'
+      + esc(catalogoTirada(carta)) + '</span>';
+    var rest = safeNum(carta.restantes, null);
+    if (rest !== null && rest > 0) {
+      html += '<span class="c-cat-rest" data-c-cat-rest="1">quedan ' + esc(miles(rest)) + '</span>';
+    }
+    if (precio !== null && precio > 0) {
+      html += '<span class="c-cat-precio">' + esc(miles(precio)) + ' XP</span>';
+    }
+    html += '</div>';
+    return html + catalogoAccionHtml(carta, estado, precio) + '</article>';
+  }
+
+  function catalogoFiltrosHtml(estado) {
+    var e = estado || {};
+    var fam = fichaTexto(e.familia).toLowerCase();
+    var rar = fichaTexto(e.rareza).toLowerCase();
+    var i;
+    var html = '<div class="c-cat-bar">'
+      + '<div class="c-cat-grp" role="group" aria-label="Filtrar el catalogo por familia">'
+      + '<button type="button" class="c-cat-f" data-cat-fam="" aria-pressed="'
+      + (fam ? 'false' : 'true') + '">Todas</button>';
+    for (i = 0; i < CATALOGO_FAMILIAS.length; i++) {
+      var kf = CATALOGO_FAMILIAS[i];
+      html += '<button type="button" class="c-cat-f" data-cat-fam="' + kf
+        + '" aria-pressed="' + (fam === kf ? 'true' : 'false') + '">'
+        + esc(FAMILIAS[kf].label) + '</button>';
+    }
+    html += '</div>'
+      + '<div class="c-cat-grp" role="group" aria-label="Filtrar el catalogo por rareza">'
+      + '<button type="button" class="c-cat-f" data-cat-rar="" aria-pressed="'
+      + (rar ? 'false' : 'true') + '">Todas</button>';
+    for (i = 0; i < CATALOGO_RAREZAS.length; i++) {
+      var kr = CATALOGO_RAREZAS[i];
+      html += '<button type="button" class="c-cat-f" data-cat-rar="' + kr
+        + '" aria-pressed="' + (rar === kr ? 'true' : 'false') + '">'
+        + esc(RAREZAS[kr].label) + '</button>';
+    }
+    return html + '</div>'
+      + '<input type="search" class="c-cat-q" data-c-cat-q="1" id="c-cat-q"'
+      + ' value="' + catalogoAttr(fichaTexto(e.q)) + '" autocomplete="off"'
+      + ' placeholder="Buscar por nombre" aria-label="Buscar una carta por nombre">'
+      + '</div>';
+  }
+
+  function catalogoInfoTexto(estado) {
+    var e = estado || {};
+    if (e.error) return e.error;
+    var filas = e.filas || [];
+    var total = safeNum(e.total, null);
+    if (!filas.length) return e.cargando ? 'Cargando catalogo...' : '';
+    if (total === null) return 'Mostrando ' + filas.length + ' cartas';
+    return 'Mostrando ' + filas.length + ' de ' + miles(total) + ' cartas';
+  }
+
+  function catalogoHayMas(estado) {
+    var e = estado || {};
+    var total = safeNum(e.total, null);
+    if (total === null || e.error) return false;
+    return (e.filas || []).length < total;
+  }
+
+  /* Rejilla + estados. Devuelve SOLO el interior de #c-cat-grid. */
+  function catalogoGridHtml(estado) {
+    var e = estado || {};
+    var i;
+    if (e.error) {
+      return '<div class="c-cat-vacio c-cat-vacio--error" role="status">' + esc(e.error)
+        + ' <button type="button" class="c-cat-mas" data-c-cat-reintentar="1">Reintentar</button></div>';
+    }
+    var filas = e.filas || [];
+    if (!filas.length) {
+      if (e.cargando) return '<div class="c-cat-vacio" role="status">Cargando catalogo...</div>';
+      return '<div class="c-cat-vacio" role="status">No hay cartas con estos filtros.</div>';
+    }
+    var html = '<div class="c-cat-rejilla">';
+    for (i = 0; i < filas.length; i++) html += catalogoCartaHtml(filas[i]);
+    return html + '</div>';
+  }
+
+  /* Tras acunar, la tarjeta pasa a "poseida" con la cantidad y el stock
+     que devolvio el servidor. Funcion pura: tambien vale para tests. */
+  function catalogoAplicarAcunar(estado, detalle) {
+    if (!estado || !detalle) return false;
+    var id = fichaTexto(detalle.carta_id);
+    if (!id) return false;
+    var filas = estado.filas || [];
+    for (var i = 0; i < filas.length; i++) {
+      if (fichaTexto(filas[i] && filas[i].id) !== id) continue;
+      var cant = safeNum(detalle.cantidad, null);
+      filas[i].posee = true;
+      if (cant !== null) filas[i].cantidad = cant;
+      var emit = safeNum(detalle.emitidas, null);
+      if (emit !== null) filas[i].emitidas = emit;
+      var sup = safeNum(filas[i].supply_max, null);
+      if (sup !== null && emit !== null) {
+        var rest = sup - emit;
+        filas[i].restantes = rest < 0 ? 0 : rest;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  var catalogoCtrl = null;
+
+  /* Sube por el DOM hasta el host buscando un atributo. Sin closest: el DOM
+     minimo de los smokes no lo trae y aqui no hace falta. */
+  function catalogoCerca(nodo, attr, host) {
+    var n = nodo;
+    var vueltas = 0;
+    while (n && n !== host && vueltas < 12) {
+      if (n.getAttribute && n.getAttribute(attr) !== null) return n;
+      n = n.parentNode;
+      vueltas++;
+    }
+    return null;
+  }
+
+  function catalogoMarcarFiltros(ctrl) {
+    var host = ctrl && ctrl.host;
+    if (!host || typeof host.querySelectorAll !== 'function') return;
+    var e = ctrl.estado;
+    var fam = e.familia;
+    var rar = e.rareza;
+    var fbs = host.querySelectorAll('[data-cat-fam]');
+    var i;
+    for (i = 0; i < fbs.length; i++) {
+      fbs[i].setAttribute('aria-pressed',
+        String(fichaTexto(fbs[i].getAttribute('data-cat-fam')) === fam));
+    }
+    var rbs = host.querySelectorAll('[data-cat-rar]');
+    for (i = 0; i < rbs.length; i++) {
+      rbs[i].setAttribute('aria-pressed',
+        String(fichaTexto(rbs[i].getAttribute('data-cat-rar')) === rar));
+    }
+  }
+
+  /* Repinta estado. `desde` > 0 = solo las filas nuevas (Cargar mas conserva
+     el scroll: no se reconstruyen las tarjetas que ya estaban). */
+  function catalogoRefrescar(ctrl, desde) {
+    if (!ctrl) return;
+    var e = ctrl.estado;
+    if (ctrl.info) ctrl.info.textContent = catalogoInfoTexto(e);
+    if (ctrl.mas) {
+      var hay = catalogoHayMas(e);
+      ctrl.mas.hidden = !hay;
+      ctrl.mas.disabled = !!e.cargando;
+      ctrl.mas.style.display = hay ? '' : 'none';
+    }
+    var grid = ctrl.grid;
+    if (!grid) return;
+    if (typeof desde === 'number' && desde > 0 && ctrl.rejilla) {
+      var extra = '';
+      for (var i = desde; i < (e.filas || []).length; i++) extra += catalogoCartaHtml(e.filas[i]);
+      if (extra) {
+        if (typeof ctrl.rejilla.insertAdjacentHTML === 'function') {
+          ctrl.rejilla.insertAdjacentHTML('beforeend', extra);
+        } else {
+          ctrl.rejilla.innerHTML += extra;
+        }
+      }
+      return;
+    }
+    grid.innerHTML = catalogoGridHtml(e);
+    ctrl.rejilla = (typeof grid.querySelector === 'function')
+      ? grid.querySelector('.c-cat-rejilla') : null;
+  }
+
+  function catalogoCargar(ctrl, acumular) {
+    if (!ctrl) return;
+    var e = ctrl.estado;
+    if (e.cargando) return;
+    var page = acumular ? (safeNum(e.page, 0) + 1) : 1;
+    var desde = acumular ? (e.filas || []).length : 0;
+    e.cargando = true;
+    e.error = '';
+    if (!acumular) {
+      e.filas = [];
+      e.total = null;
+      e.page = 0;
+    }
+    catalogoRefrescar(ctrl);
+    catalogoPedir(e, page).then(function (res) {
+      e.cargando = false;
+      if (!res || res.ok !== true) {
+        e.error = (res && res.mensaje) || catalogoError(0, 'SERVIDOR').mensaje;
+        catalogoRefrescar(ctrl);
+        return;
+      }
+      e.filas = acumular ? (e.filas || []).concat(res.filas) : res.filas;
+      e.total = res.total;
+      e.page = page;
+      catalogoRefrescar(ctrl, desde);
+    });
+  }
+
+  /* Panel abierto: barra de filtros + info + rejilla + Cargar mas. El host
+     arranca con un boton "Abrir catalogo" para no gastar un GET al cargar
+     la pagina. */
+  function catalogoAbrir(ctrl) {
+    if (!ctrl || ctrl.abierto) return;
+    ctrl.abierto = true;
+    var host = ctrl.host;
+    host.innerHTML = catalogoFiltrosHtml(ctrl.estado)
+      + '<div class="c-cat-info" id="c-cat-info" aria-live="polite"></div>'
+      + '<div id="c-cat-grid"></div>'
+      + '<button type="button" class="c-cat-mas" id="c-cat-mas" data-c-cat-mas="1" hidden>Cargar mas</button>';
+    ctrl.info = (typeof host.querySelector === 'function') ? host.querySelector('#c-cat-info') : null;
+    ctrl.grid = (typeof host.querySelector === 'function') ? host.querySelector('#c-cat-grid') : null;
+    ctrl.mas = (typeof host.querySelector === 'function') ? host.querySelector('#c-cat-mas') : null;
+    ctrl.rejilla = null;
+    catalogoMarcarFiltros(ctrl);
+    catalogoCargar(ctrl, false);
+  }
+
+  function catalogoFiltro(ctrl, clave, valor) {
+    if (!ctrl) return;
+    var v = fichaTexto(valor).toLowerCase();
+    if (clave === 'familia' && v && CATALOGO_FAMILIAS.indexOf(v) < 0) return;
+    if (clave === 'rareza' && v && CATALOGO_RAREZAS.indexOf(v) < 0) return;
+    ctrl.estado[clave] = v;
+    ctrl.estado.page = 0;
+    catalogoMarcarFiltros(ctrl);
+    catalogoCargar(ctrl, false);
+  }
+
+  /* Buscador con debounce: una sola consulta cuando el usuario para. */
+  function catalogoBuscar(ctrl, valor) {
+    if (!ctrl) return;
+    var v = fichaTexto(valor);
+    if (v === ctrl.estado.q) return;
+    ctrl.estado.q = v;
+    ctrl.estado.page = 0;
+    if (ctrl.timer && typeof w.clearTimeout === 'function') w.clearTimeout(ctrl.timer);
+    if (typeof w.setTimeout !== 'function') {
+      catalogoCargar(ctrl, false);
+      return;
+    }
+    ctrl.timer = w.setTimeout(function () {
+      ctrl.timer = null;
+      catalogoCargar(ctrl, false);
+    }, 350);
+  }
+
+  function catalogoClick(ctrl, ev) {
+    var t = ev && ev.target;
+    if (!t) return;
+    if (catalogoCerca(t, 'data-c-cat-abrir', ctrl.host)) {
+      catalogoAbrir(ctrl);
+      return;
+    }
+    if (catalogoCerca(t, 'data-c-cat-reintentar', ctrl.host)) {
+      catalogoCargar(ctrl, false);
+      return;
+    }
+    var fam = catalogoCerca(t, 'data-cat-fam', ctrl.host);
+    if (fam) {
+      catalogoFiltro(ctrl, 'familia', fam.getAttribute('data-cat-fam'));
+      return;
+    }
+    var rar = catalogoCerca(t, 'data-cat-rar', ctrl.host);
+    if (rar) {
+      catalogoFiltro(ctrl, 'rareza', rar.getAttribute('data-cat-rar'));
+      return;
+    }
+    if (catalogoCerca(t, 'data-c-cat-mas', ctrl.host)) {
+      catalogoCargar(ctrl, true);
+      return;
+    }
+    var btn = catalogoCerca(t, 'data-c-acunar', ctrl.host);
+    if (btn) acunarDesdeBoton(btn);
+  }
+
+  /* Marca la tarjeta acunada en el DOM sin recargar la pagina. */
+  function catalogoMarcarTarjeta(ctrl, detalle) {
+    var host = ctrl && ctrl.host;
+    if (!host || typeof host.querySelectorAll !== 'function' || !detalle) return;
+    var id = fichaTexto(detalle.carta_id);
+    var cards = host.querySelectorAll('[data-c-cat-id]');
+    for (var i = 0; i < cards.length; i++) {
+      if (fichaTexto(cards[i].getAttribute('data-c-cat-id')) !== id) continue;
+      cards[i].setAttribute('data-c-cat-estado', 'posee');
+      var cant = safeNum(detalle.cantidad, null);
+      if (typeof cards[i].querySelector === 'function') {
+        var acc = cards[i].querySelector('.c-cat-acc');
+        if (acc) {
+          acc.innerHTML = '<span class="c-cat-nota">Acunada'
+            + (cant !== null ? ' - tienes <b>' + esc(miles(cant)) + '</b>' : '')
+            + '</span>';
+        }
+        var stock = cards[i].querySelector('[data-c-cat-stock]');
+        var rest = cards[i].querySelector('[data-c-cat-rest]');
+        var filas = ctrl.estado.filas || [];
+        for (var j = 0; j < filas.length; j++) {
+          if (fichaTexto(filas[j] && filas[j].id) !== id) continue;
+          if (stock) stock.textContent = catalogoTirada(filas[j]);
+          var q = safeNum(filas[j].restantes, null);
+          if (rest) rest.textContent = (q !== null && q > 0) ? 'quedan ' + miles(q) : '';
+        }
+      }
+      return;
+    }
+  }
+
+  /* Monta el panel si la pagina trae el host. Idempotente y barato: sin host
+     (comunidad.html, perfil.html) devuelve false y no toca la red. */
+  function catalogoMontar(idHost, opciones) {
+    var doc = (typeof document !== 'undefined') ? document : null;
+    if (!doc || typeof doc.getElementById !== 'function') return false;
+    var id = fichaTexto(idHost) || 'catalogo-panel';
+    var host = doc.getElementById(id);
+    if (!host) return false;
+    if (catalogoCtrl && catalogoCtrl.host === host) {
+      if (opciones && opciones.auto) catalogoAbrir(catalogoCtrl);
+      return true;
+    }
+    var ctrl = {
+      host: host, estado: catalogoEstadoBase(), abierto: false,
+      grid: null, info: null, mas: null, rejilla: null, timer: null
+    };
+    catalogoCtrl = ctrl;
+    if (typeof host.addEventListener === 'function') {
+      host.addEventListener('click', function (ev) { catalogoClick(ctrl, ev); });
+      host.addEventListener('input', function (ev) {
+        var q = catalogoCerca(ev && ev.target, 'data-c-cat-q', host);
+        if (q) catalogoBuscar(ctrl, q.value);
+      });
+    }
+    if (doc.addEventListener) {
+      doc.addEventListener('cartas:acunar', function (ev) {
+        var det = ev && ev.detail;
+        if (!catalogoAplicarAcunar(ctrl.estado, det)) return;
+        catalogoMarcarTarjeta(ctrl, det);
+      });
+    }
+    if (opciones && opciones.auto) catalogoAbrir(ctrl);
+    return true;
+  }
+
+  /* Auto-arranque: solo pinta el panel en las paginas que lo declaran. */
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    var catalogoArrancar = function () { catalogoMontar('catalogo-panel'); };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', catalogoArrancar);
+    } else {
+      catalogoArrancar();
+    }
+  }
+
   w.CartasUI = {
     EMISORES: EMISORES,
     RAREZAS: RAREZAS,
@@ -1149,7 +1679,23 @@
     fichaAbierta: fichaAbierta,
     subirNivelCarta: subirNivelCarta,
     acunarCarta: acunarCarta,
-    acunarDesdeBoton: acunarDesdeBoton
+    acunarDesdeBoton: acunarDesdeBoton,
+    CATALOGO_LIMIT: CATALOGO_LIMIT,
+    CATALOGO_FAMILIAS: CATALOGO_FAMILIAS,
+    CATALOGO_RAREZAS: CATALOGO_RAREZAS,
+    catalogoEstadoBase: catalogoEstadoBase,
+    catalogoUrl: catalogoUrl,
+    catalogoNormalizar: catalogoNormalizar,
+    catalogoPedir: catalogoPedir,
+    catalogoEstadoCarta: catalogoEstadoCarta,
+    catalogoTirada: catalogoTirada,
+    catalogoCartaHtml: catalogoCartaHtml,
+    catalogoFiltrosHtml: catalogoFiltrosHtml,
+    catalogoGridHtml: catalogoGridHtml,
+    catalogoInfoTexto: catalogoInfoTexto,
+    catalogoHayMas: catalogoHayMas,
+    catalogoAplicarAcunar: catalogoAplicarAcunar,
+    catalogoMontar: catalogoMontar
   };
 
 }(window));

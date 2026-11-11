@@ -542,6 +542,225 @@ var cadenaAcunar = (function () {
 })();
 
 /* ---------------------------------------------------------------------------
+   9) CATALOGO: contrato del canal de adquisicion y tarjeta compacta.
+   --------------------------------------------------------------------------- */
+function cartaCatalogo() {
+  return {
+    id: 'ct_lugar_07',
+    nombre: 'Cascada del Tequendama',
+    familia: 'lugar',
+    subtipo: 'territorio',
+    rareza: 'epico',
+    edicion: 'limitada',
+    supply_max: 300,
+    emitidas: 40,
+    restantes: 260,
+    precio_xp: 2400,
+    poder: 31,
+    nivel: 1,
+    imagen_url: '',
+    posee: false,
+    cantidad: 0
+  };
+}
+
+(function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return;
+
+  var url = UI.catalogoUrl({ familia: 'lugar', rareza: 'raro', q: 'sierra' }, 3);
+  assert(url.indexOf('/api/usuarios?tipo=cartas_catalogo') === 0
+    && url.indexOf('limit=24') >= 0 && url.indexOf('page=3') >= 0,
+    'catalogoUrl apunta al canal de adquisicion con limit 24 y page');
+  assert(url.indexOf('familia=lugar') >= 0 && url.indexOf('rareza=raro') >= 0
+    && url.indexOf('q=sierra') >= 0,
+    'catalogoUrl transporta familia, rareza y q');
+  assert(UI.catalogoUrl({}, 1).indexOf('familia=') < 0
+    && UI.catalogoUrl({}, 1).indexOf('q=') < 0,
+    'catalogoUrl no manda filtros vacios');
+
+  var libre = cartaCatalogo();
+  var html = UI.catalogoCartaHtml(libre);
+  assert(html.indexOf('data-c-acunar="1"') >= 0 && html.indexOf('data-precio="2400"') >= 0,
+    'carta libre ofrece Acunar con su precio exacto');
+  assert(html.indexOf('1.500 XP') < 0 && html.indexOf('2.400 XP') >= 0,
+    'el precio se pinta con separador de miles');
+  assert(html.indexOf('tirada 40 / 300') >= 0, 'la tirada se pinta emitidas / supply_max');
+  assert(html.indexOf('quedan 260') >= 0,
+    'el stock restante del servidor se pinta tal cual llega');
+  assert(html.indexOf('c-chip c-chip--juego') >= 0 && html.indexOf('<b>31</b> poder') >= 0,
+    'la tarjeta reutiliza chip de familia y poder del servidor');
+  assert(html.indexOf('c-cat-rar r-epico') >= 0, 'la rareza se pinta con su clase de color');
+
+  var agotada = cartaCatalogo();
+  agotada.restantes = 0;
+  var htmlAg = UI.catalogoCartaHtml(agotada);
+  assert(htmlAg.indexOf('>Agotada</span>') >= 0 && htmlAg.indexOf('data-c-acunar') < 0,
+    'restantes 0 se pinta como Agotada y sin boton');
+
+  var mia = cartaCatalogo();
+  mia.posee = true;
+  mia.cantidad = 2;
+  var htmlMia = UI.catalogoCartaHtml(mia);
+  assert(htmlMia.indexOf('Ya la tienes <b>2</b>') >= 0 && htmlMia.indexOf('data-c-acunar') < 0,
+    'una carta que ya es tuya dice "Ya la tienes" y NUNCA ofrece Acunar');
+
+  var abierta = cartaCatalogo();
+  abierta.edicion = null;
+  abierta.supply_max = null;
+  abierta.emitidas = null;
+  abierta.restantes = null;
+  var htmlAb = UI.catalogoCartaHtml(abierta);
+  assert(htmlAb.indexOf('Tirada abierta') >= 0,
+    'restantes null con tirada abierta se dice, no se inventa');
+
+  assert(UI.catalogoEstadoCarta(abierta) === 'libre'
+    && UI.catalogoEstadoCarta(mia) === 'posee'
+    && UI.catalogoEstadoCarta(agotada) === 'agotada',
+    'catalogoEstadoCarta clasifica libre / posee / agotada');
+})();
+
+(function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return;
+
+  var vacio = UI.catalogoGridHtml(UI.catalogoEstadoBase());
+  assert(vacio.indexOf('No hay cartas con estos filtros.') >= 0,
+    'sin resultados el estado vacio es legible');
+
+  var estado = UI.catalogoEstadoBase();
+  estado.filas = [cartaCatalogo(), cartaCatalogo()];
+  estado.filas[1].id = 'ct_lugar_08';
+  estado.total = 30;
+  var rejilla = UI.catalogoGridHtml(estado);
+  assert((rejilla.match(/c-cat-card/g) || []).length === 2
+    && rejilla.indexOf('c-cat-rejilla') >= 0,
+    'la rejilla pinta una tarjeta por fila del servidor');
+  assert(UI.catalogoInfoTexto(estado).indexOf('Mostrando 2 de 30 cartas') >= 0,
+    'la info dice cuantas se ven y cuantas hay');
+  assert(UI.catalogoHayMas(estado) === true, 'con 2 de 30 queda Cargar mas');
+  estado.filas = estado.filas.concat(estado.filas);
+  estado.total = 4;
+  assert(UI.catalogoHayMas(estado) === false, 'con todas cargadas no se ofrece Cargar mas');
+
+  var conError = UI.catalogoEstadoBase();
+  conError.error = 'Catalogo no disponible.';
+  var htmlErr = UI.catalogoGridHtml(conError);
+  assert(htmlErr.indexOf('data-c-cat-reintentar="1"') >= 0
+    && htmlErr.indexOf('{') < 0 && htmlErr.indexOf('undefined') < 0,
+    'el error pinta Reintentar sin volcar JSON crudo');
+
+  var filtros = UI.catalogoFiltrosHtml({ familia: 'marca' });
+  assert(filtros.indexOf('data-cat-fam="lugar"') >= 0
+    && filtros.indexOf('data-cat-fam="cosmetica"') >= 0
+    && filtros.indexOf('data-cat-fam="producto"') < 0,
+    'los filtros de familia solo ofrecen familias con cartas');
+  assert(filtros.indexOf('data-cat-fam="marca" aria-pressed="true"') >= 0,
+    'la familia activa queda marcada con aria-pressed');
+  assert(filtros.indexOf('data-cat-rar="dorado"') >= 0
+    && filtros.indexOf('data-c-cat-q="1"') >= 0,
+    'los filtros incluyen rareza y el buscador por nombre');
+})();
+
+/* ---------------------------------------------------------------------------
+   10) CATALOGO: 503 degradado, red caida y acunacion aplicada al estado.
+   --------------------------------------------------------------------------- */
+var cadenaCatalogo = (function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return Promise.resolve();
+  var sandbox = env.sandbox;
+  var cadena = Promise.resolve();
+
+  function conRespuesta(status, cuerpo) {
+    sandbox.fetch = function () {
+      return Promise.resolve({
+        status: status,
+        ok: status >= 200 && status < 300,
+        json: function () { return Promise.resolve(cuerpo); }
+      });
+    };
+  }
+
+  cadena = cadena.then(function () {
+    var n = UI.catalogoNormalizar({ ok: true, data: [cartaCatalogo()], total: 7, page: 1 }, 1, 200);
+    assert(n.ok === true && n.filas.length === 1 && n.total === 7,
+      'catalogoNormalizar acepta la respuesta real del canal');
+  });
+
+  cadena = cadena.then(function () {
+    var n = UI.catalogoNormalizar(
+      { ok: false, error: 'SCHEMA_PENDIENTE' }, 1, 503);
+    assert(n.ok === false && n.error === 'NO_DISPONIBLE'
+      && n.mensaje === 'Catalogo no disponible.',
+      '503 degrada a "Catalogo no disponible" sin romper la pagina');
+  });
+
+  cadena = cadena.then(function () {
+    conRespuesta(200, { ok: true, data: [cartaCatalogo()], total: 1, page: 1 });
+    return UI.catalogoPedir({}, 1).then(function (r) {
+      assert(r.ok === true && r.filas.length === 1,
+        'catalogoPedir resuelve con datos cuando el GET responde');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    conRespuesta(503, { ok: false, error: 'SCHEMA_PENDIENTE' });
+    return UI.catalogoPedir({}, 2).then(function (r) {
+      assert(r.ok === false && r.error === 'NO_DISPONIBLE',
+        'un 503 real del endpoint se tipa NO_DISPONIBLE');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    sandbox.fetch = function () { return Promise.reject(new Error('sin red')); };
+    return UI.catalogoPedir({}, 1).then(function (r) {
+      assert(r.ok === false && r.error === 'CONEXION'
+        && r.mensaje.indexOf('Sin conexion') >= 0,
+        'error de red se degrada a CONEXION con mensaje legible');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    var estado = UI.catalogoEstadoBase();
+    estado.filas = [cartaCatalogo()];
+    estado.total = 1;
+    var aplicado = UI.catalogoAplicarAcunar(estado, {
+      carta_id: 'ct_lugar_07', variante: 'base', cantidad: 1, emitidas: 41
+    });
+    assert(aplicado === true && estado.filas[0].posee === true
+      && estado.filas[0].cantidad === 1,
+      'tras acunar la fila del catalogo queda marcada como poseida');
+    assert(estado.filas[0].restantes === 259 && estado.filas[0].emitidas === 41,
+      'tras acunar se refresca el stock de esa carta, no el de la pagina');
+    assert(UI.catalogoEstadoCarta(estado.filas[0]) === 'posee',
+      'la carta acunada ya no puede volver a ofrecer Acunar');
+    var ajeno = UI.catalogoAplicarAcunar(estado, { carta_id: 'ct_otra' });
+    assert(ajeno === false, 'acunar una carta fuera de la pagina no toca el estado');
+  });
+
+  cadena = cadena.then(function () {
+    var c = cartaCatalogo();
+    c.nombre = '<img src=x onerror=alert(1)>';
+    c.imagen_url = 'foto.jpg" onerror="alert(1)';
+    var html = UI.catalogoCartaHtml(c);
+    assert(html.indexOf('<img src=x') < 0 && html.indexOf('onerror="alert(1)"') < 0,
+      'nombre e imagen_url dinamicos no inyectan atributos');
+    assert(html.indexOf(' class="c-cat-img"') >= 0 && html.indexOf('onerror=') >= 0,
+      'la lamina del catalogo lleva onerror de fallback (ADR-008)');
+  });
+
+  cadena = cadena.then(function () {
+    assert(UI.catalogoMontar('catalogo-inexistente') === false,
+      'sin host en la pagina el catalogo no monta ni pide nada');
+  });
+
+  return cadena;
+})();
+
+/* ---------------------------------------------------------------------------
    Resumen: se ESPERA a las cadenas con red. Sin esto, process.exit(0) se
    adelanta a los microtasks y los checks asincronos no llegan a contar.
    --------------------------------------------------------------------------- */
@@ -556,4 +775,4 @@ function resumen() {
   process.exit(1);
 }
 
-Promise.all([cadenaSubida, cadenaAcunar]).then(resumen, resumen);
+Promise.all([cadenaSubida, cadenaAcunar, cadenaCatalogo]).then(resumen, resumen);

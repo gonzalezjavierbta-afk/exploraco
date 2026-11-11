@@ -14,7 +14,7 @@
 <!-- T7 (ADR-039): Leaflet para el map-picker de localizacion del Museo -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="dictado-voz.css?v=1"/>
-<link rel="stylesheet" href="cartas-ui.css?v=4"/>
+<link rel="stylesheet" href="cartas-ui.css?v=5"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -1219,6 +1219,16 @@ input[style*="font-size:13px"],input[style*="font-size:14px"],select[style*="fon
       <div class="pf-section-title" style="margin-top:20px">&#x1F0CF; Mis Cartas</div>
       <div class="pf-v61" id="pf-cartas" data-tab="inventario">
         <div class="v61-empty">Cargando cartas&#8230;</div>
+      </div>
+
+      <!-- CATALOGO (canal de adquisicion): cartas que NO posees. El host lo
+           pinta cartas-ui.js (CartasUI.catalogoMontar, auto-arranque al
+           cargar la pagina) y el GET solo sale al abrir el panel. Ningun ID
+           existente se sustituye ni se renombra (ADR-003). -->
+      <div class="pf-section-title" style="margin-top:20px">&#x1F50D; Catalogo</div>
+      <div class="cartas-silo pf-v61" id="catalogo-panel" data-tab="inventario">
+        <div class="c-cat-vacio">Aqui aparecen las cartas que aun no tienes, con su tirada y su coste en XP.</div>
+        <button type="button" class="c-cat-abrir" data-c-cat-abrir="1" id="catalogo-abrir">Catalogo</button>
       </div>
     </div>
 
@@ -9251,7 +9261,7 @@ else if (PF_TAB_ACTIVO === 'inventario') {
 window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>
   <script src="usuario-session.js"></script>
-<script src="cartas-ui.js?v=4"></script>
+<script src="cartas-ui.js?v=5"></script>
 <script src="cartas-arte.js"></script>
   <script src="album-comments.js?v=2"></script>
   <script>

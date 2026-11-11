@@ -1547,8 +1547,8 @@ module.exports = async function handler(req, res) {
       // cuenta TODOS los vinculos y cartas_activas_n solo los que hoy respaldan
       // gameplay (c.activo=true): es el numero que dispara MEDIA_CON_CARTAS.
       // identidad_admin=true cuando el despliegue declara ADMIN_USER_ID con un
-      // uuid valido; el panel lo usa para avisar de que moderado_por quedara
-      // NULL (nunca se inventa identidad).
+      // uuid valido; el panel lo contrasta con identidad_origen (D-25) para
+      // saber si la identidad guardada salio del env, del body o de ninguna.
       if (tipoCa === 'cartas_media_lista') {
         if (req.method !== 'GET') return res.status(405).end();
         var estMed = String(req.query.estado || 'pendiente').trim().toLowerCase();
@@ -1608,15 +1608,18 @@ module.exports = async function handler(req, res) {
       // TRANSICION_INVALIDA sin escribir. Fail-closed: si el UPDATE no
       // devuelve fila, no hay 200.
       //
-      // IDENTIDAD de moderado_por (decision del operador, 2026-11-11): la
-      // identidad se toma, por orden, de body.moderado_por (uuid explicito;
-      // mal formado -> 400 MODERADO_POR_INVALIDO) o de
-      // process.env.ADMIN_USER_ID. ADMIN_USER_ID solo se escribe si es un uuid
-      // valido Y existe en usuarios.id; si falta, esta mal formado o apunta a
-      // un usuario inexistente, moderado_por queda NULL y la moderacion
+      // IDENTIDAD de moderado_por -- D-25 (decision del operador, 2026-11-11):
+      // PRECEDENCIA. ADMIN_USER_ID, cuando esta configurado con un uuid que
+      // EXISTE en usuarios.id, gana SIEMPRE: un body.moderado_por distinto se
+      // IGNORA en silencio (recibirlo no es error y no se usa; el endpoint ya
+      // esta cerrado con ADMIN_SECRET y la identidad del despliegue manda).
+      // Si la variable falta, esta mal formada o apunta a un usuario
+      // inexistente, se acepta body.moderado_por solo con uuid valido Y
+      // existente; cualquier otra cosa deja moderado_por NULL y la moderacion
       // CONTINUA (nunca 500/503 por identidad: no se inventa identidad ni se
       // bloquea el trabajo). La respuesta lleva identidad_admin (la variable
-      // esta configurada con uuid valido) y el moderado_por realmente
+      // trae uuid con formato valido) y identidad_origen ('env'|'body'|
+      // 'ninguna'), que declara de donde salio el moderado_por REALMENTE
       // guardado, para que el panel muestre NULL en vez de suponer.
       if (tipoCa === 'cartas_media_moderar') {
         if (req.method !== 'POST') return res.status(405).end();
@@ -1631,23 +1634,31 @@ module.exports = async function handler(req, res) {
         var motMed = String(body.motivo == null ? '' : body.motivo).trim() || null;
         if (estNuevo === 'rechazada' && !motMed)
           return res.status(400).json({ ok:false, error:'MOTIVO_REQUERIDO' });
-        var modPor = normalizarUuidCarta(body.moderado_por);
-        if (modPor === undefined)
-          return res.status(400).json({ ok:false, error:'MODERADO_POR_INVALIDO',
-            detalle:'moderado_por debe ser un uuid valido o null' });
-        // ADMIN_USER_ID: la identidad del despliegue. Solo cuenta si es uuid
-        // valido; si no, se ignora en silencio (nunca rompe la moderacion).
         var admIdMed = normalizarUuidCarta(process.env.ADMIN_USER_ID);
         var identidadAdm = Boolean(admIdMed);
-        if (!modPor && admIdMed) {
+        var modPor = null;
+        var origMed = 'ninguna';
+        if (admIdMed) {
           var usrAdm = await sql(
             'SELECT id::text AS id FROM usuarios WHERE id=$1::uuid LIMIT 1',
             [admIdMed]
           );
-          // uuid inexistente -> NULL, pero la moderacion sigue.
-          modPor = usrAdm.length ? admIdMed : null;
+          if (usrAdm.length) { modPor = admIdMed; origMed = 'env'; }
         }
-        if (estNuevo === 'pendiente') modPor = null;
+        // Solo se consulta el body si el env no resolvio identidad: el uuid
+        // recibido debe EXISTIR en usuarios, o no se escribe nada.
+        if (!modPor) {
+          var modBody = normalizarUuidCarta(body.moderado_por);
+          if (modBody) {
+            var usrBody = await sql(
+              'SELECT id::text AS id FROM usuarios WHERE id=$1::uuid LIMIT 1',
+              [modBody]
+            );
+            if (usrBody.length) { modPor = modBody; origMed = 'body'; }
+          }
+        }
+        // Reabrir (pendiente) limpia la identidad: no hubo moderacion.
+        if (estNuevo === 'pendiente') { modPor = null; origMed = 'ninguna'; }
         var actMed = await sql(
           'SELECT estado_moderacion, licencia FROM cartas_media'
           + ' WHERE id=$1::uuid LIMIT 1',
@@ -1714,7 +1725,8 @@ module.exports = async function handler(req, res) {
             detalle: String(medLock.estado_moderacion) + ' -> ' + estNuevo });
         }
         return res.status(200).json({ ok:true, data: updMed[0],
-          identidad_admin: identidadAdm, mensaje: 'Obra ' + estNuevo });
+          identidad_admin: identidadAdm, identidad_origen: origMed,
+          mensaje: 'Obra ' + estNuevo });
       }
 
       // --- Crear: id unico (slug ASCII), set y rareza validos -----------
@@ -1863,31 +1875,29 @@ module.exports = async function handler(req, res) {
       if (tipoCa === 'cartas_editar') {
         if (req.method !== 'POST') return res.status(405).end();
         if (!body.id) return res.status(400).json({ ok:false, error:'id requerido' });
-        var tocaEmiCa = ('emisor_tipo' in body) || ('emisor_id' in body) || ('marca_id' in body);
-        var tocaInvCa = tocaEmiCa || ('fusionable' in body) || ('nivel_gate' in body)
-          || ('es_evento' in body) || ('es_canjeable_qr' in body);
         // ADR-121 (066/068): familia, subtipo, edicion, supply y precio se
-        // validan sobre el RESULTADO del merge, asi que exigen leer la fila
-        // actual. tocaFamCa separa ese caso del resto: una edicion de nombre,
-        // lamina o emisor NO arrastra la validacion de familia.
+        // validan sobre el RESULTADO del merge. tocaFamCa separa ese caso del
+        // resto: una edicion de nombre o lamina no arrastra la validacion de
+        // familia.
         var tocaFamCa = ('familia' in body) || ('subtipo' in body) || ('edicion' in body)
           || ('supply_max' in body) || ('precio_xp' in body);
+        // D-24: el precio de acunacion se resuelve sobre el par
+        // (familia, rareza) RESULTANTE, asi que la rareza tambien pide fila.
+        var tocaRarCa = ('rareza' in body);
         // Spec 6.2: vincular/desvincular la obra exige leer la fila actual
         // (media_id vigente) y, al desvincular, comprobar el mercado.
         var tocaMedCa = ('media_id' in body);
-        // ADR-117 D3.2: tocar imagen_url exige leer activo para no dejar sin
-        // lamina una carta ACTIVA (el invariante I1 se romperia por detras).
-        var tocaImgCa = ('imagen_url' in body);
-        var curCa = [];
-        if (tocaInvCa || tocaImgCa || tocaFamCa || tocaMedCa) {
-          curCa = await sql(
-            'SELECT nivel_gate, es_evento, es_canjeable_qr, emisor_tipo, emisor_id, marca_id, fusionable, activo, '
-            + 'familia, subtipo, edicion, supply_max, precio_xp, emitidas, stats_json, media_id '
-            + 'FROM cartas_catalogo WHERE id=$1 LIMIT 1',
-            [body.id]
-          );
-          if (!curCa.length) return res.status(404).json({ ok:false, error:'Carta no encontrada' });
-        }
+        // La fila se lee SIEMPRE (D-24): sin ella no se puede saber si el
+        // precio resultante coincide con el guardado, y una edicion sin
+        // precio_xp en el body debe recalcularlo (antes quedaba NULL). Tambien
+        // mantiene los guards de emisor/imagen/media sobre el estado real.
+        var curCa = await sql(
+          'SELECT nivel_gate, es_evento, es_canjeable_qr, emisor_tipo, emisor_id, marca_id, fusionable, activo, '
+          + 'familia, subtipo, edicion, supply_max, precio_xp, emitidas, stats_json, media_id, rareza '
+          + 'FROM cartas_catalogo WHERE id=$1 LIMIT 1',
+          [body.id]
+        );
+        if (!curCa.length) return res.status(404).json({ ok:false, error:'Carta no encontrada' });
         var effNivCa  = curCa.length ? curCa[0].nivel_gate : null;
         var effEvCa   = curCa.length ? curCa[0].es_evento === true : false;
         var effQrCa   = curCa.length ? curCa[0].es_canjeable_qr === true : false;
@@ -1899,11 +1909,14 @@ module.exports = async function handler(req, res) {
         // merge (la UI puede mandar solo familia y dejar subtipo viejo).
         var effFamCa  = curCa.length ? (curCa[0].familia || null) : null;
         var famCurCa  = effFamCa;
+        var effRarCa  = curCa.length ? String(curCa[0].rareza || '').trim().toLowerCase() : '';
         var effSubCa  = curCa.length ? (curCa[0].subtipo || null) : null;
         var effEdiCa  = curCa.length ? (curCa[0].edicion || CartasConfig.CARTA_EDICION_DEFECTO)
                                      : CartasConfig.CARTA_EDICION_DEFECTO;
         var effSupCa  = curCa.length ? (curCa[0].supply_max == null ? null : Number(curCa[0].supply_max)) : null;
         var effPreCa  = curCa.length ? (curCa[0].precio_xp == null ? null : Number(curCa[0].precio_xp)) : null;
+        var prePedCa  = ('precio_xp' in body);
+        var preBodyCa = null;
         var effEmiNum = curCa.length ? (Number(curCa[0].emitidas) || 0) : 0;
         var effStatsCa = curCa.length ? curCa[0].stats_json : null;
         var statsResCa = effStatsCa;
@@ -1922,6 +1935,7 @@ module.exports = async function handler(req, res) {
           var rarE2 = String(body.rareza || '').trim().toLowerCase();
           if (RAREZAS_CARTA.indexOf(rarE2) < 0)
             return res.status(400).json({ ok:false, error:'RAREZA_INVALIDA' });
+          effRarCa = rarE2;
           setsCa.push('rareza=$' + piCa++); paramsCa.push(rarE2);
         }
         if ('nivel_gate' in body) {
@@ -2025,13 +2039,56 @@ module.exports = async function handler(req, res) {
           effSupCa = supE2;
           setsCa.push('supply_max=$' + piCa++); paramsCa.push(supE2);
         }
-        if ('precio_xp' in body) {
+        // precio_xp explicito: se normaliza y se guarda aparte. El SET lo
+        // emite el bloque D-24 de abajo, que resuelve el valor sobre la
+        // familia/rareza RESULTANTES (un solo push, nunca dos asignaciones a
+        // la misma columna).
+        if (prePedCa) {
           var preE2 = normalizarPrecioCarta(body.precio_xp);
           if (preE2 === undefined)
             return res.status(400).json({ ok:false, error:'PRECIO_INVALIDO',
               detalle:'precio_xp debe ser numerico >= 0 o null' });
-          effPreCa = preE2;
-          setsCa.push('precio_xp=$' + piCa++); paramsCa.push(preE2);
+          preBodyCa = preE2;
+        }
+        // D-24 (decision del operador, 2026-11-11): AUTO-PRECIO AL EDITAR. En
+        // el alta el precio acunable ya se resuelve con
+        // CartasConfig.precioAcunacion(); la edicion con precio_xp vacio lo
+        // dejaba NULL. Aqui se resuelve SIEMPRE sobre la familia y la rareza
+        // resultantes (las del body si cambian, las de la fila si no):
+        //   - familia producto/consumible: precio_xp NULL obligatorio (lo exige
+        //     chk_cartas_catalogo_precio de la 066), aunque el body mande uno;
+        //   - precio_xp explicito (> 0): se respeta tal cual;
+        //   - precio_xp vacio/ausente con rareza cambiada o no: se recalcula
+        //     con precioAcunacion(familia, rareza);
+        //   - precioAcunacion() null en familia acunable (rareza desconocida):
+        //     no se inventa nada y responde 400 PRECIO_NO_DETERMINABLE; si el
+        //     body no toca precio, familia ni rareza se deja el valor previo
+        //     para no bloquear filas heredadas.
+        // Idempotente: el SET solo se emite si el valor final DIFIERE del que
+        // ya tiene la fila, asi que editar dos veces el mismo body no cambia
+        // el precio la segunda vez.
+        var famSinPreE2 = (effFamCa !== null)
+          && (CartasConfig.CARTA_FAMILIAS_SIN_PRECIO_XP.indexOf(effFamCa) >= 0);
+        var preFinE2 = effPreCa;
+        if (famSinPreE2) {
+          preFinE2 = null;
+        } else if (prePedCa && preBodyCa !== null) {
+          preFinE2 = preBodyCa;
+        } else if (effFamCa !== null) {
+          var preAutoE2 = CartasConfig.precioAcunacion(effFamCa, effRarCa);
+          if (preAutoE2 === null) {
+            if (tocaFamCa || tocaRarCa)
+              return res.status(400).json({ ok:false, error:'PRECIO_NO_DETERMINABLE',
+                detalle:'No se puede calcular precio_xp para familia ' + effFamCa
+                  + ' y rareza ' + (effRarCa || '(vacia)')
+                  + ': envia un precio_xp explicito' });
+          } else {
+            preFinE2 = preAutoE2;
+          }
+        }
+        if (preFinE2 !== effPreCa) {
+          effPreCa = preFinE2;
+          setsCa.push('precio_xp=$' + piCa++); paramsCa.push(preFinE2);
         }
         // Coherencia de emisor sobre el RESULTADO del merge (nunca dejar que
         // el 23514 de chk_cartas_catalogo_emisor_coherente caiga como 500).

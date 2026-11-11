@@ -149,7 +149,7 @@ assert(!/museo_publico/.test(tUsu), USU + ' NO contiene el nombre antiguo museo_
 // (e) Invariancia del upsert de inventario: TODO INSERT en usuarios_cartas
 // declara el conflicto de 3 columnas. El conteo es dinamico y POR TABLA: se
 // corta el texto en bloques por INSERT y solo cuenta los que apuntan a
-// usuarios_cartas (el prefijo `INSERT INTO usuarios_cartas` tambien casaba con
+// usuarios_cartas (el prefijo "INSERT INTO usuarios_cartas" tambien casaba con
 // usuarios_cartas_nivel, que tiene PK de 2 columnas y es otra tabla). Una rama
 // nueva de compra anade un INSERT mas y no rompe el gate; una regresion a 2
 // columnas si lo rompe.
@@ -251,6 +251,49 @@ assert(/CartasConfig\.precioAcunacion\s*\(/.test(tAdm),
 assert(cuenta(tAdm, /var\s+(CARTA_PRECIO_BASE_XP|CARTA_MULT_FAMILIA)\s*=/g) === 0,
   ADM + ' NO redeclara la tabla de precios (solo en lib/)',
   'declaracion local detectada');
+
+// --- (g) D-25 / D-24: identidad y auto-precio al EDITAR ---------------------
+// GATE ESTATICO: fija el ORDEN de la precedencia de identidad y la UNICIDAD
+// del SET de precio_xp en cartas_editar. El comportamiento real se ejercita
+// en smoke_cartas_economia (F1/F2) con el handler y un doble de neon.
+// D-25: ADMIN_USER_ID se resuelve ANTES del body y el body solo se consulta si
+// el env no dio identidad; un body mal formado ya NO es 400.
+var iEnvD25 = tAdm.indexOf('var admIdMed = normalizarUuidCarta(process.env.ADMIN_USER_ID)');
+var iBodyD25 = tAdm.indexOf('var modBody = normalizarUuidCarta(body.moderado_por)');
+assert(iEnvD25 !== -1 && iBodyD25 !== -1 && iEnvD25 < iBodyD25,
+  ADM + ' D-25: ADMIN_USER_ID se resuelve antes de body.moderado_por',
+  'env=' + iEnvD25 + ' body=' + iBodyD25);
+assert(tAdm.indexOf("if (usrAdm.length) { modPor = admIdMed; origMed = 'env'; }") !== -1
+  && tAdm.indexOf('if (!modPor) {') !== -1,
+  ADM + ' D-25: la identidad del env se usa siempre y el body es el respaldo',
+  'falta el orden env -> body');
+assert(tAdm.indexOf('MODERADO_POR_INVALIDO') === -1,
+  ADM + ' D-25: un moderado_por mal formado se ignora (sin 400)',
+  'el codigo viejo aun responde MODERADO_POR_INVALIDO');
+assert(tAdm.indexOf('identidad_origen: origMed') !== -1
+  && tAdm.indexOf('identidad_admin: identidadAdm') !== -1,
+  ADM + ' D-25: la respuesta declara identidad_admin e identidad_origen',
+  'falta identidad_origen en la respuesta');
+
+// D-24: la edicion resuelve el precio con la MISMA fuente que el alta
+// (lib/cartas-config.js) y en UN solo punto del bloque cartas_editar.
+assert(tAdm.indexOf('CartasConfig.precioAcunacion(effFamCa, effRarCa)') !== -1,
+  ADM + ' D-24: cartas_editar recalcula con precioAcunacion(familia, rareza)',
+  'no aparece la llamada con los valores resultantes');
+assert(tAdm.indexOf('PRECIO_NO_DETERMINABLE') !== -1
+  && tAdm.indexOf('CARTA_FAMILIAS_SIN_PRECIO_XP.indexOf(effFamCa)') !== -1,
+  ADM + ' D-24: familias sin precio -> NULL y rareza desconocida -> 400',
+  'falta alguna de las dos ramas');
+var iEditCa = tAdm.indexOf("if (tipoCa === 'cartas_editar')");
+var iTogCa = tAdm.indexOf("if (tipoCa === 'cartas_toggle')");
+var bloqueEdit = (iEditCa >= 0 && iTogCa > iEditCa) ? tAdm.slice(iEditCa, iTogCa) : '';
+assert(bloqueEdit !== '' && cuenta(bloqueEdit, /precio_xp=\$/g) === 1,
+  ADM + ' D-24: cartas_editar asigna precio_xp en UN solo SET (sin duplicados)',
+  'SET encontrados: ' + cuenta(bloqueEdit, /precio_xp=\$/g));
+assert(bloqueEdit.indexOf('if (preFinE2 !== effPreCa)') !== -1
+  && bloqueEdit.indexOf('media_id, rareza') !== -1,
+  ADM + ' D-24: idempotente (solo escribe si cambia) y la fila expone rareza',
+  'falta el guard de idempotencia o la columna rareza');
 
 // --- Resumen ---------------------------------------------------------------
 console.log('');

@@ -27,6 +27,13 @@
 //     desactivar la carta; la identidad de moderado_por sale de ADMIN_USER_ID
 //     (presente -> uuid escrito, ausente o inexistente -> NULL y la moderacion
 //     sigue). El SQL de lock/conteo/UPDATE se EXTRAE de api/admin.js.
+//   D-25 / D-24 (decisiones del operador, 2026-11-11): el handler REAL se
+//     ejercita con un doble de neon (F1/F2). D-25: ADMIN_USER_ID existente
+//     gana SIEMPRE sobre body.moderado_por (ignorado en silencio) y la
+//     respuesta declara identidad_origen; sin env, el body solo vale con uuid
+//     existente. D-24: editar sin precio_xp resuelve el precio de acunacion
+//     sobre la familia/rareza resultantes, producto/consumible fuerza NULL,
+//     precio explicito manda y la doble edicion es idempotente.
 //
 // POR QUE EL SQL ES ESPEJO Y NO UNA LLAMADA AL HANDLER
 //   api/interacciones.js crea su propia conexion con neon() al entrar; no
@@ -320,11 +327,211 @@ function casosPuros() {
     && adm.indexOf('MEDIA_CON_OFERTAS') !== -1);
 }
 
+// ---------------- D-25 / D-24: handler REAL con doble de neon -----------------
+// api/admin.js crea su cliente con neon(DATABASE_URL) al entrar, asi que aqui
+// se sustituye el MODULO por un doble en memoria y se carga el handler real:
+// req/res simulados, 0 red y 0 escrituras. El doble se retira en el acto, de
+// modo que la seccion con base de datos de abajo sigue usando el modulo real.
+async function casosHandlers() {
+  var rutaNeon = require.resolve('@neondatabase/serverless');
+  var cacheNeon = require.cache[rutaNeon];
+  var rutaAdm = require.resolve('../api/admin.js');
+  var sqlActual = null;
+  function sqlDoble(t, p) { return sqlActual(String(t), p || []); }
+  sqlDoble.transaction = function (fn) {
+    return Promise.all(fn(function (t, p) { return sqlActual(String(t), p || []); }));
+  };
+  require.cache[rutaNeon] = {
+    id: rutaNeon, filename: rutaNeon, loaded: true,
+    exports: { neon: function () { return sqlDoble; } }
+  };
+  delete require.cache[rutaAdm];
+  var hAdm = require(rutaAdm);
+  if (cacheNeon) require.cache[rutaNeon] = cacheNeon;
+  else delete require.cache[rutaNeon];
+
+  var secPrev = process.env.ADMIN_SECRET;
+  var usrPrev = process.env.ADMIN_USER_ID;
+  process.env.ADMIN_SECRET = 'smk-admin-secret';
+
+  function mkRes() {
+    var r = { code: 0, cuerpo: null };
+    r.setHeader = function () { return r; };
+    r.status = function (c) { r.code = c; return r; };
+    r.json = function (o) { r.cuerpo = o; return r; };
+    r.end = function () { return r; };
+    return r;
+  }
+  async function pedir(metodo, query, cuerpo) {
+    var res = mkRes();
+    await hAdm({ method: metodo, query: query, body: cuerpo,
+      headers: { authorization: 'Bearer ' + process.env.ADMIN_SECRET } }, res);
+    return res;
+  }
+
+  var ENV = '11111111-1111-4111-8111-111111111111';
+  var CUERPO = '22222222-2222-4222-8222-222222222222';
+  var NADA = '00000000-0000-4000-8000-000000000000';
+
+  function fakeModerar(usuarioQueExiste) {
+    var store = { mod: undefined };
+    sqlActual = function (t, p) {
+      if (t.indexOf('FROM usuarios') !== -1)
+        return Promise.resolve(p[0] === usuarioQueExiste ? [{ id: p[0] }] : []);
+      if (t.indexOf('FROM cartas_media') !== -1
+          && t.indexOf('estado_moderacion, licencia') !== -1)
+        return Promise.resolve([{ estado_moderacion: 'pendiente', licencia: 'cc-by' }]);
+      if (t.indexOf('FOR UPDATE') !== -1)
+        return Promise.resolve([{ id: 'm1', estado_moderacion: 'pendiente', cartas_n: 0 }]);
+      if (t.indexOf('UPDATE cartas_media') !== -1) {
+        store.mod = p[3];
+        return Promise.resolve([{ id: 'm1', estado_moderacion: p[1], moderado_por: p[3] }]);
+      }
+      return Promise.resolve([]);
+    };
+    return store;
+  }
+  function modBody(extra) {
+    var b = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', estado: 'aprobada' };
+    var k;
+    for (k in extra) b[k] = extra[k];
+    return b;
+  }
+  var QA = { recurso: 'cartas', tipo: 'cartas_media_moderar' };
+  var s, r;
+
+  // D-25: la variable de entorno prevalece.
+  process.env.ADMIN_USER_ID = ENV;
+  s = fakeModerar(ENV);
+  r = await pedir('POST', QA, modBody({ moderado_por: CUERPO }));
+  check('F1.1 D-25: ADMIN_USER_ID existente gana sobre body.moderado_por',
+    r.code === 200 && s.mod === ENV && r.cuerpo.identidad_origen === 'env'
+    && r.cuerpo.identidad_admin === true,
+    'code=' + r.code + ' origen=' + (r.cuerpo && r.cuerpo.identidad_origen));
+
+  s = fakeModerar(ENV);
+  r = await pedir('POST', QA, modBody({ moderado_por: 'no-es-uuid' }));
+  check('F1.2 D-25: body mal formado se ignora con env (sin 400)',
+    r.code === 200 && s.mod === ENV && r.cuerpo.identidad_origen === 'env',
+    'code=' + r.code);
+
+  delete process.env.ADMIN_USER_ID;
+  s = fakeModerar(CUERPO);
+  r = await pedir('POST', QA, modBody({ moderado_por: CUERPO }));
+  check('F1.3 D-25: sin env, body con uuid existente -> body',
+    r.code === 200 && s.mod === CUERPO && r.cuerpo.identidad_origen === 'body'
+    && r.cuerpo.identidad_admin === false,
+    'code=' + r.code + ' origen=' + (r.cuerpo && r.cuerpo.identidad_origen));
+
+  s = fakeModerar(CUERPO);
+  r = await pedir('POST', QA, modBody({ moderado_por: 'basura' }));
+  check('F1.4 D-25: sin env y body basura -> moderado_por NULL / ninguna',
+    r.code === 200 && s.mod === null && r.cuerpo.identidad_origen === 'ninguna',
+    'code=' + r.code + ' mod=' + String(s.mod));
+
+  process.env.ADMIN_USER_ID = '33333333-3333-4333-8333-333333333333';
+  s = fakeModerar(NADA);
+  r = await pedir('POST', QA, modBody({ moderado_por: '44444444-4444-4444-8444-444444444444' }));
+  check('F1.5 D-25: uuid inexistente en env y body -> NULL / ninguna',
+    r.code === 200 && s.mod === null && r.cuerpo.identidad_origen === 'ninguna',
+    'code=' + r.code + ' mod=' + String(s.mod));
+
+  delete process.env.ADMIN_USER_ID;
+  s = fakeModerar(NADA);
+  r = await pedir('POST', QA, modBody({ moderado_por: CUERPO }));
+  check('F1.6 D-25: body con uuid inexistente -> NULL / ninguna',
+    r.code === 200 && s.mod === null && r.cuerpo.identidad_origen === 'ninguna',
+    'code=' + r.code + ' mod=' + String(s.mod));
+
+  function fakeEditar(fila) {
+    var cap = { sql: '', params: null };
+    sqlActual = function (t, p) {
+      if (t.indexOf('FROM cartas_catalogo WHERE id=$1') !== -1)
+        return Promise.resolve([fila]);
+      if (t.indexOf('FROM cartas_ofertas') !== -1) return Promise.resolve([]);
+      if (t.indexOf('UPDATE cartas_catalogo SET') !== -1) {
+        cap.sql = t; cap.params = p;
+        return Promise.resolve([{ id: fila.id }]);
+      }
+      return Promise.resolve([]);
+    };
+    return cap;
+  }
+  function precioDe(cap) {
+    var m = cap.sql.match(/precio_xp=\$(\d+)/);
+    if (!m) return 'SIN_SET';
+    return cap.params[Number(m[1]) - 1];
+  }
+  function filaBase(over) {
+    var f = {
+      id: 'c1', nivel_gate: null, es_evento: false, es_canjeable_qr: false,
+      emisor_tipo: 'sistema', emisor_id: null, marca_id: null, fusionable: true,
+      activo: false, familia: 'lugar', subtipo: 'territorio', edicion: 'abierta',
+      supply_max: null, precio_xp: null, emitidas: 0, stats_json: {},
+      media_id: null, rareza: 'comun'
+    };
+    var k;
+    for (k in over) f[k] = over[k];
+    return f;
+  }
+  var QE = { recurso: 'cartas', tipo: 'cartas_editar' };
+  var cap;
+
+  // D-24: auto-precio al editar (fila con precio NULL = el bug que se cierra).
+  cap = fakeEditar(filaBase());
+  r = await pedir('POST', QE, { id: 'c1', descripcion: 'nueva' });
+  check('F2.1 D-24: lugar sin precio_xp -> 150', r.code === 200 && precioDe(cap) === 150,
+    'code=' + r.code + ' precio=' + precioDe(cap));
+
+  cap = fakeEditar(filaBase({ familia: 'personaje', subtipo: 'historico', rareza: 'raro' }));
+  r = await pedir('POST', QE, { id: 'c1', descripcion: 'nueva' });
+  check('F2.2 D-24: personaje raro -> 480', r.code === 200 && precioDe(cap) === 480,
+    'code=' + r.code + ' precio=' + precioDe(cap));
+
+  cap = fakeEditar(filaBase({ precio_xp: '150.00' }));
+  r = await pedir('POST', QE, { id: 'c1', rareza: 'dorado' });
+  check('F2.3 D-24: cambiar rareza comun->dorado recalcula 2500',
+    r.code === 200 && precioDe(cap) === 2500,
+    'code=' + r.code + ' precio=' + precioDe(cap));
+
+  cap = fakeEditar(filaBase({ precio_xp: '150.00' }));
+  r = await pedir('POST', QE, { id: 'c1', rareza: 'dorado', precio_xp: 777 });
+  check('F2.4 D-24: precio_xp explicito manda sobre el recalculo',
+    r.code === 200 && precioDe(cap) === 777,
+    'code=' + r.code + ' precio=' + precioDe(cap));
+
+  cap = fakeEditar(filaBase({ precio_xp: '150.00' }));
+  r = await pedir('POST', QE, { id: 'c1', familia: 'producto', subtipo: 'fisico',
+    stats_json: { sku: 'SMK-1' } });
+  check('F2.5 D-24: familia producto fuerza precio_xp NULL',
+    r.code === 200 && precioDe(cap) === null,
+    'code=' + r.code + ' precio=' + String(precioDe(cap)));
+
+  cap = fakeEditar(filaBase({ precio_xp: '150.00' }));
+  r = await pedir('POST', QE, { id: 'c1', descripcion: 'nueva' });
+  check('F2.6 D-24: idempotente, no reescribe si el precio ya coincide',
+    r.code === 200 && precioDe(cap) === 'SIN_SET',
+    'code=' + r.code + ' precio=' + precioDe(cap));
+
+  cap = fakeEditar(filaBase({ rareza: 'legendaria', precio_xp: '150.00' }));
+  r = await pedir('POST', QE, { id: 'c1', precio_xp: '' });
+  check('F2.7 D-24: rareza no determinable -> 400 PRECIO_NO_DETERMINABLE',
+    r.code === 400 && r.cuerpo.error === 'PRECIO_NO_DETERMINABLE',
+    'code=' + r.code + ' error=' + (r.cuerpo && r.cuerpo.error));
+
+  if (secPrev === undefined) delete process.env.ADMIN_SECRET;
+  else process.env.ADMIN_SECRET = secPrev;
+  if (usrPrev === undefined) delete process.env.ADMIN_USER_ID;
+  else process.env.ADMIN_USER_ID = usrPrev;
+  delete require.cache[rutaAdm];
+}
+
 async function main() {
   console.log('== SMOKE CARTAS ECONOMIA - compra con XP, nivel y lecturas');
   console.log('');
 
   casosPuros();
+  await casosHandlers();
 
   var motivo = motivoSinBase();
   if (motivo) {

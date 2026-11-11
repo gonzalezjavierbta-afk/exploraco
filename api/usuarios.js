@@ -1,4 +1,14 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
+// v27 (2026-11-11): CANAL DE ADQUISICION. GET ?tipo=cartas_catalogo es una
+//   lectura PUBLICA (sin sesion) del catalogo de cartas acunables, para que la
+//   tienda muestre lo que el usuario NO posee. La compra ya existe en
+//   POST /api/interacciones?tipo=carta_acunar: esta rama es SOLO lectura, no
+//   crea flujo de cobro ni endpoint (8/8, ADR-001/ADR-010). Acunable = activo,
+//   familia fuera de producto/consumible y precio_xp > 0 (el SKU no se vende
+//   aqui). Con sesion valida y opcional anade posee/cantidad de la variante
+//   base (join usuarios_cartas); sin sesion esos campos no viajan. Poder con
+//   CartasConfig.poderCarta(stats, 1, 'base'), una sola fuente. Degrada con
+//   responderSchemaPendiente si falta la 066/067.
 // v26 (2026-10-10): SELLADO del pasaporte. La EXISTENCIA de la fila en billeteras es el sello (nadie mas la crea). El flag sellado se anade al objeto pasaporte: si ya existio, la billetera se sigue devolviendo aunque hoy falte un dato. NO es una columna: se calcula en cada lectura. completo NO se falsea nunca; el SELECT de comprobacion solo corre cuando completo=false (tolerante a 42P01/42703, migracion 042 pendiente) y su fila se reutiliza, sin segunda consulta.
 // v25 (2026-09-29): Pasaporte combinado = 10 datos (union de checklist 042 + misiones de perfil); billetera_mia amplia columnas para calcularlo.
 // v24 (2026-09-29): Pasaporte + billetera + fotos de perfil (migracion 042).
@@ -652,6 +662,30 @@ function validarSesionUsuario(req, usuarioIdEsperado) {
   return { ok: true };
 }
 
+// Sesion OPCIONAL para lecturas publicas (catalogo de cartas de la tienda).
+// Devuelve el usuario_id SOLO si el Bearer viene firmado y vigente; sin
+// cabecera, sin token o con token invalido devuelve null y la rama sigue
+// siendo publica (NUNCA 401: el catalogo no exige sesion). Se decodifica el
+// sub del payload para reutilizar el validador unico
+// validarSesionUsuario(req, sub), que es quien COMPRUEBA la firma: aqui no se
+// acepta un usuario_id de query sin token. No loguea el token ni el secreto.
+function usuarioDeSesionOpcional(req) {
+  var encabezado = (req && req.headers && req.headers['authorization']) || '';
+  if (encabezado.indexOf('Bearer ') !== 0) return null;
+  var token = encabezado.slice(7).trim();
+  var punto = token.indexOf('.');
+  if (punto <= 0 || punto === token.length - 1) return null;
+  var payload = null;
+  try {
+    payload = JSON.parse(Buffer.from(token.slice(0, punto), 'base64url').toString('utf8'));
+  } catch (e) {
+    return null;
+  }
+  var sub = String((payload && payload.sub) || '');
+  if (!UUID_RE.test(sub)) return null;
+  return validarSesionUsuario(req, sub).ok ? sub : null;
+}
+
 // Verificacion del secreto de admin para las lecturas que devuelven PII
 // (WP-3, TSK-103 / ADR-028). Reutiliza el MISMO mecanismo ya instalado en
 // el repo (api/admin.js acepta X-Internal-Secret; api/utilidades.js acepta
@@ -971,6 +1005,155 @@ module.exports = async (req, res) => {
             degradado: true
           });
         }
+      }
+
+      // ---- GET: catalogo publico de cartas acunables ------------------
+      // Spec 2026-11-11 (familias / stats / supply) secciones 2 y 4: la
+      // tienda muestra y acuna lo que el usuario NO posee. La COMPRA ya existe
+      // (POST /api/interacciones?tipo=carta_acunar con {carta_id, variante});
+      // esta rama es SOLO lectura y CERO escrituras.
+      // Acunable = activo, familia fuera de producto/consumible y
+      // precio_xp > 0. producto/consumible se pagan por SKU: el catalogo no
+      // los vende ni los puntua (vector vacio), luego no entran.
+      // Sin sesion es publica. Con sesion valida (opcional) se anade posee y
+      // cantidad de la variante base, para pintar "Ya la tienes" sin llamar a
+      // cartas_mias. Sin sesion esos dos campos NO se envian.
+      if (tipo === 'cartas_catalogo') {
+        var ccPage = parseInt(req.query.page, 10);
+        if (!isFinite(ccPage) || ccPage < 1) ccPage = 1;
+        var ccLimit = parseInt(req.query.limit, 10);
+        if (!isFinite(ccLimit) || ccLimit < 1) ccLimit = 24;
+        if (ccLimit > 60) ccLimit = 60;
+        var ccOffset = (ccPage - 1) * ccLimit;
+
+        var ccFam = String(req.query.familia || '').trim().toLowerCase();
+        var ccRar = String(req.query.rareza || '').trim().toLowerCase();
+        var ccQ = String(req.query.q || '').trim();
+
+        var ccW = ['c.activo = true',
+          'c.familia NOT IN (\'producto\',\'consumible\')',
+          'c.precio_xp IS NOT NULL',
+          'c.precio_xp > 0'];
+        var ccP = [];
+        if (ccFam) {
+          ccP.push(ccFam);
+          ccW.push('c.familia = $' + ccP.length);
+        }
+        if (ccRar) {
+          ccP.push(ccRar);
+          ccW.push('c.rareza = $' + ccP.length);
+        }
+        if (ccQ) {
+          // ILIKE con el escape POR DEFECTO de Postgres (backslash): se
+          // escapan \\, % y _ para que un q con comodines busque LITERAL y no
+          // comodinee el catalogo entero. El parametro viaja como texto, luego
+          // standard_conforming_strings no altera el patron.
+          ccP.push('%' + ccQ.replace(/[\\%_]/g, '\\$&') + '%');
+          ccW.push('c.nombre ILIKE $' + ccP.length);
+        }
+
+        // Orden estable: rareza ascendente (comun -> dorado) y nombre. El id
+        // desempata para que page=2 nunca repita filas de page=1.
+        var ccOrden = ' ORDER BY CASE c.rareza'
+          + ' WHEN \'comun\' THEN 1 WHEN \'raro\' THEN 2'
+          + ' WHEN \'epico\' THEN 3 WHEN \'dorado\' THEN 4'
+          + ' ELSE 5 END, c.nombre ASC, c.id ASC';
+
+        var ccRowP = ccP.slice();
+        var ccUid = usuarioDeSesionOpcional(req);
+        // media_tipo solo si la obra esta APROBADA: el LEFT JOIN con el
+        // predicado de moderacion deja m.tipo en NULL para pendiente,
+        // rechazada o retirada, y entonces la salida anula media_id tambien.
+        // No se ofrece lo no moderado (spec 6.2).
+        var ccSel = 'SELECT c.id, c.nombre, c.familia, c.subtipo, c.rareza,'
+          + ' c.edicion, c.supply_max, c.emitidas, c.precio_xp, c.stats_json,'
+          + ' c.imagen_url, c.set_slug, c.nivel_gate, c.media_id,'
+          + ' m.tipo AS media_tipo'
+          + (ccUid ? ', pc.cantidad AS posee_cantidad' : '')
+          + ' FROM cartas_catalogo c'
+          + ' LEFT JOIN cartas_media m ON m.id = c.media_id'
+          + ' AND m.estado_moderacion = \'aprobada\'';
+        if (ccUid) {
+          ccRowP.push(ccUid);
+          ccSel += ' LEFT JOIN LATERAL (SELECT COALESCE(SUM(uc.cantidad), 0)::int'
+            + ' AS cantidad FROM usuarios_cartas uc'
+            + ' WHERE uc.usuario_id = $' + ccRowP.length
+            + ' AND uc.carta_id = c.id AND uc.variante = \'base\''
+            + ' AND uc.activo = true) pc ON true';
+        }
+        ccSel += ' WHERE ' + ccW.join(' AND ') + ccOrden
+          + ' LIMIT $' + (ccRowP.length + 1)
+          + ' OFFSET $' + (ccRowP.length + 2);
+        ccRowP.push(ccLimit, ccOffset);
+
+        var ccTotal = 0;
+        var ccRows = [];
+        try {
+          // Una sola ida: count y pagina comparten predicados. El LEFT JOIN de
+          // media y el LATERAL de posesion no multiplican filas (1 obra por
+          // carta, 1 suma por carta), luego el count sin joins es el TOTAL.
+          var ccRes = await Promise.all([
+            sql('SELECT COUNT(*)::int AS total FROM cartas_catalogo c WHERE '
+              + ccW.join(' AND '), ccP),
+            sql(ccSel, ccRowP)
+          ]);
+          ccTotal = Number((ccRes[0] && ccRes[0][0] && ccRes[0][0].total) || 0);
+          ccRows = ccRes[1] || [];
+        } catch (eCc) {
+          if (!eCc || (eCc.code !== '42P01' && eCc.code !== '42703')) throw eCc;
+          return responderSchemaPendiente(res, 'cartas_catalogo', eCc,
+            'Catalogo no disponible (migracion 066 pendiente)');
+        }
+
+        var ccData = ccRows.map(function (r) {
+          // poder y poder_base salen del MISMO calculo: nivel 1 y variante
+          // base. No hay un segundo calculo ni una columna persistida
+          // (spec 3.5: una sola fuente, dos lectores).
+          var cStats = CartasConfig.statsNormalizados(r.stats_json);
+          var cPoder = CartasConfig.poderCarta(cStats, 1, CARTA_VARIANTE_DEFECTO);
+          var cSupply = (r.supply_max === null || r.supply_max === undefined)
+            ? null : Number(r.supply_max);
+          var cEmit = (r.emitidas === null || r.emitidas === undefined)
+            ? null : Number(r.emitidas);
+          var cRest = null;
+          if (cSupply !== null) {
+            cRest = cSupply - (Number(cEmit) || 0);
+            if (cRest < 0) cRest = 0;
+          }
+          var cMediaTipo = r.media_tipo ? String(r.media_tipo) : null;
+          var cOut = {
+            id: r.id,
+            nombre: r.nombre,
+            familia: r.familia || null,
+            subtipo: r.subtipo || null,
+            rareza: r.rareza,
+            edicion: r.edicion || null,
+            supply_max: cSupply,
+            emitidas: cEmit,
+            restantes: cRest,
+            precio_xp: (r.precio_xp === null || r.precio_xp === undefined)
+              ? null : Number(r.precio_xp),
+            stats: cStats,
+            poder: cPoder,
+            nivel: 1,
+            poder_base: cPoder,
+            imagen_url: r.imagen_url || null,
+            set_slug: r.set_slug || null,
+            nivel_gate: (r.nivel_gate === null || r.nivel_gate === undefined)
+              ? null : Number(r.nivel_gate),
+            media_id: cMediaTipo ? (r.media_id || null) : null,
+            media_tipo: cMediaTipo
+          };
+          if (ccUid) {
+            var cCant = Number(r.posee_cantidad) || 0;
+            cOut.posee = cCant >= 1;
+            cOut.cantidad = cCant;
+          }
+          return cOut;
+        });
+        return res.json({
+          ok: true, data: ccData, total: ccTotal, page: ccPage, limit: ccLimit
+        });
       }
 
       // ---- GET: mis cartas (Fase 2C, T7.1 / ADR-062) ---------------
