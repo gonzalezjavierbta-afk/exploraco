@@ -1662,14 +1662,14 @@ var cadenaMercadoCatalogo = (function () {
 
   cadena = cadena.then(function () {
     /* 12.5: el JS y el CSS nuevos se sirven con la misma version (cache). */
-    assert(comunidad.indexOf('cartas-ui.js?v=11') >= 0
-      && perfil.indexOf('cartas-ui.js?v=11') >= 0
-      && perfilPub.indexOf('cartas-ui.js?v=11') >= 0,
-      'las 3 paginas cargan cartas-ui.js?v=11');
-    assert(comunidad.indexOf('cartas-ui.css?v=11') >= 0
-      && perfil.indexOf('cartas-ui.css?v=11') >= 0
-      && perfilPub.indexOf('cartas-ui.css?v=11') >= 0,
-      'las 3 paginas cargan cartas-ui.css?v=11');
+    assert(comunidad.indexOf('cartas-ui.js?v=12') >= 0
+      && perfil.indexOf('cartas-ui.js?v=12') >= 0
+      && perfilPub.indexOf('cartas-ui.js?v=12') >= 0,
+      'las 3 paginas cargan cartas-ui.js?v=12');
+    assert(comunidad.indexOf('cartas-ui.css?v=12') >= 0
+      && perfil.indexOf('cartas-ui.css?v=12') >= 0
+      && perfilPub.indexOf('cartas-ui.css?v=12') >= 0,
+      'las 3 paginas cargan cartas-ui.css?v=12');
     /* 12.4: el inventario no puede mentir sobre una carta retirada. */
     assert(perfil.indexOf('c.retirada === true') >= 0
       && perfil.indexOf('v61-retirada') >= 0,
@@ -1726,6 +1726,36 @@ var cadenaMercadoCatalogo = (function () {
   });
 
   return cadena;
+})();
+
+/* ---------------------------------------------------------------------------
+   14) Carta RETIRADA (12.4): la UI no ofrece lo que el backend rechaza.
+   carta_subir_nivel -> 404 CARTA_NO_ENCONTRADA; carta_acunar -> 409.
+   --------------------------------------------------------------------------- */
+(function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return;
+
+  var retirada = cartaCompleta();
+  retirada.retirada = true;
+  var htmlR = render(UI, retirada);
+  assert(htmlR.indexOf('data-c-subir-nivel') < 0,
+    'una carta retirada no ofrece subir nivel (el backend devuelve 404)');
+  assert(htmlR.indexOf('data-c-acunar') < 0,
+    'una carta retirada no ofrece acunar otra copia (el backend devuelve 409)');
+  assert(htmlR.indexOf('Carta retirada: no se puede subir nivel ni acunar otra copia') >= 0,
+    'la ficha de una carta retirada dice por que no hay acciones');
+  assert(htmlR.indexOf('c-ficha-retirada') >= 0,
+    'el aviso de retirada usa su propia clase en el silo de la ficha');
+
+  var activa = cartaCompleta();
+  var htmlA = render(UI, activa);
+  assert(htmlA.indexOf('data-c-subir-nivel="1"') >= 0
+    && htmlA.indexOf('data-c-acunar="1"') >= 0,
+    'con retirada !== true la ficha conserva subir nivel y acunar');
+  assert(htmlA.indexOf('Carta retirada') < 0,
+    'una carta activa no anuncia retirada');
 })();
 
 /* ---------------------------------------------------------------------------

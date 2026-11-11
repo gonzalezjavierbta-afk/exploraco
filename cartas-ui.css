@@ -971,6 +971,13 @@
   opacity: .9;
 }
 
+/* 12.4: aviso unico de la carta retirada (sin botones de accion). */
+.c-ficha .c-ficha-retirada {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #FF9B8A;
+}
+
 .c-ficha .c-acunar-btn {
   display: inline-flex;
   align-items: baseline;

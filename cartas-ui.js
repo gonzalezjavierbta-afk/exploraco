@@ -591,8 +591,16 @@
     return 'base';
   }
 
+  /* 12.4: carta poseida que ya no esta en el catalogo activo. El backend
+     rechaza subir nivel (404 CARTA_NO_ENCONTRADA) y acunar (409
+     CARTA_NO_COMPRABLE): la UI no ofrece lo que el servidor va a negar. */
+  function fichaRetirada(carta) {
+    return !!(carta && carta.retirada === true);
+  }
+
   function fichaSubirNivel(carta, contexto, variante) {
     if (contexto !== 'coleccion' && contexto !== 'album') return '';
+    if (fichaRetirada(carta)) return '';
     var id = fichaTexto(fichaCampo(carta, ['id', 'carta_id']));
     if (!id) return '';
     var nivel = safeNum(carta.nivel, null);
@@ -722,6 +730,8 @@
   function fichaAcunar(carta, contexto, variante) {
     /* Vitrina ajena: sin acciones, igual que el resto de la ficha. */
     if (contexto === 'vitrina-publica') return '';
+    /* 12.4: sobre una retirada el POST de acunar responde 409. */
+    if (fichaRetirada(carta)) return '';
     var precio = fichaAcunable(carta);
     if (precio === null) return '';
     return acunarBotonHtml(carta, precio, {
@@ -1169,6 +1179,12 @@
       bloqueAcunar = cat.acunar;
       bloqueNivel = cat.nivel;
     }
+    /* 12.4: una retirada no se acuna ni sube de nivel. Se dice una sola vez
+       en las dos superficies (catalogo y coleccion) en vez de callarlo. */
+    var bloqueRetirada = (contexto !== 'vitrina-publica' && fichaRetirada(carta))
+      ? '<div class="c-ficha-retirada" role="status">Carta retirada:'
+        + ' no se puede subir nivel ni acunar otra copia.</div>'
+      : '';
 
     return '<div class="c-ficha-bd" data-c-ficha-cerrar></div>'
       + '<div class="c-ficha-box" role="dialog" aria-modal="true" aria-labelledby="c-ficha-tit">'
@@ -1184,6 +1200,7 @@
       + bloqueCf
       + bloqueDet
       + bloquePosee
+      + bloqueRetirada
       + bloqueAcunar
       + bloqueNivel
       + '</div>'
