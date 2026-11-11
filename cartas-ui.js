@@ -326,6 +326,9 @@
      ================================================================== */
   var FAMILIAS = {
     lugar: { label: 'Lugar', capa: 'juego' },
+    /* Naturaleza es capa de juego (spec 11.11.1 regla 1.2) pero NO comparte
+       el jade de lugar: lleva tono propio de silo para distinguirse a ojo. */
+    naturaleza: { label: 'Naturaleza', capa: 'juego', tono: 'oliva' },
     personaje: { label: 'Personaje', capa: 'juego' },
     artista: { label: 'Artista', capa: 'juego' },
     marca: { label: 'Marca', capa: 'juego' },
@@ -359,25 +362,36 @@
     var src = carta && carta.stats;
     if (!src || typeof src !== 'object'
         || Object.prototype.toString.call(src) === '[object Array]') return null;
-    var out = { valores: [], suma: 0, primario: '' };
+    var out = { valores: [], suma: 0, cosm: 0, primario: '' };
     out.primario = fichaTexto(src.primario).toLowerCase();
     for (var i = 0; i < EJES.length; i++) {
       var n = safeNum(src[EJES[i].k], 0);
       if (n < 0) n = 0;
       if (n > STATS_TOPE) n = STATS_TOPE;
       out.valores.push(n);
-      if (!EJES[i].cosmetica) out.suma += n;
+      if (EJES[i].cosmetica) out.cosm += n;
+      else out.suma += n;
     }
     return out;
   }
 
-  /* Chip de familia con color por CAPA (juego / economia / estatus). */
+  /* Chip de familia con color por CAPA (juego / economia / estatus) y tono
+     propio de silo cuando la familia lo declara (naturaleza = oliva). */
   function chipFamilia(carta) {
     var k = familiaDe(carta);
     if (!k) return '';
     var f = FAMILIAS[k];
-    return '<span class="c-chip c-chip--' + f.capa + '" title="Capa ' + CAPAS[f.capa] + '">'
+    return '<span class="c-chip c-chip--' + f.capa
+      + (f.tono ? ' c-chip--' + f.tono : '')
+      + '" title="Capa ' + CAPAS[f.capa] + '">'
       + esc(f.label) + '</span>';
+  }
+
+  /* Poder ya derivado por el servidor. 0 = carta cosmetica: se dice "estetico"
+     en vez de un cero grande. Nunca se inventa el poder que no llego. */
+  function poderHtml(poder) {
+    if (poder === 0) return '<b>estetico</b> sin poder';
+    return '<b>' + esc(miles(poder)) + '</b> poder';
   }
 
   /* Metadatos de carta para la REJILLA (coleccion y museo). Cadena vacia si
@@ -390,7 +404,7 @@
     var poder = safeNum(carta.poder, null);
     if (poder !== null) {
       partes += '<span class="c-meta-poder" title="Poder de la carta">'
-        + '<b>' + esc(miles(poder)) + '</b> poder</span>';
+        + poderHtml(poder) + '</span>';
     }
     var nivel = safeNum(carta.nivel, null);
     if (nivel !== null && nivel >= 1) {
@@ -408,7 +422,10 @@
     if (poder === null && !conNivel) return '';
     var out = '<div class="c-ficha-pn">';
     if (poder !== null) {
-      out += '<span class="c-pn-poder"><b>' + esc(miles(poder)) + '</b> poder</span>';
+      out += '<span class="c-pn-poder"' + (poder === 0
+        ? ' title="Carta cosmetica: no suma poder"'
+        : ' title="Poder de la carta"')
+        + '>' + poderHtml(poder) + '</span>';
     }
     if (conNivel) {
       out += '<span class="c-pn-nivel">Nivel <b>' + esc(nivel) + '</b>/' + NIVEL_TOPE + '</span>';
@@ -454,8 +471,33 @@
   }
 
   /* --- Vector de stats: 4 ejes jugables + presencia cosmetica --------- */
+  /* Carta cosmetica (stats solo con presencia y poder 0): en vez de cuatro
+     ceros vacios se pinta la presencia y una nota. Nunca un NaN. */
+  function fichaEjesCosm(vec) {
+    var i, v, pct;
+    for (i = 0; i < EJES.length; i++) {
+      if (!EJES[i].cosmetica) continue;
+      v = vec.valores[i];
+      pct = Math.round((v / STATS_TOPE) * 100);
+      if (pct < 0) pct = 0;
+      if (pct > 100) pct = 100;
+      return '<div class="c-det c-det--cosm">'
+        + '<div class="c-det-t">Vector</div>'
+        + '<div class="c-eje c-eje--cosm">'
+        + '<span class="c-eje-l">' + esc(EJES[i].l)
+        + ' <span class="c-eje-cosm">estetica</span></span>'
+        + '<span class="c-eje-bar" aria-hidden="true"><i style="width:' + pct + '%"></i></span>'
+        + '<span class="c-eje-n">' + esc(v) + '</span>'
+        + '</div>'
+        + '<div class="c-det-pie">Cosmetico: sin efecto economico.</div>'
+        + '</div>';
+    }
+    return '';
+  }
+
   function fichaEjes(vec) {
     if (!vec) return '';
+    if (vec.suma <= 0) return fichaEjesCosm(vec);
     var filas = '';
     for (var i = 0; i < EJES.length; i++) {
       var v = vec.valores[i];
@@ -512,7 +554,7 @@
   /* Bloque completo de detalle. Devuelve '' si no hay NADA nuevo que decir. */
   function fichaDetalle(carta) {
     var vec = vectorStats(carta);
-    var ejeHtml = (vec && (vec.suma > 0 || vec.primario)) ? fichaEjes(vec) : '';
+    var ejeHtml = (vec && (vec.suma > 0 || vec.cosm > 0)) ? fichaEjes(vec) : '';
     var lineas = [];
     var tirada = fichaTirada(carta);
     if (tirada) lineas.push(tirada);
@@ -571,6 +613,7 @@
      no se acuna: el backend lo rechaza con CARTA_NO_COMPRABLE. */
   var FAMILIAS_ACUNABLES = {
     lugar: 1,
+    naturaleza: 1,
     personaje: 1,
     artista: 1,
     marca: 1,
@@ -1140,7 +1183,7 @@
      asi que comunidad.html y perfil.html no pagan nada por cargarlo.
      ================================================================== */
   var CATALOGO_LIMIT = 24;
-  var CATALOGO_FAMILIAS = ['lugar', 'personaje', 'marca', 'artista', 'cosmetica'];
+  var CATALOGO_FAMILIAS = ['lugar', 'naturaleza', 'personaje', 'marca', 'artista', 'cosmetica'];
   var CATALOGO_RAREZAS = ['comun', 'raro', 'epico', 'dorado'];
 
   function catalogoEstadoBase() {
@@ -1303,8 +1346,8 @@
       + catalogoChipRareza(carta) + '</div>';
     html += '<div class="c-cat-meta">' + chipFamilia(carta);
     if (poder !== null) {
-      html += '<span class="c-meta-poder" title="Poder de la carta"><b>'
-        + esc(miles(poder)) + '</b> poder</span>';
+      html += '<span class="c-meta-poder" title="Poder de la carta">'
+        + poderHtml(poder) + '</span>';
     }
     html += '</div>';
     html += '<div class="c-cat-datos"><span data-c-cat-stock="1">'

@@ -206,6 +206,7 @@ assert(sinPrecioCarta.every(function (f) {
 var TABLA_42 = {
   cosmetica: { comun: 75,   raro: 200,  epico: 500,  dorado: 1250 },
   lugar:     { comun: 150,  raro: 400,  epico: 1000, dorado: 2500 },
+  naturaleza:{ comun: 150,  raro: 400,  epico: 1000, dorado: 2500 },
   personaje: { comun: 180,  raro: 480,  epico: 1200, dorado: 3000 },
   artista:   { comun: 180,  raro: 480,  epico: 1200, dorado: 3000 },
   marca:     { comun: 225,  raro: 600,  epico: 1500, dorado: 3750 }
@@ -235,7 +236,7 @@ Object.keys(TABLA_42).forEach(function (fam) {
 });
 
 // numeric(12,2): el valor viaja ya cerrado a 2 decimales, sin segundo redondeo.
-assert(['lugar', 'personaje', 'artista', 'marca', 'cosmetica'].every(function (fam) {
+assert(['lugar', 'naturaleza', 'personaje', 'artista', 'marca', 'cosmetica'].every(function (fam) {
   return ['comun', 'raro', 'epico', 'dorado'].every(function (rar) {
     var x = libCfg.precioAcunacion(fam, rar);
     return typeof x === 'number' && Math.round(x * 100) === x * 100;
@@ -294,6 +295,68 @@ assert(bloqueEdit.indexOf('if (preFinE2 !== effPreCa)') !== -1
   && bloqueEdit.indexOf('media_id, rareza') !== -1,
   ADM + ' D-24: idempotente (solo escribe si cambia) y la fila expone rareza',
   'falta el guard de idempotencia o la columna rareza');
+
+// --- (h) FAMILIA NATURALEZA (spec 11.11; migracion 076) ---------------------
+// La familia entra con CUATRO listas en el mismo fichero. Si falta
+// FAMILIAS_CARTA el alta responde 400 tipado; si falta SUBTIPOS_CARTA el par
+// flora/fauna no se valida en el handler; si falta CARTA_MULT_FAMILIA el precio
+// sale null y la carta nace NO acunable EN SILENCIO (spec 11.11.4 regla 4.3).
+// Este bloque fija los cuatro hechos para que no se puedan deshacer sin gate.
+var famsCarta = libCfg.FAMILIAS_CARTA;
+assert(Object.prototype.toString.call(famsCarta) === '[object Array]'
+  && famsCarta.length === 8
+  && famsCarta.filter(function (f) { return f === 'naturaleza'; }).length === 1,
+  'FAMILIAS_CARTA declara 8 familias y naturaleza aparece UNA sola vez',
+  'valor real: ' + JSON.stringify(famsCarta));
+assert(famsCarta.indexOf('naturaleza') === famsCarta.indexOf('lugar') + 1,
+  'FAMILIAS_CARTA ordena naturaleza junto a lugar (capa de juego)',
+  'lugar=' + famsCarta.indexOf('lugar') + ' naturaleza=' + famsCarta.indexOf('naturaleza'));
+
+var subsNat = libCfg.subtiposDeFamilia('naturaleza');
+assert(JSON.stringify(subsNat) === JSON.stringify(['flora', 'fauna']),
+  'subtiposDeFamilia(naturaleza) = [flora, fauna] (hongo descartado)',
+  'valor real: ' + JSON.stringify(subsNat));
+assert(Object.keys(libCfg.SUBTIPOS_CARTA).length === 8,
+  'SUBTIPOS_CARTA cubre las 8 familias (una rama por familia, sin huerfanas)',
+  'claves: ' + Object.keys(libCfg.SUBTIPOS_CARTA).join(', '));
+
+assert(Object.prototype.hasOwnProperty.call(mults, 'naturaleza')
+  && mults.naturaleza === 1.0,
+  'CARTA_MULT_FAMILIA declara naturaleza = 1,0 (sin la clave el precio seria null)',
+  'valor real: ' + mults.naturaleza);
+assert(libCfg.CARTA_FAMILIAS_SIN_PRECIO_XP.indexOf('naturaleza') < 0
+  && libCfg.precioAcunacion('naturaleza', 'comun') === 150
+  && libCfg.precioAcunacion('naturaleza', 'dorado') === 2500,
+  'naturaleza NO cae en CARTA_FAMILIAS_SIN_PRECIO_XP y acuna 150 / 2500',
+  'sin_precio=' + libCfg.CARTA_FAMILIAS_SIN_PRECIO_XP.join(',')
+    + ' comun=' + libCfg.precioAcunacion('naturaleza', 'comun'));
+
+// Segunda autoridad retirada: admin.html ya no replica las listas. Pinta los
+// selects con el bloque config de cartas_lista (armado en api/admin.js desde
+// lib/) y el espejo CARTAS_SUBTIPOS desaparecio con la familia naturaleza.
+var ADMIN_HTML = 'admin.html';
+var tHtml = '';
+try { tHtml = leer(ADMIN_HTML); } catch (e) { tHtml = ''; }
+assert(tHtml !== '' && tHtml.indexOf('var CARTAS_SUBTIPOS') < 0
+  && tHtml.indexOf('cartasSetConfig(data.config)') !== -1,
+  ADMIN_HTML + ' consumes el config de cartas_lista (sin espejo de subtipos)',
+  'espejo local detectado o falta cartasSetConfig(data.config)');
+function bloqueSelectCarta(idSel) {
+  var i = tHtml.indexOf('id="' + idSel + '"');
+  if (i < 0) return '';
+  var j = tHtml.indexOf('</select>', i);
+  return j < 0 ? '' : tHtml.slice(i, j);
+}
+['carta-familia', 'carta-edit-familia'].forEach(function (idSel) {
+  var b = bloqueSelectCarta(idSel);
+  var nOpt = b ? cuenta(b, /<option value="[a-z]/g) : -1;
+  assert(nOpt === 0, ADMIN_HTML + ' #' + idSel + ' no lleva familias hardcodeadas',
+    'opciones literales dentro del select: ' + nOpt);
+});
+assert(tAdm.indexOf('familias: CartasConfig.FAMILIAS_CARTA') !== -1
+  && tAdm.indexOf('subtipos: CartasConfig.SUBTIPOS_CARTA') !== -1,
+  ADM + ' cartas_lista emite config desde lib/cartas-config.js',
+  'falta el bloque config de cartas_lista');
 
 // --- Resumen ---------------------------------------------------------------
 console.log('');

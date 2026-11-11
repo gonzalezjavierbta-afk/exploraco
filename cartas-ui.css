@@ -679,10 +679,20 @@
   --c-capa-fondo: rgba(123, 91, 214, .12);
 }
 
+/* Tono propio del silo naturaleza: oliva, para no confundirse con el jade
+   de lugar aunque las dos familias sean capa de juego. */
+.cartas-silo .c-chip--oliva,
+.c-ficha .c-chip--oliva {
+  --c-capa-punto: #6E8B2F;
+  --c-capa-filo: rgba(110, 139, 47, .45);
+  --c-capa-fondo: rgba(110, 139, 47, .12);
+}
+
 /* Sobre la ficha (fondo carbon) el tono sube de luz para no apagarse. */
 .c-ficha .c-chip--juego { --c-capa-punto: #5FD3A8; }
 .c-ficha .c-chip--economia { --c-capa-punto: #E8B15A; }
 .c-ficha .c-chip--estatus { --c-capa-punto: #B99CFF; }
+.c-ficha .c-chip--oliva { --c-capa-punto: #A8C25A; }
 
 .cartas-silo .c-meta-sub,
 .c-ficha .c-meta-sub {

@@ -217,6 +217,86 @@ function render(UI, carta, opciones) {
 })();
 
 /* ---------------------------------------------------------------------------
+   13) NATURALEZA (flora/fauna) y 14) COSMETICA (sin ejes jugables).
+   --------------------------------------------------------------------------- */
+function cartaNaturaleza(subtipo) {
+  var c = cartaCompleta();
+  c.id = 'ct_nat_01';
+  c.nombre = 'Frailejon';
+  c.familia = 'naturaleza';
+  c.subtipo = subtipo;
+  return c;
+}
+
+function cartaCosmetica() {
+  return {
+    id: 'ct_cosm_01',
+    nombre: 'Aura de humedal',
+    rareza: 'raro',
+    variante: 'base',
+    set_slug: 'leyenda',
+    imagen_url: '',
+    emisor_tipo: 'sistema',
+    marca_nombre: null,
+    descripcion: 'Cosmetico puro.',
+    stats_json: { presencia: 12 },
+    familia: 'cosmetica',
+    subtipo: 'aura',
+    stats: { alcance: 0, oficio: 0, fortuna: 0, rendimiento: 0, presencia: 12 },
+    nivel: 2,
+    poder: 0
+  };
+}
+
+(function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return;
+  var html = render(UI, cartaNaturaleza('flora'));
+  assert(html.indexOf('c-chip c-chip--juego c-chip--oliva') >= 0,
+    'naturaleza pinta chip de capa juego con tono oliva propio del silo');
+  assert(html.indexOf('>Naturaleza<') >= 0, 'el chip de naturaleza lleva su etiqueta');
+  assert(html.indexOf('c-chip--juego"') < 0,
+    'la naturaleza no se queda con el jade generico de lugar');
+  assert(html.indexOf('c-ficha-sub">flora') >= 0,
+    'subtipo flora se pinta en texto pequeno de la ficha');
+  var htmlFauna = render(UI, cartaNaturaleza('fauna'));
+  assert(htmlFauna.indexOf('c-ficha-sub">fauna') >= 0
+    && UI.cardMeta(cartaNaturaleza('fauna')).indexOf('c-meta-sub">fauna') >= 0,
+    'subtipo fauna se pinta en texto pequeno en ficha y rejilla');
+  assert(UI.cardMeta(cartaNaturaleza('fauna')).indexOf('c-chip--oliva') >= 0,
+    'cardMeta reutiliza el chip oliva en la rejilla');
+  assert(html.indexOf('NaN') < 0 && html.indexOf('undefined') < 0,
+    'naturaleza no produce NaN ni undefined');
+})();
+
+(function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return;
+  function cuenta(s, sub) {
+    var n = 0, i = 0;
+    while ((i = s.indexOf(sub, i)) >= 0) { n++; i += sub.length; }
+    return n;
+  }
+  var c = cartaCosmetica();
+  var html = render(UI, c);
+  assert(cuenta(html, 'c-eje-l') === 1,
+    'cosmetica pinta UN eje, no cuatro ceros vacios');
+  assert(html.indexOf('c-eje-n">0</span>') < 0,
+    'cosmetica no pinta ningun eje jugable a cero');
+  assert(html.indexOf('>Presencia') >= 0, 'la presencia de la cosmetica se ve');
+  assert(html.indexOf('Cosmetico: sin efecto economico') >= 0,
+    'la cosmetica se explica como sin efecto economico');
+  assert(html.indexOf('<b>0</b> poder') < 0 && html.indexOf('estetico') >= 0,
+    'poder 0 se pinta como estetico, no como un cero grande');
+  assert(UI.cardMeta(c).indexOf('<b>0</b> poder') < 0,
+    'cardMeta tampoco pinta el cero grande en la rejilla');
+  assert(html.indexOf('NaN') < 0 && html.indexOf('undefined') < 0,
+    'cosmetica no produce NaN ni undefined');
+})();
+
+/* ---------------------------------------------------------------------------
    3) Carta con campos nuevos pero SIN objeto stats: no hay vector.
    --------------------------------------------------------------------------- */
 (function () {

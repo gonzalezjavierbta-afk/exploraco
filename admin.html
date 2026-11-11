@@ -2600,13 +2600,6 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Familia</div>
           <select class="form-input" id="carta-familia" style="width:100%" onchange="cartasPintarSubtipos('carta-familia','carta-subtipo','')">
             <option value="">-- elige --</option>
-            <option value="lugar">lugar</option>
-            <option value="personaje">personaje</option>
-            <option value="artista">artista</option>
-            <option value="marca">marca</option>
-            <option value="producto">producto</option>
-            <option value="consumible">consumible</option>
-            <option value="cosmetica">cosmetica</option>
           </select>
         </div>
         <div style="flex:0 0 140px">
@@ -2817,13 +2810,6 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Familia</div>
           <select class="form-input" id="carta-edit-familia" style="width:100%" onchange="cartasPintarSubtipos('carta-edit-familia','carta-edit-subtipo','')">
             <option value="">-- elige --</option>
-            <option value="lugar">lugar</option>
-            <option value="personaje">personaje</option>
-            <option value="artista">artista</option>
-            <option value="marca">marca</option>
-            <option value="producto">producto</option>
-            <option value="consumible">consumible</option>
-            <option value="cosmetica">cosmetica</option>
           </select>
         </div>
         <div style="flex:1 1 130px">
@@ -11627,27 +11613,50 @@ function cartaCamposD6(esModal) {
   };
 }
 
-/* ADR-121 (migraciones 066/068/069): ESPEJO de lib/cartas-config.js solo para
-   pintar los selects. La autoridad es el SERVIDOR (400 tipado
-   FAMILIA_REQUERIDA / FAMILIA_INVALIDA / SUBTIPO_REQUERIDO / SUBTIPO_INVALIDO
-   / SUPPLY_REQUERIDO / SUPPLY_INCOHERENTE / PRECIO_INCOHERENTE /
-   SKU_REQUERIDO / CARTA_CON_OFERTAS): si una lista cambia alli y no aqui, el
-   alta falla con el codigo, nunca con un 500. Prefijo "carta" para evitar
-   colisiones (BUG-006/018/019). */
-var CARTAS_SUBTIPOS = {
-  lugar:      ['territorio', 'patrimonio', 'natural'],
-  personaje:  ['historico', 'ficcion', 'folclor'],
-  artista:    ['musica', 'cine', 'grafica', 'literatura'],
-  marca:      ['licor', 'gastronomia', 'artesania', 'otra'],
-  producto:   ['fisico', 'digital'],
-  consumible: ['entrada_evento', 'bono', 'servicio'],
-  cosmetica:  ['marco', 'fondo', 'insignia']
-};
+/* ADR-121 (migraciones 066/068/069) + familia 'naturaleza' (076): los selects
+   de familia/subtipo se pintan con el bloque CONFIG de cartas_lista, que sale
+   de lib/cartas-config.js. NO hay copia local: la segunda autoridad
+   (CARTAS_SUBTIPOS) se retiro al entrar 'naturaleza' (spec 11.11.4 regla 4.5).
+   La autoridad del alta sigue siendo el SERVIDOR (400 tipado FAMILIA_REQUERIDA
+   / FAMILIA_INVALIDA / SUBTIPO_REQUERIDO / SUBTIPO_INVALIDO / SUPPLY_REQUERIDO
+   / SUPPLY_INCOHERENTE / PRECIO_INCOHERENTE / SKU_REQUERIDO /
+   CARTA_CON_OFERTAS). Prefijo "cartas"/"carta" para evitar colisiones
+   (BUG-006/018/019). */
+var CARTAS_CONFIG = { familias: [], subtipos: {} };
+function cartasPintarFamilias(idFamilia, valor) {
+  var sel = document.getElementById(idFamilia);
+  if (!sel) return;
+  var fams = CARTAS_CONFIG.familias || [];
+  var html = '';
+  var i;
+  if (!fams.length) {
+    sel.innerHTML = '<option value="">-- recarga la vista --</option>';
+    return;
+  }
+  html = '<option value="">-- elige --</option>';
+  for (i = 0; i < fams.length; i++) {
+    html += '<option value="' + fams[i] + '"'
+      + (fams[i] === valor ? ' selected' : '') + '>' + fams[i] + '</option>';
+  }
+  sel.innerHTML = html;
+}
+function cartasSetConfig(cfg) {
+  if (!cfg || Object.prototype.toString.call(cfg.familias) !== '[object Array]') return false;
+  CARTAS_CONFIG.familias = cfg.familias;
+  CARTAS_CONFIG.subtipos = cfg.subtipos || {};
+  /* Preserva la seleccion vigente: loadCartas() se repite tras guardar y no
+     debe vaciar el select del modal abierto. */
+  cartasPintarFamilias('carta-familia',
+    String((document.getElementById('carta-familia') || {}).value || ''));
+  cartasPintarFamilias('carta-edit-familia',
+    String((document.getElementById('carta-edit-familia') || {}).value || ''));
+  return true;
+}
 function cartasPintarSubtipos(idFamilia, idSubtipo, valor) {
   var fam = (document.getElementById(idFamilia) || {}).value || '';
   var sel = document.getElementById(idSubtipo);
   if (!sel) return;
-  var subs = CARTAS_SUBTIPOS[fam] || [];
+  var subs = CARTAS_CONFIG.subtipos[fam] || [];
   var html = '';
   var i;
   if (!subs.length) {
@@ -11710,6 +11719,7 @@ async function loadCartas() {
     var data = await resp.json();
     if (!data.ok) throw new Error(data.error || 'No se pudo cargar');
     _cartasCache = data.data || [];
+    cartasSetConfig(data.config);
     renderCartas();
   } catch (e) {
     lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#9888;</div>'

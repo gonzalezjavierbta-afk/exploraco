@@ -1790,3 +1790,360 @@ Los 3 candados reales de `xpd_obr_ugc`:
 - [ ] **A20. Escudo.** `node --check api/interacciones.js` en verde; seccion 11.10 (y la nota 11.9.11) con **0 bytes > 127**; `exploraco desarrollo/*.md` sin modificar (R2); `npm test` sigue incluyendo `node scripts/smoke_expedicion.js`.
 
 **Lo que NO cambia:** las 45 cartas y sus `stats_json`, `precioAcunacion()`, `chk_cartas_catalogo_fusionable`, `carta_acunar`, la tirada, el supply, los caps de 11.9.6 y el indice de 073. Esta seccion solo dice **que acciones reales abren las 2 ramas que faltaban**; no crea XP nuevo ni toca el valor de una carta.
+
+---
+
+### 11.11. Familia naturaleza (flora y fauna de Colombia)
+
+**Estado:** contrato propuesto, **no implementado**. Enmienda a **ADR-121** (7 familias -> 8). Hoy `familia='naturaleza'` no existe en ningun sitio: no esta en `chk_cartas_catalogo_familia` (`066:217-221`) ni en `FAMILIAS_CARTA` (`lib/cartas-config.js:57-58`), y `count(*) WHERE familia='naturaleza'` = **0**.
+
+**Correccion de correlativo (ADR-006).** El brief pide "076/077". El ultimo fichero real de `db/migrations/` **no** es 074: es **`075_cartas_media_seed_prueba.sql`** (existe en el arbol, `LastWriteTime` 2026-11-11 14:18, y su cabecera lo declara aplicado en el ledger: "074 PREDECESOR INMEDIATO"). El correlativo libre empieza en **076**. Esta seccion usa **076** (esquema), **077** (seed naturaleza) y **078** (seed cosmeticas).
+
+Nota de fragilidad declarada: `075` esta **sin trackear** en git (`?? db/migrations/075_cartas_media_seed_prueba.sql`). Si el operador lo renombra o lo revierte, los correlativos de abajo se desplazan y hay que releer el directorio antes de crear el fichero. La numeracion es un contrato de orden, no una promesa: **manda el directorio**.
+
+#### 11.11.1 Slug, capa y decision de esquema
+
+`cartas_catalogo.familia` es **`varchar(12)`** (`066:122-123`). Es un limite DURO: un literal de 13 bytes revienta con **22001** antes de que el CHECK llegue a opinar.
+
+| Candidato | Longitud | Cabe en varchar(12) | Veredicto |
+|---|---|---|---|
+| `naturaleza` | **10** | Si | **ELEGIDO** |
+| `biodiversidad` | **13** | **No** | Descartado por el tipo, no por gusto |
+| `flora_fauna` | 11 | Si | Descartado: nombra los dos subtipos, no la familia |
+| `especie` | 7 | Si | Descartado: colisiona con el uso coloquial y no cubre la carta de genero (`Espeletia` spp.) |
+
+**Regla 1.1.** El slug es **`naturaleza`** (10 <= 12). **No** se amplia la columna: `ALTER COLUMN ... TYPE varchar(20)` reescribe la tabla y no compra nada que el slug elegido no resuelva.
+
+**Regla 1.2.** **Capa = `juego`.** Tres razones verificables: (a) se acuna con XP como `lugar` (4.6); (b) aporta `poder` real, que es la definicion operativa de "jugable" (ADR-117); (c) vive del mismo ciclo tirada/gate/mercado. No es `estatus` (no es un adorno) ni `economia` (no tiene SKU, luego no cae en la rama de `producto`/`consumible`).
+
+**Regla 1.3.** **`capa` NO se persiste** (regla 6 de 2.1). Hoy **no existe** el helper que la deriva: `grep -r "capaDeFamilia|CAPAS_CARTA" lib api` = **0 coincidencias**. Si el render necesita agrupar, se crea **una** funcion pura en `lib/cartas-config.js`; no se anade columna.
+
+Fila a anadir a la tabla de 2.1:
+
+| Capa | Familia | Que es | Subtipos (dominio cerrado) | Fuente de la carta | Comerciable en XP | Fusionable | Museable |
+|---|---|---|---|---|---|---|---|
+| **Juego** | `naturaleza` | Especie viva de Colombia (flora o fauna) | `flora`, `fauna` | Tirada, drop por gate, canje | **Si** | **No** (v1, columna: 11.11.2) | **Si** (techo 12) |
+
+**Regla 1.4. Frontera con `lugar`/`natural` (no duplicidad).** `lugar` ya tiene el subtipo `natural` (`066:231`) y el catalogo ya tiene `ct_leyenda_03` = **"Condor de los Andes"** con `familia='lugar'` (`040:133`). Discriminador duro, no poetico:
+
+| Pregunta | `lugar` / `natural` | `naturaleza` |
+|---|---|---|
+| Que se colecciona | Un **territorio** (parque, area protegida) | Un **ser vivo** (una especie) |
+| Lleva `stats_json.nombre_cientifico` | No | **Si, obligatorio** (CHECK de 076) |
+| Sustituye a la otra | No | No |
+
+**Regla 1.5.** Por 1.4 **no se reclasifican** las 24 cartas de `lugar` ni se toca `ct_leyenda_03` (ADR-003). Una carta de `naturaleza` **nunca** reusa un `nombre` presente en el catalogo; el guardian es **A27**.
+
+#### 11.11.2 Subtipos: `flora` y `fauna`; `hongo` descartado
+
+**Regla 2.1.** Dos subtipos: **`flora`** (5 letras) y **`fauna`** (5). El dominio se cierra en `chk_cartas_catalogo_subtipo`.
+
+**Regla 2.2. `hongo` se evalua y se descarta**, por tres razones medidas y no por taxonomia mal contada (los hongos, en efecto, no son flora):
+
+1. **No hay consumidor que lo distinga.** Ningun render, filtro ni expedicion leeria `subtipo='hongo'` de forma distinta a `flora`. Un subtipo sin lector propio es un valor muerto que hay que curar a mano en cada seed.
+2. **Serian 0 cartas en v1.** Sembrar hongos exige una nomenclatura con mucha menos fuente comun verificable: el peor ratio coste/valor de la lista.
+3. **Es reversible sin migracion de datos.** Anadir un subtipo es **DROP + ADD del CHECK en un solo `DO`** (regla 5 de 2.1, precedente `065:115-127`). Descartarlo hoy cuesta una sentencia manana, no una migracion de filas.
+
+**Regla 2.3. `fusionable = false` en las 10 filas, y hay que ESCRIBIRLO.** `cartas_catalogo.fusionable` es `NOT NULL DEFAULT true` (`060:260-261`): omitirlo en el seed **crea cartas fusionables por omision**. Decision v1: las familias fusionables siguen siendo `lugar` (los 6 `ct_comun_*`) y `artista` (2.1). Razon de fondo: fusionar 3 cartas de una especie para obtener poder es justo el incentivo perverso que 11.11.8 quiere evitar. **No es un CHECK**: es una columna, luego revertirlo es un `UPDATE`, no una migracion.
+
+**Regla 2.4. Museable = Si, con techo de 12.** La vitrina es `usuarios_cartas.orden_museo BETWEEN 1 AND 12` (`060:216`) con indice unico parcial (`060:228`). `naturaleza` compite por esos 12 puestos y **no** amplia la vitrina. `museable` no es columna de `cartas_catalogo`: es politica de render, no esquema.
+
+**Regla 2.5. `subtipo` es obligatorio para `naturaleza`.** La columna sigue nullable (`066:125-126`) y un CHECK de igualdad con NULL **no dispara**; por eso 076 anade un CHECK dedicado con `subtipo IS NOT NULL` (11.11.5). Sin el, una carta sin `flora`/`fauna` pasaria y el render tendria que adivinar.
+
+#### 11.11.3 Eje primario y secundario
+
+**Regla 3.1. Primario `fortuna`, secundario `alcance`.**
+
+| Criterio | `alcance` primario | `fortuna` primario |
+|---|---|---|
+| Definicion literal de 3.1 | "difusion: cuanta gente ve lo que haces" | "suerte de exploracion: hallazgos" |
+| Encaje con el objeto | Debil: una especie no se difunde, se **encuentra** | **Directo: una especie es un hallazgo** |
+| Cobertura de 3.2 | `alcance` ya es primario en `lugar` | **`fortuna` no es primario en NINGUNA familia hoy** (solo secundario en `lugar`) |
+| Consumidor activo hoy | Museo + rama `difusion` | Peso de tirada (4.3) + rama `hallazgo` |
+
+**Regla 3.2.** **`naturaleza` cierra el hueco de 3.2.** La frase "ningun eje queda sin familia que lo alimente" era cierta pero incompleta: `fortuna` solo existia como secundario. Con `naturaleza`, **los cuatro ejes tienen al menos una familia donde son primarios**: `alcance` (lugar), `oficio` (personaje, artista), `fortuna` (naturaleza), `rendimiento` (marca).
+
+**Regla 3.3.** **`naturaleza` es el espejo de `lugar`.** `lugar` = {primario `alcance`, secundario `fortuna`}; `naturaleza` = {primario `fortuna`, secundario `alcance`}. Mismo par, orden invertido: regla comprobable en una linea, sin inventar pesos.
+
+**Regla 3.4. Candidatos evaluados y descartados.** `oficio` seria poetico (calidad de la identificacion) pero **no tiene consumidor en v1** (3.1: "el eje existe pero no se puede subir"): un secundario hacia un eje muerto es poder decorativo. `rendimiento` se descarta porque una especie no tiene lectura economica.
+
+**Regla 3.5. NO se inventa un quinto eje.** El vector sigue teniendo **cinco claves** (`CARTA_EJES_STATS`, `lib/cartas-config.js:120`): `alcance`, `oficio`, `fortuna`, `rendimiento` (jugables, peso 1) y `presencia` (estatus, peso 0). `naturaleza` **no usa `presencia`** y no anade ninguna clave nueva.
+
+**Regla 3.6.** Puntos por rareza (3.2, sin cambios) aplicados al par:
+
+| rareza | total | `fortuna` (primario) | `alcance` (secundario) | shiny (+fortuna) | poder base |
+|---|---|---|---|---|---|
+| `comun` | 4 | 3 | 1 | +1 | 4 |
+| `raro` | 8 | 5 | 3 | +2 | 8 |
+| `epico` | 14 | 9 | 5 | +3 | 14 |
+| `dorado` | 24 | 14 | 10 | +6 | 24 |
+
+#### 11.11.4 Multiplicador de precio
+
+**Regla 4.1. Multiplicador `1.0`.** Precio = base por rareza x 1.0 = **150 / 400 / 1000 / 2500** XP, identico a `lugar`.
+
+**Regla 4.2. Por que 1.0 y no 1.1:**
+
+| Argumento | 1.0 | 1.1 |
+|---|---|---|
+| Procedencia | Ya esta en la tabla aprobada de 4.2 (`lugar`) | **No esta aprobado por el operador en ningun sitio** |
+| Precios resultantes | 150 / 400 / 1000 / 2500 (enteros limpios) | 165 / 440 / 1100 / 2750 (tramo nuevo sin justificante) |
+| Justificante de coste | Ninguno: no hay SKU ni royalty de autor | Ninguno tampoco: 1.1 no codifica escasez ni autoria |
+| Simetria con el eje | Es el espejo de `lugar` (3.3): mismo precio es coherente | Rompe el espejo sin motivo |
+
+Un multiplicador solo se justifica por **coste de adquisicion real** (`marca` = 1.5), **autoria** (`personaje`/`artista` = 1.2) o **descuento de vitrina** (`cosmetica` = 0.5). Una especie no es ninguna de las tres.
+
+**Regla 4.3. `1.0` es una clave NUEVA en el codigo, no un valor por defecto.** `CARTA_MULT_FAMILIA` (`lib/cartas-config.js:94-100`) **no tiene la clave** y `precioAcunacion()` devuelve **`null`** para familia desconocida (`:108-115`). Si se olvida, el handler recibe `null` y la carta **no se puede acunar**, sin error visible en el catalogo. Hay que anadir `naturaleza: 1.0,` **antes** de correr 077.
+
+**Regla 4.4. Tres listas cerradas en el mismo fichero.** Para que `api/admin.js` acepte el alta hay que tocar en `lib/cartas-config.js`: `FAMILIAS_CARTA` (`:57-58`), `SUBTIPOS_CARTA` (`:60-68`) y `CARTA_MULT_FAMILIA` (`:94-100`). Si falta la primera, el alta responde **400 tipado** (`api/admin.js:644`, `:684`); si falta la tercera, sale **precio null** (4.3). `api/admin.js` **consume** estas listas (`:81`, `:637-647`): no hay segunda copia en JS.
+
+**Regla 4.5. Espejo de `admin.html`: NO verificado.** `grep` de `FAMILIAS_CARTA|SUBTIPOS_CARTA` en `admin.html` = **0 coincidencias**, lo que contradice el comentario de `lib/cartas-config.js:55-56` ("admin.html lleva un ESPEJO"). No se afirma ni que exista ni que no: **@admin-dev debe confirmarlo** antes de dar 4.4 por cerrado, porque un espejo no localizado es un 400 en produccion.
+
+**Regla 4.6. Deuda de reprecio, declarada.** La 072 recalcula `familia IN ('lugar','personaje','artista','marca','cosmetica')` (`072:172`) y `naturaleza` queda **fuera**. La 072 ya esta aplicada y no se re-ejecuta, pero **cualquier migracion de reprecio futura debe incluirla** o el catalogo de naturaleza se quedara con precios que nadie recalcula.
+
+#### 11.11.5 Contrato de migracion 076 (esquema)
+
+`db/migrations/076_cartas_familia_naturaleza.sql`. **Solo esquema. Cero filas tocadas** (0 cartas de la familia al aplicarla).
+
+**Regla 5.1.** Tres operaciones, **ninguna toca `stats_json`, `precio_xp` ni dato alguno**:
+
+| # | Objeto | Accion | Guarda |
+|---|---|---|---|
+| 1 | `chk_cartas_catalogo_familia` | **DROP + ADD** con los 7 valores + `naturaleza` | `pg_get_constraintdef` **no** contiene `'naturaleza'` |
+| 2 | `chk_cartas_catalogo_subtipo` | **DROP + ADD** con las 7 ramas + `(familia = 'naturaleza' AND subtipo IN ('flora','fauna'))` | `pg_get_constraintdef` **no** contiene `'flora'` |
+| 3 | `chk_cartas_catalogo_naturaleza` | **ADD** (nueva): `familia <> 'naturaleza' OR (subtipo IS NOT NULL AND stats_json ? 'nombre_cientifico')` | `conname` **no existe** |
+
+**Regla 5.2. La guarda es por DEFINICION, no por nombre.** Es la leccion literal de `066:302-311`: una guarda `IF NOT EXISTS (conname = ...)` **nunca** sustituye un CHECK existente (el nombre ya esta) y la migracion miente diciendo que corrio. Hay que leer `pg_get_constraintdef(oid)` y comparar el texto.
+
+**Regla 5.3. DROP + ADD en el mismo `DO`** (atomico; precedente `065:115-127` y `066:304-368`). Un `DROP` fuera del bloque con un `ADD` que falle deja la tabla **sin** CHECK de dominio: peor que no haber migrado.
+
+**Regla 5.4. Idempotente por construccion.** Segunda corrida: la definicion ya contiene los literales, los tres bloques se saltan y `pg_constraint` conserva **una** fila por nombre. `ADD CONSTRAINT` no admite `IF NOT EXISTS` en Postgres 15; no se usa.
+
+**Regla 5.5. Sin `COALESCE` en el `?`.** `stats_json` es `jsonb NOT NULL DEFAULT '{}'::jsonb` (`060:254-255`), asi que `stats_json ? 'nombre_cientifico'` jamas es NULL y el CHECK no tiene el agujero de tres valores. Se escribe **sin** `COALESCE` para no sugerir que la columna es nullable.
+
+**Regla 5.6. Lo ajeno no se toca.** `chk_cartas_catalogo_sku` (`066:294-300`) se queda como esta: una migracion, un proposito.
+
+**Regla 5.7. Post-condiciones con `RAISE NOTICE`/`RAISE EXCEPTION`** (precedente `066:362-368`): los tres `conname` existen; la definicion de `familia` contiene los **8** valores; la de `subtipo` contiene `'flora'` y `'fauna'`; `count(*) WHERE familia='naturaleza'` = **0** (076 no siembra).
+
+**Regla 5.8. Orden de despliegue obligatorio:** (1) `lib/cartas-config.js` (3 listas, 4.4) -> (2) `076` -> (3) `077`. Invertir 1 y 2 no rompe la base pero abre una ventana en la que el alta acepta `naturaleza` y el precio sale `null`.
+
+#### 11.11.6 Contrato de seed 077 (no se escribe aqui)
+
+`db/migrations/077_cartas_seed_naturaleza.sql`. **No crea ni cambia esquema.**
+
+| Parametro | Valor | Verificacion |
+|---|---|---|
+| Filas | **10** (5 `flora` + 5 `fauna`) | `count(*) WHERE familia='naturaleza'` = 10 |
+| Reparto de rareza | **4 comun / 3 raro / 2 epico / 1 dorado** | `GROUP BY rareza` |
+| `precio_xp` | **150.00 / 400.00 / 1000.00 / 2500.00** (mult 1.0) | `GROUP BY rareza` de `precio_xp` |
+| `edicion` / `supply_max` | **`limitada`** / **5000 / 1000 / 250 / 50** | mismos techos que `070:28-32` |
+| `emitidas` | `0` | `sum(emitidas)` = 0 |
+| `fusionable` | **`false`, escrito explicito** | `count(*) WHERE fusionable=true` = 0 |
+| `activo` / `es_evento` | `true` / `false` | - |
+| `nivel_gate` | **NULL** en las 10 | no se inventa politica de gates |
+| `emisor_tipo` | no se escribe: `DEFAULT 'sistema'` (`060:236`) | - |
+| `set_slug` | `naturaleza_flora` / `naturaleza_fauna` | reusa `idx_cartas_catalogo_set` (`040:111`) |
+| `stats_json` | `{primario:'fortuna', fortuna:N, alcance:M, nombre_cientifico:'...'}` | 11.11.3 regla 3.6 |
+| `nombre_cientifico` | **obligatorio** (CHECK de 076) | 0 filas sin la clave |
+| `estado_iucn` | **opcional**, texto `LC/NT/VU/EN/CR/DD` | **sin CHECK** (regla 6.2) |
+| Imagen | `imagen_url` con **HEAD 200** antes del INSERT | `curl -I` 200 por las 10 |
+| Escritura | `INSERT ... ON CONFLICT (id) DO NOTHING` | idempotente, no pisa recalibracion manual (`040:114-116`) |
+
+**Regla 6.1.** **El supply reusa la tabla de 070 y no inventa otra.** Los cuatro numeros son los pesos de tirada (4.3) usados como techo de unidades, igual que en `lugar`. Dos escalas de supply en el mismo catalogo serian dos autoridades.
+
+**Regla 6.2. `estado_iucn` va sin CHECK a proposito.** Dos clases de hecho, dos tratamientos: lo **inmutable para el juego** (un binomial, un SKU) lleva CHECK porque su violacion es un bug; lo que **se revisa cada pocos anos** (la categoria UICN) lleva validacion de aplicacion, porque un CHECK obligaria a una migracion por cada reevaluacion. Misma logica que `capa` no persistido: no se congela en esquema lo que cambia por decision externa.
+
+**Regla 6.3. Cero `bonus_xp_pct`.** La clave queda tolerada e inerte (3.3) pero **no se siembra**.
+
+**Regla 6.4. Un `UPDATE` no es un seed.** Corregir un binomial es `UPDATE ... SET stats_json = COALESCE(stats_json,'{}') || '{"nombre_cientifico":"..."}'::jsonb WHERE id = ...` (MERGE, ADR-003), nunca `stats_json = EXCLUDED.stats_json`.
+
+#### 11.11.7 Contenido: 10 especies, nomenclatura declarada
+
+**Ninguna especie se inventa.** La columna `confianza` **no es una verificacion**: en esta sesion **no** se consulto GBIF, el SiB Colombia ni el catalogo del Instituto Humboldt. `ESTANDAR` = binomial de uso comun y estable; `GENERO` = identificado a nivel de genero, la especie la fija curaduria; `EN_REVISION` = binomial con taxonomia discutida. El literal visible de cada nombre comun queda en **`NOMBRE_COMUN_NO_VERIFICADO`** hasta que @content-loader lo apruebe (regla 7.2).
+
+| # | `id` | Nombre comun | Nombre cientifico | Grupo | rareza | Confianza |
+|---|---|---|---|---|---|---|
+| 1 | `ctn_flora_01` | palma de cera del Quindio | *Ceroxylon quindiuense* | flora | comun | ESTANDAR |
+| 2 | `ctn_flora_02` | orquidea Cattleya trianae | *Cattleya trianae* | flora | comun | ESTANDAR |
+| 3 | `ctn_flora_03` | frailejon | *Espeletia* spp. | flora | raro | **GENERO** |
+| 4 | `ctn_flora_04` | nenufar gigante | *Victoria amazonica* | flora | raro | ESTANDAR |
+| 5 | `ctn_flora_05` | mangle rojo | *Rhizophora mangle* | flora | epico | ESTANDAR |
+| 6 | `ctn_fauna_01` | jaguar | *Panthera onca* | fauna | epico | ESTANDAR |
+| 7 | `ctn_fauna_02` | oso de anteojos | *Tremarctos ornatus* | fauna | raro | ESTANDAR |
+| 8 | `ctn_fauna_03` | delfin rosado | *Inia geoffrensis* | fauna | comun | **EN_REVISION** |
+| 9 | `ctn_fauna_04` | titi cabeciblanco | *Saguinus oedipus* | fauna | dorado | ESTANDAR |
+| 10 | `ctn_fauna_05` | guacamaya bandera | *Ara macao* | fauna | comun | ESTANDAR |
+
+**Regla 7.1. `condor andino` NO entra en la lista.** El catalogo ya tiene `ct_leyenda_03` = "Condor de los Andes", `familia='lugar'` (`040:133`). Dos cartas homonimas en familias distintas son una duplicidad visible en la coleccion y un fallo de curaduria. Si el operador quiere el condor como fauna, primero decide que pasa con `ct_leyenda_03` (**no se renombra ni se borra en 077**: ADR-003).
+
+**Regla 7.2.** Los comunes son **nombres de trabajo**: varios son regionales (el frailejon tiene nombres locales por paramo). El **binomial** es la clave de la carta y no se cambia por region.
+
+**Regla 7.3.** 3 de las 10 son amenazadas y 1 es endemica (titi cabeciblanco). Eso no cambia el diseno: activa 11.11.8.
+
+**Regla 7.4. `frailejon` entra a nivel de genero a proposito.** Escribir una especie concreta sin fuente seria inventar (`Espeletia grandiflora` es una de las ~90 del genero). Mejor una carta de genero honesta que un binomial decorativo.
+
+#### 11.11.8 Riesgo legal y sensibilidad: la carta describe, no ubica
+
+**Regla 8.1 (DURA). Prohibido publicar coordenadas, veredas, fincas, quebradas, reservas privadas ni ningun dato que permita localizar una poblacion.** Aplica a `descripcion`, a `stats_json` (cualquier clave), a `imagen_url` y a los metadatos EXIF de la imagen.
+
+**Regla 8.2.** La ubicacion es **departamento o region natural**, nunca mas fino. "Andes colombianos" o "Amazonia" si; "km 12 via X" no.
+
+**Regla 8.3.** **Ninguna clave de `stats_json` guarda lugar.** Se admiten `nombre_cientifico` y `estado_iucn`; `ubicacion`, `lat`, `lng`, `municipio` quedan prohibidos por convencion y **no** se validan con CHECK (una lista negra de claves no escala). El guardian es **A27**.
+
+**Regla 8.4. EXIF fuera.** La imagen se sirve sin metadatos de geolocalizacion. Un `imagen_url` con 200 es condicion necesaria y **no** suficiente: la foto de una especie amenazada puede delatar la poblacion por el fondo.
+
+**Regla 8.5. La rareza de juego NO es un juicio de conservacion.** El titi cabeciblanco es `dorado` y esta en peligro critico; el jaguar es `epico` y esta en vulnerable. Para que nadie lea "raro = escaso en la naturaleza": (a) el render muestra `estado_iucn` con su fuente; (b) **ninguna regla del juego** deriva rareza, precio o supply de la categoria UICN. Son ejes independientes y se declara en el texto de la ficha.
+
+**Regla 8.6. Cero fomento de extraccion.** La `descripcion` no da instrucciones de captura, recoleccion, compra ni tenencia. La carta es una pieza de coleccion digital sobre una especie, no una guia de campo.
+
+**Regla 8.7. Esto no es asesoria legal.** Si se usa fotografia de terceros, la **licencia de la imagen** es requisito aparte de la 077 (misma disciplina que `068`) y se declara **por imagen**, no por lote.
+
+#### 11.11.9 Criterios de aceptacion (A21-A28)
+
+- [ ] **A21. El tipo manda.** `SELECT character_maximum_length FROM information_schema.columns WHERE table_name='cartas_catalogo' AND column_name='familia'` = **12**; `SELECT length('naturaleza')` = **10**; `grep -r "biodiversidad" db/migrations lib api` = **0** coincidencias (un slug de 13 no se cuela ni en un comentario ejecutable).
+- [ ] **A22. CHECK de familia extendido e idempotente.** `pg_get_constraintdef` de `chk_cartas_catalogo_familia` contiene los **8** literales; tras correr 076 **dos veces** sigue habiendo **exactamente 1** fila de ese `conname` en `pg_constraint` y la segunda corrida imprime el `NOTICE` de "ya vigente" sin error.
+- [ ] **A23. CHECK de subtipo cerrado por familia.** La definicion contiene `(familia = 'naturaleza' AND subtipo IN ('flora', 'fauna'))`; `INSERT` con `('naturaleza','hongo')` falla **23514**; `('naturaleza','flora')` pasa.
+- [ ] **A24. Los dos hechos duros.** `chk_cartas_catalogo_naturaleza` existe; `INSERT` con `subtipo IS NULL` y `stats_json='{"nombre_cientifico":"X"}'` falla **23514**; `INSERT` con `subtipo='fauna'` y `stats_json='{}'` falla **23514**; con ambos presentes **pasa**.
+- [ ] **A25. Cero cambio colateral en stats.** `pg_get_constraintdef` de `chk_cartas_catalogo_stats` es **identico antes y despues** de 076 (contiene las 5 claves y `'presencia'` en sus dos clausulas, `066:319-356`); `SELECT count(*) FROM pg_constraint WHERE conrelid='public.cartas_catalogo'::regclass` sube **exactamente +1** (solo la de A24).
+- [ ] **A26. Seed 077 exacto.** `count(*) WHERE familia='naturaleza'` = **10**; por subtipo **5/5**; por rareza **4/3/2/1**; `precio_xp` por rareza = **150.00/400.00/1000.00/2500.00** (tipo `numeric(12,2)`, no `integer`); `edicion='limitada'` y `supply_max` = **5000/1000/250/50**; `sum(emitidas)`=0; `sum((fusionable)::int)`=0; `sum((activo)::int)`=10.
+- [ ] **A27. Nomenclatura y no-duplicidad.** 10/10 filas con `stats_json->>'nombre_cientifico'` no vacio y coincidente con la tabla de 11.11.7; `SELECT nombre FROM cartas_catalogo GROUP BY nombre HAVING count(*)>1` = **0 filas**; `count(*) WHERE familia='naturaleza' AND nombre ILIKE '%condor%'` = **0**; `count(*) WHERE familia='naturaleza' AND (stats_json ? 'lat' OR stats_json ? 'lng' OR stats_json ? 'ubicacion' OR stats_json ? 'municipio')` = **0** (regla 8.3); las 10 `imagen_url` responden **HEAD 200**.
+- [ ] **A28. Aritmetica y Escudo.** Por rareza, `(stats_json->>'fortuna')::int` = **3/5/9/14** y `alcance` = **1/3/5/10**, con suma **4/8/14/24**; `count(*) WHERE familia='naturaleza' AND (stats_json->>'presencia')::int > 0` = **0**; `node --check lib/cartas-config.js` en verde y `precioAcunacion('naturaleza','comun') === 150`; la seccion 11.11 tiene **0 bytes > 127**; `exploraco desarrollo/*.md` sin modificar (R2).
+
+---
+
+### 11.12. Contrato de cosmeticas v1
+
+**Titular medido: sembrar cosmeticas NO necesita ni una linea de esquema nuevo.** La familia `cosmetica` ya esta en `chk_cartas_catalogo_familia` (`066:219-220`), sus 3 subtipos ya estan en `chk_cartas_catalogo_subtipo` (`066:237`), su multiplicador `0.5` ya esta en `CARTA_MULT_FAMILIA` (`lib/cartas-config.js:99`) y `presencia` **ya la admite** `chk_cartas_catalogo_stats` (`066:346-349` y `:352-354`). Lo unico que falta es **un seed (078)**. Por eso **078 es independiente de 076**: se puede aplicar antes, despues o sin la familia naturaleza.
+
+#### 11.12.1 Subtipos y eje unico
+
+**Regla 1.1. Tres subtipos, los tres YA existentes:** `marco`, `fondo`, `insignia` (`066:237`; `lib/cartas-config.js:67`). Cero migracion, cero edicion de lista.
+
+**Regla 1.2. `borde` se descarta: es un sinonimo de `marco`.** Tener `marco` y `borde` obliga a que dos curadores decidan cada vez cual es cual, y el render pinta ambos igual. Duplicar un valor existente es la misma falta que duplicar un campo.
+
+**Regla 1.3. `tema` se descarta: no es una pieza.** Un "tema" es una piel del sitio (paleta global), no un objeto de vitrina equipable por carta. Si el operador quiere temas de UI, es un contrato de CSS distinto (ADR-004), no una carta.
+
+**Regla 1.4. `presencia` es el UNICO eje, y el CHECK ya lo admite HOY.** Verificado en la definicion vigente:
+
+| Clausula | Linea | Que admite |
+|---|---|---|
+| Rango numerico | `066:346-349` | `presencia` presente -> `jsonb_typeof='number'` y `0 <= valor <= 40` |
+| `primario` | `066:352-354` | `primario IN ('alcance','oficio','fortuna','rendimiento','presencia')` |
+
+**No hay cambio de CHECK.** Cualquier propuesta de "migracion para que presencia pase" parte de una premisa falsa: ya pasa.
+
+**Regla 1.5.** `CARTA_EJES_STATS` ya incluye `presencia` (`lib/cartas-config.js:120`), asi que `statsNormalizados()` la preserva y `poderCarta()` la lee: no hay que tocar el validador.
+
+**Regla 1.6. Los otros cuatro ejes NO se escriben.** Escribir `alcance:0, oficio:0, fortuna:0, rendimiento:0` en una cosmetica es ruido que sugiere que la carta "podria" dar poder. `stats_json` lleva **solo** `primario` y `presencia`; el normalizador rellena el resto con 0 en memoria. El guardian es **A33**.
+
+#### 11.12.2 Precio y supply
+
+**Regla 2.1.** **Multiplicador `0.5`, ya aprobado y ya codificado** (`lib/cartas-config.js:99`). Precios efectivos, sin redondeo pendiente porque las cuatro bases son divisibles entre 2:
+
+| rareza | base | x 0.5 = `precio_xp` | `presencia` (unico eje) |
+|---|---|---|---|
+| `comun` | 150 | **75** | 4 |
+| `raro` | 400 | **200** | 8 |
+| `epico` | 1000 | **500** | 14 |
+| `dorado` | 2500 | **1250** | 24 |
+
+Coincide linea por linea con la fila `cosmetica` de la tabla de 4.2: **no se recalcula nada**.
+
+**Regla 2.2. Supply: `edicion='abierta'` y `supply_max=NULL` para las 9.** Justificacion economica, no estetica: una cosmetica es un **sumidero de XP** (`4.6`), y **un sumidero con techo deja de ser sumidero en el momento en que se agota**. Si el dorado se limita a 50 unidades, en cuanto se vendan 50 el XP deja de tener esa salida y el operador tendria que abrir una migracion para ampliarlo.
+
+| Opcion | Veredicto |
+|---|---|
+| `abierta` / `supply_max NULL` | **ELEGIDA**: el sink no se agota; el CHECK de `066:268-272` la admite |
+| `limitada` / 5000-1000-250-50 (escala de 070) | Descartada: escasez artificial sobre un objeto que no da poder; ademas convierte el sink en una subasta |
+| `serial` | Descartada: la numeracion por copia es de 4.4 y aqui no aporta nada |
+
+**Regla 2.3.** `precio_xp` **debe ser > 0** en esta familia: `chk_cartas_catalogo_precio` (`066:243-253`) solo permite `NULL` en `producto`/`consumible` y exige `> 0` en el resto. El minimo real es **75**, muy por encima de 0.
+
+**Regla 2.4.** El precio **se resuelve al acunar y se guarda** (4.2). Si manana cambia el 0.5, las cosmeticas ya acunadas conservan su precio historico: no hay reprecio retroactivo del inventario.
+
+#### 11.12.3 Cero efecto economico (regla ya aprobada) y su prueba
+
+**Regla 3.1.** `CARTA_PODER_PESOS` ya tiene **`presencia: 0`** (`lib/cartas-config.js:238-240`). No hay nada que cambiar.
+
+**Regla 3.2. `poderCarta()` devuelve EXACTAMENTE 0, con cualquier nivel y cualquier variante.** Traza literal sobre `lib/cartas-config.js:278-298`:
+
+```
+base     = suma(s[k] * peso[k])          ->  presencia*0 = 0, resto 0  =>  base = 0
+pesoPrim = CARTA_PODER_PESOS['presencia'] ->  0
+if (!pesoPrim) return base;               ->  return 0   (sale ANTES de shiny y nivel)
+```
+
+El `return` temprano es la garantia fuerte: **el bono shiny y el bono de nivel no llegan a aplicarse**, porque el unico eje con puntos es el primario y su peso es 0.
+
+| rareza | `stats_json` | nivel | variante | `poderCarta()` |
+|---|---|---|---|---|
+| comun | `{primario:'presencia',presencia:4}` | 1 | `base` | **0** |
+| raro | `{... presencia:8}` | 5 | `shiny` | **0** |
+| epico | `{... presencia:14}` | 5 | `shiny` | **0** |
+| dorado | `{... presencia:24}` | 5 | `shiny` | **0** |
+
+**Regla 3.3. `vectorExpedicion()` tampoco las convierte en poder.** Acumula `poder += vector[k] * CARTA_PODER_PESOS[k]` (`:361`), luego la presencia aporta `n * 0 = 0` y el invariante **`poder == alcance + oficio + fortuna + rendimiento`** se mantiene **por construccion**, no por suerte. `presencia` sigue entrando en el vector (cota `LEAST(40, ...)`) porque el museo la usa como criterio de orden.
+
+**Regla 3.4. No toca la tirada.** El peso de tirada depende de `fortuna` del **vector del usuario** (4.3 regla 2); una cosmetica aporta 0 a `fortuna`, luego no altera ningun porcentaje.
+
+**Regla 3.5. No toca XP.** Cero filas de `xp_ledger` se generan por poseer, equipar o mostrar una cosmetica. Ninguna recompensa (`carta_expedicion`, misiones, `bono global 24 h` de ADR-120) lee `presencia`.
+
+**Regla 3.6.** `presencia` **no amplia la vitrina**: `orden_museo` sigue en **1..12** (`060:216`). Si el operador quiere mas vitrina es una enmienda a ese CHECK, no un efecto de la cosmetica. Sin esta regla, la cosmetica seria pay-to-display.
+
+**Regla 3.7.** El **nivel** de una cosmetica es un sumidero legitimo: subirla a 5 cuesta **3.250 XP** (`lib/cartas-config.js:173-174`) y da `+4 presencia`, con **cero poder**. Es el sink funcionando, no un bug: se declara para que nadie lo "arregle" anadiendo peso.
+
+#### 11.12.4 Contrato de seed 078 (no se escribe aqui)
+
+`db/migrations/078_cartas_seed_cosmeticas.sql`. **Solo filas. Cero esquema. Sin dependencia de 076.**
+
+| Parametro | Valor | Verificacion |
+|---|---|---|
+| Filas | **9** (3 `marco` + 3 `fondo` + 3 `insignia`) | `count(*) WHERE familia='cosmetica'` = 9 |
+| Reparto de rareza | **2 comun / 3 raro / 2 epico / 2 dorado** | `GROUP BY rareza` |
+| `precio_xp` | **75.00 / 200.00 / 500.00 / 1250.00** (mult 0.5) | `GROUP BY rareza` |
+| `edicion` / `supply_max` | **`abierta`** / **NULL** | `count(*) WHERE supply_max IS NOT NULL` = 0 |
+| `emitidas` | `0` | `sum(emitidas)` = 0 |
+| `fusionable` | **`false`, escrito explicito** (OBLIGATORIO) | ver regla 4.2 |
+| `activo` / `es_evento` | `true` / `false` | - |
+| `nivel_gate` | **NULL** | drops cosmeticos no se gatean en v1 |
+| `emisor_tipo` | no se escribe: `DEFAULT 'sistema'` (`060:236`) | - |
+| `set_slug` | `cosmetica_v1` | reusa `idx_cartas_catalogo_set` |
+| `stats_json` | **solo** `{primario:'presencia', presencia:N}` | A33 |
+| `id` | `cs_marco_01..03`, `cs_fondo_01..03`, `cs_insignia_01..03` | prefijo `cs_` libre (`id` es `text`) |
+| Imagen | `imagen_url` con **HEAD 200** por las 9 | `curl -I` |
+| Escritura | `INSERT ... ON CONFLICT (id) DO NOTHING` | idempotente (`040:114-116`) |
+
+**Regla 4.1.** `presencia` por rareza = **4 / 8 / 14 / 24** (3.2, "cosmetica: 100% a presencia"). Es el presupuesto total de la carta, sin secundario.
+
+**Regla 4.2. `fusionable=false` NO es opcional.** `fusionable` nace `DEFAULT true` (`060:260-261`) y `chk_cartas_catalogo_no_fusion_cosmetica` (`066:283-289`) rechaza `fusionable = true OR familia <> 'cosmetica'`. Omitir la columna en el `INSERT` **no** toma `false`: toma el DEFAULT `true` y el seed **falla con 23514**. Es el unico tropiezo real de esta migracion y va escrito en la primera linea de cada `VALUES`.
+
+**Regla 4.3.** El seed **no toca `usuarios_cartas`**: una cosmetica se acuna por el camino normal (`precio_xp` + `carta_acunar`), no se regala.
+
+#### 11.12.5 Fusion, museo y mercado
+
+| Consumidor | Estado real hoy | Efecto de la cosmetica |
+|---|---|---|
+| **Fusion** | `chk_cartas_catalogo_no_fusion_cosmetica` ya la prohibe (`066:283-289`) | **Ninguno.** Bloqueada por CHECK, no por convencion |
+| **Museo** | 12 slots (`060:216`), indice unico parcial (`060:228`) | **Ocupa 1 slot** como cualquier carta; `poder` **no** depende del museo (3.5), luego el coste es visual, no jugable |
+| **Mercado XP** | `carta_publicar` solo exige `activo=true` (`api/interacciones.js:16200-16209`) | **Comerciable ya, sin codigo nuevo.** Es la decision aprobada; no se anade predicado de familia (sigue en **D-15**) |
+| **Tirada** | pesos de 4.3 sobre `fortuna` | **Ninguno** (aporta 0 a `fortuna`) |
+| **Nivel** | `costeSubidaNivel` (`:173-174`) | Sumidero de XP legitimo, **0 poder** (3.7) |
+
+**Regla 5.1. La comerciabilidad no se "habilita" aqui: ya existe.** Este contrato **no** crea un predicado nuevo ni lo promete. Si el operador quiere que las cosmeticas **no** se puedan revender, eso es una restriccion nueva del contrato D-15 (con su propio CHECK o su propio predicado de handler), **no** parte de 078.
+
+**Regla 5.2. `presencia` ordena la vitrina, no la financia.** El consumidor declarado de `presencia` es "orden del museo" y "insignia en la ficha" (3.1). Ninguno de los dos paga XP ni descuenta XP.
+
+**Regla 5.3.** Una cosmetica **no** puede ser `serial` en v1: la numeracion por copia exige `cartas_serie`, que no existe (4.4). Con `abierta`/`NULL` el CHECK de supply se cumple sin tocar nada.
+
+#### 11.12.6 Criterios de aceptacion (A29-A36)
+
+- [ ] **A29. Cero esquema nuevo.** `grep -c "cosmetica" db/migrations/076*` = **0** (la migracion de esquema de naturaleza no menciona esta familia); `pg_get_constraintdef` de `chk_cartas_catalogo_subtipo` contiene `'marco'`, `'fondo'` e `'insignia'` (`066:237`) y su texto es **identico antes y despues** de 076; ningun fichero nuevo de `db/migrations/` distinto de 078 contiene un `ALTER TABLE cartas_catalogo` motivado por cosmeticas.
+- [ ] **A30. `presencia` admitida HOY.** La definicion de `chk_cartas_catalogo_stats` contiene `presencia` en la clausula de rango (`066:346-349`) **y** en la de `primario` (`066:352-354`); `INSERT` con `stats_json='{"primario":"presencia","presencia":24}'` **pasa**; con `presencia=41` falla **23514**; con `presencia="x"` (texto) falla **23514**.
+- [ ] **A31. Precios exactos.** `precioAcunacion('cosmetica', r)` da **75 / 200 / 500 / 1250** para `comun/raro/epico/dorado`; `SELECT DISTINCT precio_xp FROM cartas_catalogo WHERE familia='cosmetica'` = exactamente `{75.00, 200.00, 500.00, 1250.00}`; `count(*) WHERE familia='cosmetica' AND (precio_xp IS NULL OR precio_xp <= 0)` = **0** (CHECK `066:243-253`).
+- [ ] **A32. Poder CERO.** Para las 4 rarezas, `poderCarta(stats, 1, 'base') === 0` **y** `poderCarta(stats, 5, 'shiny') === 0`; `vectorExpedicion([{carta_id:'cs_marco_01', stats_json:{primario:'presencia',presencia:24}, nivel:5, variante:'shiny'}])` devuelve `poder === 0` con `vector.presencia === 24`; `sum(poderCarta(...)) === 0` para las 9 filas del catalogo.
+- [ ] **A33. Seed 078 exacto.** 9 filas, **3 por subtipo**, rareza **2/3/2/2**; `edicion='abierta'` en 9/9 y `supply_max IS NULL` en 9/9; `sum(emitidas)`=0; `count(*) WHERE fusionable=true` = **0**; `count(*) WHERE (stats_json ? 'alcance' OR stats_json ? 'oficio' OR stats_json ? 'fortuna' OR stats_json ? 'rendimiento')` = **0** (regla 1.6); las 9 `imagen_url` responden **HEAD 200**.
+- [ ] **A34. Fusion imposible por CHECK.** `INSERT` con `familia='cosmetica' AND fusionable=true` falla **23514** nombrando `chk_cartas_catalogo_no_fusion_cosmetica`; `count(*) FROM pg_constraint WHERE conname='chk_cartas_catalogo_no_fusion_cosmetica'` = 1 y su definicion **no** cambio.
+- [ ] **A35. Museo intacto.** `count(*) FROM usuarios_cartas WHERE en_museo=true AND orden_museo NOT BETWEEN 1 AND 12` = **0**; ninguna migracion nueva menciona `orden_museo`; 078 no escribe en `usuarios_cartas` (`grep -c "usuarios_cartas" db/migrations/078*` = 0).
+- [ ] **A36. Independencia y Escudo.** 078 se aplica **con 076 sin aplicar** (su unica dependencia es 066/068/069) y `count(*) WHERE familia='cosmetica'` = 9; `node --check lib/cartas-config.js` y `node --check api/admin.js` en verde; la seccion 11.12 tiene **0 bytes > 127**; `exploraco desarrollo/*.md` sin modificar (R2).
+
+**Lo que NO cambia en 11.11 y 11.12:** las 45 cartas y sus `stats_json`, `precioAcunacion()` en las 5 familias existentes, `CARTA_PODER_PESOS`, `chk_cartas_catalogo_stats`, la tirada, `carta_acunar`, el CHECK de fusion de cosmetica, los 12 slots del museo y el indice de 073. Ninguna de las dos secciones crea un eje, un endpoint, una columna ni una tabla.

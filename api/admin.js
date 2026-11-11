@@ -1533,7 +1533,16 @@ module.exports = async function handler(req, res) {
           + 'FROM cartas_catalogo '
           + 'ORDER BY activo DESC, set_slug ASC, nivel_gate ASC NULLS FIRST, id ASC'
         );
-        return res.status(200).json({ ok:true, data: filasCa, total: filasCa.length });
+        // config: la MISMA lista que valida el alta (lib/cartas-config.js), para
+        // que admin.html pinte los selects de familia/subtipo sin una copia
+        // literal. Si una familia entra en lib/, el panel la ofrece sola; la
+        // segunda autoridad (CARTAS_SUBTIPOS de admin.html) se retiro con la
+        // familia 'naturaleza' (spec 11.11.4 regla 4.5).
+        return res.status(200).json({ ok:true, data: filasCa, total: filasCa.length,
+          config: {
+            familias: CartasConfig.FAMILIAS_CARTA,
+            subtipos: CartasConfig.SUBTIPOS_CARTA
+          } });
       }
 
       // --- Cola de moderacion de MEDIA UGC (spec 6.2) -------------------

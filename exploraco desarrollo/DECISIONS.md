@@ -13749,3 +13749,64 @@ La matriz completa es la seccion 8 de `docs/superpowers/specs/2026-11-11-cartas-
 **7. Estado de datos que condiciona las ramas nuevas (fail-closed, no bug).** **`cartas_media` 0 filas** -> las misiones **`obra`** quedan en **`SIN_ACCION`** hasta que exista **una obra aprobada**; **`usuarios_cartas` 0** -> las misiones **`economia`** **no tienen acciones de carta**; **`xp_ledger accion='compartir'` 0 filas** hasta el **primer compartir real**. Las **4 ramas** estan **cableadas y verificadas**, pero **`obra`/`economia` dependen de contenido real** (**UGC** y **mercado**) para **dar acciones**: sin dato, **no pagan**, y eso es **correcto**.
 
 **Estado tras la enmienda:** **EXPEDICION COMPLETA (4 ramas, 12 misiones)** (2026-11-11), con **066-074 aplicadas** y **caps 5/24 h + 200 XP/dia compartidos** entre las 4 ramas. **Cerradas: D-21, D-22, D-24, D-25 y D-31.** **Deudas abiertas: D-23** (arte), **D-20** (md5 070), **D-12/D-19**, **D-13**, **D-14** parcial, **D-26 a D-30** (catalogo) y **D-32** (auditoria de las **41** `historico_no_verificado`). Punteros: **`TASKS.md` TSK-257**, **`NEXT.md`** (apertura), **`PROJECT.md`** (sistema de cartas) y la spec **11.9.11 / 11.10**.
+
+### Enmienda 8 (catalogo de 64 cartas y 8 familias: `naturaleza` verificada contra GBIF y sin dato IUCN, cosmeticas v1 sin efecto, admin sin segunda autoridad, auditoria D-32 cerrada en lo material y deuda nueva D-33, 2026-11-11)
+
+**Por que ENMIENDA y no ADR-122.** Las migraciones **076, 077 y 078** **ejecutan el contrato de taxonomia que este ADR ya habia fijado**: `familia`/`subtipo` como **columnas con CHECK** (opcion C, `:13524`) y la **capa de estatus** donde `cosmetica` ya estaba declarada. **No sustituyen ninguna premisa**: no tocan `stats_json` mas alla de `presencia`, ni el precio de acunacion (**base por rareza x multiplicador**), ni la tirada por pesos, ni el supply por `emitidas` + `supply_max`, ni el esquema de la **074**. Lo que hay que registrar son **hechos de base** (3 migraciones aplicadas, 1 semilla de prueba), **un limite de fuente** (no hay dato de conservacion y no se inventa), **una retirada de autoridad duplicada** en el admin, **el resultado de una auditoria** y **una deuda de gobernanza nueva**. El argumento vive **una sola vez** aqui (ADR-084 D1); el contrato tecnico esta en la spec **11.11 / 11.12**, que este pase **no toca**.
+
+**1. Familia pasa de 7 a 8 valores: `naturaleza` entra al CHECK (076 APLICADA).**
+
+- `db/migrations/076_cartas_familia_naturaleza.sql` (**16.344 B**) **APLICADA**: el CHECK de `familia` admite **8 valores** (`lugar`, **`naturaleza`**, `personaje`, `artista`, `marca`, `producto`, `consumible`, `cosmetica`) y `subtipo` cierra **`naturaleza -> flora|fauna`**. Suma **1 constraint nueva** (`chk_cartas_catalogo_naturaleza`) a las que ya existian.
+- **`precio_xp` no cambia:** sigue exigiendo **`> 0`** (el CHECK de la 066/068 se conserva). **Idempotente** (2a corrida = no-op).
+- **Esto no reabre la decision de 7 familias del ADR: la amplia.** Las **3 capas** siguen derivandose y no se persisten; lo unico que cambia es el **dominio cerrado** de la columna, que es lo que el ADR eligio como columna precisamente para poder cerrarlo con un CHECK.
+- **Baseline verificado (ADR-006):** `lib/cartas-config.js:60-71` declara las **8** familias y `SUBTIPOS_CARTA.naturaleza = ['flora','fauna']`, alineado con la base. `CARTA_MULT_FAMILIA.naturaleza = 1.0` (mismo multiplicador que `lugar`).
+
+**2. 077 APLICADA: 10 cartas `naturaleza` con especie verificada y sin dato de conservacion inventado.**
+
+- **10 cartas `cn_*`**: **5 `flora`** y **5 `fauna`**, rareza **4/3/2/1**, precio **150 / 400 / 1000 / 2500** XP, `supply_max` **5000 / 1000 / 250 / 50**, `edicion='limitada'`, **`nivel_gate IS NULL`** (luego **`fusionable=false`**, porque manda el CHECK) y **sin localizaciones**.
+- **Especies verificadas contra GBIF** (binomio exacto **y** presencia en Colombia): palma de cera, `Cattleya trianae`, frailejon, guadua, ceibo, jaguar, oso de anteojos, danta de paramo, rana dorada y titi cabeciblanco. **La verificacion es de identidad taxonomica, no de estado de conservacion.**
+- **`estado_iucn` queda VACIO POR FALTA DE FUENTE, no por olvido:** **IUCN Red List responde 403 sin token** y **no se inventa un dato de conservacion**. Es la aplicacion literal de ADR-006 al reves: si no se puede verificar, **no se escribe**. Se abre como pendiente explicito en `NEXT.md` (se cierra cuando haya token).
+- **Nota de lectura:** una carta `naturaleza` **no declara** que la especie este amenazada. Cualquier UI o copy que lo insinue esta afirmando algo que la base no dice.
+
+**3. 078 APLICADA: cosmeticas v1 = presencia, sin efecto y con supply abierta.**
+
+- **9 cartas `cc_*`**: **3 `marco`**, **3 `fondo`** y **3 `insignia`**; precio **75 / 200 / 500 / 1250** XP; `stats_json` con **solo `presencia`** (cero ejes jugables, coherente con "presencia es solo cosmetica y no toca poder, tirada ni XP"); **`fusionable=false`**.
+- **`edicion='abierta'` y `supply_max NULL` es DECISION DEL OPERADOR, no un descuido:** **un sumidero con techo deja de ser sumidero**. La cosmetica existe para **drenar XP**, y un `supply_max` la convertiria en objeto escaso y revendible, que es lo contrario. **Consecuencia asumida:** `emitidas` no acota nada en esta familia y el precio es la unica palanca.
+- **`presencia` sigue SIN consumidor** en v1 (es cosmetica declarada). Una cosmetica **no da poder de juego**: mismo criterio que `producto`/`consumible` en lo que toca a poder, distinto en lo que toca a comprabilidad.
+- **D-14 parcial se reduce:** `cosmetica` **deja de estar sin sembrar**. **Sigue abierta en `artista`**, que espera **UGC real** (ver punto 4 y el aviso del 075).
+
+**4. 075 APLICADA: semilla de PRUEBA de UGC, no contenido real.**
+
+- `db/migrations/075_cartas_media_seed_prueba.sql` (**12.901 B**) deja **1 fila** en `cartas_media`: **`[TEST] Rio de piedra`**, `estado_moderacion='pendiente'`, licencia **`CC0-1.0`**, autor = **el usuario con mas XP** (`bc940e34...`), `media_url` = **`assets/cartas/marca_ancestral.png`** (**HEAD 200** verificado).
+- **Para que sirve:** ejercitar la cadena **envio -> moderacion -> carta con `media_id` -> mision `obra`** de punta a punta sin esperar a un autor real. **Misiones `obra` dejan de estar en `SIN_ACCION` en cuanto la obra se aprueba**, que es justo lo que la Enmienda 7 no podia probar.
+- **Lo que NO significa:** **`artista` NO tiene UGC real.** La fila es **de prueba**, su titulo lo dice (`[TEST]`) y su lamina es la de marca reutilizada. **Ningun documento debe leer esta fila como "la UGC funciona con usuarios"**: funciona el **circuito**, con un dato sembrado.
+- **Sin `estado_iucn`** no hay nada que decidir aqui; se menciona porque comparte la misma regla: **no se rellena un campo con una suposicion.**
+
+**5. Catalogo resultante: 64 cartas, 57 acunables, y el arte como deuda que crece.**
+
+- **64 cartas** = **24 `lugar`** + **8 `personaje`** + **6 `marca`** + **10 `naturaleza`** + **9 `cosmetica`** + **3 `consumible`** + **4 `producto`**. **57 acunables** (24+8+6+10+9); las **7** de `producto`/`consumible` siguen con `precio_xp NULL` (se pagan por SKU, CHECK de la 066).
+- **Las imagenes responden 19/19 con HEAD 200, pero solo son 5 laminas distintas reutilizadas.** **D-23 crece, no se cierra:** mas cartas con el mismo arte. El operador ya decidio **no generar artes nuevos**; esta enmienda **no cambia esa decision**, solo mide su costo.
+
+**6. El admin deja de tener una segunda autoridad de familias.**
+
+- `cartas_lista` (`GET ?tipo=cartas_lista`) emite **`config {familias, subtipos}`** leido de **`lib/cartas-config.js`**, y **`admin.html` pinta los selects desde ahi**. Las **listas literales del panel se retiran**.
+- **Por que importa mas que un refactor:** con 7 familias la duplicacion era invisible porque ambos lados coincidian por casualidad. Al entrar la **8a**, un panel con lista propia habria dejado **`naturaleza` fuera del selector** y el sintoma habria sido "no se puede crear una carta que la base ya acepta". **Una sola fuente, dos lectores.**
+
+**7. D-32 AUDITADA: el hueco del ledger es materialmente benigno (0 ALTO).**
+
+- **`scripts/auditoria_ledger_historico.js`** recorre las **41** `historico_no_verificado` y extrae **258 objetos**; el resultado es **252 EXISTEN**, **2 MEDIO**, **4 IGNORADO** y **0 ALTO**.
+- **Los 2 MEDIO:** `guardados_carpetas` y `media_guardados.carpeta_id`, **referenciados solo por un smoke** -> **feature dormida** (la **030** nunca se aplico y **nadie la consulta en runtime**). **No sostienen una feature viva**, que era el criterio de prioridad 1 de la Enmienda 7.
+- **El caso que abrio la deuda ya esta cerrado:** `media_compartidos` **existe** por la **074** y la fila de la **022** **sigue sin reescribirse**.
+- **Conclusion registrada:** el ledger **no es un inventario fiable** (eso ya se sabia), pero **su imprecision no esconde un agujero de esquema**. **D-32 baja de riesgo a DEUDA RESIDUAL BENIGNA:** la auditoria esta hecha y el hueco, medido; sobreviven las **2 filas MEDIO**, listadas como **deuda de feature dormida** (**030** nunca aplicada, **cero consumidor en runtime**), **no como riesgo de runtime**. **No se cierra con 0 filas pendientes: se cierra con 2 MEDIO conocidos y 0 ALTO.**
+
+**8. D-33 NUEVA: una migracion aplicada NO se edita (deuda de gobernanza).**
+
+- **Hecho medido:** al **re-ejecutar la 077 despues de la 078**, su **guarda post** exigia **45 filas ajenas** cuando ya habia **54**. El agente **corrigio la guarda** y **reconcilio el checksum de la 077** (`362fe6f3...` -> `c430dbc2...`), dejando **el hash anterior y el motivo en `notas`** del ledger.
+- **Por que es deuda aunque el resultado sea correcto:** una migracion aplicada es **historia**, y editar su guarda reescribe lo que se ejecuto. **La guarda estaba mal escrita desde el principio** (contaba filas absolutas en vez de acotar por lo propio) y **el patron correcto** era **`>=` desde el inicio** o, si ya estaba aplicada, **una migracion nueva**. La reconciliacion de checksum es **transparente y trazable** (se conserva el anterior en `notas`), pero **no convierte la edicion en buena practica**.
+- **Sin cirugia adicional:** **el hash nuevo queda** y **no se toca nada mas**. La leccion aplica a **todas** las migraciones futuras: **una guarda post que cuenta filas ajenas es fragil por diseno**.
+
+**9. Verificacion (medida en el pase de implementacion; ADR-006: no se re-ejecuta aqui).** Constantes **88/88** (74 -> 88), **economia 62/62**, **expedicion 61/61**, **UI 140/140** (sube con el chip de `naturaleza`; ese pase corre en paralelo y **aqui no se acredita su resultado**) y **`npm test` exit 0**. **8/8 funciones serverless, cero endpoint nuevo.** **No se afirma deploy:** el ultimo deploy del sistema sigue siendo **`e9be424`** (fase 2) y **nada de esta tanda esta en `origin`**.
+
+**10. Deriva documental asumida (no se corrige).** El comentario de la **076** **no coincide** con lo finalmente aplicado. **No se edita**: editar una migracion aplicada es exactamente lo que **D-33** prohibe. **El baseline es el esquema real (ADR-006), no el comentario de una migracion.** Mismo criterio que el md5 falso del header de la 070 (**D-20**).
+
+**Estado tras la enmienda:** **CATALOGO DE 64 CARTAS / 8 FAMILIAS** (2026-11-11), con **066-078 aplicadas**. **Cerradas: D-21, D-22, D-24, D-25 y D-31.** **Deudas abiertas: D-23** (arte; **crece a 19 cartas con 5 laminas**), **D-20** (md5 070), **D-12/D-19**, **D-13**, **D-14** parcial (**solo `artista`**, `cosmetica` ya sembrada), **D-26 a D-30** (catalogo), **D-32** (auditada: **0 ALTO**, **2 MEDIO** de feature dormida) y **D-33** (gobernanza de migraciones); ademas el **`estado_iucn` pendiente de token**. Punteros: **`TASKS.md` TSK-257**, **`NEXT.md`** (apertura), **`PROJECT.md`** (sistema de cartas) y la spec **11.11 / 11.12**.
