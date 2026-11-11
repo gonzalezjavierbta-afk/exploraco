@@ -4,7 +4,7 @@
 de una entrega o feature; la fuente de verdad sigue siendo el archivo real del
 repositorio (ADR-006).
 
-**Total:** 19 specs.
+**Total:** 21 specs.
 
 | Fecha | Spec | Tema | Estado |
 |---|---|---|---|
@@ -27,6 +27,8 @@ repositorio (ADR-006).
 | 2026-09-23 | [2026-09-23-consumibles-por-era-design.md](2026-09-23-consumibles-por-era-design.md) | Consumibles con gate por era: `consumibles.era_exclusiva` (banda exclusiva de compra), 15 nuevos (3 por era) + 9 premium backfilleados (catálogo 32 en el estado real de Neon: 17 previos + 15 nuevos; 35 si la 034 se aplica), migración 035 aplicada en Neon el 2026-09-23 (ADR-056) | Implementado (migración 035 APLICADA en Neon el 2026-09-23; numeración alineada a ADR-056) |
 | 2026-09-24 | [2026-09-24-multiplicador-origen-lejania-design.md](2026-09-24-multiplicador-origen-lejania-design.md) | Multiplicador de Origen por lejania Local/Nomada/Extranjero (ADR-058) | Implementado (migracion 038 aplicada en Neon el 2026-09-24) |
 | 2026-09-24 | [2026-09-24-gaming-v6.1-early-mid-late-design.md](2026-09-24-gaming-v6.1-early-mid-late-design.md) | Gaming v6.1 + Early/Middle/Late Game: gates de eleccion, referidos 10%, cartas-gate, moneda secundaria, gobernanza 3 capas, own-spot multi-media y Gig Economy P2P (ADR-059..066) | PROPUESTO / Fase 0 (SOLO documentacion) |
+| 2026-11-10 | [2026-11-10-consumibles-24h-ancestral-set-design.md](2026-11-10-consumibles-24h-ancestral-set-design.md) | Bono +% de XP global 24 h con tope por ventana (mapa `consumible_efectos`), retirada del tope de compra de 30 y set Ancestral 4/4 con acceso permanente y premio `premio_set` (ADR-120) | IMPLEMENTADO, DESPLEGADO EN PRODUCCION Y REACTIVADO (064 y 065 aplicadas en Neon) |
+| 2026-11-11 | [2026-11-11-cartas-familias-stats-supply-design.md](2026-11-11-cartas-familias-stats-supply-design.md) | Sistema de cartas: 7 familias en 3 capas, vector de 4 ejes jugables + presencia, tirada por pesos, acunacion y supply, UGC obra -> ediciones y modos (ADR-121; v3 con 2 enmiendas) | FASE 0+1 IMPLEMENTADA EN NEON (066, 067 y 068 aplicadas; ledger 65 filas / max 68) / FASE 2 PENDIENTE (contrato con gate) |
 
 ## Notas
 

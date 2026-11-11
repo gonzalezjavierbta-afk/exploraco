@@ -227,6 +227,18 @@ Mecanica nueva sobre el mercado existente; **NO crea funciones serverless** (8/8
 - **Errores:** 403 `FACCION_INSUFICIENTE` / `NIVEL_INSUFICIENTE`; 409 `LIMITE_DIARIO` / `STOCK_LLENO` / `EFECTO_YA_ACTIVO`; 429 historico del tope global. **No existe 422 `RESENA_CORTA`**: la resena corta se publica sin bono y sin consumir carga.
 - **Superficies:** `api/interacciones.js` (compra, uso y hooks en `guardado`/`visita`/`media_voto`/`resena`/`foto`), `api/admin.js` + `admin.html` (8 campos del catalogo) y `mi-perfil.html` (modulo `pf-fac` en silo CSS, ADR-004). **Cero endpoint nuevo.**
 
+### Sistema de cartas (ADR-121, 2026-11-11)
+
+El catalogo de cartas tiene ya **taxonomia, valor, supply y vector de stats** en el esquema (fase 0+1: **066, 067 y 068 aplicadas en Neon**). **El argumento completo vive en `DECISIONS.md` ADR-121**; aqui solo el mapa del sistema (ADR-084 D1).
+
+- **7 familias en 3 capas, con `subtipo` cerrado por familia:** juego (`lugar`, `personaje`, `artista`, `marca`), economia (`producto`, `consumible`) y estatus (`cosmetica`). La **capa se deriva**, no se persiste. Hoy el catalogo son **31 cartas**: **24** de lugar/territorio, **3** de consumible/entrada_evento y **4** de producto/fisico; `personaje`, `artista` y `cosmetica` aun **no tienen cartas** (deuda D-14).
+- **Vector: 4 ejes jugables + presencia.** `alcance`, `oficio`, `fortuna` y `rendimiento` actuan por **umbral y caps** (40 por eje, `poder` <= 160); `presencia` es **solo cosmetica** y no toca poder, tirada ni XP. **Ninguna stat multiplica el XP global** y `energia` queda **reservada** (sin columna).
+- **Tirada por pesos 5000/1000/250/50**, renormalizando cuando una rareza se agota; `fortuna` sube los pesos de raro/epico/dorado con techo **+20%** y **no hay pity** (la tirada no tiene estado).
+- **Valor y supply:** el precio de acunacion es **base por rareza (150/400/1000/2500) x multiplicador de familia** (`numeric(12,2)`, resuelto al acunar y guardado); la emision se acota con **`edicion` + `supply_max` + `emitidas`** (circulacion medida = inventario + escrow). No hay tabla de copias por serial en v1.
+- **UGC: `obra` -> N `ediciones`.** Una obra vive en `cartas_media` y sus ediciones son cartas del catalogo; exige **moderacion previa** (solo `aprobada` se acuna) y **licencia aceptada** (CHECK fail-closed de la 068). Royalty y tithe son **contrato de fase 2** (D-17).
+- **Modos:** coleccion pasiva, **expedicion** como extension del DAG de misiones (repetibles, recompensa <= 40 XP, tope 5 cobros/24 h) y **temporada diferida**. `producto`/`consumible` **no dan poder de juego** (CHECK) pero **hoy si se pueden listar y vender por XP** (D-15, fase 2).
+- **Estado de implementacion:** solo **esquema**. La acunacion, la subida de nivel, la tirada y toda la UI son **contrato de fase 2 con duenno y gate** (`@admin-dev`, `@backend-dev`, `@frontend-tpl`, `@content-loader`, `@qa-auditor`); **cero endpoint nuevo (8/8) y cero deploy**. `familia`/`subtipo` siguen **NULLABLE a proposito** hasta el paso 2.
+
 ### Documentacion maestra
 
 El detalle tecnico consolidado del sistema de gamificacion y del apartado social vive en dos documentos maestros (referencia de detalle; este PROJECT.md solo resume):

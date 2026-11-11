@@ -13502,3 +13502,100 @@ S-1..S-17 de la spec, seccion 5: en particular S-4/S-5 (matematica y no apilamie
 ### Estado
 
 **ACEPTADO / IMPLEMENTADO (2026-11-10):** 064 y 065 **APLICADAS** en Neon y registradas en el ledger (064 = **4** sentencias, 065 = **3**), idempotencia probada (re-ejecutar da **0** filas de dato). Backend y cliente **en arbol de trabajo, sin commit y sin deploy**. Las deudas abiertas (needle desactualizado del smoke de media, admin sin los campos nuevos, premio no cableado en intercambio/drop, UI de cooldown y panel, `premio_set` nulo en replay) se registran en `TASKS.md` TSK-256 y en `NEXT.md`; **no** reabren esta decision.
+
+---
+
+## ADR-121: Las cartas se clasifican en **7 familias de 3 capas** y su vector se fija en **4 ejes jugables mas presencia cosmetica**, con **umbrales y caps y sin multiplicar XP**; la tirada usa **pesos 5000/1000/250/50**, el valor de acunacion es **base por rareza x multiplicador de familia**, la emision se acota con **`emitidas` + `supply_max`** y `stats_json.bonus_xp_pct` **se retira del contrato** (su funcion la asume `stats.rendimiento`, como bono NUEVO solo de expedicion) [**acota** ADR-108 (taxonomia de emisor y variante) y ADR-120 solo en el **valor de canje del set Ancestral**; **no deroga** el bono global 24 h de consumibles de ADR-120, ni ADR-003 (cero borrado logico), ni ADR-018 (los sinks no tocan `xp_total`), ni ADR-117 (jugable = tiene diseno), ni el CHECK de rareza de la 040]
+
+**ID:** ADR-121
+**Fecha:** 2026-11-11 (v2, corrige el veredicto SOLICITA CAMBIOS de `@architect-review`; **enmienda 2** tras la auditoria de `@sql-security` del mismo dia, seccion 11.5 de la spec)
+**Autor:** `@architect`. Gate de riesgo CONFIRMADO por el operador: la fase 0+1 toca **esquema** (`@sql-security` + `@data-migration`); la fase 2 toca `api/*.js` (`@backend-dev`) y `admin.html` (`@admin-dev`), ambos con gate **SI**.
+**Estado:** **ACEPTADO / IMPLEMENTADO EN NEON (fase 0+1, 2026-11-11); FASE 2 PENDIENTE.** **066, 067 y 068 APLICADAS** y registradas en el ledger (`schema_migrations` = **65 filas**, max **68**; checksums 066 `5a5d6b0f`, 067 `30fd9f81`, 068 `bd3887a5`); segunda corrida de las 3 = **0 cambios de dato**. **Cero codigo de producto tocado, cero endpoint nuevo (8/8) y cero deploy.** El detalle largo (matriz V1..V24, riesgos y enmiendas) vive en `docs/superpowers/specs/2026-11-11-cartas-familias-stats-supply-design.md`; **aqui no se duplica** (ADR-084 D1).
+**Numeracion (ADR-006, verificado contra el archivo real el 2026-11-11):** el mayor encabezado del fichero era **ADR-120** (`:13429`); **121** es el consecutivo libre.
+
+### Problema
+
+El catalogo de 31 cartas tiene rareza, emisor, variante, museo, fusion y set, pero **no tiene taxonomia** (`set_slug` no dice que ES una carta), **no tiene valor** (nada dice cuanto cuesta acunar una carta), **no tiene supply** (nada limita cuantas existen) y **no tiene stats con consumidor** (`stats_json` solo lleva `bonus_xp_pct`, display-only desde ADR-108: deuda D-5). Sin eso, la tirada no se puede implementar sin inventar numeros en el handler, el mercado no puede distinguir una carta de juego de un recibo de SKU, y la UGC no tiene donde vivir. Ademas, al elegir un juego por **acciones reales** (no por energia), el eje "energia" del referente queda sin consumidor: dejarlo seria una stat muerta.
+
+### Opciones evaluadas
+
+- **A. Taxonomia en `tags` JSONB.** Flexible, cero migracion, pero `familia` es dimension de **filtro y de tirada** y `emitidas` es un **contador atomico**: un contador en JSONB exige `jsonb_set` con lectura previa y pierde actualizaciones bajo concurrencia. Un CHECK por clave en JSONB tampoco puede validar el dominio cerrado por familia con la claridad de un CHECK de columna. **Descartada.**
+- **B. Tabla `cartas_familias` + FK.** Normaliza los 7 valores, pero crea una tabla que solo sirve para hacer `JOIN` contra 7 filas estaticas y anade una escritura administrativa para algo que no cambia en runtime. **Descartada** (tabla muerta por definicion).
+- **C. Columnas en `cartas_catalogo` (`familia`, `subtipo`) + reuso de `stats_json` para el vector + `precio_xp`/`edicion`/`supply_max`/`emitidas`.** La identidad y la economia son columnas (indexables, con CHECK y con contador atomico); el vector, que es forma variable, se queda en el JSONB que **ya existe** (`060:254-255`) con MERGE (`COALESCE(stats_json,'{}') || $1`). **Elegida.**
+
+### Decision
+
+1. **7 familias en 3 capas.** Juego: `lugar`, `personaje`, `artista`, `marca`. Economia: `producto`, `consumible`. Estatus: `cosmetica`. `subtipo` es dominio cerrado **por familia**. La capa **se deriva**, no se persiste. **`familia`/`subtipo` entran NULLABLE en 066** con backfill **31/31**; el `NOT NULL` es el **paso 2** de una migracion de fase 2, **despues** de parchear `cartas_crear` (`api/admin.js:1438-1446` inserta lista explicita y hoy no escribe esas columnas). Expand/contract, no big-bang.
+2. **4 ejes jugables + presencia + nivel de carta.** `alcance`, `oficio`, `fortuna`, `rendimiento` actuan por **umbral** y por **caps** (40/eje, `poder` <= 160). `presencia` es **solo cosmetica** (no entra en `poder`, no toca XP ni tirada). **Ninguna stat multiplica el XP global.** `energia` queda **RESERVADA**: sin columna y sin clave. **v1 solo publica expediciones de `alcance`/`fortuna`**: son los unicos ejes con cartas que los aporten hoy (24 `lugar`); `oficio`/`rendimiento` valen 0 y sus ramas esperan al seed de fase 4.
+3. **Puntos por rareza 4/8/14/24**, repartidos primario/secundario en enteros exactos (3/1, 5/3, 9/5, 14/10); **shiny** `floor(25%)` al primario; **nivel 1..5** por usuario y carta con **+1 al primario por nivel** y coste **150/400/900/1800** de XP. El cargo sube **`xp_gastado_sinks`** y **nunca** resta de `xp_total` (patron `046:40-44`), con las dos guardas de ADR-018; la subida es **una sola sentencia** condicionada a `nivel < 5` e **idempotente por `(usuario, carta, variante, nivel_esperado)`** (4.9).
+4. **`producto` y `consumible` no tienen `precio_xp` ni vector.** Se pagan por su SKU (`consumibles.clave`/`precio_xp`) y **no dan PODER de juego**: eso es un CHECK, no una promesa. **La comerciabilidad NO esta cerrada:** `carta_publicar` solo exige `activo=true` (`api/interacciones.js:16200-16209`), asi que hoy una carta de producto se puede listar y vender por XP -> **D-15**, contrato de fase 2 (predicado de familia + smoke).
+5. **Precio de acunacion = base_rareza (150/400/1000/2500) x multiplicador de familia (cosmetica 0,5 / lugar 1,0 / personaje 1,2 / artista 1,2 / marca 1,5).** El precio **se resuelve al acunar y se guarda**; no se recalcula en lectura. **El tipo es `numeric(12,2)` (ADR-035)**, no `integer`: los multiplicadores no son enteros y redondear en el handler seria una segunda autoridad del precio. La 066 aplicada lo creo `integer`; **la 068 lo convierte** (enmienda 2, 11.5). **El sumidero de acunacion es contrato de fase 2** (4.8): un solo CTE con cargo, emision, inventario y asiento, fail-closed.
+6. **Tirada por pesos 5000/1000/250/50** con denominador = pesos elegibles (renormaliza al agotarse una rareza). `fortuna` multiplica los pesos de raro/epico/dorado con techo **+20%**. La tirada no tiene estado (sin pity).
+7. **Supply y edicion:** `edicion` (`abierta`/`limitada`/`serial`), `supply_max` y `emitidas`. **En v1 no hay tabla de copias por serial**: la emision se acota con un `UPDATE ... SET emitidas = emitidas + 1 WHERE ... AND emitidas < supply_max` (0 filas = AGOTADA). `emitidas` es **circulacion medida = inventario + escrow de ofertas abiertas/parciales** (`cartas_ofertas.cantidad_restante`, `041:109-130`), y el backfill usa `GREATEST(emitidas, circulacion)`. El punto de extension (`cartas_serie`) queda documentado con su coste.
+8. **Modos:** coleccion pasiva; **expedicion** como extension del DAG `MISIONES` con `requiere_stats` y **`expedicion_rama`** (clave nueva: `rama` ya existe con otro dominio), misiones **REPETIBLES**, recompensa <= 40 XP, **maximo 5 cobros por 24 h** (tope 200 XP/dia medido en `xp_ledger`) y accion exenta de bonos; **temporada diferida** (punto de extension: `set_slug`).
+9. **UGC:** `obra` (`cartas_media`) -> N `ediciones` (`cartas_catalogo.media_id`, **no UNIQUE**). **Moderacion previa obligatoria** (`pendiente` por defecto; solo `aprobada` se acuna), **derechos previos**: una obra no puede estar `aprobada` sin `licencia` no nula (CHECK fail-closed, **068**), limites por autor, royalty **10% en XP** al `emisor_id` con tithe <= 10% y **detraccion total <= 20%**, retirada por estado (**nunca `DELETE`**). **El royalty y el tithe son contrato de fase 2:** hoy la venta P2P acredita el **bruto** (`api/interacciones.js:16334-16337`) y el tithe de cartas **no existe** -> **D-17**.
+10. **D-5 cerrada:** `bonus_xp_pct` **sale del contrato**, no de la base. Su intencion la asume `stats.rendimiento` como **bono NUEVO, solo sobre recompensa de expedicion, capado y con tope 24 h**; **no deroga el bono global 24 h de consumibles de ADR-120**. Se tolera la clave en filas existentes (ADR-003) y **ningun lector nuevo la consume**.
+
+### Contratos de fase 2 (codigo NO incluido en esta release)
+
+Ninguno de estos cambios entra en la tanda de 066/067/068: son **contrato escrito** para que la fase 2 no los reinvente. Todos exigen **gate**.
+
+| Contrato | Duenno | Gate | Seccion |
+|---|---|---|---|
+| Sumidero de acunacion (cargo + emision + inventario + ledger, un solo CTE) | `@backend-dev` | SI | 4.8 |
+| Subida de nivel atomica (idempotente por `nivel_esperado`) | `@backend-dev` | SI | 4.9 |
+| `expedicion_rama` + misiones repetibles con cap 5/24 h | `@backend-dev` | SI | 5.2 |
+| Predicado de familia en `carta_publicar` (D-15) | `@backend-dev` | SI | 9.2 |
+| Royalty 10% + tithe <= 10% (detraccion <= 20%) | `@backend-dev` | SI | 6.4 |
+| Cola de moderacion y alta de obra en admin | `@admin-dev` | SI | 6.2 |
+| `familia`/`subtipo` en `cartas_crear`/`cartas_editar` + `SET NOT NULL` (paso 2) | `@admin-dev` | SI | 7.1 |
+
+### Justificacion
+
+- **Columnas y no JSONB** (opcion C): `familia`/`subtipo` necesitan CHECK de dominio cerrado, indice para la tirada y `emitidas` necesita un contador que no pierda actualizaciones. El vector, en cambio, es forma variable y **ya tiene** columna JSONB: crear columnas por eje seria duplicar y migrar cinco veces.
+- **Por acciones reales y no por energia:** la mision ya se evalua server-side sobre acciones que ocurrieron (`api/interacciones.js:4008-4011`); una barra de energia anadiria un reloj y un incentivo a esperar. Se compensa con **caps**, no con cooldowns.
+- **`rendimiento` en vez de `bonus_xp_pct`:** un porcentaje global es exactamente el incentivo invertido que ADR-082 prohibe en gates y el riesgo que `NEXT.md:67` (b) marcaba. Un eje que **habilita y acota** no puede inflarse.
+- **Producto/consumible sin poder:** con SKU + vector vacio, el **poder** no se compra: es un CHECK, no una regla de conducta. **La comerciabilidad es otra cosa y no esta cerrada**: `carta_publicar` no filtra familia (`api/interacciones.js:16200-16209`), asi que el "no se vende" es **condicion de fase 2** (D-15), no un hecho del sistema.
+- **Seriales como contador:** la PK `(usuario_id, carta_id, variante)` (`061`) no tiene sitio para copias, `cantidad` es agregado con 8 consumidores y ninguna pantalla muestra el numero. Un contador resuelve lo unico que v1 necesita (cuantas existen) sin reabrir la PK.
+- **Tabla de media nueva:** `album_fotos` cuelga de un album privado (`ON DELETE CASCADE`), no admite `poema` y no tiene moderacion; reusarla impondria `pendiente` a todas las fotos de usuario.
+
+### Impacto
+
+- **Esquema:** 6 columnas + 1 tabla en 066; 1 tabla + 1 columna con FK en 067; **068 aditiva** (tipo `precio_xp` + `licencia`/`licencia_aceptada_en` + su CHECK). **`familia`/`subtipo` quedan NULLABLE** (el `NOT NULL` es el paso 2 de fase 2, tras parchear `cartas_crear`). **Cero `DELETE`, cero `DROP COLUMN` ejecutable, cero cambio a `usuarios_cartas` ni a su PK, cero toque a `cromos_catalogo`.**
+- **Backend:** **cero cambios en esta tanda** (8/8 y ni un `.js` de `api/` tocado). Lo que necesita codigo queda como **contrato de fase 2 con duenno y gate**: acunacion (4.8), nivel atomico (4.9), `expedicion_rama` (5.2), predicado de familia en `carta_publicar` (D-15), royalty+tithe (6.4) y cola de moderacion (6.2). Todos exigen `@backend-dev`/`@admin-dev` con gate **SI**.
+- **Constantes:** `lib/cartas-config.js` crece con `CARTA_PRECIO_BASE_XP`, `CARTA_MULT_FAMILIA`, `CARTA_PESOS_RAREZA`, `CARTA_NIVEL_XP`, `CARTA_NIVEL_TOPE`, `CARTA_FAMILIAS`, `FAMILIAS_MUSEABLES`. Una fuente, dos lectores (patron `lib/cartas-config.js:10-14`).
+- **Render:** la capa de una carta se deriva de `familia`; `poder` y `vector_usuario` se calculan en lectura, nunca se persisten. Un `<img>` dinamico nuevo mantiene `onerror` (ADR-008).
+- **Datos:** 31/31 clasificadas; 24 lugar, 3 consumible, 4 producto; `emitidas` arranca como **circulacion medida** (inventario + escrow, `GREATEST`).
+- **Documentacion:** retira el pendiente D-5 de `NEXT.md:65` (d) en el pase de `@docs-keeper`; abre D-12 (documental: ADR-117 nombra la vista `cartas_jugables` y no tiene DDL), D-13 (sin ledger de acunacion), D-14 (3 familias con 0 cartas), **D-15** (`producto`/`consumible` listables y vendibles por XP), **D-16** (acunacion y nivel son contrato, no codigo; fusion resta de `xp_total`) y **D-17** (la venta P2P no cobra tithe ni paga royalty).
+
+### Verificacion
+
+La matriz completa es la seccion 8 de `docs/superpowers/specs/2026-11-11-cartas-familias-stats-supply-design.md` (V1..V20) mas **V21..V24** de la enmienda 2 (11.5.2). Los cinco criterios duros:
+
+1. `--dry-run` exit 0 en 066 y 067; aplicacion real y **segunda corrida con md5 del catalogo identico** (0 cambios de dato).
+2. **31/31 con familia** y distribucion `lugar/territorio 24`, `consumible/entrada_evento 3`, `producto/fisico 4`; **0 filas con `familia` o `subtipo` NULL**.
+3. **9/9 CHECKs** probados devolviendo 23514 (familia invalida, producto con precio, limitada sin techo, emitidas sobre el techo, stat no numerica, nivel 6, rechazo sin motivo, pendiente con moderador, producto sin `sku`) **sin dejar filas**.
+4. `emitidas >= inventario + escrow` por carta (`041:109-130`) y `emitidas <= supply_max` cuando hay techo; 0 huerfanas de `media_id`.
+5. ASCII: 0 bytes > 127 en 066, 067 y la spec.
+
+**Medido post-068 (2026-11-11):** V21 `precio_xp` = `numeric(12,2)`; V22 `cartas_media` con `licencia` y `licencia_aceptada_en` (`text`/`timestamptz`, ambas NULLABLE); V23 `chk_cartas_media_licencia` presente y **0 escritores todavia** (tabla vacia, nace en verde); V24 31 filas y md5 identico antes y despues de la segunda corrida.
+
+### Deudas que cierra y deudas que abre
+
+- **Cierra D-5** (stats sin consumidor) por la via de **retirar** la clave del contrato, no de "activarla".
+- **Abre D-12** (documental: ADR-117 nombra la vista `cartas_jugables` y no tiene DDL; **D-19** deja constancia de que 068 tampoco la toca), **D-13** (sin ledger de acunacion), **D-14** (tres familias sin cartas), **D-15** (`producto`/`consumible` listables y vendibles por XP), **D-16** (acunacion y nivel sin codigo en este release) y **D-17** (venta P2P sin royalty ni tithe).
+- **D-18 CERRADA por la 068:** la licencia UGC pasa a existir en la base (`licencia`, `licencia_aceptada_en` y CHECK fail-closed que impide aprobar sin derechos).
+- **No toca** D-2 (mercado por variante) ni D-9 (ledger de fusion fuera del CTE); D-16 **documenta** que la fusion resta de `xp_total` y no se repara aqui.
+
+### Relacion con ADRs
+
+- **ADR-108:** se **acota** la taxonomia de emisor y variante: el emisor sigue mandando y `familia`/`subtipo` se suman como dimension nueva, sin reinterpretar lo ya emitido.
+- **ADR-120:** se **acota** solo el **valor de canje del set Ancestral** (`precio_xp numeric`); **no se deroga** el bono global 24 h de consumibles, ni su mapa `consumible_efectos`, ni la retirada del tope de compra de 30.
+- **ADR-117:** **no se deroga**; "jugable = tiene diseno" sigue siendo la regla y esta tanda no cambia sus lecturas.
+- **ADR-018:** **no se deroga**; los sinks siguen sin tocar `xp_total` y la acunacion/nivel se contratan con las dos guardas.
+- **ADR-003:** cero `DELETE` y cero `DROP COLUMN` ejecutable; la clave `bonus_xp_pct` se tolera en filas existentes. **ADR-035:** `numeric(12,2)`. **ADR-002:** ASCII-safe. **ADR-006:** numeros medidos contra el archivo real.
+- **ADR-084 D1:** el argumento se escribe **una vez por decision**; el detalle de V1..V24 y de las dos enmiendas vive en la spec y aqui se cita.
+
+### Estado
+
+**ACEPTADO / IMPLEMENTADO EN NEON (fase 0+1) el 2026-11-11; FASE 2 PENDIENTE.** 066, 067 y 068 **APLICADAS** y registradas en el ledger (`schema_migrations` = **65 filas**, max **68**; checksums 066 `5a5d6b0f`, 067 `30fd9f81`, 068 `bd3887a5`), con **segunda corrida de las 3 = 0 cambios de dato**. Catalogo **31 cartas** (24 lugar/territorio, 3 consumible/entrada_evento, 4 producto/fisico; **0 NULL** en `familia`/`subtipo`), `precio_xp` en `numeric(12,2)` y `cartas_media` creada **vacia** con `licencia`/`licencia_aceptada_en` y su CHECK. **`familia`/`subtipo` siguen NULLABLE a proposito** (expand/contract): el `NOT NULL` es fase 2. **Cero codigo de producto tocado, cero endpoint nuevo (8/8) y cero deploy.** Las deudas D-12/D-19, D-15, D-16 y D-17 se registran en `TASKS.md` TSK-257 y en `NEXT.md`; **no** reabren esta decision.
