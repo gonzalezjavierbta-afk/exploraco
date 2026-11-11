@@ -1659,8 +1659,15 @@
        ni se reutiliza una ya cobrada: el backend solo acepta la derivada.
      - repetido:true (xp:0) NO es error: se dice "Ya la hiciste".
      ===================================================================== */
-  var EXP_RAMAS = { difusion: 'Difusion', hallazgo: 'Hallazgo' };
-  var EXP_RAMAS_ORDEN = ['difusion', 'hallazgo'];
+  /* Las 4 ramas (11.10): etiqueta, gancho corto y eje que mide su umbral.
+     'e' solo se pinta como pista; el umbral real llega en requiere_stats. */
+  var EXP_RAMAS = {
+    difusion: { l: 'Difusion', d: 'Llega a mas gente', e: 'alcance' },
+    hallazgo: { l: 'Hallazgo', d: 'Encuentra lo inesperado', e: 'fortuna' },
+    obra: { l: 'Obra', d: 'Crea y publica', e: 'oficio' },
+    economia: { l: 'Economia', d: 'Mueve el mercado', e: 'rendimiento' }
+  };
+  var EXP_RAMAS_ORDEN = ['difusion', 'hallazgo', 'obra', 'economia'];
   var EXP_URL_GET = '/api/interacciones?tipo=expediciones&usuario_id=';
   var EXP_URL_POST = '/api/interacciones?tipo=expedicion_cobrar';
   var expCtrl = null;
@@ -1716,13 +1723,19 @@
     if (m && m.senal_disponible === false) {
       return { clave: 'sin_accion', texto: 'Sin accion disponible' };
     }
+    /* Senal viva y CERO acciones acumuladas: no es fail-closed ni falta un
+       tramo, es que aun no hay nada que cobrar (p.ej. obra UGC sin aprobar).
+       La lista vacia con total>0 sigue contando el tramo que falta. */
+    var totalAcc = safeNum(m && m.acciones && m.acciones.total, 0);
+    if (m && m.senal_disponible === true && !pend.length && totalAcc <= 0) {
+      return { clave: 'sin_acciones', texto: 'Sin acciones todavia' };
+    }
     if (bloqueo === 'SIN_ACCION' || (m && m.motivo === 'SIN_ACCION')) {
       var falta = expAccionesFaltan(m);
       if (falta > 0) {
         return { clave: 'acciones', texto: 'Te faltan ' + falta
           + (falta === 1 ? ' accion' : ' acciones') };
       }
-      return { clave: 'sin_accion', texto: 'Sin accion disponible' };
     }
     return { clave: 'sin_accion', texto: 'Sin accion disponible' };
   }
@@ -1963,6 +1976,12 @@
     html += expEjesHtml(m);
     var det = fichaTexto(pend[0] && pend[0].detalle);
     if (det) html += '<div class="c-exp-m-ref">Cobra: ' + esc(det) + '</div>';
+    /* motivo libre del servidor (p.ej. obra UGC sin aprobar): se pinta tal
+       cual, sin enlaces ni atajos. El codigo SIN_ACCION ya lo cubre el estado. */
+    var motivo = fichaTexto(m && m.motivo);
+    if (motivo && motivo.toUpperCase() !== 'SIN_ACCION') {
+      html += '<div class="c-exp-m-motivo">' + esc(motivo) + '</div>';
+    }
     html += '<div class="c-exp-m-pie">'
       + '<span class="c-exp-m-est is-' + est.clave + '">' + esc(est.texto) + '</span>';
     if (puede) {
@@ -2002,11 +2021,17 @@
       rama = orden[i];
       var lote = grupos[rama] || [];
       if (!lote.length) continue;
-      html += '<div class="c-exp-rama" data-c-exp-rama="' + catalogoAttr(rama) + '">'
+      var meta = EXP_RAMAS[rama] || null;
+      var nom = meta ? meta.l : expEjeLabel(rama);
+      var ejeRama = meta ? meta.e : '';
+      html += '<div class="c-exp-rama" data-c-exp-rama="' + catalogoAttr(rama) + '"'
+        + (ejeRama ? ' data-c-exp-eje-rama="' + catalogoAttr(ejeRama) + '"' : '') + '>'
         + '<div class="c-exp-rama-t">'
-        + '<span class="c-exp-rama-n">' + esc(EXP_RAMAS[rama] || expEjeLabel(rama)) + '</span>'
+        + '<span class="c-exp-rama-n">' + esc(nom) + '</span>'
+        + (ejeRama ? '<span class="c-exp-rama-e">' + esc(ejeRama) + '</span>' : '')
         + '<span class="c-exp-rama-c">' + lote.length
         + (lote.length === 1 ? ' mision' : ' misiones') + '</span></div>'
+        + (meta && meta.d ? '<p class="c-exp-rama-d">' + esc(meta.d) + '</p>' : '')
         + '<ul class="c-exp-lista">';
       for (var j = 0; j < lote.length; j++) html += expMisionHtml(lote[j], ctrl);
       html += '</ul></div>';

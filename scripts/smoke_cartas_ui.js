@@ -832,6 +832,55 @@ function misionExp(id) {
   return null;
 }
 
+/* Las 4 ramas (11.10): payload base + una mision de cada rama nueva, sin
+   tocar los conteos de 5 misiones que ya verifican los checks anteriores. */
+function expPayloadCuatro() {
+  var p = expPayload();
+  p.misiones.push({
+    id: 'xpd_obr_ugc', expedicion_rama: 'obra',
+    nombre: 'Obra aprobada', descripcion: 'Consigue la aprobacion de una obra propia.',
+    xp: 40, requiere_stats: { oficio: 20 },
+    stats_usuario: { oficio: 5 }, faltan: { oficio: 15 },
+    acciones: { total: 0, por_cobro: 1, elegibles: 0, cobros: 0 },
+    disponible: false, bloqueo: 'UMBRAL', senal_disponible: true,
+    accion_ref: null, motivo: 'SIN_ACCION', acciones_pendientes: []
+  });
+  p.misiones.push({
+    id: 'xpd_obr_foto', expedicion_rama: 'obra',
+    nombre: 'Foto de autor', descripcion: 'Sube una foto a un destino.',
+    xp: 15, requiere_stats: { oficio: 0 },
+    stats_usuario: { oficio: 5 }, faltan: { oficio: 0 },
+    acciones: { total: 0, por_cobro: 1, elegibles: 0, cobros: 0 },
+    disponible: false, bloqueo: 'SIN_ACCION', senal_disponible: true,
+    accion_ref: null, motivo: 'SIN_ACCION', acciones_pendientes: []
+  });
+  p.misiones.push({
+    id: 'xpd_eco_oferta', expedicion_rama: 'economia',
+    nombre: 'Poner a la venta', descripcion: 'Publica una oferta en el mercado.',
+    xp: 25, requiere_stats: { rendimiento: 8 },
+    stats_usuario: { rendimiento: 2 }, faltan: { rendimiento: 6 },
+    acciones: { total: 0, por_cobro: 1, elegibles: 0, cobros: 0 },
+    disponible: false, bloqueo: 'UMBRAL', senal_disponible: true,
+    accion_ref: null, motivo: 'SIN_ACCION', acciones_pendientes: []
+  });
+  p.misiones.push({
+    id: 'xpd_eco_compra', expedicion_rama: 'economia',
+    nombre: 'Primera compra', descripcion: 'Compra un consumible en la tienda.',
+    xp: 15, requiere_stats: { rendimiento: 0 },
+    stats_usuario: { rendimiento: 2 }, faltan: { rendimiento: 0 },
+    acciones: { total: 1, por_cobro: 1, elegibles: 1, cobros: 0 },
+    disponible: false, bloqueo: 'SIN_ACCION', senal_disponible: false,
+    accion_ref: null, motivo: 'SIN_ACCION', acciones_pendientes: []
+  });
+  return p;
+}
+
+function misionCuatro(id) {
+  var lista = expPayloadCuatro().misiones;
+  for (var i = 0; i < lista.length; i++) if (lista[i].id === id) return lista[i];
+  return null;
+}
+
 (function () {
   var env = crearEntorno();
   var UI = env.UI;
@@ -940,6 +989,70 @@ function misionExp(id) {
   var ctrlError = { datos: null, error: 'Expediciones no disponibles.' };
   assert(UI.expPanelHtml(ctrlError).indexOf('data-c-exp-refrescar="1"') >= 0,
     'un error de panel ofrece Reintentar sin romper el bloque');
+})();
+
+/* ---------------------------------------------------------------------------
+   12) EXPEDICIONES con 4 ramas (11.10): obra/economia, umbral de oficio y
+   los DOS vacios distintos (senal viva sin acciones vs fail-closed).
+   --------------------------------------------------------------------------- */
+(function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return;
+
+  var datos = UI.expNormalizar(expPayloadCuatro(), 200).datos;
+  var html = UI.expRamasHtml(datos, null);
+  assert(html.indexOf('data-c-exp-rama="difusion"') >= 0
+    && html.indexOf('data-c-exp-rama="hallazgo"') >= 0
+    && html.indexOf('data-c-exp-rama="obra"') >= 0
+    && html.indexOf('data-c-exp-rama="economia"') >= 0,
+    'las 9 misiones se agrupan en las 4 ramas sin perder ninguna');
+  assert((html.match(/class="c-exp-rama"/g) || []).length === 4
+    && (html.match(/class="c-exp-m"/g) || []).length === 9,
+    'el render pinta un bloque por rama y una tarjeta por mision');
+
+  assert(html.indexOf('>Obra<') >= 0 && html.indexOf('Crea y publica') >= 0
+    && html.indexOf('>Economia<') >= 0 && html.indexOf('Mueve el mercado') >= 0,
+    'obra y economia llevan nombre y gancho corto, no la clave cruda');
+  assert(html.indexOf('data-c-exp-eje-rama="oficio"') >= 0
+    && html.indexOf('data-c-exp-eje-rama="rendimiento"') >= 0,
+    'cada rama declara el eje que mide su umbral');
+
+  var htmlOficio = UI.expMisionHtml(misionCuatro('xpd_obr_ugc'), null);
+  assert(htmlOficio.indexOf('>Oficio<') >= 0 && htmlOficio.indexOf('faltan 15') >= 0
+    && htmlOficio.indexOf('data-c-exp-eje="oficio"') >= 0,
+    'un umbral de oficio se pinta con su nombre y su faltan');
+
+  var htmlRend = UI.expMisionHtml(misionCuatro('xpd_eco_oferta'), null);
+  assert(htmlRend.indexOf('>Rendimiento<') >= 0 && htmlRend.indexOf('faltan 6') >= 0,
+    'la fila de ejes pinta rendimiento: no asume solo alcance y fortuna');
+
+  var htmlSinAcciones = UI.expMisionHtml(misionCuatro('xpd_obr_foto'), null);
+  assert(htmlSinAcciones.indexOf('Sin acciones todavia') >= 0
+    && htmlSinAcciones.indexOf('data-c-exp-estado="sin_acciones"') >= 0
+    && htmlSinAcciones.indexOf('Sin accion disponible') < 0
+    && htmlSinAcciones.indexOf('data-c-exp-go') < 0,
+    'senal viva con lista vacia y cero acciones dice "Sin acciones todavia"');
+
+  var htmlSinSenal = UI.expMisionHtml(misionCuatro('xpd_eco_compra'), null);
+  assert(htmlSinSenal.indexOf('Sin accion disponible') >= 0
+    && htmlSinSenal.indexOf('Sin acciones todavia') < 0
+    && htmlSinSenal.indexOf('data-c-exp-estado="sin_accion"') >= 0,
+    'senal_disponible false sigue diciendo "Sin accion disponible", no "todavia"');
+
+  var ugc = misionCuatro('xpd_obr_ugc');
+  ugc.motivo = 'Necesitas una obra aprobada por moderacion.';
+  var htmlMotivo = UI.expMisionHtml(ugc, null);
+  assert(htmlMotivo.indexOf('Necesitas una obra aprobada por moderacion.') >= 0
+    && htmlMotivo.indexOf('c-exp-m-motivo') >= 0
+    && htmlMotivo.indexOf('<a ') < 0,
+    'el motivo del servidor se pinta tal cual, sin inventar enlaces');
+
+  ugc.motivo = '<b onmouseover="alert(1)">aprobada</b>';
+  var htmlSuciaMotivo = UI.expMisionHtml(ugc, null);
+  assert(htmlSuciaMotivo.indexOf('<b onmouseover') < 0
+    && htmlSuciaMotivo.indexOf('&lt;b') >= 0,
+    'el motivo se escapa: no inyecta etiquetas ni atributos');
 })();
 
 /* ---------------------------------------------------------------------------

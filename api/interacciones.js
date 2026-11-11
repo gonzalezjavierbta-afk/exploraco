@@ -4602,10 +4602,10 @@ var EXPEDICION_CAP_DIARIO = 5;   // cobros por ventana rodante de 24 h
 var EXPEDICION_XP_DIA = 200;     // XP por ventana rodante de 24 h
 var EXPEDICION_UUID_RE = MERCADO_UUID_RE;
 
-// Catalogo v1 (11.9.4). Ids con prefijo xpd_ para no colisionar con
-// las ramas 'exp_*' de MISIONES. requiere_stats son enteros >= 0 y
-// SOLO de ejes habilitados en v1 (11.9.3: oficio y rendimiento no
-// pueden aparecer; una rama futura que los necesite es ADR + cap).
+// Catalogo de 4 ramas (11.9.4 + 11.10.3). Ids con prefijo xpd_ para no
+// colisionar con las ramas 'exp_*' de MISIONES. requiere_stats son enteros
+// >= 0, de un solo eje por mision; oficio solo en obra y rendimiento solo en
+// economia (11.10.1: umbral, jamas multiplicador de XP).
 // total_sql cuenta acciones VIGENTES del usuario ($1::uuid).
 // ref_sql devuelve la accion del offset 0-based $2 (11.9.5) con un
 // ORDER BY estable y unico.
@@ -4624,15 +4624,26 @@ var EXPEDICIONES = [
     nombre: 'Difunde un destino',
     descripcion: 'Comparte un destino publicado con un canal valido.',
     requiere_stats: { alcance: 0 }, xp: 15, acciones_por_cobro: 1,
-    // Sin senal medible: media_compartidos no existe en la base viva (022
-    // no aplicada) y el ledger lo registra como historico_no_verificado el
-    // 2026-11-11. Fail-closed: no se ofrece lista ni se inventa otra senal.
-    senal_disponible: false,
-    total_sql: 'SELECT COUNT(*)::int AS n FROM media_compartidos'
-      + ' WHERE usuario_id = $1::uuid AND fuente = \'destino\'',
-    ref_sql: 'SELECT id::text AS ref FROM media_compartidos'
-      + ' WHERE usuario_id = $1::uuid AND fuente = \'destino\''
+    // 11.9.11 (correccion D-31): la senal es el LEDGER, no media_compartidos
+    // (esa tabla no existe en la base viva: la 022 nunca se aplico, asi que
+    // el INSERT del handler muere antes de registrar la fila de ledger). El
+    // contexto del asiento ya trae fuente/item_id/canal/destino_id (16393):
+    // fuente='destino' es el filtro y accion_ref es el id del asiento, unico
+    // por fila y estable con ORDER BY creado_en, id.
+    total_sql: 'SELECT COUNT(*)::int AS n FROM xp_ledger'
+      + ' WHERE usuario_id = $1::uuid AND accion = \'compartir\''
+      + ' AND contexto->>\'fuente\' = \'destino\'',
+    ref_sql: 'SELECT id::text AS ref FROM xp_ledger'
+      + ' WHERE usuario_id = $1::uuid AND accion = \'compartir\''
+      + ' AND contexto->>\'fuente\' = \'destino\''
       + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT l.id::text AS ref, l.creado_en AS fecha,'
+      + ' (COALESCE(l.contexto->>\'canal\', \'compartir\') || \' \''
+      + ' || COALESCE(l.contexto->>\'item_id\', \'\'))::text AS detalle'
+      + ' FROM xp_ledger l'
+      + ' WHERE l.usuario_id = $1::uuid AND l.accion = \'compartir\''
+      + ' AND l.contexto->>\'fuente\' = \'destino\''
+      + ' ORDER BY l.creado_en, l.id LIMIT 5 OFFSET $2',
   },
   {
     id: 'xpd_dif_mapa', expedicion_rama: 'difusion',
@@ -4719,6 +4730,123 @@ var EXPEDICIONES = [
       + ' WHERE cg.usuario_id = $1::uuid AND cg.drop_en IS NOT NULL'
       + ' ORDER BY cg.drop_en, cg.nivel_gate LIMIT 5 OFFSET $2',
   },
+  // Fase 5 (11.10): ramas obra y economia. oficio y rendimiento se consumen
+  // SOLO como umbral (requiere_stats), nunca como multiplicador: el XP sale
+  // de mision.xp y del remanente, con los mismos caps de 24 h compartidos
+  // por las 4 ramas. Las senales son acciones REALES ya escritas por otros
+  // handlers, no tablas nuevas (11.10.3).
+  {
+    id: 'xpd_obr_foto', expedicion_rama: 'obra',
+    nombre: 'Foto de autor',
+    descripcion: 'Sube una foto a un destino.',
+    requiere_stats: { oficio: 0 }, xp: 15, acciones_por_cobro: 1,
+    total_sql: 'SELECT COUNT(*)::int AS n FROM interacciones'
+      + ' WHERE usuario_id = $1::uuid AND tipo = \'foto\' AND activo = true',
+    ref_sql: 'SELECT id::text AS ref FROM interacciones'
+      + ' WHERE usuario_id = $1::uuid AND tipo = \'foto\' AND activo = true'
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT i.id::text AS ref, i.creado_en AS fecha,'
+      + ' COALESCE(d.nombre, \'Destino\')::text AS detalle'
+      + ' FROM interacciones i LEFT JOIN destinos d ON d.id = i.destino_id'
+      + ' WHERE i.usuario_id = $1::uuid AND i.tipo = \'foto\''
+      + ' AND i.activo = true'
+      + ' ORDER BY i.creado_en, i.id LIMIT 5 OFFSET $2',
+  },
+  {
+    id: 'xpd_obr_album', expedicion_rama: 'obra',
+    nombre: 'Curador',
+    descripcion: 'Crea un album propio.',
+    requiere_stats: { oficio: 8 }, xp: 25, acciones_por_cobro: 1,
+    // El ledger, no la tabla albumes: 'Mi Museo' se auto-crea sin accion del
+    // usuario y contaria como obra gratis (11.10.3).
+    total_sql: 'SELECT COUNT(*)::int AS n FROM xp_ledger'
+      + ' WHERE usuario_id = $1::uuid AND accion = \'album_crear\'',
+    ref_sql: 'SELECT id::text AS ref FROM xp_ledger'
+      + ' WHERE usuario_id = $1::uuid AND accion = \'album_crear\''
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT l.id::text AS ref, l.creado_en AS fecha,'
+      + ' COALESCE(NULLIF(l.contexto->>\'album_id\', \'\'), \'Album\')::text'
+      + ' AS detalle'
+      + ' FROM xp_ledger l'
+      + ' WHERE l.usuario_id = $1::uuid AND l.accion = \'album_crear\''
+      + ' ORDER BY l.creado_en, l.id LIMIT 5 OFFSET $2',
+  },
+  {
+    id: 'xpd_obr_ugc', expedicion_rama: 'obra',
+    nombre: 'Obra aprobada',
+    descripcion: 'Consigue la aprobacion de una obra propia.',
+    requiere_stats: { oficio: 20 }, xp: 40, acciones_por_cobro: 1,
+    // La tabla existe y la consulta es valida: 0 filas es la verdad, no un
+    // bloqueo de diseno. La aprobacion es humana (api/admin.js), asi que hoy
+    // la mision queda en SIN_ACCION por la via generica, fail-closed.
+    total_sql: 'SELECT COUNT(*)::int AS n FROM cartas_media'
+      + ' WHERE autor_id = $1::uuid AND estado_moderacion = \'aprobada\''
+      + ' AND activo = true',
+    ref_sql: 'SELECT id::text AS ref FROM cartas_media'
+      + ' WHERE autor_id = $1::uuid AND estado_moderacion = \'aprobada\''
+      + ' AND activo = true'
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT cm.id::text AS ref, cm.creado_en AS fecha,'
+      + ' cm.titulo::text AS detalle'
+      + ' FROM cartas_media cm'
+      + ' WHERE cm.autor_id = $1::uuid AND cm.estado_moderacion = \'aprobada\''
+      + ' AND cm.activo = true'
+      + ' ORDER BY cm.creado_en, cm.id LIMIT 5 OFFSET $2',
+  },
+  {
+    id: 'xpd_eco_compra', expedicion_rama: 'economia',
+    nombre: 'Primera compra',
+    descripcion: 'Compra un consumible en la tienda.',
+    requiere_stats: { rendimiento: 0 }, xp: 15, acciones_por_cobro: 1,
+    total_sql: 'SELECT COUNT(*)::int AS n FROM compra_consumibles'
+      + ' WHERE usuario_id = $1::uuid',
+    ref_sql: 'SELECT id::text AS ref FROM compra_consumibles'
+      + ' WHERE usuario_id = $1::uuid'
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT cc.id::text AS ref, cc.creado_en AS fecha,'
+      + ' COALESCE(co.nombre, \'Compra\')::text AS detalle'
+      + ' FROM compra_consumibles cc'
+      + ' LEFT JOIN consumibles co ON co.id = cc.consumible_id'
+      + ' WHERE cc.usuario_id = $1::uuid'
+      + ' ORDER BY cc.creado_en, cc.id LIMIT 5 OFFSET $2',
+  },
+  {
+    id: 'xpd_eco_oferta', expedicion_rama: 'economia',
+    nombre: 'Poner a la venta',
+    descripcion: 'Publica una oferta en el mercado.',
+    requiere_stats: { rendimiento: 8 }, xp: 25, acciones_por_cobro: 1,
+    // Mercado de BIENES, no de cartas: publicar una carta exige poseerla y
+    // usuarios_cartas esta vacia (11.10.3).
+    total_sql: 'SELECT COUNT(*)::int AS n FROM mercado_ofertas'
+      + ' WHERE vendedor_id = $1::uuid',
+    ref_sql: 'SELECT id::text AS ref FROM mercado_ofertas'
+      + ' WHERE vendedor_id = $1::uuid'
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT mo.id::text AS ref, mo.creado_en AS fecha,'
+      + ' COALESCE(co.nombre, \'Oferta\')::text AS detalle'
+      + ' FROM mercado_ofertas mo'
+      + ' LEFT JOIN consumibles co ON co.id = mo.consumible_id'
+      + ' WHERE mo.vendedor_id = $1::uuid'
+      + ' ORDER BY mo.creado_en, mo.id LIMIT 5 OFFSET $2',
+  },
+  {
+    id: 'xpd_eco_carta', expedicion_rama: 'economia',
+    nombre: 'Trato cerrado',
+    descripcion: 'Compra una carta en el mercado.',
+    requiere_stats: { rendimiento: 20 }, xp: 40, acciones_por_cobro: 1,
+    // cartas_ventas es la ACCION; carta_venta_debito/credito son asientos y
+    // xp_ledger no tiene accion 'carta_compra' (11.10.3).
+    total_sql: 'SELECT COUNT(*)::int AS n FROM cartas_ventas'
+      + ' WHERE comprador_id = $1::uuid',
+    ref_sql: 'SELECT id::text AS ref FROM cartas_ventas'
+      + ' WHERE comprador_id = $1::uuid'
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT cv.id::text AS ref, cv.creado_en AS fecha,'
+      + ' COALESCE(NULLIF(cv.carta_id, \'\'), \'Carta\')::text AS detalle'
+      + ' FROM cartas_ventas cv'
+      + ' WHERE cv.comprador_id = $1::uuid'
+      + ' ORDER BY cv.creado_en, cv.id LIMIT 5 OFFSET $2',
+  },
 ];
 
 // Suelo de cobro DERIVADO del catalogo (11.9.4): el remanente por
@@ -4730,24 +4858,25 @@ var EXPEDICION_XP_MIN_COBRO = EXPEDICIONES.reduce(function (min, x) {
   return (min === 0 || xp < min) ? xp : min;
 }, 0);
 
-// Guard R2 (11.9.7): se ejecuta EN CARGA. Si una expedicion entra en
-// MISIONES o un id colisiona, el modulo no arranca: es preferible un
-// 503 visible a un faucet silencioso de XP. A1 y A2 de 11.9.10
-// quedan cubiertos por la misma funcion (el smoke la reusa).
+// Guard R2 (11.9.7 + 11.10.2): se ejecuta EN CARGA. Si una expedicion entra
+// en MISIONES, un id colisiona o el catalogo incumple la aritmetica de la
+// spec, el modulo no arranca: es preferible un 503 visible a un faucet
+// silencioso de XP. A1/A2 de 11.9.10 y A11/A12/A13 de 11.10.7 quedan
+// cubiertos por la misma funcion (el smoke la reusa).
 function validarCatalogosExpedicion() {
   var errs = [];
   var ids = {};
-  var ramas = { difusion: 0, hallazgo: 0 };
+  var ramas = { difusion: 0, hallazgo: 0, obra: 0, economia: 0 };
   var xpValidos = { 15: true, 25: true, 40: true };
   var reqValidos = { 0: true, 8: true, 20: true };
-  var ejesV1 = { alcance: true, fortuna: true };
+  var ejesValidos = { alcance: true, oficio: true, fortuna: true, rendimiento: true };
   var suma = 0;
   var maxXp = 0;
   var minXp = 0;
   var i, id, m, x, xp, n, req;
 
-  if (EXPEDICIONES.length !== 6) {
-    errs.push('EXPEDICIONES debe tener 6 misiones (tiene ' + EXPEDICIONES.length + ')');
+  if (EXPEDICIONES.length !== 12) {
+    errs.push('EXPEDICIONES debe tener 12 misiones (tiene ' + EXPEDICIONES.length + ')');
   }
   for (i = 0; i < EXPEDICIONES.length; i++) {
     x = EXPEDICIONES[i] || {};
@@ -4771,11 +4900,20 @@ function validarCatalogosExpedicion() {
     }
     req = x.requiere_stats || {};
     Object.keys(req).forEach(function(eje) {
-      if (!ejesV1[String(eje)]) {
-        errs.push(id + ': requiere_stats con eje no habilitado en v1: ' + eje);
+      if (!ejesValidos[String(eje)]) {
+        errs.push(id + ': requiere_stats con eje no habilitado: ' + eje);
       }
       if (!reqValidos[Number(req[eje])]) {
         errs.push(id + ': umbral fuera de {0,8,20} en ' + eje);
+      }
+      // 11.10.1: oficio es umbral de obra y rendimiento de economia. Un eje
+      // cruzado seria un segundo criterio de acceso sin ADR.
+      if (String(eje) === 'oficio' && String(x.expedicion_rama) !== 'obra') {
+        errs.push(id + ': oficio solo puede ser umbral de obra');
+      }
+      if (String(eje) === 'rendimiento'
+          && String(x.expedicion_rama) !== 'economia') {
+        errs.push(id + ': rendimiento solo puede ser umbral de economia');
       }
     });
     if (typeof x.total_sql !== 'string' || typeof x.ref_sql !== 'string') {
@@ -4796,10 +4934,11 @@ function validarCatalogosExpedicion() {
       errs.push('R2: id de expedicion dentro de MISIONES: ' + m.id);
     }
   }
-  if (ramas.difusion !== 3 || ramas.hallazgo !== 3) {
-    errs.push('ramas: se esperan 3 difusion + 3 hallazgo');
+  if (ramas.difusion !== 3 || ramas.hallazgo !== 3
+      || ramas.obra !== 3 || ramas.economia !== 3) {
+    errs.push('ramas: se esperan 3 difusion + 3 hallazgo + 3 obra + 3 economia');
   }
-  if (suma !== 160) errs.push('suma de xp != 160 (es ' + suma + ')');
+  if (suma !== 320) errs.push('suma de xp != 320 (es ' + suma + ')');
   if (maxXp !== 40) errs.push('xp maximo != 40 (es ' + maxXp + ')');
   if (minXp !== 15) errs.push('xp minimo != 15 (es ' + minXp + ')');
   return errs;
@@ -4899,9 +5038,9 @@ function expedicionCobros(sqlFn, usuarioId) {
 
 // Acciones vigentes que cumplen el predicado de la mision. Si la
 // senal no es medible se degrada a 0 (fail-closed: sin accion no hay
-// cobro). Caso medido 2026-11-11: media_compartidos no existe en la
-// base viva (022 no aplicada) y el resto del fichero degrada igual
-// (conDegradacionMedia, 6307).
+// cobro): conDegradacionMedia (6307) convierte una consulta invalida en
+// cero filas en vez de tumbar el GET. Desde 11.9.11 ninguna mision depende
+// de una tabla inexistente: xpd_dif_comparte lee el ledger canonico.
 function expedicionTotal(sqlFn, usuarioId, m) {
   return conDegradacionMedia(sqlFn(m.total_sql, [usuarioId]),
       'expedicion:' + m.id, [{ n: 0 }])
@@ -4925,8 +5064,9 @@ function expedicionFechaISO(v) {
 // escribe, no marca nada y no consume. El offset es el inicio del bloque
 // NO consumido (cobros_previos * N), asi que el elemento N-esimo de la
 // lista es exactamente la ref que expedicionCobrar derivaria en 11.9.5
-// paso 5. Una mision sin senal (senal_disponible false, p.ej. compartir)
-// devuelve lista vacia SIN consultar: no se inventa otra senal.
+// paso 5. La salida temprana por senal_disponible false se conserva como
+// fail-closed explicito del guard (11.9.9-bis); desde 11.9.11 ninguna
+// mision viva la usa.
 function expedicionAccionesPendientes(sqlFn, usuarioId, m, hechos) {
   if (!m || m.senal_disponible === false || typeof m.lista_sql !== 'string') {
     return Promise.resolve([]);

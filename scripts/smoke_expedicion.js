@@ -13,8 +13,11 @@
 //   que hay un faucet en produccion.
 //
 // QUE PRUEBA
-//   A1  catalogo: 6 misiones, 3+3 ramas, ids unicos y guard R2 EN CARGA.
-//   A2  aritmetica: max 40, suma 160, min 15, xp {15,25,40}, N {1,2,3}.
+//   A1  catalogo: 12 misiones, 4 ramas x 3 (difusion/hallazgo/obra/economia),
+//       ids unicos y guard R2 EN CARGA.
+//   A2  aritmetica: max 40, suma 320, min 15, top-5 185 (<= 200), xp
+//       {15,25,40}, N {1,2,3} y umbrales {0,8,20} con oficio solo en obra y
+//       rendimiento solo en economia.
 //   A3  sin bono: BONO_EXCLUIDAS + cobro con consumible activo -> xp intacto
 //       y CERO filas bono_consumible_24h.
 //   A4  cap de 5: el 6o cobro en 24 h -> 409 CAP_DIARIO.
@@ -31,10 +34,21 @@
 //   A11 GET 11.9.9-bis: acciones_pendientes {ref,fecha,detalle} es ESPEJO del
 //       ref_sql (la ref cobrable va PRIMERO, tope 5) y acciones_pendientes_total
 //       suma exactamente lo devuelto por las misiones.
-//   A12 senal no medible: xpd_dif_comparte -> disponible false, motivo
-//       SIN_ACCION y acciones_pendientes [] (no se inventa otra senal).
+//   A12 D-31 (11.9.11): xpd_dif_comparte lee el LEDGER (accion='compartir' y
+//       contexto->>'fuente'='destino'), no media_compartidos. Sin asientos ->
+//       lista [] pero senal_disponible TRUE: no hay bloqueo de diseno.
 //   A13 ref consumible: el POST acepta acciones_pendientes[0].ref y paga UNA
 //       sola vez; la misma ref repetida -> xp 0 / repetido true.
+//   A14 D-31 con senal: un asiento de compartir abre la mision, el GET publica
+//       su id como ref y el POST paga 15 exactos con ella.
+//   A15 fase 5 (11.10): obra/economia usan oficio/rendimiento como UMBRAL;
+//       xpd_obr_foto y xpd_eco_compra pagan 15 exactos con la ref del GET.
+//   A16 fail-closed UGC (A17 de la spec): oficio 20 alcanzado y 0 cartas_media
+//       aprobadas -> SIN_ACCION con senal_disponible TRUE; POST 200 xp 0.
+//   A17 fail-closed economia (A18): rendimiento evaluado con su eje; 0 filas
+//       en cartas_ventas -> SIN_ACCION y POST 200 xp 0.
+//   A18 caps COMPARTIDOS (A15 de la spec): 5 cobros repartidos entre las 4
+//       ramas bloquean la 6a sea cual sea su rama (no hay 5 por rama).
 //
 // COMO EJERCE EL MISMO CODIGO QUE PRODUCCION
 //   api/interacciones.js exporta (solo para test) el catalogo, el guard, la
@@ -105,32 +119,77 @@ function todosNumericos(obj) {
 // ---------------------------------------------------------------------------
 function partePura(api, Cartas) {
   var EX = api.EXPEDICIONES || [];
-  var ramas = { difusion: 0, hallazgo: 0 };
+  var ramas = { difusion: 0, hallazgo: 0, obra: 0, economia: 0 };
   var ids = {};
   EX.forEach(function (m) {
     ramas[m.expedicion_rama] = (ramas[m.expedicion_rama] || 0) + 1;
     ids[m.id] = true;
   });
-  check('A1 catalogo: 6 misiones, 3 difusion + 3 hallazgo, ids unicos',
-    EX.length === 6 && ramas.difusion === 3 && ramas.hallazgo === 3
-    && Object.keys(ids).length === 6,
-    'n=' + EX.length + ' dif=' + ramas.difusion + ' hal=' + ramas.hallazgo);
+  check('A1 catalogo: 12 misiones, 4 ramas x 3 (difusion/hallazgo/obra/economia) e ids unicos',
+    EX.length === 12 && ramas.difusion === 3 && ramas.hallazgo === 3
+    && ramas.obra === 3 && ramas.economia === 3
+    && Object.keys(ids).length === 12,
+    'n=' + EX.length + ' dif=' + ramas.difusion + ' hal=' + ramas.hallazgo
+    + ' obr=' + ramas.obra + ' eco=' + ramas.economia);
 
   var xps = EX.map(function (m) { return Number(m.xp); });
   var ns = EX.map(function (m) { return Number(m.acciones_por_cobro); });
   var suma = xps.reduce(function (a, b) { return a + b; }, 0);
+  var top5 = xps.slice(0).sort(function (a, b) { return b - a; })
+    .slice(0, 5).reduce(function (a, b) { return a + b; }, 0);
   var reqOk = EX.every(function (m) {
     return Object.keys(m.requiere_stats || {}).every(function (e) {
-      return ['alcance', 'fortuna'].indexOf(e) >= 0
+      return ['alcance', 'oficio', 'fortuna', 'rendimiento'].indexOf(e) >= 0
         && [0, 8, 20].indexOf(Number(m.requiere_stats[e])) >= 0;
     });
   });
-  check('A2 aritmetica: max 40, suma 160, min 15, xp {15,25,40}, N {1,2,3}, umbrales {0,8,20}',
-    Math.max.apply(null, xps) === 40 && suma === 160
-    && Math.min.apply(null, xps) === 15
+  check('A2 aritmetica: max 40, suma 320, min 15, top-5 185, xp {15,25,40}, N {1,2,3}, umbrales {0,8,20}',
+    Math.max.apply(null, xps) === 40 && suma === 320
+    && Math.min.apply(null, xps) === 15 && top5 === 185
     && xps.every(function (x) { return [15, 25, 40].indexOf(x) >= 0; })
     && ns.every(function (n) { return [1, 2, 3].indexOf(n) >= 0; }) && reqOk,
-    'suma=' + suma);
+    'suma=' + suma + ' top5=' + top5);
+
+  // A13 de 11.10.7: oficio solo en obra y rendimiento solo en economia. El
+  // guard de carga lo exige, pero aqui se afirma sobre el catalogo real.
+  var ejeOk = EX.every(function (m) {
+    return Object.keys(m.requiere_stats || {}).every(function (e) {
+      if (e === 'oficio') return m.expedicion_rama === 'obra';
+      if (e === 'rendimiento') return m.expedicion_rama === 'economia';
+      return true;
+    });
+  });
+  check('A13 umbral: oficio solo en obra y rendimiento solo en economia',
+    ejeOk && EX.filter(function (m) {
+      return m.expedicion_rama === 'obra';
+    }).every(function (m) {
+      return Object.prototype.hasOwnProperty.call(m.requiere_stats, 'oficio');
+    }) && EX.filter(function (m) {
+      return m.expedicion_rama === 'economia';
+    }).every(function (m) {
+      return Object.prototype.hasOwnProperty.call(m.requiere_stats, 'rendimiento');
+    }));
+
+  // D31-1 de 11.9.11: la mision de compartir ya no declara senal ausente y su
+  // predicado es el ledger, no media_compartidos (tabla inexistente).
+  var mShare = buscar(EX, 'xpd_dif_comparte');
+  check('D31-1: compartir sin senal_disponible false y con lista_sql sobre xp_ledger',
+    mShare && mShare.senal_disponible === undefined
+    && typeof mShare.lista_sql === 'string'
+    && mShare.total_sql.indexOf('xp_ledger') >= 0
+    && mShare.total_sql.indexOf('compartir') >= 0
+    && mShare.total_sql.indexOf('fuente') >= 0
+    && mShare.total_sql.indexOf('media_compartidos') === -1,
+    String(mShare && mShare.total_sql));
+
+  // A1 de 11.10.7: las 12 misiones traen el trio SQL completo (sin el, el GET
+  // no puede publicar una ref cobrable y el POST tendria que adivinarla).
+  check('A1 catalogo: las 12 misiones tienen total_sql, ref_sql y lista_sql',
+    EX.every(function (m) {
+      return typeof m.total_sql === 'string' && m.total_sql !== ''
+        && typeof m.ref_sql === 'string' && m.ref_sql !== ''
+        && typeof m.lista_sql === 'string' && m.lista_sql !== '';
+    }));
 
   check('A1 guard limpio: validarCatalogosExpedicion() devuelve 0 errores',
     Array.isArray(api.validarCatalogosExpedicion())
@@ -303,7 +362,11 @@ async function parteBase(api) {
     + ' (SELECT COUNT(*)::int FROM interacciones) AS interacciones,'
     + ' (SELECT COUNT(*)::int FROM usuarios_cartas) AS usuarios_cartas,'
     + ' (SELECT COUNT(*)::int FROM usuarios_cartas_nivel) AS usuarios_cartas_nivel,'
-    + ' (SELECT COUNT(*)::int FROM cartas_gates) AS cartas_gates';
+    + ' (SELECT COUNT(*)::int FROM cartas_gates) AS cartas_gates,'
+    + ' (SELECT COUNT(*)::int FROM cartas_media) AS cartas_media,'
+    + ' (SELECT COUNT(*)::int FROM compra_consumibles) AS compra_consumibles,'
+    + ' (SELECT COUNT(*)::int FROM mercado_ofertas) AS mercado_ofertas,'
+    + ' (SELECT COUNT(*)::int FROM cartas_ventas) AS cartas_ventas';
 
   function resumen(a, b) {
     return 'usuarios ' + a.usuarios + '->' + b.usuarios
@@ -311,7 +374,11 @@ async function parteBase(api) {
       + ' / interacciones ' + a.interacciones + '->' + b.interacciones
       + ' / usuarios_cartas ' + a.usuarios_cartas + '->' + b.usuarios_cartas
       + ' / nivel ' + a.usuarios_cartas_nivel + '->' + b.usuarios_cartas_nivel
-      + ' / gates ' + a.cartas_gates + '->' + b.cartas_gates;
+      + ' / gates ' + a.cartas_gates + '->' + b.cartas_gates
+      + ' / media ' + a.cartas_media + '->' + b.cartas_media
+      + ' / compras ' + a.compra_consumibles + '->' + b.compra_consumibles
+      + ' / ofertas ' + a.mercado_ofertas + '->' + b.mercado_ofertas
+      + ' / ventas ' + a.cartas_ventas + '->' + b.cartas_ventas;
   }
 
   var pre = null;
@@ -390,10 +457,10 @@ async function parteBase(api) {
       lect.vector.alcance === 35 && lect.vector.fortuna === 20
       && lect.vector.oficio === 0 && lect.poder === 55,
       JSON.stringify(lect.vector) + ' poder=' + lect.poder);
-    check('GET: cap inicial usadas 0/5, xp_dia 0/200, min_cobro 15 y 6 misiones',
+    check('GET: cap inicial usadas 0/5, xp_dia 0/200, min_cobro 15 y 12 misiones',
       lect.cap && lect.cap.usadas === 0 && lect.cap.limite === 5
       && lect.cap.xp_dia === 0 && lect.cap.limite_xp === 200
-      && lect.cap.min_cobro_xp === 15 && lect.misiones.length === 6,
+      && lect.cap.min_cobro_xp === 15 && lect.misiones.length === 12,
       JSON.stringify(lect.cap));
     var mMapa = buscar(lect.misiones, 'xpd_dif_mapa');
     check('A7 GET: xpd_dif_mapa total 3 / N 3 / elegibles 1 / cobros 0 y disponible',
@@ -402,7 +469,7 @@ async function parteBase(api) {
       && mMapa.disponible === true && mMapa.bloqueo === null,
       JSON.stringify(mMapa && mMapa.acciones));
     var mComp = buscar(lect.misiones, 'xpd_dif_comparte');
-    check('GET: xpd_dif_comparte degrada a 0 acciones y SIN_ACCION (senal no medible)',
+    check('A12 GET: xpd_dif_comparte sin asientos de compartir -> 0 acciones y SIN_ACCION',
       mComp && mComp.acciones.total === 0 && mComp.bloqueo === 'SIN_ACCION'
       && mComp.disponible === false,
       JSON.stringify(mComp && mComp.acciones));
@@ -436,14 +503,42 @@ async function parteBase(api) {
       lect.acciones_pendientes_total === sumaPend && sumaPend > 0,
       'total=' + lect.acciones_pendientes_total + ' suma=' + sumaPend);
 
-    // -- A12 (11.9.9-bis): mision sin senal medible ------------------------
-    check('A12 GET: compartir -> disponible false, motivo SIN_ACCION y lista vacia',
+    // -- A12/D-31 (11.9.11): la senal de compartir es el ledger -------------
+    check('A12 GET: compartir -> disponible false, motivo SIN_ACCION, lista vacia y senal_disponible TRUE',
       mComp && mComp.disponible === false && mComp.motivo === 'SIN_ACCION'
-      && mComp.senal_disponible === false
+      && mComp.senal_disponible === true
       && Array.isArray(mComp.acciones_pendientes)
       && mComp.acciones_pendientes.length === 0
       && mComp.accion_ref === null,
       JSON.stringify(mComp && mComp.acciones_pendientes));
+
+    // -- A14: un asiento REAL de compartir abre la mision --------------------
+    await q('SAVEPOINT sp_compartir');
+    var idCompartir = await q1("INSERT INTO xp_ledger (usuario_id, accion,"
+      + ' xp_base, xp_final, es_exento, contexto)'
+      + " VALUES ($1::uuid, 'compartir', 0, 0, true,"
+      + " jsonb_build_object('fuente', 'destino', 'canal', 'whatsapp',"
+      + " 'item_id', $2::text)) RETURNING id::text AS id", [u1, d[0]]);
+    var lectComp = await api.expedicionLectura(qApi, u1);
+    var mComp2 = buscar(lectComp.misiones, 'xpd_dif_comparte');
+    var pendComp = (mComp2 && mComp2.acciones_pendientes) || [];
+    check('A14 GET: asiento de compartir -> total 1, disponible, ref = id del ledger',
+      mComp2 && mComp2.acciones.total === 1 && mComp2.disponible === true
+      && mComp2.bloqueo === null && mComp2.senal_disponible === true
+      && mComp2.motivo === null && mComp2.accion_ref === String(idCompartir.id)
+      && pendComp.length === 1 && pendComp[0].ref === String(idCompartir.id)
+      && typeof pendComp[0].detalle === 'string' && pendComp[0].detalle !== '',
+      JSON.stringify(pendComp[0]));
+    var cComp = await api.expedicionCobrar(qApi, u1, {
+      mision_id: 'xpd_dif_comparte', accion_ref: String(idCompartir.id),
+    });
+    check('A14 POST: la ref del ledger de compartir paga 15 exactos (su propia rama)',
+      cComp.status === 200 && cComp.body.xp === 15
+      && cComp.body.repetido === false
+      && cComp.body.accion_ref === String(idCompartir.id)
+      && cComp.body.xp_solicitado === 15,
+      JSON.stringify(cComp.body));
+    await q('ROLLBACK TO SAVEPOINT sp_compartir');
 
     var lectU3 = await api.expedicionLectura(qApi, u3);
     check('A8 GET: usuario sin cartas -> 5 ejes a 0, poder 0, sin NaN',
@@ -683,6 +778,157 @@ async function parteBase(api) {
       && mVis4b.accion_ref === null && mVis4b.motivo === 'SIN_ACCION'
       && mVis4b.bloqueo === 'SIN_ACCION',
       JSON.stringify(mVis4b && mVis4b.acciones_pendientes));
+
+    // -- A15 (11.10): obra y economia, oficio/rendimiento como UMBRAL --------
+    var u5 = await nuevoUsuario('u5');
+    // Vector real del catalogo: oficio 14 + 9 = 23 y rendimiento 10 + 5 = 15.
+    await q('INSERT INTO usuarios_cartas (usuario_id, carta_id, variante,'
+      + ' cantidad, activo) VALUES ($1::uuid, $2, $3, 1, true)',
+      [u5, 'cp_leyenda_jaguar', 'base']);
+    await q('INSERT INTO usuarios_cartas (usuario_id, carta_id, variante,'
+      + ' cantidad, activo) VALUES ($1::uuid, $2, $3, 1, true)',
+      [u5, 'cp_madremonte', 'base']);
+    var lectU5 = await api.expedicionLectura(qApi, u5);
+    check('A15 GET: vector oficio 23 y rendimiento 15 (ejes nuevos del catalogo)',
+      lectU5.vector.oficio === 23 && lectU5.vector.rendimiento === 15,
+      JSON.stringify(lectU5.vector));
+    var mUgc5 = buscar(lectU5.misiones, 'xpd_obr_ugc');
+    check('A16 GET: xpd_obr_ugc con oficio 23 alcanzado y 0 cartas_media -> SIN_ACCION y senal TRUE',
+      mUgc5 && mUgc5.acciones.total === 0 && mUgc5.disponible === false
+      && mUgc5.bloqueo === 'SIN_ACCION' && mUgc5.senal_disponible === true
+      && mUgc5.motivo === 'SIN_ACCION' && mUgc5.faltan.oficio === 0
+      && mUgc5.acciones_pendientes.length === 0,
+      JSON.stringify(mUgc5 && { total: mUgc5.acciones.total, b: mUgc5.bloqueo }));
+    var mCarta5 = buscar(lectU5.misiones, 'xpd_eco_carta');
+    check('A17 GET: xpd_eco_carta mide el umbral en rendimiento (15 de 20), no en oficio',
+      mCarta5 && mCarta5.bloqueo === 'UMBRAL' && mCarta5.faltan.rendimiento === 5
+      && mCarta5.stats_usuario.rendimiento === 15
+      && mCarta5.requiere_stats.rendimiento === 20,
+      JSON.stringify(mCarta5 && mCarta5.faltan));
+    var mAlbum5 = buscar(lectU5.misiones, 'xpd_obr_album');
+    check('A15 GET: xpd_obr_album mide oficio (23 de 8) y sin album_crear queda SIN_ACCION',
+      mAlbum5 && mAlbum5.bloqueo === 'SIN_ACCION'
+      && mAlbum5.faltan.oficio === 0 && mAlbum5.senal_disponible === true,
+      JSON.stringify(mAlbum5 && mAlbum5.faltan));
+
+    // Fixtures de las senales nuevas: una foto propia y una compra real.
+    var refFoto5 = await accion(u5, d[8], 'foto', 0);
+    var cons = await q1('SELECT id FROM consumibles ORDER BY clave LIMIT 1');
+    var idCompra5 = await q1('INSERT INTO compra_consumibles (usuario_id,'
+      + ' consumible_id, xp_pagado) VALUES ($1::uuid, $2::uuid, 1)'
+      + ' RETURNING id::text AS id', [u5, cons.id]);
+    var lectU5b = await api.expedicionLectura(qApi, u5);
+    var mFoto5 = buscar(lectU5b.misiones, 'xpd_obr_foto');
+    var mCompra5 = buscar(lectU5b.misiones, 'xpd_eco_compra');
+    check('A15 GET: xpd_obr_foto expone la foto y xpd_eco_compra la compra real',
+      mFoto5 && mFoto5.disponible === true
+      && mFoto5.accion_ref === String(refFoto5)
+      && mFoto5.acciones_pendientes.length === 1
+      && mCompra5 && mCompra5.disponible === true
+      && mCompra5.accion_ref === String(idCompra5.id)
+      && mCompra5.acciones_pendientes.length === 1,
+      'foto=' + (mFoto5 && mFoto5.accion_ref)
+      + ' compra=' + (mCompra5 && mCompra5.accion_ref));
+    var cFoto5 = await api.expedicionCobrar(qApi, u5, {
+      mision_id: 'xpd_obr_foto', accion_ref: String(refFoto5),
+    });
+    var cCompra5 = await api.expedicionCobrar(qApi, u5, {
+      mision_id: 'xpd_eco_compra', accion_ref: String(idCompra5.id),
+    });
+    check('A15 POST: obra (foto) y economia (compra) pagan 15 exactos con su ref',
+      cFoto5.status === 200 && cFoto5.body.xp === 15
+      && cFoto5.body.repetido === false
+      && cFoto5.body.accion_ref === String(refFoto5)
+      && cCompra5.status === 200 && cCompra5.body.xp === 15
+      && cCompra5.body.repetido === false
+      && cCompra5.body.accion_ref === String(idCompra5.id)
+      && cCompra5.body.usadas === 2 && cCompra5.body.xp_dia === 30,
+      JSON.stringify(cFoto5.body) + ' ' + JSON.stringify(cCompra5.body));
+    var sumaPend5 = lectU5b.misiones.reduce(function (acc, m) {
+      return acc + ((m.acciones_pendientes || []).length);
+    }, 0);
+    check('A15 GET: acciones_pendientes_total sigue siendo la suma de las 12 listas',
+      lectU5b.acciones_pendientes_total === sumaPend5 && sumaPend5 === 2
+      && lectU5b.misiones.length === 12,
+      'total=' + lectU5b.acciones_pendientes_total + ' suma=' + sumaPend5);
+    var cUgc5 = await api.expedicionCobrar(qApi, u5, { mision_id: 'xpd_obr_ugc' });
+    var nUgc5 = await q1("SELECT COUNT(*)::int AS n FROM xp_ledger"
+      + " WHERE usuario_id=$1::uuid AND accion='carta_expedicion'"
+      + " AND contexto->>'mision_id'='xpd_obr_ugc'", [u5]);
+    check('A16 POST: xpd_obr_ugc sin obra aprobada -> 200 xp 0 repetido true y 0 asientos',
+      cUgc5.status === 200 && cUgc5.body.ok === true && cUgc5.body.xp === 0
+      && cUgc5.body.repetido === true && nUgc5.n === 0,
+      JSON.stringify(cUgc5.body));
+
+    // Tercera carta: rendimiento 29 (10+5+14) -> el umbral de economia se
+    // alcanza y la mision pasa de UMBRAL a SIN_ACCION sin filas en cartas_ventas.
+    await q('INSERT INTO usuarios_cartas (usuario_id, carta_id, variante,'
+      + ' cantidad, activo) VALUES ($1::uuid, $2, $3, 1, true)',
+      [u5, 'cm_ancestral_gran_reserva', 'base']);
+    var lectU5c = await api.expedicionLectura(qApi, u5);
+    var mCarta5c = buscar(lectU5c.misiones, 'xpd_eco_carta');
+    var cCarta5 = await api.expedicionCobrar(qApi, u5, { mision_id: 'xpd_eco_carta' });
+    var nCarta5 = await q1("SELECT COUNT(*)::int AS n FROM xp_ledger"
+      + " WHERE usuario_id=$1::uuid AND accion='carta_expedicion'"
+      + " AND contexto->>'mision_id'='xpd_eco_carta'", [u5]);
+    check('A17 GET/POST: rendimiento 29 alcanzado y 0 cartas_ventas -> SIN_ACCION con senal TRUE y POST 200 xp 0',
+      lectU5c.vector.rendimiento === 29
+      && mCarta5c && mCarta5c.acciones.total === 0
+      && mCarta5c.bloqueo === 'SIN_ACCION' && mCarta5c.senal_disponible === true
+      && cCarta5.status === 200 && cCarta5.body.xp === 0
+      && cCarta5.body.repetido === true && nCarta5.n === 0,
+      JSON.stringify(mCarta5c && mCarta5c.bloqueo));
+
+    // -- A18 (11.10.6): caps COMPARTIDOS por las 4 ramas, no por rama -------
+    var u6 = await nuevoUsuario('u6');
+    var refFoto6 = await accion(u6, d[9], 'foto', 0);
+    var idCompra6 = await q1('INSERT INTO compra_consumibles (usuario_id,'
+      + ' consumible_id, xp_pagado) VALUES ($1::uuid, $2::uuid, 1)'
+      + ' RETURNING id::text AS id', [u6, cons.id]);
+    var idAlbum6 = await q1("INSERT INTO xp_ledger (usuario_id, accion,"
+      + ' xp_base, xp_final, es_exento, contexto)'
+      + " VALUES ($1::uuid, 'album_crear', 0, 0, true,"
+      + " jsonb_build_object('album_id', $2::text)) RETURNING id::text AS id",
+      [u6, 'alb_' + tag]);
+    var cAlbum6 = await api.expedicionCobrar(qApi, u6, { mision_id: 'xpd_obr_album' });
+    check('A15 POST: umbral de oficio insuficiente -> 409 UMBRAL_NO_ALCANZADO con faltan.oficio 8',
+      cAlbum6.status === 409 && cAlbum6.body.code === 'UMBRAL_NO_ALCANZADO'
+      && cAlbum6.body.faltan.oficio === 8
+      && cAlbum6.body.requiere_stats.oficio === 8
+      && cAlbum6.body.vector.oficio === 0 && idAlbum6 && idAlbum6.id,
+      JSON.stringify(cAlbum6.body));
+    async function rellenoRama(uid, misionId, accionRef, rama) {
+      await q("INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final,"
+        + ' es_exento, contexto)'
+        + " VALUES ($1::uuid, 'carta_expedicion', 0, 0, true,"
+        + ' jsonb_build_object($2::text, $3::text, $4::text, $5::text,'
+        + ' $6::text, $7::text))',
+        [uid, 'mision_id', misionId, 'accion_ref', accionRef,
+         'expedicion_rama', rama]);
+    }
+    await rellenoRama(u6, 'xpd_fill_dif', 'r1_' + tag, 'difusion');
+    await rellenoRama(u6, 'xpd_fill_hal', 'r2_' + tag, 'hallazgo');
+    await rellenoRama(u6, 'xpd_fill_obr', 'r3_' + tag, 'obra');
+    await rellenoRama(u6, 'xpd_fill_eco', 'r4_' + tag, 'economia');
+    var lectU6 = await api.expedicionLectura(qApi, u6);
+    check('A18 GET: 4 cobros repartidos entre 4 ramas cuentan 4/5 en un solo cap',
+      lectU6.cap.usadas === 4 && lectU6.cap.limite === 5
+      && lectU6.cap.xp_dia === 0,
+      JSON.stringify(lectU6.cap));
+    var cFoto6 = await api.expedicionCobrar(qApi, u6, {
+      mision_id: 'xpd_obr_foto', accion_ref: String(refFoto6),
+    });
+    var cCompra6 = await api.expedicionCobrar(qApi, u6, {
+      mision_id: 'xpd_eco_compra', accion_ref: String(idCompra6.id),
+    });
+    var nU6 = await q1("SELECT COUNT(*)::int AS n FROM xp_ledger"
+      + " WHERE usuario_id=$1::uuid AND accion='carta_expedicion'", [u6]);
+    check('A18: 4 cobros de 4 ramas + 1 pago = 5 y la 6a (otra rama) -> 409 CAP_DIARIO',
+      cFoto6.status === 200 && cFoto6.body.usadas === 5
+      && cCompra6.status === 409 && cCompra6.body.code === 'CAP_DIARIO'
+      && cCompra6.body.usadas === 5 && cCompra6.body.limite === 5
+      && nU6.n === 5,
+      JSON.stringify(cFoto6.body) + ' ' + JSON.stringify(cCompra6.body));
 
     // -- A9 estructural: ningun id xpd_* puede estar en MISIONES -----------
     var idsMision = (api.MISIONES || []).map(function (m) { return m.id; });

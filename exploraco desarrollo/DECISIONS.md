@@ -13712,4 +13712,40 @@ La matriz completa es la seccion 8 de `docs/superpowers/specs/2026-11-11-cartas-
 
 **6. Deudas del catalogo, numeradas (aprobado por el operador, 2026-11-11).** **D-26** `posee` cubre **solo la variante `base`**; **D-27** **`restantes`/`total` son publicos** (no exigen sesion); **D-28** **la tarjeta del catalogo no abre ficha**; **D-29** **los filtros no se persisten** al cambiar de pestana o recargar; **D-30** **`usuarios_cartas` esta vacia**, luego **`posee=true` no esta medido** con dato real.
 
-**Estado tras la enmienda:** **EXPEDICION v1 OPERATIVA (difusion/hallazgo)** (2026-11-11), con **066-073 aplicadas** (**1 fila de ledger** cada una, **2a corrida no-op**) y **6 misiones** de expedicion cobrables por ledger con **cap 5/24 h y 200 XP/dia**. **Cerradas: D-21, D-22, D-24 y D-25.** **Deudas abiertas: D-23** (arte), **D-20** (md5 070), **D-12/D-19**, **D-13**, **D-14** parcial, **D-26 a D-30** (catalogo) y **D-31** (`media_compartidos`). Siguiente bloque: **`obra`/`economia` (fase 5)**, donde `oficio`/`rendimiento` encuentran consumidor.
+**Estado tras la enmienda:** **EXPEDICION v1 OPERATIVA (difusion/hallazgo)** (2026-11-11), con **066-073 aplicadas** (**1 fila de ledger** cada una, **2a corrida no-op**) y **6 misiones** de expedicion cobrables por ledger con **cap 5/24 h y 200 XP/dia**. **Cerradas: D-21, D-22, D-24 y D-25.** **Deudas abiertas: D-23** (arte), **D-20** (md5 070), **D-12/D-19**, **D-13**, **D-14** parcial, **D-26 a D-30** (catalogo) y **D-31** (`media_compartidos`). Siguiente bloque: **`obra`/`economia` (fase 5)**, donde `oficio`/`rendimiento` encuentran consumidor. *(SUPERADO POR LA ENMIENDA 7 DE ABAJO, que cierra D-31, aplica la 074 y ejecuta la fase 5; se conserva por ADR-003.)*
+
+### Enmienda 7 (expedicion COMPLETA: 4 ramas y 12 misiones, 074 aplicada y cierre de D-31, 2026-11-11)
+
+**Por que ENMIENDA y no ADR-122.** La tanda **agota el contrato de expedicion que este ADR ya tenia escrito**: las ramas **`obra` y `economia`** son las que la **Enmienda 5** punto 3 dejo declaradas como **fase 5**, y los **4 ejes** del vector son los que el ADR fijo desde el principio. **No sustituye ninguna premisa** de este ADR ni de sus Enmiendas 3-6: **no toca** las **45 cartas**, `stats_json`, `precioAcunacion()`, `carta_acunar`, la tirada ni el supply. Lo nuevo que hay que registrar son **hechos de base** (una **migracion aplicada** y una **deuda de ledger** que resulta ser **sistemica**) y **una restriccion aritmetica** del cap diario. El argumento vive **una sola vez** aqui (ADR-084 D1); el contrato tecnico, en la spec **11.9.11** y **11.10**.
+
+**1. Migracion 074 APLICADA (unica pieza de esquema de la tanda).**
+
+- **`db/migrations/074_media_compartidos_recrear.sql` (16.938 B) APLICADA:** **recrea `media_compartidos`** con el **DDL de la 022** (**9 columnas**, **3 indices**, **2 FK**, **3 CHECK**), porque la **022 figuraba como `historico_no_verificado`** en `schema_migrations` y **nunca se aplico**.
+- **Efecto medido:** la funcion **COMPARTIR deja de responder 503 `SCHEMA_NOT_MIGRATED`**.
+- **La 022 NO se toca** y **su fila NO se reescribe** (sigue `historico_no_verificado`): la 074 es una migracion **nueva** que resuelve el hueco sin **cirugia de ledger**. Reescribir la fila habria creado deriva permanente entre el registro y lo que realmente ocurrio.
+
+**2. D-31 CERRADA (la deuda que abrio la Enmienda 6).** La mision **`xpd_dif_comparte`** **cambia de senal**: pasa a leer **`xp_ledger` con `accion='compartir' AND contexto->>'fuente'='destino'`** (ref = **`id::text`**), **fail-closed** si no hay filas (la UI sigue diciendo la verdad en vez de inventar una accion). **`senal_disponible:true` desde ya**; las **acciones** apareceran **cuando el primer compartir escriba su asiento**. **Opcion elegida:** **(a) aplicar el esquema** y **reapuntar la senal al ledger**, no **(b)** inventar otra senal ni **(c)** retirar la mision. `difusion` vuelve a **3 de 3** misiones cobrables.
+
+**3. Fase 5 ejecutada: la expedicion pasa de 2 a 4 ramas.**
+
+- **6 misiones nuevas** -> **12 misiones / 4 ramas**: `difusion` (3, `alcance`), `hallazgo` (3, `fortuna`), **`obra`** (3, `oficio`) y **`economia`** (3, `rendimiento`). **320 XP** sumados entre las 12.
+- **Caps SIN cambiar y COMPARTIDOS entre las 4 ramas:** **5 cobros / 24 h** y **200 XP/dia**, medidos en `xp_ledger`. **No** hay **cap por rama**: el cap es **uno solo**, y esa es la premisa que impide que 4 ramas se conviertan en 4 faucets.
+- **Guard de carga ampliado:** exige **12 misiones / 4 ramas / 4 ejes** y aplica la regla de pertenencia **`oficio` solo en `obra`** y **`rendimiento` solo en `economia`** (una mision de `difusion` que pida `oficio` **revienta la carga**, igual que una expedicion colada en `MISIONES`).
+
+**4. Aritmetica declarada del cap (esto es la premisa, no un detalle de balance).**
+
+- **12 misiones suman 320 XP.** Una **pasada completa NO cabe en 200 y no puede caber**: el cap no es un adorno, es el techo que obliga a **elegir**.
+- **El invariante que protege el cap es `top-5 = 185 <= 200`**: las **5 recompensas mas altas** del catalogo de expedicion (**cuatro de 40 + una de 25**) suman **185**, luego **ninguna combinacion de 5 cobros puede exceder 200**. Si ese invariante se rompe, el tope de 200 XP se alcanza **antes de agotar los 5 slots** y el recorte al remanente pasa a ser el caso normal.
+- **El minimo diario posible es 75** y **12 cobros necesitan `ceil(12/5) = 3` dias** por **slots**: el cap de **5/24 h** es el que manda cuando el XP no lo hace primero. **No se relaja ninguno de los dos topes** en esta fase.
+
+**5. DEUDA SISTEMICA del ledger (dato duro, no opinion): el compartir roto era un sintoma.**
+
+- **Estado medido:** **41 filas `historico_no_verificado`** (numeros **3-43**) frente a **30 `aplicada`** (rango **44-74**), **71 filas** en total, que coinciden con las **71 migraciones** en disco. **`historico_no_verificado` no afirma nada sobre Neon**: es una **no-verificacion**, y una de ellas (**la 022**) sostenia una **feature viva** que **devolvia 503**.
+- **Lo que NO se puede seguir haciendo:** leer el ledger como si `historico_no_verificado` fuera "aplicada con matiz". **No lo es.**
+- **Criterio de cierre (verificacion una a una):** contrastar cada migracion **contra `information_schema` / `to_regclass`** y **empezar por las que tienen consumidor en codigo**, en orden de **feature viva**: una migracion con endpoint o UI que la consulta es **prioridad 1**, una sin consumidor puede esperar. **Cada verificacion se registra**; **no se reescriben filas historicas** sin decision del operador. La deuda queda numerada como **D-32**.
+
+**6. Verificacion (medida, ADR-006).** `scripts/smoke_expedicion.js` **61/61** (44 -> 61) con **0 persistencia** (`xp_ledger` **387**, compras **12**, media **0** antes y despues); **`npm test` exit 0**. **Nada de esta tanda esta en `origin`:** el ultimo deploy del sistema sigue siendo **`e9be424`** (fase 2); **no se afirma produccion** para esta fase.
+
+**7. Estado de datos que condiciona las ramas nuevas (fail-closed, no bug).** **`cartas_media` 0 filas** -> las misiones **`obra`** quedan en **`SIN_ACCION`** hasta que exista **una obra aprobada**; **`usuarios_cartas` 0** -> las misiones **`economia`** **no tienen acciones de carta**; **`xp_ledger accion='compartir'` 0 filas** hasta el **primer compartir real**. Las **4 ramas** estan **cableadas y verificadas**, pero **`obra`/`economia` dependen de contenido real** (**UGC** y **mercado**) para **dar acciones**: sin dato, **no pagan**, y eso es **correcto**.
+
+**Estado tras la enmienda:** **EXPEDICION COMPLETA (4 ramas, 12 misiones)** (2026-11-11), con **066-074 aplicadas** y **caps 5/24 h + 200 XP/dia compartidos** entre las 4 ramas. **Cerradas: D-21, D-22, D-24, D-25 y D-31.** **Deudas abiertas: D-23** (arte), **D-20** (md5 070), **D-12/D-19**, **D-13**, **D-14** parcial, **D-26 a D-30** (catalogo) y **D-32** (auditoria de las **41** `historico_no_verificado`). Punteros: **`TASKS.md` TSK-257**, **`NEXT.md`** (apertura), **`PROJECT.md`** (sistema de cartas) y la spec **11.9.11 / 11.10**.

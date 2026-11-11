@@ -1530,6 +1530,22 @@
   color: rgba(255, 255, 255, .34);
 }
 
+.cartas-silo .c-exp-rama-e {
+  font-family: 'Outfit', sans-serif;
+  font-size: 9px;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: rgba(201, 162, 39, .62);
+}
+
+.cartas-silo .c-exp-rama-d {
+  margin: -4px 0 8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, .46);
+}
+
 .cartas-silo .c-exp-lista {
   list-style: none;
   margin: 0;
@@ -1659,6 +1675,15 @@
 .cartas-silo .c-exp-m-est.is-listo { color: #E8C766; }
 .cartas-silo .c-exp-m-est.is-umbral,
 .cartas-silo .c-exp-m-est.is-acciones { color: #FF9B8A; }
+.cartas-silo .c-exp-m-est.is-sin_acciones { color: rgba(255, 255, 255, .62); }
+
+.cartas-silo .c-exp-m-motivo {
+  font-family: 'Outfit', sans-serif;
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, .52);
+  overflow-wrap: anywhere;
+}
 
 .cartas-silo .c-exp-go {
   flex: 0 0 auto;

@@ -1649,3 +1649,144 @@ Cada uno es una afirmacion que el backend puede ejecutar o un `SELECT` que se pu
 - [ ] **A10. Escudo.** `node --check api/interacciones.js` en verde; la seccion 11.9 con **0 bytes > 127**; `exploraco desarrollo/*.md` sin modificar (R2); `db/migrations/073_*.sql` con 0 bytes > 127, idempotente en segunda corrida.
 
 **Lo que NO cambia:** las 45 cartas y sus `stats_json`, `precioAcunacion()`, `chk_cartas_catalogo_fusionable`, `carta_acunar`, la tirada y el supply. Esta seccion solo fija como se paga una expedicion, no cuanto vale una carta.
+
+#### 11.9.11 Correccion D-31 (2026-11-11): `xpd_dif_comparte` cambia de senal
+
+**Estado:** cierra **D-31**. **Cero migraciones, cero endpoints.** Reemplaza la fila `xpd_dif_comparte` de 11.9.4 (1451) y el comentario `4627-4630` del archivo real. El resto de 11.9 queda intacto.
+
+**Lo medido en la base viva (2026-11-11, solo lectura, `@neondatabase/serverless`):**
+
+| Comprobacion | Resultado |
+|---|---|
+| `SELECT to_regclass('public.media_compartidos')` | **NULL** -> la 022 nunca se aplico |
+| Tablas `ILIKE '%compart%'` en `public` | **ninguna** |
+| `SELECT COUNT(*) FROM xp_ledger WHERE accion='compartir'` | **0** (de 387 filas totales) |
+| `SELECT COUNT(*) FROM xp_ledger WHERE accion='carta_expedicion'` | 0 (correcto: aun sin cobros) |
+
+**Por que la senal de 11.9.4 no sirve.** El unico escritor de `media_compartidos` es el handler de compartir: `INSERT` en `16327-16343`, **sin** `conDegradacionMedia` (los `SELECT` de `16319` y `16348` si degradan; el `INSERT` no). Sin tabla, ese `INSERT` lanza `42P01`, el `catch` global responde **503 `SCHEMA_NOT_MIGRATED`** (`21677-21678`) y el flujo muere **antes** de `registrarXpLedger` (`16387-16394`). La prueba es el ledger: 0 filas `accion='compartir'`. Luego `senal_disponible: false` (`4630`) no era un fail-closed transitorio: era un **bloqueo permanente sobre una tabla inexistente**.
+
+**Decision (a): la senal buena YA existe y es consultable.** Se cuenta el **ledger canonico**, unico libro de XP (ADR-018):
+
+```
+total_sql: SELECT COUNT(*)::int AS n FROM xp_ledger
+            WHERE usuario_id = $1::uuid AND accion = 'compartir'
+              AND contexto->>'fuente' = 'destino'
+ref_sql:   SELECT id::text AS ref FROM xp_ledger
+            WHERE usuario_id = $1::uuid AND accion = 'compartir'
+              AND contexto->>'fuente' = 'destino'
+            ORDER BY creado_en, id LIMIT 1 OFFSET $2
+```
+
+`contexto` ya trae `fuente`, `item_id`, `canal`, `destino_id` y `primero` (`16393`): el "canal valido" que pide la mision es el `CHECK` del handler (`16283-16284`) y `fuente='destino'` es el filtro. `accion_ref` = `xp_ledger.id`, unico por fila, con `ORDER BY creado_en, id` estable. El tope de 10 eventos/24 h del handler (`16216-16223`) acota el farm del lado de `compartir`.
+
+**Cambio exacto en `api/interacciones.js` (3 lineas, sin migracion):** (i) borrar `senal_disponible: false` y el comentario `4627-4629`; (ii) sustituir `total_sql` y `ref_sql` por los de arriba; (iii) anadir `lista_sql` (obligatorio por el guard `4786-4787`) con `ref` = `id::text`, `fecha` = `creado_en` y `detalle` = `COALESCE(contexto->>'canal','compartir')` || ' ' || `COALESCE(contexto->>'item_id','')`. El mapper `5036-5059` pasa a `senal_disponible: true` y `motivo: null`, y la mision deja de estar bloqueada por construccion.
+
+**Por que NO (b).** Aplicar la 022 haria funcionar la mision **solo** aplicando una migracion de otra feature (`compartir`) y, peor, dejaria el conteo leyendo `media_compartidos.xp_ganado` (`022:50`), que es un **segundo libro de XP** en paralelo al ledger: dos autoridades para el mismo hecho, justo lo que 11.9.6 evita.
+
+**Por que NO (c).** Retirar la mision rompe las cifras cerradas de `1341` (6 misiones, suma 160) y los criterios A1/A2 ya implementados en `scripts/smoke_expedicion.js` (`115-116`, `128-129`); `difusion` quedaria con 2 misiones. No hay ganancia: mientras este en 0 no cuesta nada.
+
+**Dependencia declarada (no de la mision, sino de la FEATURE compartir).** Mientras la 022 siga sin aplicarse **y** el handler siga insertando en ella, compartir devuelve 503 y esta mision vale **0 acciones** para todos. Bajo (a) eso es exacto y **se arregla solo** cuando compartir vuelva a escribir su fila de ledger: la expedicion no necesita una linea mas. **El backend puede implementar esta correccion sin migracion.**
+
+**Chequeo (D31-1):** `EXPEDICIONES[0].senal_disponible === undefined`; `typeof EXPEDICIONES[0].lista_sql === 'string'`; `total_sql` contiene `xp_ledger` y `accion = 'compartir'`; `to_regclass('public.media_compartidos')` sigue NULL y la consulta nueva **no falla** porque no toca esa tabla.
+
+---
+
+### 11.10. Contrato de fase 5: `obra` y `economia`
+
+**Estado:** cierra la parte de 5.2 que 11.9 dejo fuera (`1339`: "no habilita `obra` ni `economia`"). **No crea endpoint** (8/8), **no crea migracion** (073 es la ultima y **no menciona `expedicion_rama`**: `expedicion_rama` no aparece en `db/migrations/*.sql`), **no toca `exploraco desarrollo/*.md`**. Mismo array `EXPEDICIONES`, mismo GET/POST, mismos caps, mismo indice unico, misma accion `carta_expedicion`.
+
+#### 11.10.1 Consumo de `oficio` y `rendimiento`: solo umbral, cero bono
+
+11.9.3 (`1418`) dijo: "si una rama futura los necesita, es ADR + cap propio, no un parametro". Esta seccion **no aplica ningun bono**: `oficio` y `rendimiento` se consumen **solo como umbral** (`requiere_stats`), jamas como multiplicador de XP.
+
+- No hay segunda autoridad de pago: el XP sale de `mision.xp` y del remanente, como en 11.9.6. Por eso **no hace falta cap nuevo**: los topes 5/24 h, 200/24 h y `<= 40 XP/cobro` son los mismos y siguen siendo la unica regla.
+- `poder` (3.5:235) y `puntos[eje]` (11.9.2) **no cambian**; el bono shiny/nivel sigue siendo solo del eje primario de la carta (`lib/cartas-config.js:278-298`).
+- Efecto neto: el vector deja de ser puramente display en 2 de sus 4 ejes; pasa a ser **requisito de acceso**, que es la forma mas barata de darle consumidor sin tocar la economia ni el valor de las cartas.
+
+#### 11.10.2 El guard de carga hay que ampliarlo o el modulo no arranca
+
+`validarCatalogosExpedicion()` (`4737-4801`) corre **en carga** (`4733-4736`) y hoy exige literalmente lo contrario de esta seccion:
+
+| Guard | Hoy (archivo real) | Debe pasar a |
+|---|---|---|
+| `EXPEDICIONES.length` | `!== 6` (`4749`) | `!== 12` |
+| `ramas` | `{ difusion, hallazgo }` (`4740`) | `+ obra, economia` |
+| `ejesV1` | `{ alcance, fortuna }` (`4743`) | `+ oficio, rendimiento` |
+| reparto por rama | `difusion === 3 && hallazgo === 3` (`4799`) | las 4 `=== 3` |
+
+Sin este cambio el guard falla y el modulo no sirve (503 en carga). **No es migracion:** es el mismo archivo. `xpValidos {15,25,40}` (`4741`) y `reqValidos {0,8,20}` (`4742`) **no cambian**.
+
+#### 11.10.3 Catalogo (2 ramas x 3 misiones)
+
+`requiere_stats` conserva **un solo eje por mision** (como v1), enteros comparados con `>=`. `N` = `acciones_por_cobro`. `check()` es, en el motor real (`4610-4620`), el trio `total_sql` + `ref_sql` + `lista_sql`.
+
+| id | `expedicion_rama` | nombre | descripcion (ASCII) | `requiere_stats` | `xp` | N | senal real (archivo:linea) y filas hoy |
+|---|---|---|---|---|---|---|---|
+| `xpd_obr_foto` | `obra` | Foto de autor | Sube una foto a un destino. | `{oficio: 0}` | 15 | 1 | `interacciones tipo='foto'` (`13647`), **13** |
+| `xpd_obr_album` | `obra` | Curador | Crea un album propio. | `{oficio: 8}` | 25 | 1 | `xp_ledger accion='album_crear'` (`14214`), **2** |
+| `xpd_obr_ugc` | `obra` | Obra aprobada | Consigue la aprobacion de una obra propia. | `{oficio: 20}` | 40 | 1 | `cartas_media estado='aprobada'` (`17931`), **0** -> `SIN_ACCION` |
+| `xpd_eco_compra` | `economia` | Primera compra | Compra un consumible en la tienda. | `{rendimiento: 0}` | 15 | 1 | `compra_consumibles` (`15377`), **12** |
+| `xpd_eco_oferta` | `economia` | Poner a la venta | Publica una oferta en el mercado. | `{rendimiento: 8}` | 25 | 1 | `mercado_ofertas.vendedor_id` (`19546`), **0** |
+| `xpd_eco_carta` | `economia` | Trato cerrado | Compra una carta en el mercado. | `{rendimiento: 20}` | 40 | 1 | `cartas_ventas.comprador_id` (`17111-17116`), **0** -> `SIN_ACCION` |
+
+**Predicados exactos (`$1` = usuario, `$2` = offset 0-based de 11.9.5).** Todas llevan `lista_sql` (el guard `4786-4787` lo exige) con el mismo `WHERE` y `ORDER BY` que `ref_sql`, mas `fecha` y `detalle`.
+
+| id | `total_sql` (y `ref_sql` con `id::text AS ref ... ORDER BY creado_en, id LIMIT 1 OFFSET $2`) |
+|---|---|
+| `xpd_obr_foto` | `FROM interacciones WHERE usuario_id=$1::uuid AND tipo='foto' AND activo=true` |
+| `xpd_obr_album` | `FROM xp_ledger WHERE usuario_id=$1::uuid AND accion='album_crear'` |
+| `xpd_obr_ugc` | `FROM cartas_media WHERE autor_id=$1::uuid AND estado_moderacion='aprobada' AND activo=true` |
+| `xpd_eco_compra` | `FROM compra_consumibles WHERE usuario_id=$1::uuid` |
+| `xpd_eco_oferta` | `FROM mercado_ofertas WHERE vendedor_id=$1::uuid` |
+| `xpd_eco_carta` | `FROM cartas_ventas WHERE comprador_id=$1::uuid` |
+
+**Candidatas rechazadas con evidencia (no se inventan senales):**
+
+- **`xp_ledger accion='carta_compra'` no existe.** `xp_ledger.accion` tiene **17 valores distintos** y ninguno es `carta_compra`; la compra de carta escribe la fila de dominio `cartas_ventas` (`17111-17116`) y el par contable `carta_venta_debito` / `carta_venta_credito` (`17119`, `17124`). Se usa `cartas_ventas`, que es la accion, no el asiento.
+- **`album_fotos` no se reutiliza en `obra`.** Ya es la senal de `xpd_for_album` (`4695`). Dos misiones con `mision_id` distinto pagarian **dos veces la misma accion** (el indice unico es por mision). `obra` usa `interacciones tipo='foto'` y `xp_ledger accion='album_crear'`, que son acciones distintas de las de `hallazgo`.
+- **`albumes` como tabla directa se descarta.** `Mi Museo` se auto-crea sin accion del usuario (`13807-13811`) y contaria como obra gratis. Por eso `xpd_obr_album` lee el ledger (`14214`), que solo existe si el usuario creo el album (`14161`).
+- **`cartas_ofertas` (mercado de cartas) no se usa en la mision intermedia.** Publicar una carta exige poseerla y `usuarios_cartas` tiene **0 filas**: seria otra mision muerta. `mercado_ofertas` (bienes) si es alcanzable: 43 consumibles activos y basta nivel 2 + casa (`19491-19495`).
+- **`cartas_gates`, `visita`, `resena`, `guardado` no se repiten:** ya son senal de `hallazgo`/`difusion`.
+
+#### 11.10.4 Aritmetica exacta (declarada, no opinable)
+
+- **12 misiones, 4 ramas x 3.** `xp` = 4 x {15, 25, 40}: **suma 320**, **max 40**, **min 15**. `EXPEDICION_XP_MIN_COBRO` sigue **15** porque se deriva del catalogo (`4728-4731`), no se escribe a mano.
+- **La invariante vieja "una pasada completa <= 200" NO se mantiene, y no puede mantenerse.** Con `xp in {15,25,40}` el minimo de 6 misiones nuevas es `6 x 15 = 90`; los 160 de v1 dejan **40 XP** de margen: no existe asignacion posible. Cualquier catalogo de 4 ramas suma **>= 250**.
+- **La invariante que si protege el cap es el top-5, porque solo caben 5 cobros/dia:** mejor dia posible `40+40+40+40+25 =` **185 <= 200**. El cap de 200 solo se alcanza repitiendo una mision de 40 cinco veces (`5 x 40 = 200`, exacto), que es justo lo que el cap 5/24 h acota.
+- Minimo dia = `5 x 15 =` **75**. Una pasada completa exige **12 cobros**: por slots `ceil(12/5) = 3` dias; por XP `ceil(320/200) = 2`. **Manda el slot: 3 dias.**
+- Acciones reales de una pasada completa = **12** (las 6 nuevas van con N=1; v1 aporta 10) = **22 acciones** distintas en las 4 ramas.
+- **Consecuencia para A2:** `sum(xp) === 160` pasa a `sum(xp) === 320 && top5 === 185 && max === 40 && min === 15`. La frase "una pasada completa = 160 <= 200" (`1435`) queda **retirada para el catalogo de 4 ramas** y se sustituye por "5 cobros/dia y top-5 <= 200".
+
+#### 11.10.5 `obra` depende de moderacion UGC: `SIN_ACCION` explicito (fail-closed)
+
+**Premisa a corregir (ADR-006):** `cartas_media` **si tiene escritor**: `carta_media_subir` (`17839`) inserta en `17931` y deja asiento `carta_media_envio` (`17938`). Lo que no tiene es **filas**: `SELECT COUNT(*) FROM cartas_media` = **0**.
+
+Los 3 candados reales de `xpd_obr_ugc`:
+
+1. **Cuesta XP:** `CARTA_MEDIA_XP_COSTE` se debita en `17926-17928` (`xp_gastado_sinks`).
+2. **Gate de publicacion:** exige `>= 3` resenas largas de `>= 25` XP o `>= 1` obra ya aprobada (`17915-17924`; `lib/cartas-config.js:205-210`).
+3. **La aprobacion es humana:** la cola y la transicion viven en `api/admin.js:1589` (`cartas_media_moderar`). La mision no depende del codigo, depende de una cola de moderacion.
+
+**Estado definido:** `SIN_ACCION` por la via **generica** (`5030-5031`, `5055`), **sin** `senal_disponible: false`. La tabla existe y la consulta es valida: 0 filas **es la verdad**, no un bloqueo de diseno (contraste exacto con D-31, donde la tabla no existia). El POST re-valida y devuelve **200** `{ok:true, xp:0, repetido:true}` (regla 6 de `1510`): **nunca paga de mas**. Lo mismo para `xpd_eco_carta`: `usuarios_cartas` = **0** filas, luego no hay oferta que comprar; su desbloqueo es el canal de adquisicion diferido en 11.8 (tienda), no esta fase.
+
+#### 11.10.6 Lo que NO cambia: caps, idempotencia, ledger
+
+- **Caps compartidos entre las 4 ramas, no por rama:** `usadas` y `xp_dia` cuentan `accion='carta_expedicion'` **sin filtrar `expedicion_rama`** (`1496-1497`). 5/24 h y 200/24 h son **globales**; 5 por rama seria un faucet x4.
+- **Idempotencia heredada:** mismo indice `xp_ledger_expedicion_accion_uq` sobre `(usuario_id, contexto->>'mision_id', contexto->>'accion_ref')` (`073:125-129`) y mismo `CHECK chk_xp_ledger_expedicion_contexto` (`073:161`). **Cero migracion nueva:** `expedicion_rama` vive solo en `contexto` (JSONB), nunca en una columna con `CHECK`.
+- **`<= 40 XP/cobro`** se mantiene por catalogo (max 40) y por remanente (11.9.6).
+- `carta_expedicion` sigue siendo la **unica** accion que paga expediciones (R4) y ninguna mision nueva entra en `MISIONES` (R2, `4790-4798`).
+
+#### 11.10.7 Criterios de aceptacion (A11-A20)
+
+- [ ] **A11. Catalogo de 4 ramas.** `EXPEDICIONES.length === 12`; `obra === 3` y `economia === 3`; 12 ids unicos con prefijo `xpd_`; `MISIONES.filter(m => m.expedicion_rama).length === 0` (R2). `scripts/smoke_expedicion.js` (`115-116`, `396`) actualizado a 12.
+- [ ] **A12. Aritmetica.** `sum(xp) === 320`; `Math.max(...xp) === 40`; `Math.min(...xp) === 15`; `EXPEDICION_XP_MIN_COBRO === 15`; top-5 = `185`; `xp` en `{15,25,40}` y `N` en `{1,2,3}` (`4741`, `4764`).
+- [ ] **A13. Solo umbral, cero bono.** Toda clave de `requiere_stats` esta en `{alcance, oficio, fortuna, rendimiento}`; todo valor en `{0,8,20}`; `oficio` aparece **solo** en `obra` y `rendimiento` **solo** en `economia`; el XP pagado de un cobro es exactamente `min(mision.xp, remanente)` y ninguna fila de `xp_ledger` de expedicion lleva `mult_final != 1`.
+- [ ] **A14. D-31.** `EXPEDICIONES[0].senal_disponible === undefined`; `typeof lista_sql === 'string'`; `total_sql` contiene `xp_ledger` y `accion = 'compartir'`; la consulta de `xpd_dif_comparte` devuelve 0 filas **sin error** mientras `to_regclass('public.media_compartidos') IS NULL`.
+- [ ] **A15. Cap 5 global.** 5 cobros repartidos entre las 4 ramas: el 6o devuelve **409** `CAP_DIARIO` con `usadas === 5`; `SELECT COUNT(*) FROM xp_ledger WHERE accion='carta_expedicion'` = 5 (no hay 5 por rama).
+- [ ] **A16. Cap 200 y remanente con ramas nuevas.** `xp_dia = 180` + mision de 40 -> paga **20**, `recortado: true`, `cap_aplicado = 'accion'`; `xp_dia = 195` -> **409** `CAP_RECOMPENSA` y 0 filas nuevas; `xp_dia = 200` -> **409** `CAP_DIARIO`.
+- [ ] **A17. Fail-closed `obra`/UGC.** Con `cartas_media` con 0 aprobadas: GET -> `acciones.total === 0`, `disponible === false`, `bloqueo === 'SIN_ACCION'`, `senal_disponible === true`; POST -> **200** `{ok:true, xp:0, repetido:true}` y **0** filas nuevas en `xp_ledger`.
+- [ ] **A18. Fail-closed `economia`/cartas.** Con `usuarios_cartas` vacia: `xpd_eco_carta` responde igual que A17. En el mismo estado, `xpd_eco_compra.acciones.total > 0` para los 2 usuarios con `compra_consumibles` (12 filas): la rama **no** esta muerta entera.
+- [ ] **A19. Cero migracion e idempotencia.** Dos POST identicos del mismo `mision_id` y `accion_ref`: **una** fila de ledger y el segundo **200** `xp:0`; `xp_ledger_expedicion_accion_uq` en `pg_indexes`; `chk_xp_ledger_expedicion_contexto` en `pg_constraint`; `expedicion_rama` ausente de `db/migrations/*.sql`.
+- [ ] **A20. Escudo.** `node --check api/interacciones.js` en verde; seccion 11.10 (y la nota 11.9.11) con **0 bytes > 127**; `exploraco desarrollo/*.md` sin modificar (R2); `npm test` sigue incluyendo `node scripts/smoke_expedicion.js`.
+
+**Lo que NO cambia:** las 45 cartas y sus `stats_json`, `precioAcunacion()`, `chk_cartas_catalogo_fusionable`, `carta_acunar`, la tirada, el supply, los caps de 11.9.6 y el indice de 073. Esta seccion solo dice **que acciones reales abren las 2 ramas que faltaban**; no crea XP nuevo ni toca el valor de una carta.
