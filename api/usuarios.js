@@ -1223,7 +1223,7 @@ module.exports = async (req, res) => {
             return 'SELECT c.id, c.nombre, c.set_slug, c.rareza, c.nivel_gate, c.es_evento,'
               + ' c.imagen_url, c.emisor_tipo, c.emisor_id, c.marca_id,'
               + ' m.nombre AS marca_nombre, c.descripcion, c.stats_json,'
-              + ' c.es_canjeable_qr, c.fusionable,'
+              + ' c.es_canjeable_qr, c.fusionable, c.activo,'
               + (conSet ? ' c.set_coleccion,' : '')
               // 066: familia / subtipo / edicion / supply_max / emitidas /
               // precio_xp. Aditivo y con reintento degradado: sin la 066 la
@@ -1241,7 +1241,10 @@ module.exports = async (req, res) => {
               + '   FROM usuarios_cartas u2'
               + '   WHERE u2.usuario_id = $1 AND u2.carta_id = c.id'
               + ' ) uc ON true'
-              + ' WHERE c.activo = true'
+              + ' WHERE (c.activo = true OR EXISTS ('
+              + '   SELECT 1 FROM usuarios_cartas u3'
+              + '   WHERE u3.usuario_id = $1 AND u3.carta_id = c.id'
+              + '   AND u3.activo = true AND u3.cantidad >= 1))'
               + ' ORDER BY c.set_slug ASC, c.nivel_gate ASC NULLS LAST, c.id ASC';
           };
           try {
@@ -1362,12 +1365,21 @@ module.exports = async (req, res) => {
           // poder se calcula aqui con el helper de lib/cartas-config.js.
           var cmNv = cmNivelMap[String(c.id)] || 1;
           var cmPoder = 0;
+          var cmPoderBase = 0;
           vNorm.forEach(function (v) {
             if (!(v.activa && v.cantidad >= 1)) return;
-            var pv = CartasConfig.poderCarta(c.stats_json, cmNv, v.variante);
+            var pb = CartasConfig.poderCarta(c.stats_json, cmNv, v.variante);
+            if (pb > cmPoderBase) cmPoderBase = pb;
+            // Spec 12.1: el factor de copias se aplica al poder ya calculado
+            // (variante + nivel incluidos) y el MAX entre variantes se toma
+            // sobre el valor YA escalado. La cantidad es de la variante.
+            var pv = CartasConfig.poderConCopias(pb, v.cantidad);
             if (pv > cmPoder) cmPoder = pv;
           });
-          if (!cmPoder) cmPoder = CartasConfig.poderCarta(c.stats_json, cmNv, CARTA_VARIANTE_DEFECTO);
+          if (!cmPoder) {
+            cmPoder = CartasConfig.poderCarta(c.stats_json, cmNv, CARTA_VARIANTE_DEFECTO);
+            cmPoderBase = cmPoder;
+          }
           return {
             id: c.id,
             nombre: c.nombre,
@@ -1407,11 +1419,23 @@ module.exports = async (req, res) => {
             stats: CartasConfig.statsNormalizados(c.stats_json),
             nivel: cmNv,
             poder: cmPoder,
+            // Spec 12.2: par (poder base, poder con copias) para la UI.
+            poder_sin_copias: cmPoderBase,
+            // Spec 12.4: una carta retirada (activo=false) sigue en el
+            // inventario de quien la compro. El campo retirada es ADITIVO: el campo activa
+            // conserva su significado (variante en posesion, vPosesion).
+            activa_catalogo: c.activo === true,
+            retirada: c.activo === false,
             nivel_tope: CartasConfig.CARTA_NIVEL_TOPE,
             coste_nivel_xp: CartasConfig.costeSubidaNivel(cmNv),
             variantes: vNorm
           };
         });
+        // Spec 12.4: conteo ADITIVO de cartas retiradas, FUERA del progreso
+        // (el progreso sigue midiendo solo catalogo activo).
+        var cmRetiradas = cmCartas.filter(function (c) {
+          return c.retirada === true;
+        }).length;
         cmReq = cmReq.map(function (r) {
           r.total = Number(r.total) || 0;
           r.obtenidas = Number(r.obtenidas) || 0;
@@ -1427,7 +1451,8 @@ module.exports = async (req, res) => {
             gates: cmGates,
             requisitos: cmReq,
             museo: cmMuseo || [],
-            museo_tope: MUSEO_TOPE
+            museo_tope: MUSEO_TOPE,
+            cartas_retiradas: cmRetiradas
           }
         });
       }
@@ -1481,7 +1506,7 @@ module.exports = async (req, res) => {
         var mpSqlCartas = function (conExtras) {
           return 'SELECT c.id, c.nombre, c.rareza, c.set_slug, c.imagen_url,'
             + ' c.descripcion, c.emisor_tipo, m.nombre AS marca_nombre,'
-            + ' c.stats_json, uc.variante'
+            + ' c.stats_json, uc.variante, uc.cantidad'
             // 066: aditivo y con reintento degradado (pre-066 = shape historico).
             + (conExtras ? ', c.familia, c.subtipo, c.edicion, c.supply_max,'
               + ' c.emitidas, c.precio_xp' : '')
@@ -1524,6 +1549,11 @@ module.exports = async (req, res) => {
         var mpLista = (mpCartas || []).map(function (c) {
           var mpVar = String(c.variante || CARTA_VARIANTE_DEFECTO);
           var mpNv = mpNivelMap[String(c.id)] || 1;
+          // Spec 12.2: sin uc.cantidad (reintento pre-066 o columna ausente)
+          // degrada a 1 copia -> factor 1.00, nunca NaN.
+          var mpCant = Number(c.cantidad);
+          if (!isFinite(mpCant) || mpCant < 1) mpCant = 1;
+          var mpPoderBase = CartasConfig.poderCarta(c.stats_json, mpNv, mpVar);
           return {
             id: c.id,
             nombre: c.nombre,
@@ -1548,7 +1578,8 @@ module.exports = async (req, res) => {
               ? null : Number(c.precio_xp),
             stats: CartasConfig.statsNormalizados(c.stats_json),
             nivel: mpNv,
-            poder: CartasConfig.poderCarta(c.stats_json, mpNv, mpVar)
+            poder: CartasConfig.poderConCopias(mpPoderBase, mpCant),
+            poder_sin_copias: mpPoderBase
           };
         });
         return res.json({

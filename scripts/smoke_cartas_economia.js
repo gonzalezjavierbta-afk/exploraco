@@ -269,6 +269,21 @@ function casosPuros() {
     && CartasConfig.costeSubidaNivel(5) === 0
     && CartasConfig.CARTA_NIVEL_TOPE === 5);
 
+  // Spec 12 (copias multiples): el poder escala con la cantidad y el poder base
+  // NO cambia (la funcion vieja conserva su firma y su valor).
+  var comun5 = { primario: 'alcance', alcance: 5 };
+  var pBase5 = CartasConfig.poderCarta(comun5, 1, 'base');
+  var pCop5 = CartasConfig.poderConCopias(pBase5, 5);
+  check('C0.9 copias: comun de poder 5 con 5 copias -> 6.0, base intacto y tope 1.45',
+    pBase5 === 5 && pCop5 === 6
+    && CartasConfig.poderConCopias(pBase5, 1) === 5
+    && CartasConfig.poderConCopias(pBase5, 10) === 7.3
+    && CartasConfig.poderConCopias(pBase5, 11) === 7.3
+    && CartasConfig.poderConCopias(pBase5, 500) === 7.3
+    && CartasConfig.poderConCopias(pBase5, 'x') === 5
+    && !isNaN(CartasConfig.poderConCopias(pBase5, 'x')),
+    'base=' + pBase5 + ' c5=' + pCop5 + ' c10=' + CartasConfig.poderConCopias(pBase5, 10));
+
   // C8 (parte estatica): las 9 claves historicas de cartas_mias siguen en el
   // codigo y las nuevas del contrato 3.6 existen. No es una lectura de BD.
   var src = fs.readFileSync(path.join(__dirname, '..', 'api', 'usuarios.js'), 'utf8');
@@ -284,8 +299,8 @@ function casosPuros() {
   var faltanN = nuevas.filter(function (k) { return src.indexOf(k) === -1; });
   check('C8.2 cartas_mias emite stats/nivel/poder (contrato 3.6)',
     faltanN.length === 0, faltanN.join(','));
-  var museo = ['poder: CartasConfig.poderCarta(c.stats_json, mpNv, mpVar)',
-    'nivel: mpNv'];
+  var museo = ['poder: CartasConfig.poderConCopias(mpPoderBase, mpCant)',
+    'nivel: mpNv', 'poder_sin_copias: mpPoderBase'];
   var faltanM = museo.filter(function (k) { return src.indexOf(k) === -1; });
   check('C8.3 museo_cartas emite nivel y poder', faltanM.length === 0,
     faltanM.join(','));
@@ -1343,6 +1358,230 @@ async function main() {
           + ' neto=' + (rAbs && rAbs.neto) + ' led=' + ledAbs.n);
       }
     }
+
+    // ---- Spec 12: COPIAS MULTIPLES (compra repetida, tope y retirada) ------
+    // Handler REAL de api/interacciones.js (carta_acunar) y de api/usuarios.js
+    // (cartas_mias) con un doble de neon que ejecuta sus consultas en ESTA tx.
+    // Todo se revierte con el ROLLBACK final.
+    await (async function () {
+      var srcInt = fs.readFileSync(path.join(__dirname, '..', 'api', 'interacciones.js'), 'utf8');
+      var srcUsr2 = fs.readFileSync(path.join(__dirname, '..', 'api', 'usuarios.js'), 'utf8');
+      check('S12.0 guard del tope en el statement y en el ON CONFLICT',
+        srcInt.indexOf('AS tope_ok') !== -1
+        && srcInt.indexOf('WHERE usuarios_cartas.cantidad < ') !== -1
+        && srcInt.indexOf('CARTA_TOPE_COPIAS') !== -1,
+        'tope_ok=' + (srcInt.indexOf('AS tope_ok') !== -1)
+        + ' where=' + (srcInt.indexOf('WHERE usuarios_cartas.cantidad < ') !== -1));
+      check('S12.1 cartas_mias lee retiradas y publica retirada/poder_sin_copias',
+        srcUsr2.indexOf('OR EXISTS (') !== -1
+        && srcUsr2.indexOf('retirada: c.activo === false') !== -1
+        && srcUsr2.indexOf('poder_sin_copias: cmPoderBase') !== -1
+        && srcUsr2.indexOf('uc.variante, uc.cantidad') !== -1,
+        'retirada=' + (srcUsr2.indexOf('retirada: c.activo === false') !== -1));
+
+      var rutaNeon2 = require.resolve('@neondatabase/serverless');
+      var cacheNeon2 = require.cache[rutaNeon2];
+      var rutaInt = require.resolve('../api/interacciones.js');
+      var rutaUsu = require.resolve('../api/usuarios.js');
+      var cacheInt = require.cache[rutaInt];
+      var cacheUsu = require.cache[rutaUsu];
+      var handlerInt = null;
+      var handlerUsu = null;
+      function sqlDoble2(primer, segundo) {
+        if (Array.isArray(primer) && primer.raw) {
+          var texto = '';
+          var params = [];
+          for (var i2 = 0; i2 < primer.length; i2++) {
+            texto += primer[i2];
+            if (i2 < primer.length - 1) {
+              params.push(segundo[i2]);
+              texto += '$' + params.length;
+            }
+          }
+          return q(texto, params);
+        }
+        return q(primer, segundo || []);
+      }
+      try {
+        require.cache[rutaNeon2] = {
+          id: rutaNeon2, filename: rutaNeon2, loaded: true,
+          exports: { neon: function () { return sqlDoble2; } }
+        };
+        delete require.cache[rutaInt];
+        delete require.cache[rutaUsu];
+        handlerInt = require(rutaInt);
+        handlerUsu = require(rutaUsu);
+      } finally {
+        if (cacheNeon2) require.cache[rutaNeon2] = cacheNeon2;
+        else delete require.cache[rutaNeon2];
+        if (cacheInt) require.cache[rutaInt] = cacheInt;
+        else delete require.cache[rutaInt];
+        if (cacheUsu) require.cache[rutaUsu] = cacheUsu;
+        else delete require.cache[rutaUsu];
+      }
+      if (!handlerInt || !handlerUsu) {
+        check('S12.2 handlers de interacciones y usuarios cargados', false, 'require vacio');
+        return;
+      }
+
+      function resFake2() {
+        var salida = null;
+        var res = {
+          statusCode: 200,
+          setHeader: function () { return this; },
+          status: function (c) { this.statusCode = c; return this; },
+          json: function (b) { salida = b; return this; },
+          send: function (b) { salida = b; return this; },
+          end: function () { return this; }
+        };
+        res.leer = function () { return salida; };
+        return res;
+      }
+
+      var tag12 = 'smk_s12_' + Date.now().toString(36);
+      var u12 = await q1('INSERT INTO usuarios (email, nombre, xp_total)'
+        + ' VALUES ($1, $2, 100000) RETURNING id::text AS id',
+        [tag12 + '@example.invalid', 'smk_s12']);
+      var uid12 = String(u12.id);
+      var secreto12 = process.env.SESSION_JWT_SECRET || 'dev_secret';
+      var payload12 = Buffer.from(JSON.stringify({
+        sub: uid12, exp: Math.floor(Date.now() / 1000) + 600
+      }), 'utf8').toString('base64url');
+      var tok12 = payload12 + '.' + crypto
+        .createHmac('sha256', secreto12).update(payload12).digest('base64url');
+
+      function llamar12(handler, tipo, token, extra) {
+        var cab = {};
+        if (token) cab.authorization = 'Bearer ' + token;
+        var cuerpo = { tipo: tipo };
+        Object.keys(extra || {}).forEach(function (k) { cuerpo[k] = extra[k]; });
+        var r2 = resFake2();
+        return Promise.resolve(handler({
+          method: 'POST', query: {}, headers: cab, body: cuerpo
+        }, r2)).then(function () { return { code: r2.statusCode, body: r2.leer() }; });
+      }
+
+      var cand = await q1('SELECT c.id::text AS id, c.precio_xp, c.emitidas'
+        + ' FROM cartas_catalogo c WHERE c.activo = true AND c.precio_xp > 0'
+        + ' AND c.familia NOT IN (\'producto\',\'consumible\')'
+        + ' AND (c.supply_max IS NULL OR c.emitidas < c.supply_max)'
+        + ' AND (c.media_id IS NULL OR EXISTS (SELECT 1 FROM cartas_media m'
+        + '  WHERE m.id=c.media_id AND m.estado_moderacion=\'aprobada\' AND m.activo=true))'
+        + ' ORDER BY c.precio_xp ASC, c.id LIMIT 1');
+      if (!cand) {
+        console.log('SKIP S12: no hay carta acunable con stock en el catalogo');
+        return;
+      }
+      var cid12 = String(cand.id);
+      var precio12 = Number(cand.precio_xp);
+      var emi0 = await q1('SELECT emitidas FROM cartas_catalogo WHERE id=$1', [cid12]);
+
+      var p1 = await llamar12(handlerInt, 'carta_acunar', tok12, { carta_id: cid12 });
+      var inv1 = await q1('SELECT cantidad FROM usuarios_cartas'
+        + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=\'base\'', [uid12, cid12]);
+      var sink1 = await q1('SELECT xp_gastado_sinks FROM usuarios WHERE id=$1::uuid', [uid12]);
+      check('S12.2 1a compra: 200, cantidad 1 y cobro de 1 x precio_xp',
+        p1.code === 200 && p1.body && p1.body.ok === true
+        && Number(p1.body.data && p1.body.data.cantidad) === 1
+        && !!inv1 && Number(inv1.cantidad) === 1
+        && Number(sink1.xp_gastado_sinks) === precio12,
+        'code=' + p1.code + ' cant=' + (p1.body && p1.body.data && p1.body.data.cantidad)
+        + ' sink=' + (sink1 && sink1.xp_gastado_sinks) + ' precio=' + precio12);
+
+      var p2 = await llamar12(handlerInt, 'carta_acunar', tok12, { carta_id: cid12 });
+      var inv2 = await q1('SELECT cantidad FROM usuarios_cartas'
+        + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=\'base\'', [uid12, cid12]);
+      var sink2 = await q1('SELECT xp_gastado_sinks FROM usuarios WHERE id=$1::uuid', [uid12]);
+      var emi2 = await q1('SELECT emitidas FROM cartas_catalogo WHERE id=$1', [cid12]);
+      var led2 = await q1('SELECT COUNT(*)::int AS n FROM xp_ledger'
+        + ' WHERE usuario_id=$1::uuid AND accion=\'carta_compra\'', [uid12]);
+      check('S12.3 2a compra: cantidad 1 -> 2 y cobro 2 x precio_xp (sin descuento)',
+        p2.code === 200 && Number(p2.body.data && p2.body.data.cantidad) === 2
+        && !!inv2 && Number(inv2.cantidad) === 2
+        && Number(sink2.xp_gastado_sinks) === 2 * precio12
+        && Number(emi2.emitidas) === Number(emi0.emitidas) + 2
+        && Number(led2.n) === 2,
+        'code=' + p2.code + ' cant=' + (inv2 && inv2.cantidad)
+        + ' sink=' + (sink2 && sink2.xp_gastado_sinks) + ' esp=' + (2 * precio12)
+        + ' emit=' + (emi2 && emi2.emitidas));
+
+      await q('UPDATE usuarios_cartas SET cantidad=99'
+        + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=\'base\'', [uid12, cid12]);
+      var sinkT0 = await q1('SELECT xp_gastado_sinks FROM usuarios WHERE id=$1::uuid', [uid12]);
+      var emiT0 = await q1('SELECT emitidas FROM cartas_catalogo WHERE id=$1', [cid12]);
+      var pT = await llamar12(handlerInt, 'carta_acunar', tok12, { carta_id: cid12 });
+      var sinkT1 = await q1('SELECT xp_gastado_sinks FROM usuarios WHERE id=$1::uuid', [uid12]);
+      var emiT1 = await q1('SELECT emitidas FROM cartas_catalogo WHERE id=$1', [cid12]);
+      var invT = await q1('SELECT cantidad FROM usuarios_cartas'
+        + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=\'base\'', [uid12, cid12]);
+      check('S12.4 tope 99: 409 CARTA_TOPE_COPIAS sin subir cantidad ni cobrar',
+        pT.code === 409 && pT.body && pT.body.error === 'CARTA_TOPE_COPIAS'
+        && pT.body.data && Number(pT.body.data.cantidad) === 99
+        && Number(pT.body.data.tope) === 99
+        && Number(invT.cantidad) === 99
+        && Number(sinkT1.xp_gastado_sinks) === Number(sinkT0.xp_gastado_sinks)
+        && Number(emiT1.emitidas) === Number(emiT0.emitidas),
+        'code=' + pT.code + ' err=' + (pT.body && pT.body.error)
+        + ' cant=' + (invT && invT.cantidad)
+        + ' sink=' + sinkT0.xp_gastado_sinks + '->' + sinkT1.xp_gastado_sinks
+        + ' emit=' + emiT0.emitidas + '->' + emiT1.emitidas);
+
+      await q('UPDATE usuarios_cartas SET cantidad=98'
+        + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=\'base\'', [uid12, cid12]);
+      var p98 = await llamar12(handlerInt, 'carta_acunar', tok12, { carta_id: cid12 });
+      var p99 = await llamar12(handlerInt, 'carta_acunar', tok12, { carta_id: cid12 });
+      var inv99 = await q1('SELECT cantidad FROM usuarios_cartas'
+        + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=\'base\'', [uid12, cid12]);
+      check('S12.5 98 -> 99 acuna y la siguiente vuelve 409 (tope duro)',
+        p98.code === 200 && Number(inv99.cantidad) === 99
+        && p99.code === 409 && p99.body && p99.body.error === 'CARTA_TOPE_COPIAS',
+        'p98=' + p98.code + ' p99=' + p99.code + ' err=' + (p99.body && p99.body.error));
+
+      var sinkPre401 = await q1('SELECT xp_gastado_sinks FROM usuarios WHERE id=$1::uuid', [uid12]);
+      var sinSes = await llamar12(handlerInt, 'carta_acunar', null, { carta_id: cid12 });
+      var sinkS = await q1('SELECT xp_gastado_sinks FROM usuarios WHERE id=$1::uuid', [uid12]);
+      check('S12.6 sin sesion: 401 y ningun cobro',
+        sinSes.code === 401
+        && Number(sinkS.xp_gastado_sinks) === Number(sinkPre401.xp_gastado_sinks),
+        'code=' + sinSes.code + ' sink=' + (sinkS && sinkS.xp_gastado_sinks));
+
+      // Retirada visible (spec 12.4, A41): fixture real car_artista_prueba con
+      // activo=false. NO se reactiva: solo se lee.
+      var ret = await q1('SELECT id::text AS id, activo, stats_json FROM cartas_catalogo'
+        + ' WHERE id=\'car_artista_prueba\' LIMIT 1');
+      if (!ret) {
+        console.log('SKIP A41: car_artista_prueba no existe en este entorno');
+        return;
+      }
+      await q('DELETE FROM usuarios_cartas WHERE usuario_id=$1::uuid AND carta_id=$2',
+        [uid12, ret.id]);
+      await q('INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo)'
+        + ' VALUES ($1::uuid, $2, \'base\', 5, true)', [uid12, ret.id]);
+      var rMias = resFake2();
+      await handlerUsu({
+        method: 'GET',
+        query: { tipo: 'cartas_mias', usuario_id: uid12 },
+        headers: { authorization: 'Bearer ' + tok12 }
+      }, rMias);
+      var bMias = rMias.leer();
+      var filaRet = null;
+      ((bMias && bMias.data && bMias.data.cartas) || []).forEach(function (f2) {
+        if (String(f2.id) === String(ret.id)) filaRet = f2;
+      });
+      var baseRet = CartasConfig.poderCarta(ret.stats_json, 1, 'base');
+      check('A41 carta retirada: aparece con retirada=true, cantidad real y poder escalado',
+        !!filaRet && filaRet.retirada === true && Number(filaRet.cantidad) === 5
+        && filaRet.poder === CartasConfig.poderConCopias(baseRet, 5)
+        && filaRet.poder_sin_copias === baseRet
+        && Number(bMias.data.cartas_retiradas) >= 1,
+        'fila=' + (filaRet ? 'si' : 'no')
+        + ' retirada=' + (filaRet && filaRet.retirada)
+        + ' cant=' + (filaRet && filaRet.cantidad)
+        + ' poder=' + (filaRet && filaRet.poder) + ' base=' + baseRet);
+      var actRet = await q1('SELECT activo FROM cartas_catalogo WHERE id=$1', [ret.id]);
+      check('A41 la carta retirada sigue activo=false (no se reactiva)',
+        actRet && actRet.activo === false);
+    })();
   } catch (eTx) {
     check('transaccion sin excepcion', false,
       (eTx && eTx.code ? String(eTx.code) + ' ' : '') + limpiar(eTx && eTx.message));

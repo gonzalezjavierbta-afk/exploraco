@@ -960,6 +960,17 @@
   gap: 10px;
 }
 
+/* 12.5: "Tienes N" de la copia que ya esta en la coleccion. */
+.c-ficha .c-acunar-nota {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #E8C766;
+  opacity: .9;
+}
+
 .c-ficha .c-acunar-btn {
   display: inline-flex;
   align-items: baseline;

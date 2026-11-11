@@ -2147,3 +2147,259 @@ El `return` temprano es la garantia fuerte: **el bono shiny y el bono de nivel n
 - [ ] **A36. Independencia y Escudo.** 078 se aplica **con 076 sin aplicar** (su unica dependencia es 066/068/069) y `count(*) WHERE familia='cosmetica'` = 9; `node --check lib/cartas-config.js` y `node --check api/admin.js` en verde; la seccion 11.12 tiene **0 bytes > 127**; `exploraco desarrollo/*.md` sin modificar (R2).
 
 **Lo que NO cambia en 11.11 y 11.12:** las 45 cartas y sus `stats_json`, `precioAcunacion()` en las 5 familias existentes, `CARTA_PODER_PESOS`, `chk_cartas_catalogo_stats`, la tirada, `carta_acunar`, el CHECK de fusion de cosmetica, los 12 slots del museo y el indice de 073. Ninguna de las dos secciones crea un eje, un endpoint, una columna ni una tabla.
+
+---
+
+## 12. Copias multiples y escalado de atributos (v1)
+
+**Origen:** regla de producto del operador (2026-11-11): *"las cartas se pueden comprar varias, ya que esto aumenta los atributos que da cada carta"*. Esta seccion fija el contrato; **no implementa**. Duenno de la implementacion: `@backend-dev` (gate **SI**) para `lib/cartas-config.js` + `api/usuarios.js` + el guard de `carta_acunar`; `@frontend-tpl` (sin gate) para `cartas-ui.js`. Cero endpoints nuevos (8/8 de Vercel Hobby).
+
+### 12.0. Que sustituye, y que NO toca
+
+| Punto vigente | Texto que queda superado | Estado tras esta seccion |
+|---|---|---|
+| **3.5 (:238)** | "Una carta cuenta UNA vez por usuario, sin multiplicar por `cantidad` (...). Poseer 40 copias de la misma carta no da poder" | **SUPERADO.** La carta cuenta una vez **por variante**, y su `poder` escala con la `cantidad` **de esa variante** con cap duro. El **MAX por variante** (base vs shiny de la misma carta, por eje) **NO** se sustituye: sigue tomandose el maximo, nunca la suma. |
+| **3.6 regla 2 (:245)** | "Una carta cuenta una vez por usuario (sin apilar `cantidad` ni variantes)" | **SUPERADO en `cantidad`** (ahora escala, acotado). **VIGENTE en "ni variantes"**: base y shiny de la misma carta no se suman entre si. |
+| **3.6 reglas 1, 3, 4 y 5** | anti-inflacion restantes | **Intactas en su texto; la 3 se refuerza.** El cap de **40 por eje** y el `poder` **160** de la cuenta **NO se mueven**: el factor de copias entra **antes** del `LEAST`, nunca despues (12.2.1). |
+
+**Regla 0. Lo que esta seccion NO cambia:** caps de vector (40/eje), `poder` de cuenta (<=160), `xp_total`, `interacciones.xp_ganado`, `precio_xp` del catalogo ni del mercado, `supply_max`/`emitidas` mas alla de la emision ya existente, tirada, `CARTA_PODER_PESOS`, CHECKs y migraciones. **Cero columnas nuevas.**
+
+**Regla 0-bis (decision del operador, 2026-11-11).** Las copias **SI** escalan el **vector de expedicion**, no solo la vitrina: si no lo tocaran, la regla seria decorativa. El multiplicador de 12.1 se aplica al poder de **cada carta** antes del MAX por carta y de la suma, y el tope 40 por eje queda como **red anti-saturacion** (12.2.1).
+
+### 12.1. Formula y constantes
+
+```
+factor(cantidad)   = (100 + min(max(cantidad,1) - 1, CARTA_COPIAS_CAP) * CARTA_COPIAS_BP) / 100
+poderConCopias(p,c)= Math.round(p * factor(c) * 10) / 10        // 1 decimal
+```
+
+| Constante (en `lib/cartas-config.js`, fuente unica) | Valor | Razon |
+|---|---|---|
+| `CARTA_COPIAS_BP` | **5** (5% por copia extra) | Conservador: 10 copias dan **+45%**, no el doble. Suficiente para que comprar se note y bajo para no reescribir el balance de seccion 3. |
+| `CARTA_COPIAS_CAP` | **9** (tope de copias que cuentan) | `1 + 9 * 0.05 = 1.45`. La copia 11 no anade nada: el techo de poder se alcanza con **10 copias**. |
+| `CARTA_MAX_COPIAS` | **99** | Tope de inventario (12.3). Es **decorativo para el poder** (se agota en 10); solo acota el abuso de `cantidad`. 2 digitos, < `INTEGER`. |
+| `factor` maximo | **1.45** | `poder` por carta nunca supera `1.45 x poderCarta(...)`. |
+
+**Numeros exactos (una sola tabla, sin ambiguedad):**
+
+| Copias | `factor` | Comun de `poder` 5 | Dorada de `poder` 20 |
+|---|---|---|---|
+| 1 | 1.00 | **5.0** | **20.0** |
+| 2 | 1.05 | **5.3** (5.25) | **21.0** |
+| 3 | 1.10 | **5.5** | **22.0** |
+| 5 | 1.20 | **6.0** | **24.0** |
+| 10 | 1.45 | **7.3** (7.25) | **29.0** |
+| 11 o mas | 1.45 | **7.3** | **29.0** |
+
+**Reglas duras de la formula (numeradas):**
+
+1. **Nunca se suman stats crudos por copia.** Prohibido `stats.alcance * cantidad`, `alcance + 1 por copia` o cualquier variante: el unico insumo es `cantidad` y el unico producto es un **factor sobre el `poder` ya calculado**. Con 10 copias de una dorada de alcance 24 el alcance sigue siendo **24**, no 240 (eso romperia el cap 40 de seccion 3.6 regla 3 y el `poder` 160).
+2. **El multiplicador se aplica al RESULTADO de `poderCarta`, no a la base.** Asi el bono shiny y el de nivel (que ya existen, `lib/cartas-config.js:296-305`) se escalan con el mismo factor y **no hay que recalcular ni duplicar** esa logica. Ejemplo: si `poderCarta(stats, 5, 'shiny')` da **29.0**, con 10 copias da `29.0 * 1.45 = 42.05 ->` **42.1**. La formula no asume cuanto vale el bono.
+3. **Redondeo a 1 decimal**, hecho en el servidor. La UI **no** recalcula (Regla de No-Duplicidad / ADR-108 D9). Tolerancia de comparacion en los AC: **0.05**.
+4. **`cantidad` invalida degrada a 1** (`0`, negativa, `null`, texto, `NaN`): `factor = 1.00`, nunca `NaN` ni `Infinity`. Es el mismo criterio de degradacion que `statsNormalizados`.
+5. **`cantidad` > 99 se clampan a 99** antes del calculo (defensa en profundidad; en la practica se clampan a 10 por `CARTA_COPIAS_CAP`).
+6. **La copia no crea stat nueva.** No aparece `energia` (3.6, reservada) ni keys nuevas en `stats_json`.
+7. **Orden en el vector (no negociable):** el factor se aplica a los puntos de **cada carta-variante** -> despues el **MAX por variante** -> despues la **suma de cartas distintas** -> y **al final** el `LEAST(40)`. Multiplicar antes del MAX y sumar despues del cap son dos errores distintos: el primero infla cartas; el segundo multiplica el techo por el numero de cartas.
+
+### 12.2. Donde aplica y donde NO
+
+| Consumidor | Archivo:linea | Aplica copias | Contrato |
+|---|---|---|---|
+| `poder`/`poder_base` del **catalogo** (carta desnuda: **nivel 1, variante base, 1 copia**) | `api/usuarios.js:1129` | **NO** | Es el valor **de referencia del catalogo**, comparable entre cartas y por el que se paga: **poder base a nivel 1 con 1 copia** (factor 1.00), aunque el espectador tenga 40. Si escalara con las copias del que mira, dos usuarios verian poderes distintos para la misma carta y el precio dejaria de ser comparable. **No** se anade `poder_copias` aqui: el poder efectivo con copias se ve en **inventario** (`cartas_mias`) y **museo**. |
+| **`cartas_mias`** (inventario) | `api/usuarios.js:1244` (filtro), `:1304` | **SI** | `poder` = `poderConCopias(poderCarta(...), v.cantidad)` **por variante**, y se sigue tomando el **MAX** entre variantes (1365-1369). Se anade **aditivo** `poder_sin_copias` para que la UI muestre el par (`5.0` base, `6.0` con 5 copias). |
+| **Perfil publico / museo** | `api/usuarios.js:1551` | **SI** | Requiere anadir `uc.cantidad` al `SELECT` de `mpSqlCartas` (`:1482-1492`, **hoy NO lo selecciona**: solo `uc.variante`). Si el campo falta, **degradar a `cantidad = 1`** (factor 1.00) para no romper el reintento pre-066. |
+| **`vectorExpedicion`** | `lib/cartas-config.js:324-371` | **SI** | Ver 12.2.1: el factor se aplica a los puntos de **cada carta-variante** antes del MAX por variante y de la suma; el `LEAST(40)` por eje **no se mueve**. La firma `vectorExpedicion(filas)` **no cambia**: cada fila puede traer `cantidad`; ausente o invalida -> 1 (factor 1.00). |
+| **XP** (`xp_ledger`, `xp_ganado`, `carta_expedicion`, misiones) | - | **NO** | **Cero XP extra por copias.** Ninguna accion de `BONO_EXCLUIDAS` cambia. Comprar 10 copias cuesta **10 x `precio_xp`** (sin descuento por volumen: un descuento seria un arbitraje contra el mercado P2P). |
+| **Mercado P2P** (`carta_publicar`) | `api/interacciones.js:16200-16209` | **NO** | `precio_xp` es por **copia**, no por stack. El vendedor publica 1 unidad; la `cantidad` del vendedor no toca el precio ni la comision. |
+| **Tirada** (seccion 4.3) | - | **NO** | Las copias no aportan `fortuna` ni pesos. |
+
+#### 12.2.1. Como entran las copias en el vector sin romper el cap (decision del operador)
+
+**Decision (2026-11-11): las copias SI escalan el vector.** Si no lo tocaran, la regla de producto seria decorativa. Orden de operaciones, literal (el orden es la mitad del contrato):
+
+```
+puntos_carta[eje]   = s[eje] + (eje === s.primario ? bono_shiny + bono_nivel : 0)
+puntos_escalados    = puntos_carta[eje] * factor(cantidad)                 // 12.1
+puntos_variante[eje]= MAX(puntos_escalados) por (carta, variante)          // sin cambios
+vector[eje]         = LEAST(40, SUM sobre cartas DISTINTAS de puntos_variante[eje])
+poder               = alcance + oficio + fortuna + rendimiento del vector   // <= 160
+```
+
+| Carta | `cantidad` | Eje primario | Vector |
+|---|---|---|---|
+| Comun de `poder` 5 | 1 | 5.0 | **5.0** |
+| Comun de `poder` 5 | 5 | 6.0 | **6.0** |
+| Comun de `poder` 5 | 10 | 7.3 | **7.3** |
+| Dorada de `poder` 20 | 10 | 29.0 | **29.0** |
+| Dorada shiny nivel 5 (34.0) | 5 | 40.8 -> **40 (cap)** | **40** |
+| Dorada shiny nivel 5 (34.0) | 10 | 49.3 -> **40 (cap)** | **40** |
+
+**Reglas duras:**
+
+1. **El `LEAST(40)` va DESPUES de la suma**, nunca antes (mover el orden multiplicaria el techo por el numero de cartas).
+2. **El cap no se mueve:** ningun eje pasa de 40 y el `poder` de cuenta nunca pasa de **160**. Ninguna copia puede llevar un eje a 41.
+3. **Saturacion declarada y acotada:** la unica combinacion que satura un eje con **UNA** carta es `poderCarta = 34.0` (dorada + shiny + nivel 5) desde **5 copias** (`34 * 1.20 = 40.8`); una carta de `poder` 29.0 llega al cap con **9 copias** (`29 * 1.40 = 40.6`). Es una inversion de gama alta y el exceso se pierde **solo en ese eje**: las otras cartas siguen aportando a los otros tres. Se acepta como coste de la decision, no como defecto.
+4. **El MAX por variante es POR EJE y va DESPUES del factor**, nunca sobre el maximo de dos variantes: base y shiny de la misma carta siguen sin sumarse (12.0).
+5. **Redondeo:** 1 decimal por eje; el `vector` y el `poder` se redondean a 1 decimal **al final**, no se acumulan redondeos por carta.
+6. **Cero stats crudos:** sigue prohibido `stats.alcance * cantidad`; el factor actua sobre puntos ya calculados, nunca sobre `stats_json` (12.1 regla 1).
+
+**Derogado:** la version anterior de esta seccion (2026-11-11) excluia el vector y proponia un escape hatch de "+1 al primario cada 3 copias". **Ambas cosas se retiran**: no se implementan y no quedan como plan B.
+
+### 12.3. Tope por usuario y codigo de error
+
+| Item | Contrato |
+|---|---|
+| Constante | `CARTA_MAX_COPIAS = 99` (`lib/cartas-config.js`, exportada) |
+| Donde se valida | **Solo en el handler** del statement de acunacion (seccion 4.8). **Sin migracion**: no hay columna nueva, `cantidad` ya es `INTEGER` |
+| Codigo nuevo | **`CARTA_TOPE_COPIAS`** -> HTTP **409**, `data: { cantidad: 99, tope: 99 }` |
+| Precedencia de errores | `CARTA_NO_ACUNABLE` -> `CARTA_AGOTADA` -> **`CARTA_TOPE_COPIAS`** -> `XP_INSUFICIENTE` (gana el error mas cercano a la carta antes de tocar el saldo) |
+| Fail-closed | El guard va **dentro del mismo statement**: si no pasa, `0 filas`, **no se cobra y no se emite** (seccion 4.8 ya lo exige) |
+
+Guard en el CTE `ok_carta` (sustituye el bloque de `:386-393`):
+
+```
+ok_carta AS (
+  SELECT c.id, c.precio_xp, COALESCE(uc.cantidad,0) AS tiene
+    FROM cartas_catalogo c
+    LEFT JOIN usuarios_cartas uc
+      ON uc.usuario_id = $1::uuid AND uc.carta_id = c.id AND uc.variante = $3
+   WHERE c.id = $2 AND c.activo = true
+     AND c.familia NOT IN ('producto','consumible')
+     AND c.precio_xp IS NOT NULL
+     AND (c.supply_max IS NULL OR c.emitidas < c.supply_max)
+     AND COALESCE(uc.cantidad,0) < 99
+)
+```
+
+**Regla 3.2 (carrera).** `ON CONFLICT ... DO UPDATE SET cantidad = cantidad + 1` toma lock de fila, pero el guard se evalua en el snapshot del statement: dos peticiones simultaneas sobre 98 podrian pasar ambas. Se cierra **tambien** en el `ON CONFLICT`:
+
+```
+ON CONFLICT (usuario_id, carta_id, variante)
+DO UPDATE SET cantidad = usuarios_cartas.cantidad + 1, activo = true
+  WHERE usuarios_cartas.cantidad < 99
+RETURNING cantidad
+```
+
+Con `WHERE` en el `DO UPDATE`, si el gate cae en carrera `inv` devuelve **0 filas**, `led` no inserta y el resultado es fail-closed (`CARTA_TOPE_COPIAS`). **Ninguna migracion nueva menciona `usuarios_cartas`.**
+
+### 12.4. Cartas retiradas: el inventario no puede mentir (cierra el defecto de D-34)
+
+**Hecho medido:** `cartas_mias` (`api/usuarios.js:1244`) filtra `WHERE c.activo = true`. Una carta retirada **desaparece del inventario de quien la compro**, y su `poder` con ella. La prueba `car_artista_prueba` quedo `activo=false` al cerrar D-34: hoy **no se ve**, aunque el usuario la tenga y haya pagado XP.
+
+| Superficie | Filtro | Contrato |
+|---|---|---|
+| **`cartas_mias`** (`:1244`) | `c.activo = true` | **SUPERADO.** Pasa a `uc.activo = true AND uc.cantidad >= 1` (**sin** condicion sobre `c.activo`). Se devuelve `activa: c.activo === true` y `retirada: c.activo === false` como campos **aditivos**. `posee` y `cantidad` **intactos** (no se recalcula nada por estar retirada). |
+| **Catalogo / mercado** (`:1037`) | `c.activo = true` | **SIN CAMBIOS.** Una retirada no se puede acunar ni listar. |
+| **Conteos de coleccion** (`:1275-1304`) | `c.activo = true` | **Progreso: SOLO catalogo activo, en numerador Y denominador** (decision del operador): `poseidas_activas / total_activo`. Una carta retirada **no cuenta** para el progreso (no lo infla ni lo desinfla) y **no** puede producir >100%. Se anade **aditivo** `cartas_retiradas` (numero) al bloque de stats, fuera del progreso. |
+| **Perfil publico / museo** (`:1491`) | `c.activo = true` | **SIN CAMBIOS**: el museo es vitrina publica y no puede exponer una carta retirada. Si el usuario la tenia en museo, el slot deja de renderizarse pero **la copia no se pierde** (sigue en `usuarios_cartas`). |
+
+**Regla 4.1.** Retirar una carta **no borra nada** (ADR-003): ni fila, ni `cantidad`, ni nivel (`usuarios_cartas_nivel`). Solo cambia la visibilidad, y ahora cambia **a favor** del usuario.
+**Regla 4.2.** La retirada **conserva el multiplicador**: `poder` se sigue calculando con `cantidad` y con `poderCarta`. Lo unico que no ocurre es entrar en el catalogo.
+**Regla 4.3.** `car_artista_prueba` **no se reactiva**. Queda como **fixture permanente** del AC A41 (12.8).
+
+### 12.5. UI del catalogo: de "quitar el boton" a "Acunar otra"
+
+Hoy, con `posee=true`, el boton **se elimina** (`cartas-ui.js:668-673` en ficha y `:1423-1426` en tarjeta). Eso hace **imposible** comprar la segunda copia que esta seccion autoriza. Contrato de estados (**identico texto en ficha y tarjeta**, una sola funcion de render):
+
+| Estado | Condicion | Texto exacto | Boton |
+|---|---|---|---|
+| `nuevo` | `posee=false`, stock > 0, XP alcanza | `"Acunar"` | habilitado |
+| `repetir` | `posee=true`, `cantidad < 99`, stock > 0, XP alcanza | `"Tienes N"` + boton **`"Acunar otra"`** | habilitado |
+| `sin_stock` | `supply_max - emitidas <= 0` | `"Agotada"` | deshabilitado |
+| `sin_xp` | `XP_DISPONIBLE < precio_xp` | `"XP insuficiente"` + `"Cuesta 75 XP"` (precio real de la fila) | deshabilitado |
+| `tope` | `cantidad >= 99` | `"Tope: 99"` | deshabilitado |
+
+**Reglas (numeradas):**
+
+1. **El boton NUNCA se elimina del DOM** (ADR-003): se alternan `disabled` + `aria-disabled` y el texto. Los dos call-sites pasan a compartir el mismo helper; queda prohibido el `remove()`/`display:none` definitivo del boton.
+2. **Confirmacion de coste identica** a la actual (misma ruta, mismo modal), con una linea anadida: `"Ya tienes N. Acunar otra cuesta X XP."` donde `X` es `precio_xp` de **esa** fila (nunca el acumulado).
+3. **Respeta stock y XP por copia:** cada copia es una acunacion **independiente**, con su debito y su asiento. No hay "comprar N de golpe" en v1 (el statement de seccion 4.8 es de 1 unidad; un lote seria otro contrato).
+4. **Post-exito sin recarga:** `cantidad += 1`, `posee = true`, `emitidas += 1` (o resta de stock) y re-render de **ficha y tarjeta**. Si la respuesta trae `CARTA_TOPE_COPIAS`, pasar a estado `tope`; si `CARTA_AGOTADA`, a `sin_stock`; si `XP_INSUFICIENTE`, a `sin_xp`. **La UI no adivina**: usa el codigo de error del servidor.
+5. **Cero calculo de poder en cliente:** la UI pinta `poder`/`poder_sin_copias` tal como llegan (12.1 regla 3). `CARTA_COPIAS_BP`/`CARTA_COPIAS_CAP` **no** se duplican en `cartas-ui.js`.
+
+### 12.6. Museo y fusion
+
+| Caso | Contrato |
+|---|---|
+| **Museo con copias** | 1 slot por `(usuario, carta, variante)` (indice unico parcial de `060:228`, **sin cambios**). Las copias **no** consumen slots: 10 copias de la misma carta = **1 slot**. `cantidad` no se toca al entrar ni al salir del museo. |
+| **Copia 0 en museo** | Imposible por el filtro `uc.cantidad >= 1` (`:1491`). Si una fusion dejara `cantidad = 0`, el `UPDATE` de la fusion debe poner `en_museo = false, orden_museo = NULL` en la misma sentencia (invariante de vitrina, sin fila huerfana). |
+| **Fusion 4 base -> 1 shiny** | Consume **4 copias de la variante base** (`cantidad - 4`) y anade **+1** a la variante shiny. Guard `cantidad_base >= 4` ya necesario; la fusion **no** puede dejar `cantidad` negativa (CHECK/guard, fail-closed). |
+| **Interaccion con el multiplicador** | El factor es **por `(carta, variante)`** y se **recalcula desde las copias restantes**: tras fusionar, la base queda con `cantidad - 4` y su factor se recalcula (`cantidad 5 -> 1`: 6.0 -> 5.0 en el eje). El factor del stack consumido **NO se transfiere** al shiny: el shiny nace con `cantidad = 1` (factor 1.00) y **conserva su bono de variante propio** (shiny + nivel, `lib/cartas-config.js:296-305`). Es el precio de la fusion y es intencional (evita "fusionar para escalar"). |
+| **Fusion y retirada** | `carta_fusionar` opera sobre `usuarios_cartas`, no sobre el catalogo activo: una carta retirada **sigue siendo fusionable** si su `fusionable=true` (no lo decide `c.activo`). Se declara aqui para que no se "arregle" por accidente al tocar 12.4. |
+
+### 12.7. Contrato de calculo y call-sites
+
+**Decision: funcion NUEVA, firma vieja intacta.** `poderCarta(stats, nivel, variante)` **no cambia** (ni firma ni resultado); se anade una funcion pura y su export:
+
+```
+// lib/cartas-config.js, junto a poderCarta (:286) y exportada en :409
+function poderConCopias(poder, cantidad) {
+  var p = Number(poder);
+  if (!isFinite(p)) p = 0;
+  var c = parseInt(cantidad, 10);
+  if (!isFinite(c) || c < 1) c = 1;
+  if (c > CARTA_COPIAS_CAP + 1) c = CARTA_COPIAS_CAP + 1;
+  var bp = 100 + Math.min(c - 1, CARTA_COPIAS_CAP) * CARTA_COPIAS_BP;
+  return Math.round(p * bp / 10) / 10;
+}
+```
+
+*Por que no cambiar la firma:* `poderCarta` tiene **7 call-sites** entre `api/usuarios.js` (3), `scripts/smoke_cartas_economia.js` (5 llamadas en 3 asserts) y el export. Un cuarto parametro opcional seria retrocompatible, pero dejaria el escalado **dentro** de la funcion de poder "desnudo" y haria que un call-site olvidado devolviera poder sin copias **en silencio** (justo el fallo que ADR-006 persigue). Con funcion aparte, el escalado es **explicito en cada lector**. `vectorExpedicion` **no** puede usar `poderConCopias` porque reparte por eje: usa `factor()` directo sobre los puntos (12.2.1), con la misma constante.
+
+| Call-site | Cambio | Detalle |
+|---|---|---|
+| `lib/cartas-config.js:286-306` | **sin cambios** | `poderCarta` sigue igual |
+| `lib/cartas-config.js:409` | **+1 linea** | exportar `poderConCopias` (display) |
+| `lib/cartas-config.js:324-371` (`vectorExpedicion`) | **cambia** | aplicar `factor(fila.cantidad)` a los puntos de **cada carta-variante** antes del MAX por variante; `LEAST(40)` despues de la suma; `cantidad` ausente o invalida -> 1. **No** usa `poderConCopias`: trabaja **por eje**, no sobre un escalar ya sumado |
+| Lectura unica de expedicion (11.9.2, la que alimenta `vectorExpedicion`) | **cambia** | el `SELECT` debe traer **`uc.cantidad`** junto a `stats_json`, `variante` y el nivel. Sin esa columna el factor seria 1.00 **en silencio**: es exactamente el fallo a evitar |
+| `api/usuarios.js:1129` | **sin cambios** | catalogo: **poder base a nivel 1 con 1 copia** (factor 1.00), sin `poder_copias` (12.2) |
+| `api/usuarios.js:1367` | **cambia** | `poderConCopias(poderCarta(c.stats_json, cmNv, v.variante), v.cantidad)`; el MAX entre variantes (1368) se mantiene sobre el valor **ya escalado** |
+| `api/usuarios.js:1370` | **sin cambios** | fallback sin posesion = carta desnuda (`cantidad` 1 -> factor 1.00) |
+| `api/usuarios.js:1482-1492` (`mpSqlCartas`) | **cambia** | anadir **`uc.cantidad`** al `SELECT` (hoy solo trae `uc.variante`); sin esa columna el museo pinta poder de 1 copia |
+| `api/usuarios.js:1551` | **cambia** | `poderConCopias(poderCarta(...), c.cantidad o 1)` usando la columna del row anterior |
+| `api/usuarios.js:1244` | **cambia** | filtro de 12.4 (retiradas) |
+| `scripts/smoke_cartas_economia.js:254-261` | **+ asserts** | A37/A38 (12.8) |
+| `cartas-ui.js:668-673`, `:1423-1426` | **cambian** | helper unico de 12.5 |
+
+**Regla 7.1.** Un lector nuevo de poder **debe** pasar por `poderConCopias`; queda prohibido `poder * (1 + ...)` fuera de `lib/cartas-config.js` (fuente unica, ADR-108 D9).
+**Regla 7.2.** `poderConCopias` es **pura**: sin `Date`, sin `fetch`, sin BD, sin DOM (mismo contrato que `vectorExpedicion`).
+**Regla 7.3.** El `poder` **no se persiste** (3.5:239 sigue vigente). Cero columnas `poder`.
+**Regla 7.4.** El **catalogo** muestra poder **base a nivel 1 con 1 copia** y **no** se toca por copias: el poder efectivo con copias vive en `cartas_mias` y en museo, y en el `vector` del usuario.
+**Regla 7.5.** `factor()` es **una sola implementacion**, compartida por `poderConCopias` y `vectorExpedicion`. Duplicar `100 + min(...) * 5` en otro archivo es un fallo de revision.
+
+### 12.8. Criterios de aceptacion (A37-A44)
+
+- [ ] **A37. Formula y constantes.** `CARTA_COPIAS_BP === 5`, `CARTA_COPIAS_CAP === 9`, `CARTA_MAX_COPIAS === 99` exportadas desde `lib/cartas-config.js`; `poderConCopias(5,1)===5`, `poderConCopias(5,0)===5`, `poderConCopias(5,'x')===5`, `poderConCopias(5,-3)===5` (degradacion), `poderConCopias(5,500)===7.3` (clamp). Ningun valor devuelto es `NaN`.
+- [ ] **A38. Numeros exactos.** Tabla de 12.1 verificada con tolerancia 0.05: comun `5 -> {1:5.0, 2:5.3, 5:6.0, 10:7.3}`, dorada `20 -> {1:20.0, 2:21.0, 5:24.0, 10:29.0}`; `poderConCopias(29,10) === 42.1`; `poderConCopias(20,11) === poderConCopias(20,10)`. **Vector (12.2.1):** una comun con `cantidad=5` aporta **6.0** a su eje (no 5.0) y con `cantidad=1` aporta **5.0**; una dorada con `cantidad=10` aporta **29.0**; `factor` implementada **una sola vez** (`grep -c "100 + Math.min" lib/cartas-config.js` = 1).
+- [ ] **A39. Vector con copias y cap intacto.** `vectorExpedicion` escala por `cantidad` **y** sigue capado: dorada shiny nivel 5 (34.0) con `cantidad` 5 y 10 -> eje **exactamente 40** (nunca 40.8 ni 49.3); dos doradas distintas con `cantidad=10` en el mismo eje -> **40**, no 58; `LEAST` se aplica **despues** de la suma (mover el orden lo delata: 58 > 40); `poder` de cuenta **<= 160** en las 4 combinaciones; filas **sin** `cantidad` devuelven **identico** `{vector, poder}` que antes de esta seccion (compatibilidad); `vectorExpedicion` **lee** `cantidad` (`grep -c "cantidad"` en su rango > 0) y **no** usa `poderConCopias`.
+- [ ] **A40. Tope sin migracion.** `POST carta_acunar` sobre una fila con `cantidad = 99` devuelve **409 `CARTA_TOPE_COPIAS`**, `emitidas` **no** sube, `xp_gastado_sinks` **no** sube y `xp_ledger` **no** gana fila; sobre `cantidad = 98` sube a 99 y la siguiente falla; **ningun** archivo nuevo de `db/migrations/` menciona `usuarios_cartas` ni `cantidad` (7/7 funciones serverless intactas, cero endpoint nuevo).
+- [ ] **A41. Retirada visible (fixture `car_artista_prueba`).** Con `car_artista_prueba.activo = false` y una fila `usuarios_cartas` de ese usuario: `GET cartas_mias` **devuelve** la carta con `retirada=true`, `posee=true` y `cantidad` real; `GET` de catalogo **no** la lista; `cartas_retiradas >= 1` en los conteos; el `poder` devuelto es `poderConCopias(...)` y **no** 0. La carta **sigue** `activo=false` al terminar la prueba (no se reactiva).
+- [ ] **A42. UI en los dos call-sites.** Con `posee=true`: ni `:668-673` ni `:1423-1426` eliminan el nodo; ficha y tarjeta muestran `"Tienes N"` + `"Acunar otra"`; los 4 estados restantes (`sin_stock`, `sin_xp`, `tope`, `nuevo`) renderizan su texto exacto de 12.5; `grep -c "poderConCopias\|CARTA_COPIAS_BP" cartas-ui.js` = **0** (cero calculo en cliente).
+- [ ] **A43. Cero inflacion colateral y fusion que recalcula.** Tras 5 acunaciones de la misma carta: `cantidad` 1 -> 5, `xp_gastado_sinks` **+5 x `precio_xp`** exacto, `xp_total` **sin cambios**, `xp_ledger` con **5 filas** `carta_acunar` y **`xp_final = 0`** en las 5; `precio_xp` de la carta **identico** antes y despues; ningun `xp_ledger` con `accion` nueva. **Fusion:** con un stack base de `cantidad=5` (eje 6.0), fusionar 4 deja `cantidad_base = 1` y su eje **recalculado a 5.0** (factor 1.00), y `cantidad_shiny = +1` con factor 1.00 cuyo poder es **exactamente** `poderCarta(stats, nivel, 'shiny')` (bono de variante propio, sin factor heredado del stack).
+- [ ] **A44. Escudo y no-regresion.** `node --check lib/cartas-config.js`, `node --check api/usuarios.js` en verde; `scripts/smoke_cartas_economia.js` en verde (los asserts viejos de `poderCarta` **no** cambian de valor); esta seccion tiene **0 bytes > 127**; `exploraco desarrollo/*.md` **sin modificar** (R2); `prompt de compra` con `posee=true` **no** duplica el `xp_ledger` ni el debito (1 copia = 1 asiento).
+
+### 12.9. Plan de prueba (ejecutable, sin reactivar la carta de D-34)
+
+| Paso | Accion | Esperado |
+|---|---|---|
+| 1 | `SELECT id, precio_xp, familia, rareza FROM cartas_catalogo WHERE familia='cosmetica' AND activo=true ORDER BY precio_xp LIMIT 1` | **`cs_marco_01`, 75.00, comun** (seed 078, seccion 11.12.4). Se usa **esta** carta real de 75 XP |
+| 2 | `POST carta_acunar` x5 con un usuario de prueba con XP suficiente | `cantidad` 1..5; `poder` **5.0 -> 6.0**; `poder_sin_copias` constante en 5.0; el **eje primario del `vectorExpedicion`** del usuario sube **5.0 -> 6.0** |
+| 3 | `SELECT xp_gastado_sinks` antes/despues | **+375.00** (5 x 75); `xp_total` **igual**; `xp_ledger` 5 filas `carta_acunar`, `es_exento=true`, `xp_final=0` |
+| 4 | `SELECT emitidas` | **+5** (no +1, no +6) |
+| 5 | `UPDATE usuarios_cartas SET cantidad=99 WHERE ...` en el usuario de prueba; `POST carta_acunar` | **409 `CARTA_TOPE_COPIAS`**; `emitidas`, `xp_gastado_sinks` y `xp_ledger` **sin cambios**; `REVERT` a `cantidad` original |
+| 6 | `GET cartas_mias` con `car_artista_prueba` (`activo=false`) poseida | aparece con `retirada=true` y `cantidad` real (**A41**) |
+| 7 | `GET` catalogo con `posee=true` sobre `cs_marco_01` | `"Tienes 5"` + `"Acunar otra"` en ficha **y** tarjeta; sin `remove()` del nodo |
+| 8 | Fusion de 4 copias de una `fusionable` con `cantidad=5` | base 1 con eje **recalculado 6.0 -> 5.0**; shiny 1 con `poderCarta(stats,nivel,'shiny')` **exacto** (factor 1.00, sin herencia); `en_museo=false` si la base quedo en 0 |
+
+**Regla 9.1 (prohibicion expresa).** **NO** se reactiva `car_artista_prueba` para probar la compra repetida: quedaria un `UPDATE` de catalogo en produccion para un test. La compra repetida se prueba con una cosmetica **real** ya sembrada (`cs_marco_01`, 75 XP). `car_artista_prueba` se usa **solo en lectura**, como fixture de carta retirada (A41), que es exactamente el defecto que motivo esta seccion.
+**Regla 9.2.** Toda prueba que escriba en `usuarios_cartas` sobre un usuario de prueba **declara su revert** en el mismo script (idempotencia, ADR-003).
+
+### 12.10. Riesgos y deudas que esta seccion abre (sin ID, lo numera `@docs-keeper` en R2)
+
+| Riesgo | Contrato |
+|---|---|
+| **Compra en lote** | v1 solo permite 1 copia por statement. Un "comprar 5" es otro contrato (batch atomico), no una variante de este. |
+| **Saturacion de un eje** | Con copias en el vector, la dorada shiny nivel 5 satura su primario desde **5 copias** (`34 * 1.20 = 40.8`). Aceptado por decision del operador: el cap 40 es la red, el exceso se pierde **solo en ese eje** y el coste es de gama alta. Si se quisiera eliminar, seria bajar `CARTA_COPIAS_BP`, **no** mover el cap 40. |
+| **`cantidad` como palanca de mercado** | Publicar 1 copia no depende de tener 99. Queda prohibido cualquier "precio por stack". |
+| **Retirada + museo** | Un usuario con la carta retirada en museo pierde el slot visible pero **no** la copia (12.4). Si el operador quiere conservar el slot, es un cambio **de `:1491`**, no de 12.4, y exige su propio AC. |
+| **Doble autoridad de poder** | Se mantiene la prohibicion de persistir `poder` (3.5:239). Ninguna migracion nueva puede crear la columna. |

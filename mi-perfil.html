@@ -14,7 +14,7 @@
 <!-- T7 (ADR-039): Leaflet para el map-picker de localizacion del Museo -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="dictado-voz.css?v=1"/>
-<link rel="stylesheet" href="cartas-ui.css?v=10"/>
+<link rel="stylesheet" href="cartas-ui.css?v=11"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -746,6 +746,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-v61 .v61-card.r-dorado{border-top:3px solid var(--gold)}
 .pf-v61 .v61-card-n{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#fff}
 .pf-v61 .v61-meta{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px}
+/* 12.4: carta retirada del catalogo activo que el usuario si posee. */
+.pf-v61 .v61-retirada{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:1px 6px;border-radius:999px;border:1px solid rgba(255,155,138,.55);color:#FF9B8A;background:rgba(255,155,138,.1)}
 .pf-v61 .v61-rareza{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gold);background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.3);border-radius:999px;padding:1px 7px;align-self:flex-start}
 .pf-v61 .v61-qty{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--gold)}
 .pf-v61 .v61-btn{width:100%;padding:6px 8px;border-radius:6px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;background:transparent;border:1px solid rgba(255,74,0,.4);color:var(--gold);transition:background .15s}
@@ -7718,6 +7720,7 @@ function cargarCartas(uid) {
         html += '<div class="v61-card ' + v61RarezaClase(rareza) + '"' + v61FichaAttrs(id, vFicha, 'coleccion') + '>'
           + '<div class="c-card c-card--lg">' + slot + '</div>'
           + '<div class="v61-meta">Tienes <b class="v61-qty">' + cant + '</b></div>'
+          + (c.retirada === true ? '<span class="v61-retirada">Retirada</span>' : '')
           + varHtml
           + (ui ? ui.badgeEmisor(c.emisor_tipo, c.marca_nombre) : '')
           + acc
@@ -7728,6 +7731,7 @@ function cargarCartas(uid) {
         + '<div class="v61-card-n">' + esc(c.nombre || id) + '</div>'
         + '<span class="v61-rareza">' + esc(rareza) + (esGate ? (' \u00b7 gate ' + esc(c.nivel_gate)) : '') + '</span>'
         + '<div class="v61-meta">Tienes <b class="v61-qty">' + cant + '</b></div>'
+        + (c.retirada === true ? '<span class="v61-retirada">Retirada</span>' : '')
         + acc
         + '</div>';
     });
@@ -9281,7 +9285,7 @@ else if (PF_TAB_ACTIVO === 'inventario') {
 window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>
   <script src="usuario-session.js"></script>
-<script src="cartas-ui.js?v=10"></script>
+<script src="cartas-ui.js?v=11"></script>
 <script src="cartas-arte.js"></script>
   <script src="album-comments.js?v=2"></script>
   <script>

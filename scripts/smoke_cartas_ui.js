@@ -505,21 +505,27 @@ var cadenaAcunar = (function () {
   var sandbox = env.sandbox;
 
   /* Boton real del DOM minimo, con su caja y su aviso. */
-  function cajaAcunar() {
+  function cajaAcunar(extra) {
     var caja = Elemento('div');
     var msg = Elemento('span');
     msg.classList.add('c-acunar-msg');
+    var nota = Elemento('span');
+    nota.classList.add('c-acunar-nota');
     caja.querySelector = function (sel) {
-      return sel === '.c-acunar-msg' ? msg : null;
+      if (sel === '.c-acunar-msg') return msg;
+      if (sel === '.c-acunar-nota') return nota;
+      return null;
     };
     var btn = Elemento('button');
     btn.setAttribute('data-c-acunar', '1');
     btn.setAttribute('data-carta-id', 'ct_leyenda_01');
     btn.setAttribute('data-variante', 'base');
     btn.setAttribute('data-precio', '1500');
+    if (extra) { for (var k in extra) btn.setAttribute(k, extra[k]); }
     btn.innerHTML = 'Acunar';
+    caja.appendChild(nota);
     caja.appendChild(btn);
-    return { btn: btn, msg: msg };
+    return { btn: btn, msg: msg, nota: nota };
   }
 
   function conRespuesta(status, cuerpo, contador) {
@@ -574,8 +580,13 @@ var cadenaAcunar = (function () {
       'mientras envia el boton queda disabled con aria-busy');
     return ticks(8).then(function () {
       assert(contador.n === 1, 'el exito hace un solo POST');
-      assert(t.btn.disabled === true && t.btn.innerHTML === 'Acunada',
-        'tras acunar el boton queda deshabilitado: cero doble clic');
+      assert(t.btn.disabled === false && t.btn.innerHTML === 'Acunar otra',
+        'tras acunar el boton vuelve habilitado como "Acunar otra" (12.5)');
+      assert(t.btn.getAttribute('data-c-acunar-estado') === 'repetir'
+        && t.btn.getAttribute('aria-disabled') === 'false',
+        'tras acunar el estado pasa a repetir y no queda aria-disabled');
+      assert(t.nota.textContent === 'Tienes 3',
+        'tras acunar la nota dice "Tienes 3" sin recargar la pagina');
       assert(t.btn.getAttribute('aria-busy') === null,
         'tras acunar se retira aria-busy');
       assert(t.msg.textContent.indexOf('Copia acunada') >= 0
@@ -595,8 +606,9 @@ var cadenaAcunar = (function () {
     return ticks(8).then(function () {
       assert(t.msg.textContent.indexOf('No quedan copias') >= 0,
         'SIN_STOCK se explica en texto legible');
-      assert(t.btn.disabled === false && t.btn.innerHTML === 'Acunar',
-        'un error rehabilita el boton y restaura su texto');
+      assert(t.btn.disabled === true && t.btn.innerHTML === 'Agotada'
+        && t.btn.getAttribute('data-c-acunar-estado') === 'sin_stock',
+        'SIN_STOCK deja el boton en estado Agotada, deshabilitado');
       assert(t.msg.classList.contains('is-error'), 'el error se marca como error');
     });
   });
@@ -637,6 +649,37 @@ var cadenaAcunar = (function () {
         'CARTA_NO_COMPRABLE se explica en texto legible');
       assert(t.msg.textContent.indexOf('{') < 0 && t.msg.textContent.indexOf('undefined') < 0,
         'el mensaje de error no vuelca JSON crudo ni undefined');
+    });
+  });
+
+  /* 12.5 regla 2: repetir dice cuantas tiene y cuanto cuesta la OTRA. */
+  cadena = cadena.then(function () {
+    var t = cajaAcunar({ 'data-cantidad': '2' });
+    var contador = { n: 0 };
+    var pregunta = '';
+    env.win.confirm = function (txt) { pregunta = txt; return false; };
+    sandbox.fetch = function () {
+      contador.n++;
+      return Promise.reject(new Error('sin red'));
+    };
+    UI.acunarDesdeBoton(t.btn);
+    assert(pregunta.indexOf('Ya tienes 2. Acunar otra cuesta 1.500 XP') >= 0,
+      'la confirmacion de la copia extra dice cuantas tiene y el coste de esa copia');
+    assert(contador.n === 0, 'cancelar la copia extra tampoco llama a fetch');
+  });
+
+  cadena = cadena.then(function () {
+    var t = cajaAcunar();
+    var contador = { n: 0 };
+    env.win.confirm = function () { return true; };
+    conRespuesta(409, { ok: false, error: 'CARTA_TOPE_COPIAS', data: { cantidad: 99, tope: 99 } }, contador);
+    UI.acunarDesdeBoton(t.btn);
+    return ticks(8).then(function () {
+      assert(t.msg.textContent.indexOf('maximo de 99 copias') >= 0,
+        'CARTA_TOPE_COPIAS se explica en texto legible');
+      assert(t.btn.innerHTML === 'Tope: 99' && t.btn.disabled === true
+        && t.btn.getAttribute('data-c-acunar-estado') === 'tope',
+        'CARTA_TOPE_COPIAS deja el boton en "Tope: 99" deshabilitado');
     });
   });
 
@@ -698,15 +741,59 @@ function cartaCatalogo() {
   var agotada = cartaCatalogo();
   agotada.restantes = 0;
   var htmlAg = UI.catalogoCartaHtml(agotada);
-  assert(htmlAg.indexOf('>Agotada</span>') >= 0 && htmlAg.indexOf('data-c-acunar') < 0,
-    'restantes 0 se pinta como Agotada y sin boton');
+  assert(htmlAg.indexOf('>Agotada</button>') >= 0
+    && htmlAg.indexOf('data-c-acunar-estado="sin_stock"') >= 0
+    && htmlAg.indexOf('disabled') >= 0,
+    'restantes 0 se pinta como Agotada deshabilitada (12.5)');
+  assert(veces(htmlAg, 'data-c-acunar=') === 1,
+    'la tarjeta agotada CONSERVA el boton en el DOM (ADR-003)');
 
   var mia = cartaCatalogo();
   mia.posee = true;
   mia.cantidad = 2;
   var htmlMia = UI.catalogoCartaHtml(mia);
-  assert(htmlMia.indexOf('Ya la tienes <b>2</b>') >= 0 && htmlMia.indexOf('data-c-acunar') < 0,
-    'una carta que ya es tuya dice "Ya la tienes" y NUNCA ofrece Acunar');
+  assert(htmlMia.indexOf('Tienes 2') >= 0
+    && htmlMia.indexOf('>Acunar otra</button>') >= 0,
+    'una carta que ya es tuya dice "Tienes 2" y ofrece "Acunar otra"');
+  assert(htmlMia.indexOf('data-c-acunar-estado="repetir"') >= 0
+    && htmlMia.indexOf('data-cantidad="2"') >= 0
+    && htmlMia.indexOf('aria-disabled="false"') >= 0,
+    'el estado repetir llega habilitado y con la cantidad de la fila');
+
+  /* 12.5 regla 5: el poder se pinta TAL CUAL, nunca escalado en cliente. */
+  var copias = cartaCatalogo();
+  copias.posee = true;
+  copias.cantidad = 5;
+  copias.poder = 31;
+  var htmlCopias = UI.catalogoCartaHtml(copias);
+  assert(htmlCopias.indexOf('<b>31</b> poder') >= 0
+    && htmlCopias.indexOf('<b>3</b>') < 0,
+    'con 5 copias el poder se pinta sin multiplicar: cero calculo en cliente');
+
+  var tope = cartaCatalogo();
+  tope.posee = true;
+  tope.cantidad = 99;
+  assert(UI.catalogoCartaHtml(tope).indexOf('>Tope: 99</button>') >= 0,
+    'cantidad 99 se pinta como "Tope: 99"');
+
+  var sinXp = cartaCatalogo();
+  sinXp.xp_disponible = 100;
+  var htmlXp = UI.catalogoCartaHtml(sinXp);
+  assert(htmlXp.indexOf('>XP insuficiente') >= 0
+    && htmlXp.indexOf('Cuesta 2.400 XP') >= 0,
+    'con saldo insuficiente en la fila se pinta "XP insuficiente" y su coste');
+
+  /* Sin el dato de saldo NO se inventa el estado: sigue ofreciendo Acunar. */
+  var sinDato = cartaCatalogo();
+  assert(UI.catalogoCartaHtml(sinDato).indexOf('XP insuficiente') < 0,
+    'sin xp_disponible en la fila no se inventa "XP insuficiente"');
+
+  assert(UI.acunarEstadoDe(mia, 2400) === 'repetir'
+    && UI.acunarEstadoDe(tope, 2400) === 'tope'
+    && UI.acunarEstadoDe(sinXp, 2400) === 'sin_xp'
+    && UI.acunarEstadoDe(agotada, 2400) === 'sin_stock'
+    && UI.acunarEstadoDe(libre, 2400) === 'nuevo',
+    'acunarEstadoDe clasifica los 5 estados del contrato 12.5');
 
   var abierta = cartaCatalogo();
   abierta.edicion = null;
@@ -941,8 +1028,10 @@ var cadenaFichaCatalogo = (function () {
       'la ficha del catalogo tiene UN solo boton Acunar');
     assert(html.indexOf('data-c-subir-nivel') < 0,
       'sin copia propia la ficha no ofrece subir nivel');
-    assert(html.indexOf('Ya la tienes') < 0,
-      'sin copia propia no se anuncia "Ya la tienes"');
+    assert(html.indexOf('c-acunar-nota') < 0,
+      'sin copia propia la ficha no anuncia "Tienes N"');
+    assert(html.indexOf('aria-disabled="false"') >= 0,
+      'sin copia propia el boton nace habilitado y con aria-disabled false');
     assert(html.indexOf('Disponible: 0') < 0,
       'sin copia propia la ficha no inventa una cantidad');
   });
@@ -975,10 +1064,14 @@ var cadenaFichaCatalogo = (function () {
     var ctrl = { host: Elemento('div'), estado: { filas: [mia] } };
     UI.catalogoAbrirFicha(ctrl, 'ct_lugar_07', null);
     var html = fichaActual(env);
-    assert(html.indexOf('Ya la tienes') >= 0,
-      'con copia propia la ficha dice "Ya la tienes"');
-    assert(html.indexOf('data-c-acunar') < 0,
-      'con copia propia no se repite el boton Acunar');
+    assert(html.indexOf('Tienes 2') >= 0 && html.indexOf('>Acunar otra</button>') >= 0,
+      'con copia propia la ficha dice "Tienes 2" y ofrece "Acunar otra" (12.5)');
+    assert(html.indexOf('id="c-acunar-btn"') >= 0
+      && html.indexOf('data-c-acunar-estado="repetir"') >= 0
+      && html.indexOf('data-cantidad="2"') >= 0,
+      'la ficha conserva el boton con su id y pasa al estado repetir');
+    assert(html.indexOf('c-acunar-nota') >= 0,
+      'la ficha pinta la nota "Tienes N" del helper compartido');
     assert(html.indexOf('data-c-subir-nivel') >= 0 && html.indexOf('Subir a nivel 4') >= 0,
       'con copia propia y nivel < 5 se ofrece subir de nivel');
     assert(html.indexOf('Cantidad en tu coleccion: 2') >= 0,
@@ -1564,7 +1657,26 @@ var cadenaExpediciones = (function () {
 var cadenaMercadoCatalogo = (function () {
   var comunidad = fs.readFileSync(path.join(ROOT, 'comunidad.html'), 'utf8');
   var perfil = fs.readFileSync(path.join(ROOT, 'mi-perfil.html'), 'utf8');
+  var perfilPub = fs.readFileSync(path.join(ROOT, 'perfil.html'), 'utf8');
   var cadena = Promise.resolve();
+
+  cadena = cadena.then(function () {
+    /* 12.5: el JS y el CSS nuevos se sirven con la misma version (cache). */
+    assert(comunidad.indexOf('cartas-ui.js?v=11') >= 0
+      && perfil.indexOf('cartas-ui.js?v=11') >= 0
+      && perfilPub.indexOf('cartas-ui.js?v=11') >= 0,
+      'las 3 paginas cargan cartas-ui.js?v=11');
+    assert(comunidad.indexOf('cartas-ui.css?v=11') >= 0
+      && perfil.indexOf('cartas-ui.css?v=11') >= 0
+      && perfilPub.indexOf('cartas-ui.css?v=11') >= 0,
+      'las 3 paginas cargan cartas-ui.css?v=11');
+    /* 12.4: el inventario no puede mentir sobre una carta retirada. */
+    assert(perfil.indexOf('c.retirada === true') >= 0
+      && perfil.indexOf('v61-retirada') >= 0,
+      'mi-perfil.html marca "Retirada" la carta poseida fuera del catalogo activo');
+    assert(perfil.indexOf('Ya la tienes') < 0,
+      'mi-perfil.html no anuncia "Ya la tienes" en el inventario');
+  });
 
   cadena = cadena.then(function () {
     assert(veces(comunidad, 'id="catalogo-panel"') === 1

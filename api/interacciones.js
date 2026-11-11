@@ -17721,27 +17721,33 @@ module.exports = async function handler(req, res) {
           ccoRes = await sql(
             'WITH cat AS ('
             + ' SELECT c.id, c.precio_xp, c.emitidas, c.supply_max,'
+            + '  COALESCE(uc.cantidad,0) AS cantidad_actual,'
             + '  (c.precio_xp IS NOT NULL AND c.precio_xp > 0'
             + '   AND c.familia NOT IN (SELECT jsonb_array_elements_text($4::jsonb))) AS comprable,'
             + '  (c.supply_max IS NULL OR c.emitidas < c.supply_max) AS stock_ok,'
             + '  (c.media_id IS NULL OR EXISTS (SELECT 1 FROM cartas_media m'
             + '   WHERE m.id=c.media_id AND m.estado_moderacion=\'aprobada\''
-            + '   AND m.activo=true)) AS media_ok'
-            + ' FROM cartas_catalogo c WHERE c.id=$2 AND c.activo=true LIMIT 1'
+            + '   AND m.activo=true)) AS media_ok,'
+            // Spec 12.3: tope de copias por (usuario, carta, variante). El
+            // guard va DENTRO del statement: si no pasa, ok_carta queda vacio
+            // y NADA se cobra ni se emite (fail-closed).
+            + '  (COALESCE(uc.cantidad,0) < ' + String(CartasConfig.CARTA_MAX_COPIAS) + ') AS tope_ok'
+            + ' FROM cartas_catalogo c'
+            + ' LEFT JOIN usuarios_cartas uc'
+            + '  ON uc.usuario_id=$1::uuid AND uc.carta_id=c.id AND uc.variante=$3'
+            + ' WHERE c.id=$2 AND c.activo=true LIMIT 1'
             + '), ok_carta AS ('
-            + ' SELECT * FROM cat WHERE comprable AND stock_ok AND media_ok'
+            + ' SELECT * FROM cat WHERE comprable AND stock_ok AND media_ok AND tope_ok'
             + '), ok_saldo AS ('
             + ' SELECT u.id FROM usuarios u, ok_carta k'
             + '  WHERE u.id=$1::uuid AND u.xp_total >= k.precio_xp'
             + '  AND GREATEST(u.xp_total - COALESCE(u.xp_gastado_sinks,0),0) >= k.precio_xp'
-            + '), deb AS ('
-            + ' UPDATE usuarios u SET xp_gastado_sinks = COALESCE(u.xp_gastado_sinks,0)'
-            + '  + (SELECT precio_xp FROM ok_carta)'
-            + '  WHERE u.id=$1::uuid AND EXISTS (SELECT 1 FROM ok_saldo)'
-            + ' RETURNING u.xp_total, u.xp_gastado_sinks'
+            // Orden 12.3: el cobro del sink va DESPUES de la copia. Con el
+            // cobro antes, una carrera en el tope (98 -> 99 entre el snapshot
+            // y el ON CONFLICT) dejaba XP cobrada sin copia.
             + '), emit AS ('
             + ' UPDATE cartas_catalogo c SET emitidas = c.emitidas + 1'
-            + '  WHERE c.id=$2 AND EXISTS (SELECT 1 FROM deb)'
+            + '  WHERE c.id=$2 AND EXISTS (SELECT 1 FROM ok_saldo)'
             + '  AND (c.supply_max IS NULL OR c.emitidas < c.supply_max)'
             + ' RETURNING c.emitidas'
             + '), inv AS ('
@@ -17749,7 +17755,13 @@ module.exports = async function handler(req, res) {
             + ' SELECT $1::uuid, $2, $3, 1, true, NOW() FROM emit LIMIT 1'
             + ' ON CONFLICT (usuario_id, carta_id, variante) DO UPDATE SET'
             + '  cantidad = usuarios_cartas.cantidad + 1, activo = true, obtenida_en = NOW()'
+            + ' WHERE usuarios_cartas.cantidad < ' + String(CartasConfig.CARTA_MAX_COPIAS)
             + ' RETURNING cantidad'
+            + '), deb AS ('
+            + ' UPDATE usuarios u SET xp_gastado_sinks = COALESCE(u.xp_gastado_sinks,0)'
+            + '  + (SELECT precio_xp FROM ok_carta)'
+            + '  WHERE u.id=$1::uuid AND EXISTS (SELECT 1 FROM inv)'
+            + ' RETURNING u.xp_total, u.xp_gastado_sinks'
             + '), nvl AS ('
             + ' INSERT INTO usuarios_cartas_nivel (usuario_id, carta_id, nivel, xp_invertido)'
             + ' SELECT $1::uuid, $2, 1, 0 WHERE EXISTS (SELECT 1 FROM inv)'
@@ -17761,13 +17773,16 @@ module.exports = async function handler(req, res) {
             + '  jsonb_build_object(\'carta_id\',$2,\'variante\',$3,'
             + '   \'emitidas\',(SELECT emitidas FROM emit),'
             + '   \'precio_xp\',(SELECT precio_xp FROM ok_carta))'
-            + ' WHERE EXISTS (SELECT 1 FROM inv)'
+            + ' WHERE EXISTS (SELECT 1 FROM deb)'
             + ' RETURNING id'
             + ')'
             + ' SELECT (SELECT COUNT(*)::int FROM cat) AS carta_n,'
             + ' COALESCE((SELECT comprable FROM cat), false) AS comprable,'
             + ' COALESCE((SELECT stock_ok FROM cat), false) AS stock_ok,'
             + ' COALESCE((SELECT media_ok FROM cat), true) AS media_ok,'
+            + ' COALESCE((SELECT tope_ok FROM cat), true) AS tope_ok,'
+            + ' (SELECT COUNT(*)::int FROM emit) AS emit_n,'
+            + ' (SELECT COUNT(*)::int FROM inv) AS inv_n,'
             + ' (SELECT emitidas FROM emit) AS emitidas,'
             + ' (SELECT cantidad FROM inv) AS cantidad,'
             + ' (SELECT nivel FROM usuarios_cartas_nivel'
@@ -17798,11 +17813,37 @@ module.exports = async function handler(req, res) {
           return res.status(409).json({
             ok: false, error: 'MEDIA_NO_APROBADA', carta_id: ccoCarta
           });
-        if (ccoR.cantidad === null || ccoR.cantidad === undefined)
+        // Spec 12.3: precedencia CARTA_NO_ACUNABLE -> CARTA_AGOTADA ->
+        // CARTA_TOPE_COPIAS -> XP_INSUFICIENTE. El tope se evalua antes del
+        // saldo y NUNCA cobra (ok_carta vacio => sin debito ni emision).
+        if (ccoR.tope_ok !== true)
+          return res.status(409).json({
+            ok: false, error: 'CARTA_TOPE_COPIAS', carta_id: ccoCarta,
+            data: {
+              cantidad: CartasConfig.CARTA_MAX_COPIAS,
+              tope: CartasConfig.CARTA_MAX_COPIAS
+            }
+          });
+        if (ccoR.cantidad === null || ccoR.cantidad === undefined) {
+          // Carreras: el stock real se revalida en emit y el tope en el
+          // ON CONFLICT ... DO UPDATE ... WHERE. Si cualquiera de los dos
+          // devuelve 0 filas, no hay copia: se informa el motivo real y el
+          // cobro (que va DESPUES) no ha ocurrido.
+          if (Number(ccoR.emit_n) !== 1)
+            return res.status(409).json({ ok: false, error: 'SIN_STOCK', carta_id: ccoCarta });
+          if (Number(ccoR.inv_n) !== 1)
+            return res.status(409).json({
+              ok: false, error: 'CARTA_TOPE_COPIAS', carta_id: ccoCarta,
+              data: {
+                cantidad: CartasConfig.CARTA_MAX_COPIAS,
+                tope: CartasConfig.CARTA_MAX_COPIAS
+              }
+            });
           return res.status(400).json({
             ok: false, error: 'PUNTOS_INSUFICIENTES', carta_id: ccoCarta,
             xp_disponible: red2(numXp(ccoR.xp_disponible))
           });
+        }
         var ccoDisp = numXp(ccoR.xp_total) - numXp(ccoR.xp_gastado_sinks);
         return res.status(200).json({
           ok: true,

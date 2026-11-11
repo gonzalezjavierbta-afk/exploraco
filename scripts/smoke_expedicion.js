@@ -243,6 +243,36 @@ function partePura(api, Cartas) {
   check('A8 LEAST sobre la SUMA: 3 doradas base -> alcance 40 (42 recortado)',
     tres.vector.alcance === 40, 'alcance=' + tres.vector.alcance);
 
+  // Spec 12.2.1: las copias escalan los puntos de CADA carta ANTES del MAX por
+  // variante y de la suma; el LEAST(40) sigue DESPUES de la suma.
+  var comun = { alcance: 5, primario: 'alcance' };
+  var c1 = Cartas.vectorExpedicion([
+    { carta_id: 'ct_comun_01', cantidad: 1, stats_json: comun },
+  ]);
+  var c5 = Cartas.vectorExpedicion([
+    { carta_id: 'ct_comun_01', cantidad: 5, stats_json: comun },
+  ]);
+  check('S12 vector: comun de poder 5 con 1 copia aporta 5.0 y con 5 copias 6.0',
+    c1.vector.alcance === 5 && c5.vector.alcance === 6,
+    'n1=' + c1.vector.alcance + ' n5=' + c5.vector.alcance);
+
+  var c10 = Cartas.vectorExpedicion([
+    { carta_id: 'ct_comun_01', cantidad: 10, stats_json: comun },
+  ]);
+  check('S12 vector: 10 copias aportan 7.3 (factor 1.45, 1 decimal)',
+    c10.vector.alcance === 7.3, 'n10=' + c10.vector.alcance);
+
+  var dos10 = Cartas.vectorExpedicion([
+    { carta_id: 'ct_leyenda_01', cantidad: 10, stats_json: dorada },
+    { carta_id: 'ct_leyenda_02', cantidad: 10, stats_json: dorada },
+  ]);
+  var una10 = Cartas.vectorExpedicion([
+    { carta_id: 'ct_leyenda_01', cantidad: 10, stats_json: dorada },
+  ]);
+  check('S12 vector: cap 40 DESPUES de la suma (2 doradas n10 -> 40, no 40.6) y 1 sola da 20.3',
+    dos10.vector.alcance === 40 && una10.vector.alcance === 20.3,
+    'dos=' + dos10.vector.alcance + ' una=' + una10.vector.alcance);
+
   check('A3 BONO_EXCLUIDAS: carta_expedicion no recibe bono global (accionConBono false)',
     api.accionConBono('carta_expedicion') === false);
 

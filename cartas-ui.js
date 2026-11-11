@@ -632,12 +632,90 @@
     return p;
   }
 
-  /* Tirada cerrada y sin copias: el boton se pinta, pero agotado. */
-  function fichaAgotada(carta) {
-    var supply = safeNum(carta && carta.supply_max, null);
-    if (supply === null) return false;
-    var emitidas = safeNum(carta && carta.emitidas, 0);
-    return emitidas >= supply;
+  /* --- 12.5: copias multiples. UNA sola funcion de render ------------- */
+  /* Espejo de CARTA_MAX_COPIAS (lib/cartas-config.js): SOLO decide el estado
+     "tope" y su texto. Prohibido usarlo para calcular poder (12.5 regla 5). */
+  var ACUNAR_TOPE_COPIAS = 99;
+  /* Texto exacto del contrato 12.5, identico en ficha y tarjeta. */
+  var ACUNAR_TXT = {
+    nuevo: 'Acunar',
+    repetir: 'Acunar otra',
+    sin_stock: 'Agotada',
+    sin_xp: 'XP insuficiente',
+    tope: 'Tope: 99'
+  };
+
+  /* Estado de acunacion de una fila. Precedencia = la del servidor (12.3):
+     agotada -> tope -> xp. Un dato que no viene NO se inventa: nuevo/repetir. */
+  function acunarEstadoDe(carta, precio) {
+    var rest = safeNum(carta && carta.restantes, null);
+    if (rest === null && safeNum(carta && carta.supply_max, null) !== null) {
+      rest = safeNum(carta.supply_max, 0) - safeNum(carta.emitidas, 0);
+    }
+    if (rest !== null && rest <= 0) return 'sin_stock';
+    if (safeNum(carta && carta.cantidad, 0) >= ACUNAR_TOPE_COPIAS) return 'tope';
+    var xp = safeNum(carta && carta.xp_disponible, null);
+    var p = safeNum(precio, null);
+    if (xp !== null && p !== null && p > 0 && xp < p) return 'sin_xp';
+    return catalogoEstadoCarta(carta) === 'posee' ? 'repetir' : 'nuevo';
+  }
+
+  /* Etiquetas de un estado explicito (tambien vale para el error del POST). */
+  function acunarLabel(estado, cantidad, precio) {
+    var est = ACUNAR_TXT[estado] ? estado : 'nuevo';
+    var n = safeNum(cantidad, null);
+    var p = safeNum(precio, null);
+    var costo = miles(p === null ? 0 : p) + ' XP';
+    var out = {
+      estado: est,
+      texto: ACUNAR_TXT[est],
+      xp: '',
+      nota: '',
+      disabled: est === 'sin_stock' || est === 'sin_xp' || est === 'tope'
+    };
+    if (est === 'nuevo') out.xp = costo;
+    if (est === 'repetir') out.nota = 'Tienes ' + miles(n !== null && n > 0 ? n : 1);
+    if (est === 'sin_xp') out.xp = 'Cuesta ' + costo;
+    return out;
+  }
+
+  /* Boton para un estado explicito. 12.5 regla 1: NUNCA sale del DOM. */
+  function acunarBotonInner(carta, precio, estado, opts) {
+    var o = opts || {};
+    var l = acunarLabel(estado, carta && carta.cantidad, precio);
+    var n = safeNum(carta && carta.cantidad, null);
+    return {
+      estado: l.estado,
+      nota: l.nota,
+      html: '<button type="button" class="' + (o.claseBoton || 'c-acunar-btn') + '"'
+        + ' data-c-acunar="1"' + (o.idBoton ? ' id="' + esc(o.idBoton) + '"' : '')
+        + ' aria-disabled="' + (l.disabled ? 'true' : 'false') + '"'
+        + ' data-c-acunar-estado="' + l.estado + '"'
+        + ' data-carta-id="' + esc(fichaCampo(carta, ['id', 'carta_id'])) + '"'
+        + ' data-variante="' + esc(o.variante || 'base') + '"'
+        + ' data-precio="' + esc(safeNum(precio, 0)) + '"'
+        + (n !== null ? ' data-cantidad="' + esc(n) + '"' : '')
+        + (l.disabled ? ' disabled' : '') + '>'
+        + esc(l.texto)
+        + (l.xp ? '<span class="c-acunar-xp">' + esc(l.xp) + '</span>' : '')
+        + '</button>'
+    };
+  }
+
+  /* Caja completa (nota + boton + aviso). Los dos call-sites usan ESTA. */
+  function acunarBotonHtml(carta, precio, opts) {
+    var o = opts || {};
+    if (!fichaTexto(fichaCampo(carta, ['id', 'carta_id']))) return '';
+    var b = acunarBotonInner(carta, precio, acunarEstadoDe(carta, precio), o);
+    return '<div class="' + (o.clase || 'c-acunar') + '"'
+      + (o.cajaId ? ' id="' + esc(o.cajaId) + '"' : '')
+      + ' data-c-acunar-caja="' + b.estado + '">'
+      + (o.nota && b.nota
+        ? '<span class="' + (o.notaClase || 'c-acunar-nota') + '">' + esc(b.nota) + '</span>'
+        : '')
+      + b.html
+      + '<span class="c-acunar-msg" role="status" aria-live="polite"></span>'
+      + '</div>';
   }
 
   /* Boton de acunar, junto al precio en XP del bloque de detalle. */
@@ -646,33 +724,34 @@
     if (contexto === 'vitrina-publica') return '';
     var precio = fichaAcunable(carta);
     if (precio === null) return '';
-    var id = fichaTexto(fichaCampo(carta, ['id', 'carta_id']));
-    var agotada = fichaAgotada(carta);
-    var etiqueta = agotada
-      ? 'Agotada'
-      : 'Acunar<span class="c-acunar-xp">' + esc(miles(precio)) + ' XP</span>';
-    return '<div class="c-acunar" id="c-acunar">'
-      + '<button type="button" class="c-acunar-btn" id="c-acunar-btn" data-c-acunar="1"'
-      + ' data-carta-id="' + esc(id) + '" data-variante="' + esc(variante) + '"'
-      + ' data-precio="' + esc(precio) + '"' + (agotada ? ' disabled' : '') + '>'
-      + etiqueta + '</button>'
-      + '<span class="c-acunar-msg" role="status" aria-live="polite"></span>'
-      + '</div>';
+    return acunarBotonHtml(carta, precio, {
+      cajaId: 'c-acunar',
+      idBoton: 'c-acunar-btn',
+      variante: variante,
+      nota: true
+    });
   }
 
   /* --- Ficha desde el catalogo (D-28): lectura, UNA sola accion ------ */
-  /* Sin copia propia: un unico "Acunar" (el handler de siempre, con su
-     confirmacion de coste). Con copia propia: "Ya la tienes" y la subida
-     de nivel que ya existe, con los datos que traiga la fila. */
+  /* 12.5: con copia propia ya NO se quita el boton. La ficha pasa a
+     "Tienes N" + "Acunar otra" (misma confirmacion de coste) y mantiene la
+     subida de nivel, que sigue siendo la unica accion de la coleccion. */
   function fichaCatalogo(carta, variante) {
-    if (catalogoEstadoCarta(carta) === 'posee') {
-      return {
-        nota: '<div class="c-ficha-posee">Ya la tienes</div>',
-        acunar: '',
-        nivel: fichaSubirNivel(carta, 'coleccion', variante)
-      };
+    var posee = catalogoEstadoCarta(carta) === 'posee';
+    var acunar = fichaAcunar(carta, 'catalogo', variante);
+    var nota = '';
+    /* Poseida y no acunable (sin precio o familia de producto): la
+       pertenencia se dice igual, sin inventar un boton. */
+    if (posee && !acunar) {
+      var cant = safeNum(carta && carta.cantidad, null);
+      nota = '<div class="c-ficha-posee">Tienes'
+        + (cant !== null ? ' <b>' + esc(miles(cant)) + '</b>' : '') + '</div>';
     }
-    return { nota: '', acunar: fichaAcunar(carta, 'catalogo', variante), nivel: '' };
+    return {
+      nota: nota,
+      acunar: acunar,
+      nivel: posee ? fichaSubirNivel(carta, 'coleccion', variante) : ''
+    };
   }
 
   /* --- POST de subida de nivel: NUNCA rechaza, siempre resuelve -------- */
@@ -813,6 +892,9 @@
     if (code === 'PUNTOS_INSUFICIENTES') return 'XP insuficiente para acunar esta carta.';
     if (code === 'SESION_REQUERIDA') return 'Inicia sesion para acunar esta carta.';
     if (code === 'SERVIDOR') return 'No se pudo acunar la carta. Intenta de nuevo.';
+    /* 12.3: el tope de copias por usuario lo dicta el servidor. */
+    if (code === 'CARTA_TOPE_COPIAS') return 'Ya tienes el maximo de 99 copias de esta carta.';
+    if (code === 'CARTA_AGOTADA') return 'No quedan copias de esta carta.';
     return NIVEL_ERRORES[code] || 'No se pudo acunar la carta. Intenta de nuevo.';
   }
 
@@ -850,6 +932,44 @@
     });
   }
 
+  /* Codigos del POST que fijan un estado de la tarjeta (12.5 regla 4). */
+  var ACUNAR_ESTADO_ERROR = {
+    CARTA_TOPE_COPIAS: 'tope',
+    CARTA_AGOTADA: 'sin_stock',
+    SIN_STOCK: 'sin_stock',
+    PUNTOS_INSUFICIENTES: 'sin_xp'
+  };
+
+  /* Refleja en el DOM un estado ya decidido (exito o error del servidor).
+     Reutiliza acunarLabel: cero copia de los textos del contrato. */
+  function acunarPintarEstado(btn, estado, cantidad, precio) {
+    if (!btn) return;
+    var l = acunarLabel(estado, cantidad, precio);
+    var caja = btn.parentNode;
+    btn.setAttribute('data-c-acunar-estado', l.estado);
+    btn.setAttribute('aria-disabled', l.disabled ? 'true' : 'false');
+    if (l.disabled) btn.setAttribute('disabled', 'disabled');
+    else btn.removeAttribute('disabled');
+    btn.disabled = l.disabled;
+    btn.innerHTML = esc(l.texto)
+      + (l.xp ? '<span class="c-acunar-xp">' + esc(l.xp) + '</span>' : '');
+    if (!caja || typeof caja.setAttribute !== 'function') return;
+    caja.setAttribute('data-c-acunar-caja', l.estado);
+    if (!l.nota) return;
+    var nota = caja.querySelector ? caja.querySelector('.c-acunar-nota') : null;
+    if (nota) {
+      nota.textContent = l.nota;
+      return;
+    }
+    /* Primera compra: la nota "Tienes N" aparece junto al boton. */
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function'
+      || typeof caja.insertBefore !== 'function') return;
+    var span = document.createElement('span');
+    span.className = 'c-acunar-nota';
+    span.textContent = l.nota;
+    caja.insertBefore(span, btn);
+  }
+
   /* Handler del boton de acunar. Confirmacion con el coste exacto y un
      solo vuelo por boton: cancelar NO toca la red. */
   function acunarDesdeBoton(btn) {
@@ -858,8 +978,14 @@
     var variante = fichaTexto(btn.getAttribute('data-variante')) || 'base';
     var precio = safeNum(btn.getAttribute('data-precio'), null);
     if (!cartaId || precio === null || precio <= 0) return;
+    var yaTiene = safeNum(btn.getAttribute('data-cantidad'), null);
     if (typeof w.confirm === 'function') {
+      /* 12.5 regla 2: al repetir se dice cuantas tiene y cuanto cuesta OTRA. */
       var pregunta = 'Acunar por ' + miles(precio) + ' XP. Continuar?';
+      if (yaTiene !== null && yaTiene > 0) {
+        pregunta = 'Ya tienes ' + miles(yaTiene) + '. Acunar otra cuesta '
+          + miles(precio) + ' XP. Continuar?';
+      }
       var acepta = false;
       try {
         acepta = w.confirm(pregunta) === true;
@@ -883,8 +1009,14 @@
           msg.textContent = (res && res.mensaje) || mensajeAcunar('SERVIDOR');
           if (msg.classList) msg.classList.add('is-error');
         }
-        btn.disabled = false;
         btn.removeAttribute('aria-busy');
+        /* 12.5 regla 4: la UI no adivina, usa el codigo del servidor. */
+        var estErr = res && ACUNAR_ESTADO_ERROR[res.error];
+        if (estErr) {
+          acunarPintarEstado(btn, estErr, null, precio);
+          return;
+        }
+        btn.disabled = false;
         btn.innerHTML = htmlPrevio;
         return;
       }
@@ -895,9 +1027,10 @@
           + (cant !== null ? ' Tienes ' + miles(cant) + ' en tu coleccion.' : '');
         if (msg.classList) msg.classList.remove('is-error');
       }
-      /* Queda deshabilitado a proposito: cero doble clic y cero doble cobro. */
-      btn.innerHTML = 'Acunada';
+      /* 12.5 regla 4: sin recargar, la copia nueva se ve y se puede repetir.
+         El cobro de la siguiente la vuelve a confirmar el modal. */
       btn.removeAttribute('aria-busy');
+      acunarPintarEstado(btn, 'repetir', cant, precio);
       var detalle = {
         carta_id: cartaId,
         variante: variante,
@@ -1417,26 +1550,25 @@
     return esc(v).replace(/"/g, '&quot;');
   }
 
-  /* Accion de la tarjeta. Nunca "Acunar" en una carta que ya es tuya: la
-     copia extra se compra desde la ficha de la coleccion, no aqui. */
+  /* Accion de la tarjeta. 12.5: MISMO helper que la ficha. El boton nunca
+     se elimina; con copia propia pasa a "Tienes N" + "Acunar otra". */
   function catalogoAccionHtml(carta, estado, precio) {
-    if (estado === 'posee') {
-      var cant = safeNum(carta.cantidad, null);
-      return '<div class="c-cat-acc"><span class="c-cat-nota">Ya la tienes'
+    var p = safeNum(precio, null);
+    var conPrecio = p !== null && p > 0;
+    if (estado === 'posee' && !conPrecio) {
+      var cant = safeNum(carta && carta.cantidad, null);
+      return '<div class="c-cat-acc"><span class="c-cat-nota">Tienes'
         + (cant !== null ? ' <b>' + esc(miles(cant)) + '</b>' : '') + '</span></div>';
     }
-    if (estado === 'agotada') {
-      return '<div class="c-cat-acc"><span class="c-cat-nota c-cat-nota--agotada">Agotada</span></div>';
-    }
-    if (precio === null || precio <= 0) {
+    if (estado !== 'agotada' && !conPrecio) {
       return '<div class="c-cat-acc"><span class="c-cat-nota">No disponible</span></div>';
     }
-    return '<div class="c-cat-acc c-acunar">'
-      + '<button type="button" class="c-acunar-btn" data-c-acunar="1"'
-      + ' data-carta-id="' + catalogoAttr(fichaTexto(carta.id)) + '" data-variante="base"'
-      + ' data-precio="' + catalogoAttr(precio) + '">Acunar'
-      + ' <span class="c-acunar-xp">' + esc(miles(precio)) + ' XP</span></button>'
-      + '<span class="c-acunar-msg"></span></div>';
+    return acunarBotonHtml(carta, p, {
+      clase: 'c-cat-acc c-acunar',
+      variante: 'base',
+      nota: true,
+      notaClase: 'c-cat-nota'
+    });
   }
 
   /* Tarjeta compacta del catalogo. Todo dato de servidor pasa por esc. */
@@ -1826,9 +1958,14 @@
       if (typeof cards[i].querySelector === 'function') {
         var acc = cards[i].querySelector('.c-cat-acc');
         if (acc) {
-          acc.innerHTML = '<span class="c-cat-nota">Acunada'
-            + (cant !== null ? ' - tienes <b>' + esc(miles(cant)) + '</b>' : '')
-            + '</span>';
+          /* 12.5: la tarjeta NO pierde el boton; pasa a "Tienes N" + otra. */
+          var b = acunarBotonInner({ id: id, cantidad: cant }, detalle.precio_xp, 'repetir', {});
+          if (typeof acc.setAttribute === 'function') {
+            acc.setAttribute('data-c-acunar-caja', b.estado);
+          }
+          acc.innerHTML = '<span class="c-cat-nota">' + esc(b.nota) + '</span>'
+            + b.html
+            + '<span class="c-acunar-msg" role="status" aria-live="polite"></span>';
         }
         var stock = cards[i].querySelector('[data-c-cat-stock]');
         var rest = cards[i].querySelector('[data-c-cat-rest]');
@@ -2496,6 +2633,10 @@
     subirNivelCarta: subirNivelCarta,
     acunarCarta: acunarCarta,
     acunarDesdeBoton: acunarDesdeBoton,
+    ACUNAR_TOPE_COPIAS: ACUNAR_TOPE_COPIAS,
+    acunarEstadoDe: acunarEstadoDe,
+    acunarLabel: acunarLabel,
+    acunarBotonHtml: acunarBotonHtml,
     CATALOGO_LIMIT: CATALOGO_LIMIT,
     CATALOGO_FAMILIAS: CATALOGO_FAMILIAS,
     CATALOGO_RAREZAS: CATALOGO_RAREZAS,

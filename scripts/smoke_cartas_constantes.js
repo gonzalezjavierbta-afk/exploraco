@@ -358,6 +358,88 @@ assert(tAdm.indexOf('familias: CartasConfig.FAMILIAS_CARTA') !== -1
   ADM + ' cartas_lista emite config desde lib/cartas-config.js',
   'falta el bloque config de cartas_lista');
 
+// --- (i) COPIAS MULTIPLES (spec 12, 2026-11-11) -----------------------------
+// El escalado vive en lib/ (fuente unica) y el catalogo NO lo aplica: si el
+// poder del catalogo escalara con las copias del espectador, dos usuarios
+// verian precios distintos para la misma carta (12.2).
+var COPIAS = libCfg.CARTA_COPIAS_BP;
+var COPIAS_CAP = libCfg.CARTA_COPIAS_CAP;
+var MAX_COPIAS = libCfg.CARTA_MAX_COPIAS;
+assert(COPIAS === 5 && COPIAS_CAP === 9 && MAX_COPIAS === 99,
+  'lib exporta CARTA_COPIAS_BP=5, CARTA_COPIAS_CAP=9 y CARTA_MAX_COPIAS=99',
+  'valores: ' + COPIAS + '/' + COPIAS_CAP + '/' + MAX_COPIAS);
+
+assert(typeof libCfg.factorCopias === 'function'
+  && typeof libCfg.poderConCopias === 'function',
+  'lib exporta factorCopias() y poderConCopias()', 'falta algun helper');
+
+assert(libCfg.factorCopias(1) === 1 && libCfg.factorCopias(2) === 1.05
+  && libCfg.factorCopias(5) === 1.2 && libCfg.factorCopias(10) === 1.45
+  && libCfg.factorCopias(11) === 1.45 && libCfg.factorCopias(500) === 1.45,
+  'factorCopias: 1 -> 1.00, 2 -> 1.05, 5 -> 1.20, 10/11/500 -> 1.45',
+  'c5=' + libCfg.factorCopias(5) + ' c10=' + libCfg.factorCopias(10));
+
+assert(libCfg.poderConCopias(5, 1) === 5 && libCfg.poderConCopias(5, 2) === 5.3
+  && libCfg.poderConCopias(5, 5) === 6 && libCfg.poderConCopias(5, 10) === 7.3
+  && libCfg.poderConCopias(20, 1) === 20 && libCfg.poderConCopias(20, 5) === 24
+  && libCfg.poderConCopias(20, 10) === 29 && libCfg.poderConCopias(29, 10) === 42.1,
+  'poderConCopias reproduce la tabla de 12.1 (5/20/29 con 1,2,5,10 copias)',
+  'c5n5=' + libCfg.poderConCopias(5, 5) + ' c29n10=' + libCfg.poderConCopias(29, 10));
+
+assert(libCfg.poderConCopias(20, 11) === libCfg.poderConCopias(20, 10),
+  'la copia 11 no anade poder (cap en 10 copias)', 'c11=' + libCfg.poderConCopias(20, 11));
+
+var degradan = [0, -3, null, undefined, 'x', NaN, Infinity, '', {}, []];
+var sinNaN = degradan.every(function (c) {
+  var v = libCfg.poderConCopias(5, c);
+  return v === 5 && isFinite(v);
+});
+assert(sinNaN, 'cantidad invalida (0, negativo, null, texto, NaN, Infinity, objeto) -> factor 1.00 sin NaN',
+  String(degradan.map(function (c) { return String(c) + '=' + libCfg.poderConCopias(5, c); }).join(' ')));
+
+var raros = [libCfg.poderConCopias(null, 5), libCfg.poderConCopias('x', 5),
+  libCfg.poderConCopias(undefined, 5)];
+assert(raros.every(function (v) { return v === 0; }),
+  'poder no numerico -> 0 (nunca NaN)', String(raros.join(',')));
+
+assert(cuenta(tLib, /100 \+ Math\.min\(/g) === 1,
+  'factor() tiene UNA sola implementacion en lib (sin duplicar 100 + min)',
+  'ocurrencias: ' + cuenta(tLib, /100 \+ Math\.min\(/g));
+
+var iVec = tLib.indexOf('function vectorExpedicion(');
+var bloqueVec = iVec < 0 ? '' : tLib.slice(iVec, tLib.indexOf('module.exports', iVec));
+assert(bloqueVec !== '' && bloqueVec.indexOf('cantidad') !== -1
+  && bloqueVec.indexOf('poderConCopias') === -1,
+  'vectorExpedicion lee cantidad y NO usa poderConCopias (trabaja por eje)',
+  'cantidad=' + (bloqueVec.indexOf('cantidad') !== -1));
+
+assert(/function poderCarta\(stats, nivel, variante\)/.test(tLib),
+  'poderCarta conserva su firma de 3 parametros (el escalado es explicito)',
+  'firma cambiada');
+
+assert(tUsu.indexOf('poderConCopias') !== -1
+  && tUsu.indexOf('poder_sin_copias') !== -1,
+  USU + ' aplica poderConCopias y publica poder_sin_copias', 'falta el escalado');
+
+assert(tUsu.indexOf('retirada: c.activo === false') !== -1,
+  USU + ' marca las cartas retiradas (spec 12.4)', 'falta el campo retirada');
+
+// El catalogo sigue con poder base a nivel 1 y 1 copia: su poder NO se escala
+// (dos usuarios deben ver el mismo precio por la misma carta).
+var iCat = tUsu.indexOf("tipo === 'cartas_catalogo'");
+var iMias = tUsu.indexOf("tipo === 'cartas_mias'");
+var bloqueCat = (iCat >= 0 && iMias > iCat) ? tUsu.slice(iCat, iMias) : '';
+assert(bloqueCat !== '' && bloqueCat.indexOf('poder_base: cPoder') !== -1
+  && bloqueCat.indexOf('poderConCopias') === -1,
+  USU + ' cartas_catalogo mantiene poder base (sin factor de copias)',
+  'bloque=' + (bloqueCat.length) + ' escalado=' + (bloqueCat.indexOf('poderConCopias') !== -1));
+
+assert(tInter.indexOf('CARTA_TOPE_COPIAS') !== -1
+  && tInter.indexOf('AS tope_ok') !== -1
+  && tInter.indexOf('WHERE usuarios_cartas.cantidad < ') !== -1,
+  INTER + ' carta_acunar lleva el guard de tope (CTE y ON CONFLICT)',
+  'falta el guard');
+
 // --- Resumen ---------------------------------------------------------------
 console.log('');
 console.log('Checks: ' + total + ' total, ' + pass + ' PASS, ' + fails + ' FAIL');
