@@ -35,6 +35,12 @@
 //     sobre la familia/rareza resultantes, producto/consumible fuerza NULL,
 //     precio explicito manda y la doble edicion es idempotente.
 //
+//   D-29 (catalogo, 2026-11-11): GET /api/usuarios?tipo=cartas_catalogo
+//     publica el nivel REAL de la copia (usuarios_cartas_nivel, PK
+//     (usuario_id, carta_id)): nivel 3 -> coste 3->4, tope 5 -> coste null,
+//     sin fila -> nivel 1, sin sesion -> nivel 1 y coste null. No duplica
+//     filas y conserva posee/cantidad/cantidad_base/poder.
+//
 // POR QUE EL SQL ES ESPEJO Y NO UNA LLAMADA AL HANDLER
 //   api/interacciones.js crea su propia conexion con neon() al entrar; no
 //   acepta un cliente inyectado. Llamarlo desde aqui leeria datos COMMITEADOS y
@@ -65,6 +71,7 @@ if (!vacioExplicito) require('./load_env_local')();
 
 var fs = require('fs');
 var path = require('path');
+var crypto = require('crypto');
 var CartasConfig = require('../lib/cartas-config.js');
 
 var SOLO_SIN_NEON = process.argv.indexOf('--sin-neon') !== -1;
@@ -579,6 +586,210 @@ async function main() {
     pre = await q1(Q_CONTEO);
     await q('BEGIN');
     enTx = true;
+
+    // ---- D-26: posee/cantidad AGREGAN todas las variantes ----------------
+    // Handler REAL de api/usuarios.js con un doble de neon que ejecuta sus
+    // consultas en ESTA misma transaccion: ve las fixtures sin commitear y el
+    // ROLLBACK final las borra (cero persistencia). La sesion se firma con el
+    // mismo HMAC que validarSesionUsuario, sin tocar la BD.
+    await (async function () {
+      var sqlDoble = function (primer, segundo) {
+        if (Array.isArray(primer) && primer.raw) {
+          var texto = '';
+          var params = [];
+          for (var i = 0; i < primer.length; i++) {
+            texto += primer[i];
+            if (i < primer.length - 1) {
+              params.push(segundo[i]);
+              texto += '$' + params.length;
+            }
+          }
+          return q(texto, params);
+        }
+        return q(primer, segundo || []);
+      };
+      var rutaNeon = require.resolve('@neondatabase/serverless');
+      var rutaApi = require.resolve('../api/usuarios.js');
+      var cacheNeon = require.cache[rutaNeon];
+      var cacheApi = require.cache[rutaApi];
+      var handlerUsuarios = null;
+      try {
+        require.cache[rutaNeon] = {
+          id: rutaNeon, filename: rutaNeon, loaded: true,
+          exports: { neon: function () { return sqlDoble; } }
+        };
+        delete require.cache[rutaApi];
+        handlerUsuarios = require(rutaApi);
+      } finally {
+        if (cacheNeon) require.cache[rutaNeon] = cacheNeon;
+        else delete require.cache[rutaNeon];
+        if (cacheApi) require.cache[rutaApi] = cacheApi;
+        else delete require.cache[rutaApi];
+      }
+      if (!handlerUsuarios) {
+        check('D26.0 handler de usuarios cargado', false, 'require vacio');
+        return;
+      }
+
+      // Texto de la rama: el LATERAL debe agregar 1 fila por carta.
+      var srcUsr = fs.readFileSync(path.join(__dirname, '..', 'api', 'usuarios.js'), 'utf8');
+      var lateralViejo = srcUsr.indexOf('AND uc.carta_id = c.id AND uc.variante');
+      var sumaPorVariante = srcUsr.indexOf('THEN uc.cantidad ELSE 0 END');
+      check('D26.0 LATERAL agrega todas las variantes y publica cantidad_base',
+        lateralViejo === -1 && sumaPorVariante !== -1
+        && srcUsr.indexOf('pc.cantidad_base AS posee_cantidad_base') !== -1,
+        'filtro_base_en_lateral=' + (lateralViejo !== -1));
+
+      var tagD26 = 'smk_d26_' + Date.now().toString(36);
+      var usrD26 = await q1('INSERT INTO usuarios (email, nombre) VALUES ($1, $2)'
+        + ' RETURNING id::text AS id', [tagD26 + '@example.invalid', 'smk_d26']);
+      var uidD26 = String(usrD26.id);
+      var cartasD26 = await q('SELECT c.id::text AS id FROM cartas_catalogo c'
+        + ' WHERE c.activo = true'
+        + ' AND c.familia NOT IN (\'producto\',\'consumible\')'
+        + ' AND c.precio_xp IS NOT NULL AND c.precio_xp > 0'
+        + ' ORDER BY c.id LIMIT 3');
+      if (cartasD26.length < 3) {
+        check('D26 fixtures: 3 cartas del catalogo publico', false,
+          'solo ' + cartasD26.length);
+        return;
+      }
+      var cA = String(cartasD26[0].id);
+      var cB = String(cartasD26[1].id);
+      var cC = String(cartasD26[2].id);
+      // cA: base 2 + shiny 1 (dos variantes de la MISMA carta).
+      // cB: solo shiny 1. cC: sin filas.
+      await q('INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo)'
+        + ' VALUES ($1::uuid, $2, \'base\', 2, true)', [uidD26, cA]);
+      await q('INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo)'
+        + ' VALUES ($1::uuid, $2, \'shiny\', 1, true)', [uidD26, cA]);
+      await q('INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo)'
+        + ' VALUES ($1::uuid, $2, \'shiny\', 1, true)', [uidD26, cB]);
+
+      var secretoD26 = process.env.SESSION_JWT_SECRET || 'dev_secret';
+      var payloadD26 = Buffer.from(JSON.stringify({
+        sub: uidD26,
+        exp: Math.floor(Date.now() / 1000) + 600
+      }), 'utf8').toString('base64url');
+      var tokenD26 = payloadD26 + '.' + crypto
+        .createHmac('sha256', secretoD26).update(payloadD26).digest('base64url');
+
+      function llamarCatalogo(auth) {
+        var cabeceras = {};
+        if (auth) cabeceras.authorization = 'Bearer ' + auth;
+        var reqF = {
+          method: 'GET',
+          query: { tipo: 'cartas_catalogo', limit: '60', page: '1' },
+          headers: cabeceras
+        };
+        var salida = null;
+        var resF = {
+          statusCode: 200,
+          setHeader: function () { return this; },
+          status: function (c) { this.statusCode = c; return this; },
+          json: function (b) { salida = b; return this; },
+          send: function (b) { salida = b; return this; },
+          end: function () { return this; }
+        };
+        return Promise.resolve(handlerUsuarios(reqF, resF))
+          .then(function () { return salida; });
+      }
+
+      var conSesion = await llamarCatalogo(tokenD26);
+      var filasD26 = (conSesion && conSesion.data) || [];
+      var mapaD26 = {};
+      var idsD26 = [];
+      filasD26.forEach(function (r2) {
+        mapaD26[String(r2.id)] = r2;
+        idsD26.push(String(r2.id));
+      });
+      var totalDb = await q1('SELECT COUNT(*)::int AS total FROM cartas_catalogo c'
+        + ' WHERE c.activo = true'
+        + ' AND c.familia NOT IN (\'producto\',\'consumible\')'
+        + ' AND c.precio_xp IS NOT NULL AND c.precio_xp > 0');
+      var totalEsp = Number(totalDb.total) || 0;
+
+      check('D26.1 base 2 + shiny 1 -> posee=true, cantidad=3, cantidad_base=2',
+        !!mapaD26[cA] && mapaD26[cA].posee === true
+        && mapaD26[cA].cantidad === 3 && mapaD26[cA].cantidad_base === 2,
+        'ok=' + (conSesion && conSesion.ok)
+        + ' posee=' + (mapaD26[cA] && mapaD26[cA].posee)
+        + ' cant=' + (mapaD26[cA] && mapaD26[cA].cantidad)
+        + ' base=' + (mapaD26[cA] && mapaD26[cA].cantidad_base));
+      check('D26.2 solo shiny -> posee=true, cantidad=1, cantidad_base=0',
+        !!mapaD26[cB] && mapaD26[cB].posee === true
+        && mapaD26[cB].cantidad === 1 && mapaD26[cB].cantidad_base === 0,
+        'posee=' + (mapaD26[cB] && mapaD26[cB].posee)
+        + ' cant=' + (mapaD26[cB] && mapaD26[cB].cantidad)
+        + ' base=' + (mapaD26[cB] && mapaD26[cB].cantidad_base));
+      check('D26.3 sin filas -> posee=false, cantidad=0, cantidad_base=0',
+        !!mapaD26[cC] && mapaD26[cC].posee === false
+        && mapaD26[cC].cantidad === 0 && mapaD26[cC].cantidad_base === 0,
+        'posee=' + (mapaD26[cC] && mapaD26[cC].posee));
+      check('D26.4 el LATERAL no duplica: 1 fila por carta, total=' + totalEsp,
+        filasD26.length === totalEsp && idsD26.length === new Set(idsD26).size
+        && Number(conSesion && conSesion.total) === totalEsp,
+        'filas=' + filasD26.length + ' total=' + (conSesion && conSesion.total)
+        + ' unicos=' + new Set(idsD26).size);
+
+      var sinSesion = await llamarCatalogo(null);
+      var fAnon = (sinSesion && sinSesion.data && sinSesion.data[0]) || null;
+      check('D26.5 sin sesion: ni posee ni cantidad ni cantidad_base',
+        !!fAnon && !('posee' in fAnon) && !('cantidad' in fAnon)
+        && !('cantidad_base' in fAnon) && !!fAnon.id,
+        'claves=' + (fAnon ? Object.keys(fAnon).length : 'sin fila'));
+
+      // ---- D-29: nivel REAL de la copia + coste de la siguiente subida -----
+      // El catalogo publicaba nivel 1 de relleno y no publicaba coste, luego la
+      // ficha de una carta que el usuario YA tiene subida no podia ofrecer
+      // "subir nivel". Se siembran DOS niveles (3 y tope 5) en la tx: el
+      // ROLLBACK final los borra (cero persistencia).
+      await q('INSERT INTO usuarios_cartas_nivel (usuario_id, carta_id, nivel)'
+        + ' VALUES ($1::uuid, $2, $3) ON CONFLICT (usuario_id, carta_id)'
+        + ' DO UPDATE SET nivel = EXCLUDED.nivel', [uidD26, cA, 3]);
+      await q('INSERT INTO usuarios_cartas_nivel (usuario_id, carta_id, nivel)'
+        + ' VALUES ($1::uuid, $2, $3) ON CONFLICT (usuario_id, carta_id)'
+        + ' DO UPDATE SET nivel = EXCLUDED.nivel', [uidD26, cB, 5]);
+      var conNivel = await llamarCatalogo(tokenD26);
+      var filasNv = (conNivel && conNivel.data) || [];
+      var mapaNv = {};
+      var idsNv = [];
+      filasNv.forEach(function (r3) {
+        mapaNv[String(r3.id)] = r3;
+        idsNv.push(String(r3.id));
+      });
+      check('D29.1 copia nivel 3 -> nivel=3 y coste_nivel_xp = coste 3->4',
+        !!mapaNv[cA] && mapaNv[cA].nivel === 3
+        && mapaNv[cA].coste_nivel_xp === CartasConfig.costeSubidaNivel(3),
+        'nivel=' + (mapaNv[cA] && mapaNv[cA].nivel)
+        + ' coste=' + (mapaNv[cA] && mapaNv[cA].coste_nivel_xp)
+        + ' esperado=' + CartasConfig.costeSubidaNivel(3));
+      check('D29.2 copia en el tope (5) -> coste_nivel_xp=null y nivel=5',
+        !!mapaNv[cB] && mapaNv[cB].nivel === 5
+        && mapaNv[cB].coste_nivel_xp === null,
+        'nivel=' + (mapaNv[cB] && mapaNv[cB].nivel)
+        + ' coste=' + (mapaNv[cB] && mapaNv[cB].coste_nivel_xp));
+      check('D29.3 sin fila de nivel -> nivel=1 y coste 1->2 (con sesion)',
+        !!mapaNv[cC] && mapaNv[cC].nivel === 1
+        && mapaNv[cC].coste_nivel_xp === CartasConfig.costeSubidaNivel(1),
+        'nivel=' + (mapaNv[cC] && mapaNv[cC].nivel)
+        + ' coste=' + (mapaNv[cC] && mapaNv[cC].coste_nivel_xp));
+      check('D29.4 sin sesion: nivel=1 y coste_nivel_xp=null, sin duplicar filas',
+        !!fAnon && fAnon.nivel === 1 && fAnon.coste_nivel_xp === null
+        && filasNv.length === totalEsp && idsNv.length === new Set(idsNv).size
+        && Number(conNivel && conNivel.total) === totalEsp,
+        'nivel=' + (fAnon && fAnon.nivel)
+        + ' coste=' + (fAnon && fAnon.coste_nivel_xp)
+        + ' filas=' + filasNv.length + ' total=' + totalEsp
+        + ' unicos=' + new Set(idsNv).size);
+      // Retrocompatibilidad: los campos de posesion siguen ahi y con su valor.
+      check('D29.5 posee/cantidad/cantidad_base intactos con el join de nivel',
+        !!mapaNv[cA] && mapaNv[cA].posee === true && mapaNv[cA].cantidad === 3
+        && mapaNv[cA].cantidad_base === 2 && typeof mapaNv[cA].poder === 'number'
+        && typeof mapaNv[cA].poder_base === 'number',
+        'posee=' + (mapaNv[cA] && mapaNv[cA].posee)
+        + ' cant=' + (mapaNv[cA] && mapaNv[cA].cantidad));
+    })();
 
     var famSinPrecio = JSON.stringify(CartasConfig.CARTA_FAMILIAS_SIN_PRECIO_XP);
     var costes = CartasConfig.CARTA_NIVEL_XP;

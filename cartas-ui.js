@@ -207,7 +207,9 @@
     coleccion: 1,
     album: 1,
     'vitrina-publica': 1,
-    mercado: 1
+    mercado: 1,
+    /* D-28: tarjeta del catalogo -> ficha de LECTURA, una sola accion. */
+    catalogo: 1
   };
   /* Etiqueta de cantidad POR CONTEXTO (D4). Prohibido "tienes" fuera de
      coleccion: la misma palabra en una vitrina ajena o en el mercado
@@ -216,7 +218,8 @@
     coleccion: 'Cantidad en tu coleccion',
     album: 'Cantidad en tu coleccion',
     'vitrina-publica': 'En su museo',
-    mercado: 'Disponible'
+    mercado: 'Disponible',
+    catalogo: 'Disponible'
   };
   var FICHA_DESC_VACIA = 'Este catalogo todavia no tiene descripcion editorial';
 
@@ -657,6 +660,21 @@
       + '</div>';
   }
 
+  /* --- Ficha desde el catalogo (D-28): lectura, UNA sola accion ------ */
+  /* Sin copia propia: un unico "Acunar" (el handler de siempre, con su
+     confirmacion de coste). Con copia propia: "Ya la tienes" y la subida
+     de nivel que ya existe, con los datos que traiga la fila. */
+  function fichaCatalogo(carta, variante) {
+    if (catalogoEstadoCarta(carta) === 'posee') {
+      return {
+        nota: '<div class="c-ficha-posee">Ya la tienes</div>',
+        acunar: '',
+        nivel: fichaSubirNivel(carta, 'coleccion', variante)
+      };
+    }
+    return { nota: '', acunar: fichaAcunar(carta, 'catalogo', variante), nivel: '' };
+  }
+
   /* --- POST de subida de nivel: NUNCA rechaza, siempre resuelve -------- */
   var NIVEL_ERRORES = {
     PUNTOS_INSUFICIENTES: 'XP insuficiente para subir el nivel.',
@@ -960,10 +978,13 @@
         : ['cantidad', 'cantidad_restante']);
     }
     var qtyPartes = [];
+    /* D-28: en el catalogo, cantidad:0 no significa "Disponible: 0" (el
+       stock va en la tirada). La linea solo habla cuando la carta es tuya. */
+    var qtyMuda = contexto === 'catalogo' && catalogoEstadoCarta(carta) !== 'posee';
     var cantidadNum = fichaEntero(cantidadCruda);
-    if (cantidadNum !== null) {
+    if (!qtyMuda && cantidadNum !== null) {
       qtyPartes.push(etiquetaQty + ': ' + cantidadNum);
-    } else if (fichaTexto(cantidadCruda)) {
+    } else if (!qtyMuda && fichaTexto(cantidadCruda)) {
       qtyPartes.push(etiquetaQty + ': ' + fichaTexto(cantidadCruda));
     }
     /* D5: el precio SOLO tiene sentido en el mercado. En coleccion y en
@@ -1007,6 +1028,14 @@
       || varianteDeCarta(carta);
     var bloqueNivel = fichaSubirNivel(carta, contexto, varianteNivel);
     var bloqueAcunar = fichaAcunar(carta, contexto, varianteNivel);
+    var bloquePosee = '';
+    /* D-28: el catalogo no ofrece dos veces lo mismo. */
+    if (contexto === 'catalogo') {
+      var cat = fichaCatalogo(carta, varianteNivel);
+      bloquePosee = cat.nota;
+      bloqueAcunar = cat.acunar;
+      bloqueNivel = cat.nivel;
+    }
 
     return '<div class="c-ficha-bd" data-c-ficha-cerrar></div>'
       + '<div class="c-ficha-box" role="dialog" aria-modal="true" aria-labelledby="c-ficha-tit">'
@@ -1017,10 +1046,11 @@
       + esc(nombre || 'Carta') + '</h3>'
       + '<div class="c-ficha-tags">' + tags.join('') + '</div>'
       + bloquePn
-      + '<div class="c-ficha-qty">' + esc(qtyPartes.join(' - ')) + '</div>'
+      + (qtyMuda ? '' : '<div class="c-ficha-qty">' + esc(qtyPartes.join(' - ')) + '</div>')
       + '<p class="c-ficha-desc">' + esc(desc) + '</p>'
       + bloqueCf
       + bloqueDet
+      + bloquePosee
       + bloqueAcunar
       + bloqueNivel
       + '</div>'
@@ -1185,12 +1215,95 @@
   var CATALOGO_LIMIT = 24;
   var CATALOGO_FAMILIAS = ['lugar', 'naturaleza', 'personaje', 'marca', 'artista', 'cosmetica'];
   var CATALOGO_RAREZAS = ['comun', 'raro', 'epico', 'dorado'];
+  var CATALOGO_FILTROS_KEY = 'exploraco.catalogo.filtros';
+
+  /* D-29: sessionStorage es opcional. Modo privado, iframe sin permisos o
+     un entorno sin Web Storage devuelven null y el catalogo sigue igual. */
+  function catalogoAlmacen() {
+    try {
+      var s = w && w.sessionStorage;
+      return (s && typeof s.getItem === 'function') ? s : null;
+    } catch (eAcceso) {
+      return null;
+    }
+  }
+
+  /* Filtros recordados. JSON corrupto, tipo raro o valor fuera del
+     contrato -> defaults: nunca se restaura un filtro que el backend
+     rechazaria ni se propaga una excepcion al arranque del panel. */
+  function catalogoFiltrosLeer() {
+    var out = { familia: '', rareza: '', q: '' };
+    var s = catalogoAlmacen();
+    if (!s) return out;
+    var crudo = null;
+    try {
+      crudo = s.getItem(CATALOGO_FILTROS_KEY);
+    } catch (eLeer) {
+      return out;
+    }
+    if (!crudo) return out;
+    var j = null;
+    try {
+      j = JSON.parse(crudo);
+    } catch (eJson) {
+      return out;
+    }
+    if (!j || typeof j !== 'object') return out;
+    var fam = fichaTexto(j.familia).toLowerCase();
+    if (CATALOGO_FAMILIAS.indexOf(fam) >= 0) out.familia = fam;
+    var rar = fichaTexto(j.rareza).toLowerCase();
+    if (CATALOGO_RAREZAS.indexOf(rar) >= 0) out.rareza = rar;
+    var q = fichaTexto(j.q);
+    out.q = q.length > 80 ? q.slice(0, 80) : q;
+    return out;
+  }
+
+  function catalogoFiltrosGuardar(estado) {
+    var e = estado || {};
+    var s = catalogoAlmacen();
+    if (!s) return false;
+    var fam = fichaTexto(e.familia).toLowerCase();
+    var rar = fichaTexto(e.rareza).toLowerCase();
+    var q = fichaTexto(e.q);
+    try {
+      if (!fam && !rar && !q) {
+        if (typeof s.removeItem === 'function') s.removeItem(CATALOGO_FILTROS_KEY);
+        return true;
+      }
+      s.setItem(CATALOGO_FILTROS_KEY, JSON.stringify({ familia: fam, rareza: rar, q: q }));
+      return true;
+    } catch (eGuardar) {
+      return false;
+    }
+  }
+
+  function catalogoFiltrosLimpiar() {
+    var s = catalogoAlmacen();
+    if (!s || typeof s.removeItem !== 'function') return false;
+    try {
+      s.removeItem(CATALOGO_FILTROS_KEY);
+      return true;
+    } catch (eLimpiar) {
+      return false;
+    }
+  }
 
   function catalogoEstadoBase() {
     return {
       q: '', familia: '', rareza: '', page: 0,
       filas: [], total: null, cargando: false, error: ''
     };
+  }
+
+  /* Estado de arranque del panel: defaults + filtros recordados. Con ellos
+     ya cargados, la PRIMERA peticion sale filtrada (D-29: una sola). */
+  function catalogoEstadoInicial() {
+    var base = catalogoEstadoBase();
+    var f = catalogoFiltrosLeer();
+    base.familia = f.familia;
+    base.rareza = f.rareza;
+    base.q = f.q;
+    return base;
   }
 
   /* URL del canal de adquisicion. Los filtros vacios NO viajan: el backend
@@ -1334,7 +1447,7 @@
     var poder = safeNum(carta.poder, null);
     var img = fichaTexto(carta.imagen_url);
     var html = '<article class="c-cat-card" data-c-cat-id="' + catalogoAttr(id)
-      + '" data-c-cat-estado="' + estado + '">';
+      + '" data-c-cat-estado="' + estado + '" tabindex="0" aria-haspopup="dialog">';
     html += '<div class="c-cat-arte">'
       + '<span class="c-cat-fallo" aria-hidden="true">' + esc(catalogoInicial(nombre)) + '</span>';
     if (img) {
@@ -1392,6 +1505,11 @@
       + '<input type="search" class="c-cat-q" data-c-cat-q="1" id="c-cat-q"'
       + ' value="' + catalogoAttr(fichaTexto(e.q)) + '" autocomplete="off"'
       + ' placeholder="Buscar por nombre" aria-label="Buscar una carta por nombre">'
+      /* Solo con algo que limpiar: la accion no ocupa barra de adorno. */
+      + ((fam || rar || fichaTexto(e.q))
+        ? '<button type="button" class="c-cat-limpiar" data-c-cat-limpiar="1">'
+          + 'Limpiar filtros</button>'
+        : '')
       + '</div>';
   }
 
@@ -1486,6 +1604,11 @@
       rbs[i].setAttribute('aria-pressed',
         String(fichaTexto(rbs[i].getAttribute('data-cat-rar')) === rar));
     }
+    /* "Limpiar filtros" solo existe mientras haya algo que limpiar. */
+    if (typeof host.querySelector === 'function') {
+      var limpiar = host.querySelector('[data-c-cat-limpiar]');
+      if (limpiar) limpiar.hidden = !(fam || rar || fichaTexto(e.q));
+    }
   }
 
   /* Repinta estado. `desde` > 0 = solo las filas nuevas (Cargar mas conserva
@@ -1573,6 +1696,7 @@
     if (clave === 'rareza' && v && CATALOGO_RAREZAS.indexOf(v) < 0) return;
     ctrl.estado[clave] = v;
     ctrl.estado.page = 0;
+    catalogoFiltrosGuardar(ctrl.estado);
     catalogoMarcarFiltros(ctrl);
     catalogoCargar(ctrl, false);
   }
@@ -1584,6 +1708,9 @@
     if (v === ctrl.estado.q) return;
     ctrl.estado.q = v;
     ctrl.estado.page = 0;
+    /* Se guarda al teclear, no al disparar el debounce: cerrar la pestana
+       antes de los 350 ms no pierde la busqueda. */
+    catalogoFiltrosGuardar(ctrl.estado);
     if (ctrl.timer && typeof w.clearTimeout === 'function') w.clearTimeout(ctrl.timer);
     if (typeof w.setTimeout !== 'function') {
       catalogoCargar(ctrl, false);
@@ -1595,6 +1722,56 @@
     }, 350);
   }
 
+  /* "Limpiar filtros": borra la clave y vuelve al estado inicial con UNA
+     sola peticion. El buscador visible se vacia sin repintar la barra. */
+  function catalogoLimpiar(ctrl) {
+    if (!ctrl) return;
+    var e = ctrl.estado;
+    e.familia = '';
+    e.rareza = '';
+    e.q = '';
+    e.page = 0;
+    if (ctrl.timer && typeof w.clearTimeout === 'function') w.clearTimeout(ctrl.timer);
+    ctrl.timer = null;
+    catalogoFiltrosLimpiar();
+    var host = ctrl.host;
+    if (host && typeof host.querySelector === 'function') {
+      var inp = host.querySelector('[data-c-cat-q]');
+      if (inp && 'value' in inp) inp.value = '';
+    }
+    catalogoMarcarFiltros(ctrl);
+    catalogoCargar(ctrl, false);
+  }
+
+  /* D-28: la tarjeta abre la ficha compartida en modo lectura. El foco se
+     posa en la tarjeta ANTES de abrir para que cerrarFicha lo devuelva. */
+  function catalogoAbrirFicha(ctrl, id, disparador) {
+    var filas = (ctrl && ctrl.estado && ctrl.estado.filas) || [];
+    var clave = fichaTexto(id);
+    var fila = null;
+    var i;
+    for (i = 0; i < filas.length; i++) {
+      if (fichaTexto(filas[i] && filas[i].id) === clave) {
+        fila = filas[i];
+        break;
+      }
+    }
+    if (!fila) return false;
+    if (disparador && disparador.focus) {
+      try {
+        disparador.focus();
+      } catch (eFoco) {
+        /* sin foco no hay nada que devolver, pero la ficha si abre */
+      }
+    }
+    var posee = catalogoEstadoCarta(fila) === 'posee';
+    abrirFicha(fila, {
+      contexto: 'catalogo',
+      etiquetaCantidad: posee ? 'Cantidad en tu coleccion' : 'Disponible'
+    });
+    return true;
+  }
+
   function catalogoClick(ctrl, ev) {
     var t = ev && ev.target;
     if (!t) return;
@@ -1604,6 +1781,10 @@
     }
     if (catalogoCerca(t, 'data-c-cat-reintentar', ctrl.host)) {
       catalogoCargar(ctrl, false);
+      return;
+    }
+    if (catalogoCerca(t, 'data-c-cat-limpiar', ctrl.host)) {
+      catalogoLimpiar(ctrl);
       return;
     }
     var fam = catalogoCerca(t, 'data-cat-fam', ctrl.host);
@@ -1621,7 +1802,13 @@
       return;
     }
     var btn = catalogoCerca(t, 'data-c-acunar', ctrl.host);
-    if (btn) acunarDesdeBoton(btn);
+    if (btn) {
+      acunarDesdeBoton(btn);
+      return;
+    }
+    /* El resto de la tarjeta abre la ficha de lectura (D-28). */
+    var card = catalogoCerca(t, 'data-c-cat-id', ctrl.host);
+    if (card) catalogoAbrirFicha(ctrl, card.getAttribute('data-c-cat-id'), card);
   }
 
   /* Marca la tarjeta acunada en el DOM sin recargar la pagina. */
@@ -1668,7 +1855,7 @@
       return true;
     }
     var ctrl = {
-      host: host, estado: catalogoEstadoBase(), abierto: false,
+      host: host, estado: catalogoEstadoInicial(), abierto: false,
       grid: null, info: null, mas: null, rejilla: null, timer: null
     };
     catalogoCtrl = ctrl;
@@ -1677,6 +1864,18 @@
       host.addEventListener('input', function (ev) {
         var q = catalogoCerca(ev && ev.target, 'data-c-cat-q', host);
         if (q) catalogoBuscar(ctrl, q.value);
+      });
+      /* La tarjeta es focusable (tabindex=0): Enter/Espacio abren la ficha
+         igual que el clic. El boton de acunar conserva su propio Enter. */
+      host.addEventListener('keydown', function (ev) {
+        var k = ev && ev.key;
+        if (k !== 'Enter' && k !== ' ' && k !== 'Spacebar') return;
+        var t = ev && ev.target;
+        if (!t || catalogoCerca(t, 'data-c-acunar', host)) return;
+        var card = catalogoCerca(t, 'data-c-cat-id', host);
+        if (!card) return;
+        if (ev.preventDefault) ev.preventDefault();
+        catalogoAbrirFicha(ctrl, card.getAttribute('data-c-cat-id'), card);
       });
     }
     if (doc.addEventListener) {
@@ -2294,6 +2493,14 @@
     catalogoHayMas: catalogoHayMas,
     catalogoAplicarAcunar: catalogoAplicarAcunar,
     catalogoMontar: catalogoMontar,
+    catalogoAbrir: catalogoAbrir,
+    catalogoAbrirFicha: catalogoAbrirFicha,
+    catalogoLimpiar: catalogoLimpiar,
+    CATALOGO_FILTROS_KEY: CATALOGO_FILTROS_KEY,
+    catalogoEstadoInicial: catalogoEstadoInicial,
+    catalogoFiltrosLeer: catalogoFiltrosLeer,
+    catalogoFiltrosGuardar: catalogoFiltrosGuardar,
+    catalogoFiltrosLimpiar: catalogoFiltrosLimpiar,
     expUrl: expUrl,
     expAccionesFaltan: expAccionesFaltan,
     expEstadoMision: expEstadoMision,

@@ -534,6 +534,16 @@
   color: #E8C766;
 }
 
+/* D-28: la carta del catalogo ya esta en la coleccion. */
+.c-ficha .c-ficha-posee {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #5FD3A8;
+}
+
 /* Secundario: 7:1 sobre #14171A, por encima del 4.5:1 exigido. */
 .c-ficha .c-ficha-desc {
   margin: 0;
@@ -1056,6 +1066,26 @@
   color: #0A0C0F;
 }
 
+/* D-29: descarta los filtros recordados y vuelve al estado inicial. */
+.cartas-silo .c-cat-limpiar {
+  min-height: 32px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px dashed rgba(255, 255, 255, .22);
+  background: transparent;
+  color: rgba(255, 255, 255, .55);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.cartas-silo .c-cat-limpiar:hover { border-color: rgba(201, 162, 39, .55); color: #E8C766; }
+.cartas-silo .c-cat-limpiar[hidden] { display: none; }
+.cartas-silo .c-cat-limpiar:focus-visible { outline: 2px solid #E8C766; outline-offset: 2px; }
+
 .cartas-silo .c-cat-q {
   flex: 1 1 200px;
   min-width: 160px;
@@ -1103,6 +1133,14 @@
 .cartas-silo .c-cat-card:hover {
   border-color: rgba(201, 162, 39, .45);
   background: rgba(255, 255, 255, .05);
+}
+
+/* D-28: la tarjeta entera abre la ficha de lectura y recibe el foco. */
+.cartas-silo .c-cat-card { cursor: pointer; }
+
+.cartas-silo .c-cat-card:focus-visible {
+  outline: 2px solid #E8C766;
+  outline-offset: 2px;
 }
 
 .cartas-silo .c-cat-card[data-c-cat-estado="posee"] { border-color: rgba(95, 211, 168, .35); }

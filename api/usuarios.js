@@ -5,8 +5,11 @@
 //   POST /api/interacciones?tipo=carta_acunar: esta rama es SOLO lectura, no
 //   crea flujo de cobro ni endpoint (8/8, ADR-001/ADR-010). Acunable = activo,
 //   familia fuera de producto/consumible y precio_xp > 0 (el SKU no se vende
-//   aqui). Con sesion valida y opcional anade posee/cantidad de la variante
-//   base (join usuarios_cartas); sin sesion esos campos no viajan. Poder con
+//   aqui). Con sesion valida y opcional anade posee/cantidad/cantidad_base:
+//   posee y cantidad AGREGAN todas las variantes (D-26: quien tiene la shiny
+//   ya la tiene; cantidad = suma de todas, cantidad_base = solo 'base') y el
+//   LATERAL agrega 1 fila por carta, luego no duplica el catalogo. Sin sesion
+//   esos campos no viajan. Poder con
 //   CartasConfig.poderCarta(stats, 1, 'base'), una sola fuente. Degrada con
 //   responderSchemaPendiente si falta la 066/067.
 // v26 (2026-10-10): SELLADO del pasaporte. La EXISTENCIA de la fila en billeteras es el sello (nadie mas la crea). El flag sellado se anade al objeto pasaporte: si ya existio, la billetera se sigue devolviendo aunque hoy falte un dato. NO es una columna: se calcula en cada lectura. completo NO se falsea nunca; el SELECT de comprobacion solo corre cuando completo=false (tolerante a 42P01/42703, migracion 042 pendiente) y su fila se reutiliza, sin segunda consulta.
@@ -1015,9 +1018,10 @@ module.exports = async (req, res) => {
       // Acunable = activo, familia fuera de producto/consumible y
       // precio_xp > 0. producto/consumible se pagan por SKU: el catalogo no
       // los vende ni los puntua (vector vacio), luego no entran.
-      // Sin sesion es publica. Con sesion valida (opcional) se anade posee y
-      // cantidad de la variante base, para pintar "Ya la tienes" sin llamar a
-      // cartas_mias. Sin sesion esos dos campos NO se envian.
+      // Sin sesion es publica. Con sesion valida (opcional) se anade posee,
+      // cantidad y cantidad_base, para pintar "Ya la tienes" sin llamar a
+      // cartas_mias. posee/cantidad agregan TODAS las variantes (D-26); sin
+      // sesion esos campos NO se envian.
       if (tipo === 'cartas_catalogo') {
         var ccPage = parseInt(req.query.page, 10);
         if (!isFinite(ccPage) || ccPage < 1) ccPage = 1;
@@ -1069,17 +1073,29 @@ module.exports = async (req, res) => {
           + ' c.edicion, c.supply_max, c.emitidas, c.precio_xp, c.stats_json,'
           + ' c.imagen_url, c.set_slug, c.nivel_gate, c.media_id,'
           + ' m.tipo AS media_tipo'
-          + (ccUid ? ', pc.cantidad AS posee_cantidad' : '')
+          + (ccUid ? ', pc.cantidad AS posee_cantidad,'
+            + ' pc.cantidad_base AS posee_cantidad_base,'
+            + ' ucn.nivel AS posee_nivel' : '')
           + ' FROM cartas_catalogo c'
           + ' LEFT JOIN cartas_media m ON m.id = c.media_id'
           + ' AND m.estado_moderacion = \'aprobada\'';
         if (ccUid) {
           ccRowP.push(ccUid);
+          var ccUidP = '$' + ccRowP.length;
           ccSel += ' LEFT JOIN LATERAL (SELECT COALESCE(SUM(uc.cantidad), 0)::int'
-            + ' AS cantidad FROM usuarios_cartas uc'
-            + ' WHERE uc.usuario_id = $' + ccRowP.length
-            + ' AND uc.carta_id = c.id AND uc.variante = \'base\''
-            + ' AND uc.activo = true) pc ON true';
+            + ' AS cantidad, COALESCE(SUM(CASE WHEN uc.variante = \'base\''
+            + ' THEN uc.cantidad ELSE 0 END), 0)::int AS cantidad_base'
+            + ' FROM usuarios_cartas uc'
+            + ' WHERE uc.usuario_id = ' + ccUidP
+            + ' AND uc.carta_id = c.id'
+            + ' AND uc.activo = true) pc ON true'
+            // 066: la PK real de usuarios_cartas_nivel es
+            // (usuario_id, carta_id), luego UNA fila por carta y NO hay nivel
+            // por variante: el nivel del par ya es el de la mayor de sus
+            // variantes por construccion. Este LEFT JOIN no puede multiplicar
+            // filas (PK) ni crear filas: la rama solo lee.
+            + ' LEFT JOIN usuarios_cartas_nivel ucn ON ucn.usuario_id = ' + ccUidP
+            + ' AND ucn.carta_id = c.id';
         }
         ccSel += ' WHERE ' + ccW.join(' AND ') + ccOrden
           + ' LIMIT $' + (ccRowP.length + 1)
@@ -1121,6 +1137,24 @@ module.exports = async (req, res) => {
             if (cRest < 0) cRest = 0;
           }
           var cMediaTipo = r.media_tipo ? String(r.media_tipo) : null;
+          // nivel REAL de la copia (066). Una fila por (usuario, carta); sin
+          // fila = el usuario no tiene nivel en esa carta = 1 (no se escribe
+          // nada: esta rama es de lectura).
+          // coste_nivel_xp es el coste de la SIGUIENTE subida desde el nivel
+          // devuelto (una sola fuente: CartasConfig.costeSubidaNivel, el mismo
+          // helper que cobra el handler) y null en el tope (5), donde el helper
+          // devuelve 0. Sin sesion no hay identidad ni subida posible: nivel 1
+          // informativo y coste null (no se pinta un precio que daria 401). Con
+          // sesion y sin posesion nivel tambien es 1 y el coste es el de 1->2:
+          // quien decide pintar el boton es el cliente, con posee (D-26).
+          var cNivel = 1;
+          var cCoste = null;
+          if (ccUid) {
+            var cNv = parseInt(r.posee_nivel, 10);
+            if (isFinite(cNv) && cNv >= 1) cNivel = cNv;
+            var cCst = CartasConfig.costeSubidaNivel(cNivel);
+            if (cCst > 0) cCoste = cCst;
+          }
           var cOut = {
             id: r.id,
             nombre: r.nombre,
@@ -1135,7 +1169,8 @@ module.exports = async (req, res) => {
               ? null : Number(r.precio_xp),
             stats: cStats,
             poder: cPoder,
-            nivel: 1,
+            nivel: cNivel,
+            coste_nivel_xp: cCoste,
             poder_base: cPoder,
             imagen_url: r.imagen_url || null,
             set_slug: r.set_slug || null,
@@ -1145,9 +1180,14 @@ module.exports = async (req, res) => {
             media_tipo: cMediaTipo
           };
           if (ccUid) {
+            // D-26: posee/cantidad son AGREGADOS de todas las variantes (un
+            // usuario con solo la shiny YA la tiene). cantidad_base queda como
+            // detalle de la variante base para quien lo necesite.
             var cCant = Number(r.posee_cantidad) || 0;
+            var cCantBase = Number(r.posee_cantidad_base) || 0;
             cOut.posee = cCant >= 1;
             cOut.cantidad = cCant;
+            cOut.cantidad_base = cCantBase;
           }
           return cOut;
         });

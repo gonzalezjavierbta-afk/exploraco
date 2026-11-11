@@ -50,14 +50,25 @@ function Elemento(tag) {
     hijos: [],
     parentNode: null,
     disabled: false,
+    oyentes: {},
     setAttribute: function (k, v) { e.attrs[String(k)] = String(v); },
     getAttribute: function (k) {
       return Object.prototype.hasOwnProperty.call(e.attrs, k) ? e.attrs[k] : null;
     },
     removeAttribute: function (k) { delete e.attrs[String(k)]; },
     appendChild: function (n) { n.parentNode = e; e.hijos.push(n); return n; },
-    addEventListener: function () {},
-    removeEventListener: function () {},
+    addEventListener: function (t, fn) {
+      var k = String(t);
+      if (!e.oyentes[k]) e.oyentes[k] = [];
+      e.oyentes[k].push(fn);
+    },
+    removeEventListener: function (t, fn) {
+      var k = String(t);
+      var l = e.oyentes[k] || [];
+      var out = [];
+      for (var i = 0; i < l.length; i++) { if (l[i] !== fn) out.push(l[i]); }
+      e.oyentes[k] = out;
+    },
     focus: function () {},
     querySelector: function () { return null; },
     classList: null,
@@ -96,8 +107,19 @@ function crearEntorno() {
     documentElement: { contains: function () { return true; } },
     getElementById: function (id) { return buscar(body, id); },
     createElement: function (t) { return Elemento(t); },
-    addEventListener: function () {},
-    removeEventListener: function () {},
+    oyentes: {},
+    addEventListener: function (t, fn) {
+      var k = String(t);
+      if (!doc.oyentes[k]) doc.oyentes[k] = [];
+      doc.oyentes[k].push(fn);
+    },
+    removeEventListener: function (t, fn) {
+      var k = String(t);
+      var l = doc.oyentes[k] || [];
+      var out = [];
+      for (var i = 0; i < l.length; i++) { if (l[i] !== fn) out.push(l[i]); }
+      doc.oyentes[k] = out;
+    },
     dispatchEvent: function () { return true; }
   };
   var win = {};
@@ -841,6 +863,236 @@ var cadenaCatalogo = (function () {
 })();
 
 /* ---------------------------------------------------------------------------
+   12) D-28 ficha de lectura desde el catalogo + D-29 filtros recordados.
+   --------------------------------------------------------------------------- */
+var CLAVE_FILTROS = 'exploraco.catalogo.filtros';
+
+/* Dispara un evento sobre los oyentes que registro el DOM minimo. */
+function disparar(nodo, tipo, ev) {
+  var l = (nodo && nodo.oyentes && nodo.oyentes[tipo]) || [];
+  for (var i = 0; i < l.length; i++) l[i](ev);
+}
+
+/* sessionStorage de mentira: mismo contrato, datos en memoria. */
+function almacenFalso(crudo) {
+  var datos = {};
+  if (typeof crudo === 'string') datos[CLAVE_FILTROS] = crudo;
+  return {
+    setItem: function (k, v) { datos[String(k)] = String(v); },
+    getItem: function (k) {
+      var c = String(k);
+      return Object.prototype.hasOwnProperty.call(datos, c) ? datos[c] : null;
+    },
+    removeItem: function (k) { delete datos[String(k)]; }
+  };
+}
+
+function esperar(n) {
+  var p = Promise.resolve();
+  for (var i = 0; i < n; i++) p = p.then(function () {});
+  return p;
+}
+
+function veces(s, sub) {
+  var n = 0;
+  var i = 0;
+  while ((i = String(s).indexOf(sub, i)) >= 0) { n++; i += sub.length; }
+  return n;
+}
+
+function fichaActual(env) {
+  var host = env.doc.getElementById('c-ficha');
+  return host ? String(host.innerHTML) : '';
+}
+
+function nodoCon(attr, host) {
+  var n = Elemento('div');
+  n.setAttribute(attr, '1');
+  n.parentNode = host;
+  return n;
+}
+
+var cadenaFichaCatalogo = (function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return Promise.resolve();
+  var cadena = Promise.resolve();
+  var card = Elemento('article');
+
+  cadena = cadena.then(function () {
+    env.doc.activeElement = card;
+    card.foco = 0;
+    card.focus = function () { card.foco++; };
+    var ctrl = { host: Elemento('div'), estado: { filas: [cartaCatalogo()] } };
+    var abierto = UI.catalogoAbrirFicha(ctrl, 'ct_lugar_07', card);
+    var html = fichaActual(env);
+    assert(abierto === true && UI.fichaAbierta() === true
+      && html.indexOf('Cascada del Tequendama') >= 0,
+      'la tarjeta del catalogo abre la ficha compartida en modo lectura');
+    assert(html.indexOf('role="dialog"') >= 0 && html.indexOf('aria-modal="true"') >= 0
+      && html.indexOf('c-ficha-x') >= 0,
+      'la ficha del catalogo es un dialogo modal con boton de cierre');
+    assert(card.foco === 1, 'el foco se posa en la tarjeta antes de abrir la ficha');
+  });
+
+  cadena = cadena.then(function () {
+    var html = fichaActual(env);
+    assert(veces(html, 'data-c-acunar=') === 1,
+      'la ficha del catalogo tiene UN solo boton Acunar');
+    assert(html.indexOf('data-c-subir-nivel') < 0,
+      'sin copia propia la ficha no ofrece subir nivel');
+    assert(html.indexOf('Ya la tienes') < 0,
+      'sin copia propia no se anuncia "Ya la tienes"');
+    assert(html.indexOf('Disponible: 0') < 0,
+      'sin copia propia la ficha no inventa una cantidad');
+  });
+
+  cadena = cadena.then(function () {
+    card.foco = 0;
+    disparar(env.doc, 'keydown', { key: 'Escape' });
+    assert(UI.fichaAbierta() === false && card.foco === 1,
+      'Escape cierra la ficha y devuelve el foco a la tarjeta');
+  });
+
+  cadena = cadena.then(function () {
+    var ctrl = { host: Elemento('div'), estado: { filas: [cartaCatalogo()] } };
+    UI.catalogoAbrirFicha(ctrl, 'ct_lugar_07', card);
+    var host = env.doc.getElementById('c-ficha');
+    disparar(host, 'click', { target: nodoCon('data-c-ficha-cerrar', host) });
+    assert(UI.fichaAbierta() === false, 'el clic fuera del cuadro cierra la ficha');
+    UI.catalogoAbrirFicha(ctrl, 'ct_lugar_07', card);
+    var host2 = env.doc.getElementById('c-ficha');
+    disparar(host2, 'click', { target: nodoCon('data-c-ficha-cerrar', host2) });
+    assert(UI.fichaAbierta() === false, 'el boton X cierra la ficha del catalogo');
+  });
+
+  cadena = cadena.then(function () {
+    var mia = cartaCatalogo();
+    mia.posee = true;
+    mia.cantidad = 2;
+    mia.nivel = 3;
+    mia.coste_nivel_xp = 900;
+    var ctrl = { host: Elemento('div'), estado: { filas: [mia] } };
+    UI.catalogoAbrirFicha(ctrl, 'ct_lugar_07', null);
+    var html = fichaActual(env);
+    assert(html.indexOf('Ya la tienes') >= 0,
+      'con copia propia la ficha dice "Ya la tienes"');
+    assert(html.indexOf('data-c-acunar') < 0,
+      'con copia propia no se repite el boton Acunar');
+    assert(html.indexOf('data-c-subir-nivel') >= 0 && html.indexOf('Subir a nivel 4') >= 0,
+      'con copia propia y nivel < 5 se ofrece subir de nivel');
+    assert(html.indexOf('Cantidad en tu coleccion: 2') >= 0,
+      'con copia propia la ficha usa la cantidad de la fila');
+    UI.cerrarFicha();
+  });
+
+  return cadena;
+})();
+
+var cadenaFiltrosCatalogo = (function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return Promise.resolve();
+  var cadena = Promise.resolve();
+  var llamadas = [];
+  var panel = Elemento('div');
+
+  cadena = cadena.then(function () {
+    assert(UI.CATALOGO_FILTROS_KEY === CLAVE_FILTROS,
+      'la clave de filtros es propia del catalogo');
+    assert(UI.catalogoFiltrosHtml({}).indexOf('data-c-cat-limpiar') < 0
+      && UI.catalogoFiltrosHtml({ familia: 'lugar' }).indexOf('data-c-cat-limpiar') >= 0,
+      'Limpiar filtros aparece solo cuando hay filtros activos');
+  });
+
+  cadena = cadena.then(function () {
+    env.win.sessionStorage = almacenFalso('{ roto');
+    var f = UI.catalogoFiltrosLeer();
+    assert(f.familia === '' && f.rareza === '' && f.q === '',
+      'JSON corrupto en sessionStorage degrada a defaults sin lanzar');
+  });
+
+  cadena = cadena.then(function () {
+    env.win.sessionStorage = almacenFalso(
+      JSON.stringify({ familia: 'nope', rareza: 'mitico', q: '  sierra  ' }));
+    var f = UI.catalogoFiltrosLeer();
+    assert(f.familia === '' && f.rareza === '' && f.q === 'sierra',
+      'un filtro fuera del contrato se descarta y q se restaura limpio');
+  });
+
+  cadena = cadena.then(function () {
+    env.win.sessionStorage = almacenFalso(
+      JSON.stringify({ familia: 'lugar', rareza: '', q: 'sierra' }));
+    panel.id = 'catalogo-panel';
+    env.doc.body.appendChild(panel);
+    env.sandbox.fetch = function (url) {
+      llamadas.push(String(url));
+      return Promise.resolve({
+        status: 200, ok: true,
+        json: function () {
+          return Promise.resolve({ ok: true, data: [cartaCatalogo()], total: 1, page: 1 });
+        }
+      });
+    };
+    llamadas = [];
+    assert(UI.catalogoMontar('catalogo-panel') === true,
+      'con host en la pagina el catalogo monta');
+    disparar(panel, 'click', { target: nodoCon('data-c-cat-abrir', panel) });
+    return esperar(2).then(function () {
+      assert(llamadas.length === 1 && llamadas[0].indexOf('familia=lugar') >= 0
+        && llamadas[0].indexOf('q=sierra') >= 0,
+        'los filtros restaurados se piden UNA sola vez, ya filtrados');
+      assert(panel.innerHTML.indexOf('data-cat-fam="lugar" aria-pressed="true"') >= 0
+        && panel.innerHTML.indexOf('value="sierra"') >= 0,
+        'la barra del catalogo se pinta con el filtro y la busqueda recordados');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    var store = env.win.sessionStorage;
+    var ctrl = {
+      host: panel,
+      estado: {
+        q: 'sierra', familia: 'lugar', rareza: 'raro', page: 0,
+        filas: [], total: null, cargando: false, error: ''
+      },
+      grid: null, info: null, mas: null, rejilla: null, timer: null
+    };
+    llamadas = [];
+    UI.catalogoLimpiar(ctrl);
+    return esperar(2).then(function () {
+      assert(ctrl.estado.familia === '' && ctrl.estado.rareza === ''
+        && ctrl.estado.q === '',
+        'Limpiar filtros vuelve al estado inicial');
+      assert(store.getItem(CLAVE_FILTROS) === null,
+        'Limpiar filtros borra la clave recordada');
+      assert(llamadas.length === 1 && llamadas[0].indexOf('familia=') < 0
+        && llamadas[0].indexOf('q=') < 0,
+        'Limpiar filtros pide el catalogo sin filtros, una sola vez');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    var env2 = crearEntorno();
+    var UI2 = env2.UI;
+    var limpio = false;
+    try {
+      var f = UI2.catalogoFiltrosLeer();
+      var g = UI2.catalogoFiltrosGuardar({ familia: 'lugar' });
+      var h = UI2.catalogoFiltrosLimpiar();
+      limpio = (f.familia === '' && f.rareza === '' && f.q === '')
+        && g === false && h === false;
+    } catch (eSinStorage) {
+      limpio = false;
+    }
+    assert(limpio,
+      'sin sessionStorage el catalogo arranca en defaults y no lanza');
+  });
+
+  return cadena;
+})();
+
+/* ---------------------------------------------------------------------------
    11) EXPEDICIONES: contrato del GET (11.9.8), estados y textos por codigo.
    --------------------------------------------------------------------------- */
 function expPayload() {
@@ -1319,4 +1571,5 @@ function resumen() {
   process.exit(1);
 }
 
-Promise.all([cadenaSubida, cadenaAcunar, cadenaCatalogo, cadenaExpediciones]).then(resumen, resumen);
+Promise.all([cadenaSubida, cadenaAcunar, cadenaCatalogo, cadenaFichaCatalogo,
+  cadenaFiltrosCatalogo, cadenaExpediciones]).then(resumen, resumen);
