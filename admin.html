@@ -2494,6 +2494,11 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 
   <div id="cartas-tab-catalogo" style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
 
+    <!-- Filtro por media_id: lo pinta cartasVerCartasDeMedia() cuando la cola
+         de media UGC bloquea un retiro (409 MEDIA_CON_CARTAS). Filtra en
+         cliente sobre _cartasCache, no pide otro viaje al servidor. -->
+    <div id="cartas-filtro-media-aviso" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:9px 14px;font-size:11px;color:var(--text2);align-items:center;gap:10px;flex-wrap:wrap"><span id="cartas-filtro-media-txt" style="font-weight:700"></span><button class="btn btn-ghost btn-sm" type="button" onclick="cartasQuitarFiltroMedia()">Quitar filtro</button></div>
+
     <!-- Nueva carta -->
     <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
       <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px">&#10133; Nueva carta</div>
@@ -2704,6 +2709,8 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <button class="btn btn-ghost btn-sm" type="button" onclick="cargarCartasMedia()">&#8635; Actualizar</button>
       <span id="cartas-media-estado-txt" style="font-size:11px;font-weight:700;color:var(--muted)"></span>
     </div>
+    <div id="cartas-media-identidad-aviso" style="display:none;background:#FEF3C7;border:1px solid #FDE68A;border-radius:10px;padding:9px 14px;font-size:11px;font-weight:700;color:#B45309">Sin ADMIN_USER_ID: las moderaciones se registran sin autor.</div>
+    <div id="cartas-media-bloqueo" style="display:none;background:var(--red-l);border:1px solid var(--red);border-radius:10px;padding:10px 14px;font-size:11px;font-weight:700;color:var(--red);line-height:1.5"></div>
     <div style="font-size:10px;color:var(--muted);line-height:1.5">Aprobar exige licencia declarada; rechazar exige motivo. Cero Borrado Logico: retirar cambia el estado, nunca borra la obra.</div>
     <div id="cartas-media-lista"><div class="mod-empty"><div class="mod-empty-icon">&#128247;</div><div style="font-size:13px;font-weight:600">Sin obras en este estado</div></div></div>
   </div>
@@ -11573,6 +11580,8 @@ var _cartasEditId = null;
    servidor: renderCartas() filtra sobre _cartasCache. */
 var _cartasFiltro = 'todas';
 var _cartasFiltroSet = '';
+/* Filtro por media_id (salto desde MEDIA_CON_CARTAS). Vacio = sin filtro. */
+var _cartasFiltroMedia = '';
 /* Parte B: seleccion multiple por id y cola del lote masivo. La seleccion
    se limpia al recargar la lista (loadCartas). */
 var _cartasSel = {};
@@ -11724,6 +11733,7 @@ function cartaEsJugable(c) {
   return !!(c && c.activo && cartaTieneDiseno(c));
 }
 function cartaFiltroPasa(c) {
+  if (_cartasFiltroMedia && String(c.media_id || '') !== _cartasFiltroMedia) return false;
   if (_cartasFiltroSet && String(c.set_slug || '') !== _cartasFiltroSet) return false;
   if (_cartasFiltro === 'juego') return cartaEsJugable(c);
   if (_cartasFiltro === 'sindiseno') return !cartaTieneDiseno(c);
@@ -11824,6 +11834,7 @@ function cartaThumbHTML(c) {
 function renderCartas() {
   var lista = document.getElementById('cartas-lista');
   if (!lista) return;
+  cartasFiltroMediaAviso();
   renderCartasResumen();
   renderCartasFiltroSets();
   var visibles = _cartasCache.filter(cartaFiltroPasa);
@@ -12350,13 +12361,19 @@ async function toggleCarta(id) {
    GET  /api/admin?recurso=cartas&tipo=cartas_media_lista&estado=pendiente
         -> { ok, data:[{id,autor_id,autor_nombre,autor_email,tipo,titulo,
              media_url,thumb_url,texto,duracion_seg,estado_moderacion,motivo,
-             licencia,licencia_aceptada_en,moderado_por,moderado_en,activo,
-             creado_en,cartas_n}], total, estado }
+             licencia,licencia_aceptada_en,moderado_por,moderado_por_nombre,
+             moderado_en,activo,creado_en,cartas_n,cartas_activas_n}],
+             total, estado, identidad_admin }
+         identidad_admin=false => ADMIN_USER_ID no declarado o mal formado:
+         se avisa en el panel y se sigue moderando (moderado_por queda NULL).
         estado: pendiente (default) | aprobada | rechazada | retirada.
    POST /api/admin?recurso=cartas&tipo=cartas_media_moderar
         {id, estado:pendiente|aprobada|rechazada|retirada, motivo?}
         Errores tipados: MOTIVO_REQUERIDO, LICENCIA_REQUERIDA,
         TRANSICION_INVALIDA, MEDIA_NO_ENCONTRADA, SCHEMA_NOT_MIGRATED.
+        409 MEDIA_CON_CARTAS {cartas_n}: la obra respalda cartas activas; hay
+        que desactivarlas o desvincularlas antes de retirarla. No es un error
+        generico: se pinta el motivo y el salto al catalogo filtrado.
    Maquina de estados del servidor: pendiente -> aprobada|rechazada;
    aprobada -> retirada; rechazada -> pendiente (reabrir).
    Cero Borrado Logico: se cambia estado_moderacion, nunca se borra la fila.
@@ -12366,6 +12383,9 @@ var _cartasMediaEstado = 'pendiente';
 var _cartasMediaCache = [];
 var _cartasMediaAprob = [];
 var _cartasMediaSubTab = 'catalogo';
+/* null = el backend aun no dijo nada; false = ADMIN_USER_ID ausente. */
+var _cartasMediaIdentidad = null;
+var _cartasMediaBloqueoId = null;
 
 /* Sub-pestanas Catalogo / Media UGC dentro de screen-cartas. No toca el
    router showScreen(): solo alterna paneles hermanos. */
@@ -12394,6 +12414,69 @@ function cartasMediaFiltroSet(estado) {
   var v = String(estado || '');
   _cartasMediaEstado = (validos.indexOf(v) >= 0) ? v : 'pendiente';
   cargarCartasMedia();
+}
+
+/* Aviso de identidad: discreto y persistente, NO bloquea la moderacion.
+   El backend manda identidad_admin=false cuando ADMIN_USER_ID no esta
+   declarado o no es un uuid valido; entonces moderado_por queda NULL. */
+function cartasMediaIdentidadAviso(sinIdentidad) {
+  _cartasMediaIdentidad = (sinIdentidad === true);
+  var box = document.getElementById('cartas-media-identidad-aviso');
+  if (!box) return;
+  box.style.display = _cartasMediaIdentidad ? 'block' : 'none';
+}
+
+/* 409 MEDIA_CON_CARTAS: la obra aprobada respalda cartas activas y el
+   servidor no la retira. Mensaje accionable con el numero real; si el
+   catalogo ya esta en memoria (_cartasCache) se ofrece el salto filtrado.
+   No inventa identidad ni cartas: solo pinta lo que respondio el servidor. */
+function cartasMediaBloqueoPintar(mediaId, n) {
+  _cartasMediaBloqueoId = String(mediaId || '');
+  var nC = Number(n);
+  if (!isFinite(nC) || nC < 0) nC = 0;
+  var box = document.getElementById('cartas-media-bloqueo');
+  var txt = 'No se puede retirar: ' + nC + ' cartas activas la usan. Desactiva o desvincula primero.';
+  if (!box) { showAdminToast('MEDIA_CON_CARTAS: ' + txt, 'error'); return; }
+  var btn = (_cartasCache && _cartasCache.length && _cartasMediaBloqueoId)
+    ? ' <button class="btn btn-ghost btn-sm" type="button" onclick="cartasVerCartasDeMedia(\'' + escH(_cartasMediaBloqueoId) + '\')" style="margin-left:8px">Ver cartas</button>'
+    : '';
+  box.innerHTML = '<span>' + escH(txt) + '</span>' + btn;
+  box.style.display = 'block';
+}
+
+function cartasMediaBloqueoOcultar() {
+  _cartasMediaBloqueoId = null;
+  var box = document.getElementById('cartas-media-bloqueo');
+  if (box) box.style.display = 'none';
+}
+
+/* Salto barato al catalogo filtrado por media_id: reusa _cartasCache y el
+   filtro cliente de cartaFiltroPasa(). Si la cache esta vacia, recarga. */
+function cartasVerCartasDeMedia(mediaId) {
+  var v = String(mediaId || '').trim();
+  if (!v) return;
+  _cartasFiltroMedia = v;
+  _cartasSel = {};
+  cartasSubTab('catalogo');
+  if (_cartasCache && _cartasCache.length) renderCartas();
+  else loadCartas();
+  cartasFiltroMediaAviso();
+}
+
+function cartasFiltroMediaAviso() {
+  var box = document.getElementById('cartas-filtro-media-aviso');
+  if (!box) return;
+  if (!_cartasFiltroMedia) { box.style.display = 'none'; return; }
+  var txt = document.getElementById('cartas-filtro-media-txt');
+  if (txt) txt.textContent = 'Filtrado por media: ' + _cartasFiltroMedia;
+  box.style.display = 'flex';
+}
+
+function cartasQuitarFiltroMedia() {
+  _cartasFiltroMedia = '';
+  _cartasSel = {};
+  cartasFiltroMediaAviso();
+  renderCartas();
 }
 
 function cartasMediaFecha(v) {
@@ -12477,6 +12560,9 @@ async function cargarCartasMedia() {
     var data = await resp.json();
     if (!data.ok) throw new Error((data.error || 'No se pudo cargar') + (data.detalle ? ': ' + data.detalle : ''));
     _cartasMediaCache = data.data || [];
+    /* Solo se pinta si el backend lo dijo con un booleano: una respuesta
+       antigua sin el flag no debe ocultar un aviso ya visible. */
+    if (typeof data.identidad_admin === 'boolean') cartasMediaIdentidadAviso(!data.identidad_admin);
     renderCartasMedia();
   } catch (e) {
     cont.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#9888;</div>'
@@ -12514,7 +12600,7 @@ function renderCartasMedia() {
     return;
   }
   var html = '<table class="data-table" style="margin-top:0"><thead><tr>'
-    + '<th>Autor</th><th>Tipo</th><th>Titulo</th><th>Licencia</th><th>Fecha</th>'
+    + '<th>Autor</th><th>Tipo</th><th>Titulo</th><th>Licencia</th><th>Fecha</th><th>Moderada por</th>'
     + '<th style="text-align:right">Cartas</th><th style="text-align:right">Acciones</th>'
     + '</tr></thead><tbody>';
   for (var i = 0; i < filas.length; i++) {
@@ -12532,6 +12618,13 @@ function renderCartasMedia() {
       ? '<div style="font-size:10px;color:#B00020">Motivo: ' + escH(m.motivo) + '</div>' : '';
     var nCartas = Number(m.cartas_n);
     if (!isFinite(nCartas)) nCartas = 0;
+    /* Quien modulo, tal cual lo manda el servidor (LEFT JOIN usuarios).
+       Sin nombre no se inventa identidad: se pinta "-". */
+    var modPor = String(m.moderado_por_nombre || '').trim();
+    var modHTML = modPor
+      ? '<span style="font-weight:600">' + escH(modPor) + '</span>'
+        + (m.moderado_en ? '<span style="display:block;font-size:10px;color:var(--muted)">' + escH(cartasMediaFecha(m.moderado_en)) + '</span>' : '')
+      : '-';
     html += '<tr>'
       + '<td><div style="font-weight:700">' + escH(autor) + '</div>'
       + '<div style="font-size:10px;color:var(--muted)">' + escH(m.autor_email || '') + '</div></td>'
@@ -12539,6 +12632,7 @@ function renderCartasMedia() {
       + '<td>' + titulo + motivo + '</td>'
       + '<td>' + lic + '</td>'
       + '<td>' + escH(cartasMediaFecha(m.creado_en)) + '</td>'
+      + '<td>' + modHTML + '</td>'
       + '<td style="text-align:right;font-weight:700;white-space:nowrap">' + nCartas + ' cartas</td>'
       + '<td style="text-align:right;white-space:nowrap">' + cartasMediaAcciones(m) + '</td>'
       + '</tr>';
@@ -12565,7 +12659,18 @@ async function cartasMediaModerar(id, estado) {
       body: JSON.stringify({ id: id, estado: estado, motivo: motivo })
     });
     var data = await resp.json();
-    if (!data.ok) throw new Error((data.error || 'ERROR') + (data.detalle ? ': ' + data.detalle : ''));
+    if (!data.ok) {
+      /* 409 MEDIA_CON_CARTAS: regla de negocio, no fallo de red. Se pinta
+         el motivo con el numero real y, si el catalogo esta cargado, el
+         acceso a las cartas que la respaldan. */
+      if (data.error === 'MEDIA_CON_CARTAS') {
+        cartasMediaBloqueoPintar(id, data.cartas_n);
+        return;
+      }
+      throw new Error((data.error || 'ERROR') + (data.detalle ? ': ' + data.detalle : ''));
+    }
+    cartasMediaBloqueoOcultar();
+    if (typeof data.identidad_admin === 'boolean') cartasMediaIdentidadAviso(!data.identidad_admin);
     showAdminToast(data.mensaje || ('Obra ' + estado), 'success');
     cargarCartasMedia();
     cargarCartasMediaAprobadas();

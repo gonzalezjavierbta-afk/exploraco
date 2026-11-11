@@ -7,7 +7,7 @@
 // la comprobacion de que los conteos PRE y POST son IDENTICOS.
 //
 // POR QUE EXISTE
-//   Los 6 invariantes se validaron una vez a mano. Un ensayo one-off no protege
+//   Los 7 invariantes se validaron una vez a mano. Un ensayo one-off no protege
 //   el repo: si alguien dropea un CHECK, cambia la PK de vuelta a 2 columnas o
 //   relaja el ON DELETE de la FK de marca, nada lo detecta hasta produccion.
 //   Este fichero convierte ese ensayo en guardia repetible.
@@ -23,7 +23,7 @@
 //         unique, 23503 foreign key).
 //   Si (a) mide 0 filas, el caso se declara FAIL aunque no haya habido error.
 //
-// LOS 6 CASOS
+// LOS 7 CASOS
 //   C1 chk_usuarios_cartas_variante ....... dominio cerrado base / shiny
 //   C2 chk_usuarios_cartas_museo .......... techo 1..12 + coherencia
 //                                           en_museo / orden_museo / cantidad
@@ -38,6 +38,9 @@
 //                                           (usuario_id, nivel_gate)
 //   C6 cartas_catalogo: chk_cartas_catalogo_emisor_coherente y
 //                                           chk_cartas_catalogo_fusionable
+//   C7 cartas_catalogo: familia y subtipo NOT NULL (069). La lista de
+//                                           columnas VIEJA, sin familia ni
+//                                           subtipo, no puede volver a entrar
 //
 // SEGURIDAD DE LA ESCRITURA
 //   Todo va en UNA transaccion. Cada sentencia que se espera que FALLE va
@@ -143,7 +146,7 @@ async function main() {
     console.log('SKIP no se abre conexion, no se ejecuta SQL y la cadena de test no se rompe.');
     console.log('');
     console.log('----');
-    console.log('TOTAL casos=6 checks=0 PASS=0 FAIL=0 SKIP=1');
+    console.log('TOTAL casos=7 checks=0 PASS=0 FAIL=0 SKIP=1');
     // Vaciar stdout antes de salir: con la salida por tuberia process.exit()
     // descarta lo que aun este en el buffer y el SKIP quedaria invisible.
     process.stdout.write('', function () { process.exit(0); });
@@ -187,11 +190,14 @@ async function main() {
       return client.query(s, p || []).then(function (r) {
         var n = (r && typeof r.rowCount === 'number') ? r.rowCount
           : ((r && r.rows) ? r.rows.length : -1);
-        return { code: null, n: n };
+        return { code: null, n: n, col: null };
       }).catch(function (e) {
         var code = (e && e.code) ? String(e.code) : limpiar(e && e.message);
+        // El nombre de columna solo viaja en 23502 (not_null_violation): se
+        // propaga para que el caso C7 pueda exigir la columna exacta.
+        var col = (e && e.column) ? String(e.column) : null;
         return q('ROLLBACK TO SAVEPOINT ' + sp).then(function () {
-          return { code: code, n: 0 };
+          return { code: code, n: 0, col: col };
         });
       });
     });
@@ -204,7 +210,7 @@ async function main() {
       + (e && e.code ? String(e.code) + ' ' : '') + limpiar(e && e.message));
     console.log('SKIP se trata como entorno sin base para no romper la cadena de npm run test.');
     console.log('----');
-    console.log('TOTAL casos=6 checks=0 PASS=0 FAIL=0 SKIP=1');
+    console.log('TOTAL casos=7 checks=0 PASS=0 FAIL=0 SKIP=1');
     salir(0);
     return;
   }
@@ -243,7 +249,7 @@ async function main() {
     }
     check('P0d columnas de la 060 presentes en las 3 tablas', colErr === null, 'error=' + String(colErr));
     if (colErr !== null) {
-      console.log('ABORTA: la 060 no esta aplicada; los 6 casos no existirian.');
+      console.log('ABORTA: la 060 no esta aplicada; los 7 casos no existirian.');
       throw new Error('preflight 060');
     }
 
@@ -470,6 +476,29 @@ async function main() {
       'code=' + String(c6c.code) + ' filas=' + c6c.n);
 
     // =====================================================================
+    // C7 cartas_catalogo: familia y subtipo NOT NULL (migracion 069)
+    // Contrato que se blinda: la lista de columnas VIEJA (la del codigo previo
+    // a la 069) ya no puede insertar. Si alguien relaja el NOT NULL o vuelve a
+    // desplegar un INSERT sin familia/subtipo, este caso se pone en rojo.
+    // Es un caso NEGATIVO puro: no lleva pata positiva porque la fila objetivo
+    // no debe existir; la prueba es el SQLSTATE exacto 23502 sobre la columna
+    // familia (primera columna NOT NULL sin DEFAULT en orden fisico).
+    // Va por qfalla, que abre su SAVEPOINT y revierte: cero residuos.
+    // La columna se compara de forma tolerante: si el driver no envia el campo
+    // 'column', el guard se apoya en el SQLSTATE 23502 y deja la evidencia en
+    // el detalle, para no acoplar el contrato al driver.
+    // =====================================================================
+    var SQL_CARTA_LISTA_VIEJA =
+      'INSERT INTO cartas_catalogo'
+      + ' (id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url)'
+      + " VALUES ($1, $2, 'smoke_tx', 'comun', NULL, false, NULL)";
+    var c7 = await qfalla('sp_c7', SQL_CARTA_LISTA_VIEJA,
+      ['cartas_tx_' + tag + '_x3', 'smoke tx lista vieja']);
+    check('C7 lista vieja sin familia/subtipo recibe 23502 en familia',
+      c7.code === '23502' && (!c7.col || c7.col === 'familia'),
+      'code=' + String(c7.code) + ' columna=' + String(c7.col) + ' filas=' + c7.n);
+
+    // =====================================================================
     // CONTROL INTERMEDIO: dentro de la tx tiene que haber escrituras.
     // Si aqui no hay mas filas que en PRE, los casos anteriores no escribieron
     // y sus verdes serian falsos negativos.
@@ -541,7 +570,7 @@ async function main() {
   }
 
   console.log('----');
-  console.log('TOTAL casos=6 checks=' + num + ' PASS=' + (num - fallos) + ' FAIL=' + fallos + ' SKIP=' + saltados);
+  console.log('TOTAL casos=7 checks=' + num + ' PASS=' + (num - fallos) + ' FAIL=' + fallos + ' SKIP=' + saltados);
   salir(fallos ? 1 : 0);
 }
 

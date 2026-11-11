@@ -171,6 +171,87 @@ assert(nTresCol === nInsCartas,
 assert(nDosColCarta === 0, INTER + ' no conserva ningun ON CONFLICT de 2 columnas sobre usuarios_cartas',
   'encontrados ' + nDosColCarta);
 
+// --- (f) PRECIO DE ACUNACION: base por rareza x mult de familia (spec 4.2) --
+// El precio se RESUELVE una vez y se GUARDA (4.2): dos lectores del mismo par
+// de factores (el alta del catalogo y el recalculo del seed). Si la tabla se
+// replica en el handler o en el SQL, la deriva es invisible porque los dos
+// numeros parecen plausibles. Por eso el gate fija VALORES, no solo existencia.
+var ADM = 'api/admin.js';
+var tAdm = '';
+try { tAdm = leer(ADM); } catch (e) { tAdm = ''; }
+assert(tAdm !== '', ADM + ' es legible para el gate de precio', 'no se pudo leer');
+
+var bases = libCfg.CARTA_PRECIO_BASE_XP;
+var mults = libCfg.CARTA_MULT_FAMILIA;
+assert(!!bases && bases.comun === 150 && bases.raro === 400
+  && bases.epico === 1000 && bases.dorado === 2500,
+  'lib exporta CARTA_PRECIO_BASE_XP = 150/400/1000/2500',
+  'valor real: ' + JSON.stringify(bases));
+assert(!!mults && mults.lugar === 1.0 && mults.personaje === 1.2
+  && mults.artista === 1.2 && mults.marca === 1.5 && mults.cosmetica === 0.5,
+  'lib exporta CARTA_MULT_FAMILIA = 1,0 / 1,2 / 1,2 / 1,5 / 0,5',
+  'valor real: ' + JSON.stringify(mults));
+assert(typeof libCfg.precioAcunacion === 'function',
+  'lib exporta precioAcunacion() como funcion', 'falta el helper');
+
+// producto / consumible NO tienen precio de carta: su precio es el SKU.
+var sinPrecioCarta = libCfg.CARTA_FAMILIAS_SIN_PRECIO_XP;
+assert(sinPrecioCarta.every(function (f) {
+  return !Object.prototype.hasOwnProperty.call(mults, f);
+}), 'CARTA_MULT_FAMILIA no incluye las familias sin precio_xp',
+  'aparece ' + sinPrecioCarta.join(' o '));
+
+// Tabla COMPLETA de 4.2 (filas x familia acunable). Un unico caso con la
+// matriz entera detecta cualquier desliz de un solo numero.
+var TABLA_42 = {
+  cosmetica: { comun: 75,   raro: 200,  epico: 500,  dorado: 1250 },
+  lugar:     { comun: 150,  raro: 400,  epico: 1000, dorado: 2500 },
+  personaje: { comun: 180,  raro: 480,  epico: 1200, dorado: 3000 },
+  artista:   { comun: 180,  raro: 480,  epico: 1200, dorado: 3000 },
+  marca:     { comun: 225,  raro: 600,  epico: 1500, dorado: 3750 }
+};
+Object.keys(TABLA_42).forEach(function (fam) {
+  ['comun', 'raro', 'epico', 'dorado'].forEach(function (rar) {
+    var esperado = TABLA_42[fam][rar];
+    var real = libCfg.precioAcunacion(fam, rar);
+    assert(real === esperado, 'precioAcunacion(' + fam + ',' + rar + ') = ' + esperado,
+      'valor real: ' + real);
+  });
+});
+
+// Casos de borde: no acunable, rareza desconocida y argumentos ausentes -> null
+// (nunca 0, NaN ni un precio inventado: el CHECK de la 066 exige NULL o > 0).
+[[null, 'comun'], ['producto', 'comun'], ['consumible', 'dorado'],
+ ['producto', null], ['lugar', 'legendaria'], ['lugar', null],
+ [undefined, undefined], ['marca', 'COMUN ']].forEach(function (par) {
+  var real = libCfg.precioAcunacion(par[0], par[1]);
+  var etiqueta = 'precioAcunacion(' + String(par[0]) + ',' + String(par[1]) + ')';
+  if (par[0] === 'marca') {
+    assert(real === 225, etiqueta + ' normaliza mayusculas/espacios a 225',
+      'valor real: ' + real);
+    return;
+  }
+  assert(real === null, etiqueta + ' devuelve null', 'valor real: ' + real);
+});
+
+// numeric(12,2): el valor viaja ya cerrado a 2 decimales, sin segundo redondeo.
+assert(['lugar', 'personaje', 'artista', 'marca', 'cosmetica'].every(function (fam) {
+  return ['comun', 'raro', 'epico', 'dorado'].every(function (rar) {
+    var x = libCfg.precioAcunacion(fam, rar);
+    return typeof x === 'number' && Math.round(x * 100) === x * 100;
+  });
+}), 'todo precioAcunacion() cierra a 2 decimales (numeric(12,2), ADR-035)',
+  'hay un valor con mas de 2 decimales');
+
+// El handler NO reproduce la tabla: enlaza el helper y se apoya en el.
+assert(/var\s+CartasConfig\s*=\s*require\(\s*'\.\.\/lib\/cartas-config\.js'\s*\)/.test(tAdm),
+  ADM + ' requirea lib/cartas-config.js', 'falta el require');
+assert(/CartasConfig\.precioAcunacion\s*\(/.test(tAdm),
+  ADM + ' usa CartasConfig.precioAcunacion() al crear la carta', 'no aparece la llamada');
+assert(cuenta(tAdm, /var\s+(CARTA_PRECIO_BASE_XP|CARTA_MULT_FAMILIA)\s*=/g) === 0,
+  ADM + ' NO redeclara la tabla de precios (solo en lib/)',
+  'declaracion local detectada');
+
 // --- Resumen ---------------------------------------------------------------
 console.log('');
 console.log('Checks: ' + total + ' total, ' + pass + ' PASS, ' + fails + ' FAIL');

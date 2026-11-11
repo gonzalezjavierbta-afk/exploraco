@@ -93,7 +93,7 @@ La **capa** es una funcion pura de la familia (no se persiste: dos autoridades s
 | Capa | Familia | Que es | Subtipos (dominio cerrado) | Fuente de la carta | Comerciable en XP | Fusionable | Museable |
 |---|---|---|---|---|---|---|---|
 | **Juego** | `lugar` | Destino, territorio o patrimonio de Colombia | `territorio`, `patrimonio`, `natural` | Drop por gate (`cartas_gates`), tirada, canje | **Si** | **Si** | **Si** |
-| **Juego** | `personaje` | Persona real, de ficcion o de folclor | `historico`, `ficcion`, `folclor` | Tirada, UGC aprobada | **Si** | **Si** | **Si** |
+| **Juego** | `personaje` | Persona real, de ficcion o de folclor | `historico`, `ficcion`, `folclor` | Tirada, UGC aprobada | **Si** | **No** (lo exige `chk_cartas_catalogo_fusionable`: `nivel_gate IS NULL`, y las 14 cartas nuevas llevan gate; deuda D-21) | **Si** |
 | **Juego** | `artista` | Autor creativo (una carta por obra) | `musica`, `cine`, `grafica`, `literatura` (espeja las vocaciones de `api/interacciones.js:2450-2453`) | UGC aprobada | **Si** | **Si** | **Si** |
 | **Juego** | `marca` | Marca aliada; puede gatear set y premio | `licor`, `gastronomia`, `artesania`, `otra` | SKU (`es_canjeable_qr`) o acunacion XP | **Si** | **No** (lo exige `chk_cartas_catalogo_fusionable`, `060:352-355`) | **Si** |
 | **Economia** | `producto` | Recibo coleccionable de un SKU fisico | `fisico`, `digital` | `canjes_tienda` con `origen='premio_set'` o mostrador | **No (sin predicado hoy: D-15)** | **No** | **No** |
@@ -110,7 +110,7 @@ La **capa** es una funcion pura de la familia (no se persiste: dos autoridades s
 6. `capa` **no se persiste.** Se deriva de `familia` en una sola funcion del render/API.
 7. **Vinculo carta <-> SKU por convencion ya existente:** `stats_json.sku` (precedente literal en `065:78-90`). Es la unica llave carta->SKU; no se crea columna `sku` (segunda autoridad). 066 lo valida como **CHECK en `producto`** (las 4 cartas actuales ya lo cumplen, 4/4) y como **verificacion** en `consumible`, donde **no** se puede poner CHECK sin inventar datos: las 3 `ce_evento_*` son legacy y **ninguna tiene `sku`** (baseline declarado, 8 V19). Las cartas `consumible` nuevas quedan obligadas por contrato de handler (fase 2) + verificacion.
 
-### 2.2. Mapeo de las 31 cartas actuales
+### 2.2. Mapeo de las 31 cartas al nacimiento del diseno (HISTORICO; hoy el catalogo es de 45, ver 11.7)
 
 | Grupo | Cartas | n | familia / subtipo destino |
 |---|---|---|---|
@@ -144,7 +144,7 @@ Notas de mapeo:
 | `rendimiento` | Rendimiento economico | Misiones y expediciones cobradas, ventas en mercado, canjes atendidos | (a) umbral de `expedicion_rama='economia'` (**DIFERIDA: 0 cartas hoy, fase 4**); (b) **sin consumidor en v1** (declarado). **No** sustituye ni deroga el bono global 24 h de ADR-120 (4.7), y el cap de 5/24 h es una constante, no un derivado de este eje. | 40 |
 | `presencia` | Estatus puro | Cosmetics equipadas | (a) orden del museo; (b) insignia en la ficha de carta. **Cero efecto economico: no entra en `poder`, no toca tirada, no toca XP.** | 40 (display) |
 
-**Disponibilidad por ejes (hecho medido, correccion 10):** las 31 cartas actuales son **24 `lugar` + 3 `consumible` + 4 `producto`**. Por familia (3.2) eso significa que **solo `alcance` y `fortuna` tienen cartas que los aporten hoy**; `oficio` y `rendimiento` valen **0** en el catalogo actual y no se pueden subir con nada. Por eso **v1 expone unicamente las `expedicion_rama` de `alcance` y `fortuna`**; `obra` y `economia` se habilitan **despues del seed de `personaje`/`marca`/`artista` (fase 4)**. Un eje a 0 con una rama publicada seria una mision imposible, no una stat muerta: la distincion importa.
+**Disponibilidad por ejes (hecho medido al disenar, correccion 10; HOY SUPERADO por 11.7: tras la 071 hay 8 `personaje` y 6 `marca`, luego `oficio` y `rendimiento` ya tienen cartas):** las 31 cartas de entonces eran **24 `lugar` + 3 `consumible` + 4 `producto`**. Por familia (3.2) eso significaba que **solo `alcance` y `fortuna` tenian cartas que los aportaran**; `oficio` y `rendimiento` valian **0** y no se podian subir con nada. Por eso **v1 expone unicamente las `expedicion_rama` de `alcance` y `fortuna`**; `obra` y `economia` se habilitan **despues del seed de `personaje`/`marca`/`artista` (fase 4)**. Un eje a 0 con una rama publicada seria una mision imposible, no una stat muerta: la distincion importa.
 
 **Ningun eje multiplica el XP global** (decision cerrada 3). Los cuatro ejes jugables actuan por **umbral** (habilitan o no) y por **caps** (limitan cuanto).
 
@@ -523,7 +523,7 @@ Todo lo de esta seccion es **CONTRATO DE FASE 2** (duenno `@backend-dev`, gate *
 
 ### 6.3. Limites por autor y gate de oficio
 
-- **Publicar exige ACCIONES REALES, no un eje vacio:** `n_resenas_largas >= 3` **o** `media propia aprobada >= 1`. **No** se usa `oficio >= 8` en v1: `oficio` vale 0 hoy porque ninguna de las 31 cartas lo aporta (3.1) y el gate bloquearia toda la UGC hasta la fase 4. Cuando existan cartas de `personaje`/`artista`, el gate puede endurecerse a `oficio >= 8` **como condicion adicional** (fase 4), nunca como sustituto.
+- **Publicar exige ACCIONES REALES, no un eje vacio:** `n_resenas_largas >= 3` **o** `media propia aprobada >= 1`. **No** se usa `oficio >= 8` en v1: `oficio` valia 0 al disenar porque ninguna de las 31 cartas de entonces lo aportaba (3.1) y el gate habria bloqueado toda la UGC hasta la fase 4 (**hoy ya hay 8 `personaje` y 6 `marca` que aportan `oficio`/`rendimiento`, ver 11.7**). Cuando existan cartas de `personaje`/`artista`, el gate puede endurecerse a `oficio >= 8` **como condicion adicional** (fase 4), nunca como sustituto.
 - Maximo **3 obras `pendiente`** simultaneas por autor (COUNT sobre `cartas_media`; sin tabla de cuotas).
 - Maximo **10 obras `aprobada` por ventana de 30 dias** por autor (COUNT con `creado_en`).
 - Superar el limite -> error de aplicacion, nunca un bloqueo silencioso.
@@ -1268,3 +1268,48 @@ END $m068chk$;
 **Defecto documental conocido (no de dato):** el comentario `md5 POST` del header de la 070 (`f2ae6007...`) es una prediccion **FALSA**; el md5 real es `a3bc72bf...`. El operador acepta el comentario como obsoleto y **no autoriza cirugia del ledger** (su `sha256` coincide con el disco; editarlo crearia deriva permanente).
 
 **Deudas vivas:** (a) C7 opcional del `smoke_cartas_db_tx` (**23502**, subiria a **41**); (b) politica de retirada de obra `aprobada` con cartas ya emitidas; (c) `moderado_por` sin identidad de admin; (d) md5 obsoleto del header 070; (e) assets UGC son URL/texto, sin storage ni subida binaria; (f) **0 cartas** de `personaje`/`artista`/`marca`/`cosmetica`, luego las ramas de expedicion de `oficio`/`rendimiento` siguen sin cartas que las alimenten (**D-14**). **Fuera de este release:** `expedicion_rama` + misiones repetibles (5.2) siguen como contrato pendiente; no se declaran implementadas.
+
+### 11.7. Enmienda 4 (familias de juego y precio por familia)
+
+**Estado medido (2026-11-11):** **071** y **072 APLICADAS** en Neon, **1 fila de ledger** cada una y **segunda corrida = 0 cambios**. El argumento vive en `DECISIONS.md` **ADR-121 Enmienda 4** (ADR-084 D1); aqui solo el **contrato efectivo** y la **tabla de precios**.
+
+**Catalogo tras 071: 45 cartas.**
+
+| Familia | Cartas | N | Comprables |
+|---|---|---|---|
+| `lugar` | `ct_*` (24) | 24 | 24 |
+| `consumible` | `ce_evento_*` | 3 | 0 (SKU) |
+| `producto` | `cta_ancestral_*` | 4 | 0 (SKU) |
+| `personaje` | `cp_*` | **8** | **8** |
+| `marca` | `cm_*` | **6** | **6** |
+| **Total** | | **45** | **38** (24+8+6) |
+
+Rarezas de las **14** nuevas: **5 comun, 4 raro, 3 epico, 2 dorado**, con **dorado en AMBAS familias**. `stats_json` lleva **solo los 4 ejes** (`alcance`, `oficio`, `fortuna`, `rendimiento`): **sin** `presencia`, **sin** `sku`, **sin** `bonus_xp_pct`. La migracion lleva **16 guardas `RAISE`**.
+
+**Precio de acunacion efectivo (072): base por rareza x multiplicador de familia.**
+
+La formula tiene **autoridad unica** en `lib/cartas-config.js`: `CARTA_PRECIO_BASE_XP`, `CARTA_MULT_FAMILIA` y `precioAcunacion()`. No se duplica en SQL ni en el handler de servicio.
+
+| Familia | Mult. | comun | raro | epico | dorado |
+|---|---|---|---|---|---|
+| `lugar` | x1.0 | 150 | 400 | 1000 | 2500 |
+| `personaje` | x1.2 | **180** | **480** | **1200** | **3000** |
+| `marca` | x1.5 | **225** | **600** | **1500** | **3750** |
+| `producto` / `consumible` | n/a | NULL | NULL | NULL | NULL (se pagan por SKU) |
+
+**Regla de aplicacion:** `api/admin.js` calcula con `precioAcunacion()` **solo al crear** una carta acunable **sin `precio_xp` explicito**. **`carta_acunar` NO cambia**: sigue leyendo `precio_xp` de la base, que **es la autoridad del cobro**. Una edicion que deje `precio_xp` vacio **no recalcula** (**D-24**).
+
+**Codigos nuevos del contrato de moderacion y de estado (`api/admin.js` + `admin.html`).**
+
+| Codigo | Cuando | Efecto |
+|---|---|---|
+| `MEDIA_CON_CARTAS` | Retirar o rechazar una obra `aprobada` con cartas activas (`cartas_catalogo.media_id` y `activo=true`) | **409** con **`cartas_n`**, **dentro de transaccion** con `SELECT ... FOR UPDATE` (**sin carrera**) y **sin tocar el estado**. Salida: desactivar o desvincular las cartas |
+| `MEDIA_AUTOR_INCOHERENTE` | El `emisor_id` no coincide con el `autor_id` de la obra UGC | Rechazo de la operacion (coherencia ya exigida a `cartas_crear`/`cartas_editar`) |
+| `MODERADO_POR_INVALIDO` | El `moderado_por` recibido no es un uuid valido o no existe en `usuarios.id` | Rechazo del valor; la identidad valida es **`process.env.ADMIN_USER_ID`** |
+| `ESTADO_INVALIDO` | Transicion de estado no permitida por la maquina (`pendiente->aprobada|rechazada`, `aprobada->retirada`, `rechazada->pendiente`) | Rechazo sin escritura |
+
+**Identidad real de moderacion:** `process.env.ADMIN_USER_ID` (uuid validado + `EXISTS usuarios.id`). Si **falta o no existe**, `moderado_por` queda **NULL** y la moderacion **NO falla**; la respuesta trae **`identidad_admin:true|false`** y **`moderado_por_nombre`**. El panel pinta **aviso persistente** cuando `identidad_admin=false`, columna **"Moderada por"**, y el **409** con **N** y boton **"Ver cartas"** que filtra el Catalogo por `media_id`. **Precedencia pendiente (D-25):** hoy `body.moderado_por` puede pisar `ADMIN_USER_ID`.
+
+**Deudas de esta enmienda.** **D-20** md5 obsoleto del header 070 (sin cirugia de ledger). **D-21** spec 2.1 vs `chk_cartas_catalogo_fusionable` (manda el esquema; la linea de 2.1 queda corregida aqui). **D-22** `historico` con **0 cartas** (sin persona historica nombrada; no se invento IP). **D-23** arte provisional: las 8 `personaje` reutilizan 4 laminas de herramienta y las 6 `marca` usan `marca_ancestral.png`; `cartas-arte.js` **no se amplio** (9 claves fijadas por 2 checks del smoke; `imagen_url` gana en `arteDe()`). **D-24** precio al editar. **D-25** precedencia de `moderado_por`. **`expedicion_rama`** (`obra`/`economia`) **sigue sin implementar**: ahora hay cartas de `oficio`/`rendimiento` que podrian alimentarla, pero el contrato de 5.2 **no se declara implementado**. **`artista` no se siembra** (solo nace de UGC aprobado) y **la tienda esta diferida** hasta **>= 2 familias de juego con stock real**; **no** se afirma que exista.
+
+**Verificacion (medida):** economia **49/49** (**E14-E19** nuevos, **0 persistencia**), `smoke_cartas_db_tx.js` **41/41** con **C7** (`23502` en `familia` con la lista vieja), constantes **66/66**, **`npm test` exit 0**, divs de `admin.html` **1408/1408**. **No se editaron** las migraciones 066-072, ni `api/` mas alla de lo descrito, ni `db/`, ni `admin.html`, ni `cartas-ui.*`, ni `cartas-arte.js`.

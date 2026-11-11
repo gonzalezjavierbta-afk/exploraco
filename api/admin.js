@@ -1542,6 +1542,13 @@ module.exports = async function handler(req, res) {
       // (estado_moderacion, creado_en) cubre el filtro y el ORDER BY.
       // autor_id NO tiene FK (067:35-38): LEFT JOIN y COALESCE, la obra de un
       // autor desaparecido se sigue leyendo.
+      // moderado_por se resuelve con un segundo LEFT JOIN (tampoco tiene FK):
+      // el panel muestra quien modulo en claro, no solo el uuid. cartas_n
+      // cuenta TODOS los vinculos y cartas_activas_n solo los que hoy respaldan
+      // gameplay (c.activo=true): es el numero que dispara MEDIA_CON_CARTAS.
+      // identidad_admin=true cuando el despliegue declara ADMIN_USER_ID con un
+      // uuid valido; el panel lo usa para avisar de que moderado_por quedara
+      // NULL (nunca se inventa identidad).
       if (tipoCa === 'cartas_media_lista') {
         if (req.method !== 'GET') return res.status(405).end();
         var estMed = String(req.query.estado || 'pendiente').trim().toLowerCase();
@@ -1556,16 +1563,21 @@ module.exports = async function handler(req, res) {
           + ' COALESCE(u.email, \'\') AS autor_email, m.tipo, m.titulo,'
           + ' m.media_url, m.thumb_url, m.texto, m.duracion_seg,'
           + ' m.estado_moderacion, m.motivo, m.licencia, m.licencia_aceptada_en,'
-          + ' m.moderado_por, m.moderado_en, m.activo, m.creado_en,'
+          + ' m.moderado_por, m.moderado_en, COALESCE(ua.nombre, \'\') AS moderado_por_nombre,'
+          + ' m.activo, m.creado_en,'
           + ' (SELECT COUNT(*)::int FROM cartas_catalogo c'
-          + '   WHERE c.media_id = m.id) AS cartas_n'
+          + '   WHERE c.media_id = m.id) AS cartas_n,'
+          + ' (SELECT COUNT(*)::int FROM cartas_catalogo c'
+          + '   WHERE c.media_id = m.id AND c.activo = true) AS cartas_activas_n'
           + ' FROM cartas_media m LEFT JOIN usuarios u ON u.id = m.autor_id'
+          + ' LEFT JOIN usuarios ua ON ua.id = m.moderado_por'
           + ' WHERE m.estado_moderacion=$1'
           + ' ORDER BY m.activo DESC, m.creado_en DESC LIMIT $2::int',
           [estMed, limMed]
         );
         return res.status(200).json({ ok:true, data: medFilas,
-          total: medFilas.length, estado: estMed });
+          total: medFilas.length, estado: estMed,
+          identidad_admin: Boolean(normalizarUuidCarta(process.env.ADMIN_USER_ID)) });
       }
 
       // --- Moderar una obra (spec 6.2) ----------------------------------
@@ -1581,6 +1593,31 @@ module.exports = async function handler(req, res) {
       // moderado_por: el panel admin se autentica con ADMIN_SECRET (secreto
       // compartido, sin uuid de usuario: admin.js:3200), asi que no se inventa
       // una identidad. Se acepta opcional en el body y por omision queda NULL.
+      //
+      // GUARD MEDIA_CON_CARTAS (decision del operador, 2026-11-11): una obra
+      // que ya respalda cartas VIVAS no se retira de golpe. Antes de fijar
+      // 'retirada' -- y tambien 'rechazada' si la obra esta hoy 'aprobada' --
+      // se cuenta cartas_catalogo con media_id=id AND activo=true. Si hay
+      // alguna: 409 MEDIA_CON_CARTAS con cartas_n y el estado NO se toca. La
+      // salida es desactivar o desvincular las cartas primero (cartas_editar
+      // con media_id=null ya tiene su guard MEDIA_CON_OFERTAS).
+      // Carrera: el conteo y el UPDATE corren en UNA transaccion con
+      // SELECT ... FOR UPDATE sobre la fila de cartas_media, y el UPDATE exige
+      // el estado previo leido ($5). Dos moderaciones simultaneas se
+      // serializan: la segunda no pisa el estado de la primera y responde 409
+      // TRANSICION_INVALIDA sin escribir. Fail-closed: si el UPDATE no
+      // devuelve fila, no hay 200.
+      //
+      // IDENTIDAD de moderado_por (decision del operador, 2026-11-11): la
+      // identidad se toma, por orden, de body.moderado_por (uuid explicito;
+      // mal formado -> 400 MODERADO_POR_INVALIDO) o de
+      // process.env.ADMIN_USER_ID. ADMIN_USER_ID solo se escribe si es un uuid
+      // valido Y existe en usuarios.id; si falta, esta mal formado o apunta a
+      // un usuario inexistente, moderado_por queda NULL y la moderacion
+      // CONTINUA (nunca 500/503 por identidad: no se inventa identidad ni se
+      // bloquea el trabajo). La respuesta lleva identidad_admin (la variable
+      // esta configurada con uuid valido) y el moderado_por realmente
+      // guardado, para que el panel muestre NULL en vez de suponer.
       if (tipoCa === 'cartas_media_moderar') {
         if (req.method !== 'POST') return res.status(405).end();
         var idMed = normalizarUuidCarta(body.id);
@@ -1598,6 +1635,18 @@ module.exports = async function handler(req, res) {
         if (modPor === undefined)
           return res.status(400).json({ ok:false, error:'MODERADO_POR_INVALIDO',
             detalle:'moderado_por debe ser un uuid valido o null' });
+        // ADMIN_USER_ID: la identidad del despliegue. Solo cuenta si es uuid
+        // valido; si no, se ignora en silencio (nunca rompe la moderacion).
+        var admIdMed = normalizarUuidCarta(process.env.ADMIN_USER_ID);
+        var identidadAdm = Boolean(admIdMed);
+        if (!modPor && admIdMed) {
+          var usrAdm = await sql(
+            'SELECT id::text AS id FROM usuarios WHERE id=$1::uuid LIMIT 1',
+            [admIdMed]
+          );
+          // uuid inexistente -> NULL, pero la moderacion sigue.
+          modPor = usrAdm.length ? admIdMed : null;
+        }
         if (estNuevo === 'pendiente') modPor = null;
         var actMed = await sql(
           'SELECT estado_moderacion, licencia FROM cartas_media'
@@ -1613,19 +1662,30 @@ module.exports = async function handler(req, res) {
         if (estNuevo === 'aprobada' && !String(actMed[0].licencia || '').trim())
           return res.status(400).json({ ok:false, error:'LICENCIA_REQUERIDA',
             detalle:'la obra no declara licencia: no se puede aprobar' });
-        var updMed;
+        var txMed;
         try {
-          updMed = await sql(
-            'UPDATE cartas_media SET estado_moderacion=($2::text)::varchar(12),'
-            + ' motivo=CASE WHEN $2::text=\'rechazada\' THEN $3 ELSE motivo END,'
-            + ' moderado_por=$4::uuid,'
-            + ' moderado_en=CASE WHEN $2::text=\'pendiente\' THEN NULL ELSE NOW() END,'
-            + ' activo=CASE WHEN $2::text=\'retirada\' THEN false ELSE activo END'
-            + ' WHERE id=$1::uuid'
-            + ' RETURNING id, autor_id, estado_moderacion, motivo, moderado_por,'
-            + ' moderado_en, activo, creado_en',
-            [idMed, estNuevo, motMed, modPor]
-          );
+          txMed = await sql.transaction(function (tx) {
+            return [
+              tx('SELECT m.id::text AS id, m.estado_moderacion,'
+                + ' (SELECT COUNT(*)::int FROM cartas_catalogo c'
+                + '   WHERE c.media_id = m.id AND c.activo = true) AS cartas_n'
+                + ' FROM cartas_media m WHERE m.id=$1::uuid FOR UPDATE',
+                [idMed]),
+              tx('UPDATE cartas_media SET estado_moderacion=($2::text)::varchar(12),'
+                + ' motivo=CASE WHEN $2::text=\'rechazada\' THEN $3 ELSE motivo END,'
+                + ' moderado_por=$4::uuid,'
+                + ' moderado_en=CASE WHEN $2::text=\'pendiente\' THEN NULL ELSE NOW() END,'
+                + ' activo=CASE WHEN $2::text=\'retirada\' THEN false ELSE activo END'
+                + ' WHERE id=$1::uuid AND estado_moderacion=$5::text'
+                + ' AND NOT (($2::text=\'retirada\''
+                + '  OR ($2::text=\'rechazada\' AND estado_moderacion=\'aprobada\'))'
+                + '  AND EXISTS (SELECT 1 FROM cartas_catalogo c'
+                + '   WHERE c.media_id=cartas_media.id AND c.activo=true))'
+                + ' RETURNING id, autor_id, estado_moderacion, motivo,'
+                + ' moderado_por, moderado_en, activo, creado_en',
+                [idMed, estNuevo, motMed, modPor, estViejo])
+            ];
+          });
         } catch (eMod) {
           var msgMod = String((eMod && eMod.message) || '');
           if (eMod && eMod.code === '23514'
@@ -1636,8 +1696,25 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ ok:false, error:'MOTIVO_REQUERIDO' });
           throw eMod;
         }
+        var medLock = (txMed && txMed[0] && txMed[0][0]) ? txMed[0][0] : null;
+        var updMed = (txMed && txMed[1]) ? txMed[1] : [];
+        if (!medLock)
+          return res.status(404).json({ ok:false, error:'MEDIA_NO_ENCONTRADA' });
+        if (!updMed.length) {
+          var nVivas = Number(medLock.cartas_n) || 0;
+          var guardaVivas = (estNuevo === 'retirada'
+            || (estNuevo === 'rechazada'
+                && String(medLock.estado_moderacion) === 'aprobada'));
+          if (guardaVivas && nVivas > 0)
+            return res.status(409).json({ ok:false, error:'MEDIA_CON_CARTAS',
+              cartas_n: nVivas,
+              detalle:'La obra respalda ' + nVivas + ' carta(s) activa(s):'
+                + ' desactiva o desvincula las cartas antes de retirarla' });
+          return res.status(409).json({ ok:false, error:'TRANSICION_INVALIDA',
+            detalle: String(medLock.estado_moderacion) + ' -> ' + estNuevo });
+        }
         return res.status(200).json({ ok:true, data: updMed[0],
-          mensaje: 'Obra ' + estNuevo });
+          identidad_admin: identidadAdm, mensaje: 'Obra ' + estNuevo });
       }
 
       // --- Crear: id unico (slug ASCII), set y rareza validos -----------
@@ -1713,6 +1790,17 @@ module.exports = async function handler(req, res) {
         if (preCa === undefined)
           return res.status(400).json({ ok:false, error:'PRECIO_INVALIDO',
             detalle:'precio_xp debe ser numerico >= 0 o null' });
+        // ADR-121 (spec 4.2): una carta ACUNABLE sin precio explicito NO se
+        // rechaza ni se guarda con NULL: se resuelve con la tabla unica de
+        // lib/cartas-config.js (base por rareza x multiplicador de familia).
+        // producto/consumible devuelven null y siguen con precio_xp NULL, que
+        // es lo que exige chk_cartas_catalogo_precio. La AUTORIDAD del cobro
+        // sigue siendo el precio_xp de la FILA (carta_acunar lo lee de la base),
+        // no este calculo: aqui solo se evita que el alta caiga como 23514.
+        if (preCa === null) {
+          var preAutoCa = CartasConfig.precioAcunacion(famCa, rarCa);
+          if (preAutoCa !== null) preCa = preAutoCa;
+        }
         var motFusCa = motivoNoFusionableCarta({
           nivel_gate: nivCa, es_evento: evCa, es_canjeable_qr: qrCa, emisor_tipo: emiTipoCa,
           familia: famCa

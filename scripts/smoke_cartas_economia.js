@@ -22,6 +22,11 @@
 //   D-17 (spec 6.4): venta UGC bruto 1000 / tithe 4% -> royalty 100, tithe 40,
 //     neto 860 (suma 1000); tramos 1/4/7/10 con neto >= 0; autor ausente ->
 //     royalty 0 y cero filas huerfanas en el ledger.
+//   Moderacion de media (spec 6.2, E14-E19): retirar una obra que respalda
+//     cartas vivas se BLOQUEA (MEDIA_CON_CARTAS, estado intacto) y pasa tras
+//     desactivar la carta; la identidad de moderado_por sale de ADMIN_USER_ID
+//     (presente -> uuid escrito, ausente o inexistente -> NULL y la moderacion
+//     sigue). El SQL de lock/conteo/UPDATE se EXTRAE de api/admin.js.
 //
 // POR QUE EL SQL ES ESPEJO Y NO UNA LLAMADA AL HANDLER
 //   api/interacciones.js crea su propia conexion con neon() al entrar; no
@@ -678,6 +683,111 @@ async function main() {
           + ' WHERE id=$1::uuid', [e9pend.id]);
         check('E13 retirada = estado retirada + activo=false (cero DELETE)',
           e13m && e13m.estado_moderacion === 'retirada' && e13m.activo === false);
+
+        // E14..E19: GUARD MEDIA_CON_CARTAS e IDENTIDAD de moderado_por
+        // (decision del operador 2026-11-11). El SQL es el DEL HANDLER,
+        // extraido de su fuente con el mismo truco que D-15/D-17: si alguien
+        // edita el statement, este smoke lo ve. El lock y el UPDATE corren
+        // dentro de la tx del smoke (ROLLBACK al final, cero persistencia).
+        var advSrc = fs.readFileSync(path.join(__dirname, '..', 'api', 'admin.js'), 'utf8');
+        var mkAdm = function (ancla, hasta) {
+          var i0 = advSrc.indexOf(ancla);
+          if (i0 < 0) throw new Error('ancla ausente: ' + ancla);
+          var j0 = advSrc.indexOf("'", i0);
+          var i1 = advSrc.indexOf(hasta, j0);
+          if (i1 < 0) throw new Error('fin ausente: ' + hasta);
+          var trozo = advSrc.slice(j0, i1 + hasta.length);
+          var re2 = /'((?:[^'\\]|\\.)*)'/g;
+          var m2, out2 = '';
+          while ((m2 = re2.exec(trozo)) !== null) {
+            out2 += m2[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+          }
+          return out2;
+        };
+        var SQL_GUARD_LOCK = mkAdm(
+          "tx('SELECT m.id::text AS id, m.estado_moderacion,", "FOR UPDATE'");
+        var SQL_GUARD_UPD = mkAdm(
+          "tx('UPDATE cartas_media SET estado_moderacion=($2::text)::varchar(12),",
+          "creado_en'");
+
+        var medGuard = await q1("INSERT INTO cartas_media (autor_id, tipo, titulo,"
+          + " media_url, licencia, estado_moderacion, moderado_en)"
+          + " VALUES ($1::uuid,'foto','smk_guard','https://x/gd.jpg','cc-by',"
+          + " 'aprobada',NOW()) RETURNING id", [uid]);
+        await q('UPDATE cartas_catalogo SET media_id=$2::uuid, activo=true'
+          + ' WHERE id=$1', [cartaId, medGuard.id]);
+
+        var gLock1 = await q1(SQL_GUARD_LOCK, [medGuard.id]);
+        var gUpd1 = await q(SQL_GUARD_UPD,
+          [medGuard.id, 'retirada', null, uid, 'aprobada']);
+        var gEst1 = await q1('SELECT estado_moderacion, activo FROM cartas_media'
+          + ' WHERE id=$1::uuid', [medGuard.id]);
+        check('E14 retirada bloqueada con 1 carta activa: 0 filas y estado intacto',
+          gLock1 && Number(gLock1.cartas_n) === 1 && gUpd1.length === 0
+          && gEst1 && gEst1.estado_moderacion === 'aprobada' && gEst1.activo === true,
+          'cartas_n=' + (gLock1 && gLock1.cartas_n)
+          + ' estado=' + (gEst1 && gEst1.estado_moderacion));
+
+        await q('UPDATE cartas_catalogo SET activo=false WHERE id=$1', [cartaId]);
+        var gLock2 = await q1(SQL_GUARD_LOCK, [medGuard.id]);
+        var gUpd2 = await q(SQL_GUARD_UPD,
+          [medGuard.id, 'retirada', null, uid, 'aprobada']);
+        var gEst2 = await q1('SELECT estado_moderacion, activo FROM cartas_media'
+          + ' WHERE id=$1::uuid', [medGuard.id]);
+        // Se restaura el vinculo original: los casos D-15/D-17 corren despues.
+        await q('UPDATE cartas_catalogo SET activo=true, media_id=$2::uuid'
+          + ' WHERE id=$1', [cartaId, e9pend.id]);
+        check('E15 retirada tras desactivar la carta: 1 fila, retirada y activo=false',
+          gLock2 && Number(gLock2.cartas_n) === 0 && gUpd2.length === 1
+          && gEst2 && gEst2.estado_moderacion === 'retirada'
+          && gEst2.activo === false,
+          'cartas_n=' + (gLock2 && gLock2.cartas_n)
+          + ' estado=' + (gEst2 && gEst2.estado_moderacion));
+
+        var medId1 = await q1("INSERT INTO cartas_media (autor_id, tipo, titulo,"
+          + " media_url, licencia) VALUES ($1::uuid,'foto','smk_id1',"
+          + " 'https://x/i1.jpg','cc-by') RETURNING id", [uid]);
+        var iUpd1 = await q(SQL_GUARD_UPD,
+          [medId1.id, 'aprobada', null, uid, 'pendiente']);
+        var iRow1 = await q1('SELECT estado_moderacion, moderado_por, moderado_en'
+          + ' FROM cartas_media WHERE id=$1::uuid', [medId1.id]);
+        check('E16 identidad presente: moderado_por = uuid real y moderado_en escrito',
+          iUpd1.length === 1 && iRow1 && iRow1.estado_moderacion === 'aprobada'
+          && String(iRow1.moderado_por) === String(uid)
+          && iRow1.moderado_en !== null,
+          'moderado_por=' + (iRow1 && iRow1.moderado_por));
+
+        var medId2 = await q1("INSERT INTO cartas_media (autor_id, tipo, titulo,"
+          + " media_url, licencia) VALUES ($1::uuid,'foto','smk_id2',"
+          + " 'https://x/i2.jpg','cc-by') RETURNING id", [uid]);
+        var iUpd2 = await q(SQL_GUARD_UPD,
+          [medId2.id, 'aprobada', null, null, 'pendiente']);
+        var iRow2 = await q1('SELECT estado_moderacion, moderado_por FROM'
+          + ' cartas_media WHERE id=$1::uuid', [medId2.id]);
+        check('E17 identidad ausente: moderado_por NULL y la moderacion pasa',
+          iUpd2.length === 1 && iRow2 && iRow2.estado_moderacion === 'aprobada'
+          && iRow2.moderado_por === null);
+
+        var idFant = (await q1('SELECT gen_random_uuid()::text AS id')).id;
+        var iExiste = await q('SELECT id::text AS id FROM usuarios'
+          + ' WHERE id=$1::uuid LIMIT 1', [idFant]);
+        var medId3 = await q1("INSERT INTO cartas_media (autor_id, tipo, titulo,"
+          + " media_url, licencia) VALUES ($1::uuid,'foto','smk_id3',"
+          + " 'https://x/i3.jpg','cc-by') RETURNING id", [uid]);
+        var iUpd3 = await q(SQL_GUARD_UPD,
+          [medId3.id, 'aprobada', null, null, 'pendiente']);
+        var iRow3 = await q1('SELECT estado_moderacion, moderado_por FROM'
+          + ' cartas_media WHERE id=$1::uuid', [medId3.id]);
+        check('E18 uuid inexistente: 0 filas en usuarios -> NULL sin error',
+          iExiste.length === 0 && iUpd3.length === 1 && iRow3
+          && iRow3.estado_moderacion === 'aprobada' && iRow3.moderado_por === null);
+
+        check('E19 fuente admin: 409 MEDIA_CON_CARTAS, FOR UPDATE y ADMIN_USER_ID',
+          advSrc.indexOf("error:'MEDIA_CON_CARTAS'") !== -1
+          && advSrc.indexOf('cartas_n: nVivas') !== -1
+          && advSrc.indexOf('FOR UPDATE') !== -1
+          && advSrc.indexOf('process.env.ADMIN_USER_ID') !== -1
+          && advSrc.indexOf('identidad_admin') !== -1);
       }
 
       var mkUsr = await q('SELECT id::text AS id FROM usuarios'
