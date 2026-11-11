@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="mapa-cultural.css?v=13">
 <link rel="stylesheet" href="dictado-voz.css?v=1">
-<link rel="stylesheet" href="cartas-ui.css?v=9">
+<link rel="stylesheet" href="cartas-ui.css?v=10">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -1229,6 +1229,19 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
         <div class="cv-sec-t">&#x1F0CF; Mercado de Cartas</div>
         <div id="cm-cartas"></div>
 
+        <!-- CATALOGO / ACUNACION (correccion de producto): comprar cartas al
+             sistema vive en el MERCADO, junto al mercado entre jugadores. Es
+             el host que antes estaba en Inventario, MOVIDO aqui con sus IDs
+             (no hay copia en las dos paginas). Los hooks data-tab / pf-v61
+             del host son inertes aqui: esta pagina no filtra por pestana.
+             Lo pinta cartas-ui.js (CartasUI.catalogoMontar, auto-arranque
+             por el marcador de mercado); el GET sale al abrir el panel. -->
+        <div class="cv-sec-t">&#x1F6D2; Comprar cartas (acu&#xF1;acion)</div>
+        <div class="cartas-silo pf-v61" id="catalogo-panel" data-c-cat-modo="mercado">
+          <div class="c-cat-vacio">Aqui aparecen las cartas que aun no tienes, con su tirada y su coste en XP.</div>
+          <button type="button" class="c-cat-abrir" data-c-cat-abrir="1" id="catalogo-abrir">Catalogo</button>
+        </div>
+
         <!-- GAMING v6.1 (Fase 4 / T8): moneda secundaria Condor (CDR) -->
         <div class="cv-sec-t">&#x1FA99; Moneda Condor (CDR)</div>
         <div id="cm-moneda"></div>
@@ -1318,7 +1331,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 <script src="media-actions.js"></script>
 <script src="dictado-voz.js?v=1"></script>
 <script src="mymapa.js?v=10"></script>
-<script src="cartas-ui.js?v=9"></script>
+<script src="cartas-ui.js?v=10"></script>
 <script src="cartas-arte.js"></script>
 <script src="mercado.js?v=4"></script>
 <script>

@@ -1557,6 +1557,66 @@ var cadenaExpediciones = (function () {
 })();
 
 /* ---------------------------------------------------------------------------
+   13) El catalogo es MERCADO, no inventario (correccion de producto).
+   El host #catalogo-panel vive en comunidad.html (pestana Mercado) y
+   mi-perfil.html solo lo conserva inerte (ADR-003) con un puente al Mercado.
+   --------------------------------------------------------------------------- */
+var cadenaMercadoCatalogo = (function () {
+  var comunidad = fs.readFileSync(path.join(ROOT, 'comunidad.html'), 'utf8');
+  var perfil = fs.readFileSync(path.join(ROOT, 'mi-perfil.html'), 'utf8');
+  var cadena = Promise.resolve();
+
+  cadena = cadena.then(function () {
+    assert(veces(comunidad, 'id="catalogo-panel"') === 1
+      && comunidad.indexOf('data-c-cat-modo="mercado"') >= 0,
+      'el catalogo monta en el MERCADO: comunidad.html trae UN host marcado "mercado"');
+    assert(veces(perfil, 'id="catalogo-panel"') === 1
+      && perfil.indexOf('data-c-cat-modo="inventario"') >= 0
+      && perfil.indexOf('id="catalogo-panel" data-tab="inventario" data-c-cat-modo="inventario" hidden') >= 0,
+      'Inventario conserva el host VACIO y oculto por ADR-003 (ningun ID se borra)');
+    assert(veces(comunidad + perfil, 'data-c-cat-modo="mercado"') === 1,
+      'un solo #catalogo-panel ACTIVO entre las dos paginas: el del Mercado');
+  });
+
+  cadena = cadena.then(function () {
+    var abreMercado = comunidad.indexOf('id="cpanel-mercado"');
+    var host = comunidad.indexOf('id="catalogo-panel"');
+    var cierraMercado = comunidad.indexOf('id="cpanel-gobernanza"');
+    assert(abreMercado >= 0 && host > abreMercado && host < cierraMercado,
+      'el host del catalogo cuelga de la pestana Mercado, junto al mercado P2P');
+    assert(comunidad.indexOf('data-c-cat-abrir="1" id="catalogo-abrir"') >= 0
+      && comunidad.indexOf('Comprar cartas') >= 0,
+      'el bloque de compra del sistema llega con su titulo y su boton de abrir');
+    assert(veces(perfil, 'data-c-cat-abrir') === 0
+      && perfil.indexOf('las cartas que aun no tienes') < 0,
+      'Inventario no duplica la vitrina ni el boton de compra');
+    assert(perfil.indexOf('href="comunidad.html#mercado"') >= 0
+      && perfil.indexOf('Ver catalogo en el Mercado') >= 0,
+      'Inventario sustituye la entrada por el enlace "Ver catalogo en el Mercado"');
+  });
+
+  cadena = cadena.then(function () {
+    var env = crearEntorno();
+    var UI = env.UI;
+    if (!UI) return;
+    var inerte = Elemento('div');
+    inerte.id = 'catalogo-panel';
+    inerte.setAttribute('data-c-cat-modo', 'inventario');
+    env.doc.body.appendChild(inerte);
+    assert(UI.catalogoMontar('catalogo-panel') === false,
+      'con el host marcado "inventario" el catalogo NO monta ni pide nada');
+    var mercado = Elemento('div');
+    mercado.id = 'catalogo-mercado-test';
+    mercado.setAttribute('data-c-cat-modo', 'mercado');
+    env.doc.body.appendChild(mercado);
+    assert(UI.catalogoMontar('catalogo-mercado-test') === true,
+      'con el host marcado "mercado" el catalogo si monta');
+  });
+
+  return cadena;
+})();
+
+/* ---------------------------------------------------------------------------
    Resumen: se ESPERA a las cadenas con red. Sin esto, process.exit(0) se
    adelanta a los microtasks y los checks asincronos no llegan a contar.
    --------------------------------------------------------------------------- */
@@ -1572,4 +1632,4 @@ function resumen() {
 }
 
 Promise.all([cadenaSubida, cadenaAcunar, cadenaCatalogo, cadenaFichaCatalogo,
-  cadenaFiltrosCatalogo, cadenaExpediciones]).then(resumen, resumen);
+  cadenaFiltrosCatalogo, cadenaExpediciones, cadenaMercadoCatalogo]).then(resumen, resumen);

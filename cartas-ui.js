@@ -1209,8 +1209,10 @@
      el handler YA existente (acunarCarta / acunarDesdeBoton): el boton
      de la tarjeta usa los mismos data-* que la ficha.
      `restantes === null` = tirada abierta (nunca se inventa un stock).
-     El panel solo se monta si la pagina trae el host #catalogo-panel,
-     asi que comunidad.html y perfil.html no pagan nada por cargarlo.
+     El catalogo es MERCADO, no inventario: solo monta si el host declara
+     data-c-cat-modo="mercado". En Inventario (mi-perfil.html) el host
+     #catalogo-panel se conserva VACIO por ADR-003 y marcado "inventario":
+     ahi no se monta y no se pide nada. perfil.html no trae host.
      ================================================================== */
   var CATALOGO_LIMIT = 24;
   var CATALOGO_FAMILIAS = ['lugar', 'naturaleza', 'personaje', 'marca', 'artista', 'cosmetica'];
@@ -1842,14 +1844,29 @@
     }
   }
 
-  /* Monta el panel si la pagina trae el host. Idempotente y barato: sin host
-     (comunidad.html, perfil.html) devuelve false y no toca la red. */
+  /* Superficie del host. El catalogo (vitrina + acunacion) es una funcion
+     del MERCADO: un host marcado con otra superficie -o con el marcador
+     "inventario" que mi-perfil.html conserva por ADR-003- no monta y no
+     toca la red. Sin marca se respeta el contrato anterior (host = montar). */
+  var CATALOGO_MODO_ATTR = 'data-c-cat-modo';
+
+  function catalogoHostActivo(host) {
+    if (!host || typeof host.getAttribute !== 'function') return true;
+    var modo = fichaTexto(host.getAttribute(CATALOGO_MODO_ATTR));
+    if (!modo) return true;
+    return modo === 'mercado';
+  }
+
+  /* Monta el panel si la pagina trae el host ACTIVO. Idempotente y barato:
+     sin host, o con el host inerte de Inventario, devuelve false y no toca
+     la red. */
   function catalogoMontar(idHost, opciones) {
     var doc = (typeof document !== 'undefined') ? document : null;
     if (!doc || typeof doc.getElementById !== 'function') return false;
     var id = fichaTexto(idHost) || 'catalogo-panel';
     var host = doc.getElementById(id);
     if (!host) return false;
+    if (!catalogoHostActivo(host)) return false;
     if (catalogoCtrl && catalogoCtrl.host === host) {
       if (opciones && opciones.auto) catalogoAbrir(catalogoCtrl);
       return true;
@@ -2441,7 +2458,9 @@
     }, EXP_ESPERA_MS);
   }
 
-  /* Auto-arranque: solo pinta los paneles en las paginas que los declaran. */
+  /* Auto-arranque: solo pinta los paneles en las paginas que los declaran.
+     El catalogo cuelga del host del MERCADO (comunidad.html); el host
+     inerte que Inventario conserva por ADR-003 devuelve false sin red. */
   if (typeof document !== 'undefined' && document.addEventListener) {
     var panelesArrancar = function () {
       catalogoMontar('catalogo-panel');
