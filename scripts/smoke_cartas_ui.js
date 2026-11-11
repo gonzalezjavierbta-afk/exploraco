@@ -761,6 +761,357 @@ var cadenaCatalogo = (function () {
 })();
 
 /* ---------------------------------------------------------------------------
+   11) EXPEDICIONES: contrato del GET (11.9.8), estados y textos por codigo.
+   --------------------------------------------------------------------------- */
+function expPayload() {
+  return {
+    ok: true,
+    vector: { alcance: 12, fortuna: 4 },
+    poder: 16,
+    cap: {
+      usadas: 1, limite: 5, xp_dia: 25, limite_xp: 200,
+      remanente_xp: 175, min_cobro_xp: 15
+    },
+    misiones: [
+      {
+        id: 'xpd_dif_mapa', expedicion_rama: 'difusion',
+        nombre: 'Mapa que crece', descripcion: 'Guarda 3 destinos mas en Tu Mapa.',
+        xp: 25, requiere_stats: { alcance: 8 },
+        stats_usuario: { alcance: 12 }, faltan: { alcance: 0 },
+        acciones: { total: 4, por_cobro: 3, elegibles: 1, cobros: 0 },
+        disponible: true, bloqueo: null, senal_disponible: true,
+        accion_ref: 'ref-a', motivo: null,
+        acciones_pendientes: [
+          { ref: 'ref-a', fecha: '2026-11-11T00:00:00.000Z', detalle: 'Cascada del Tequendama' }
+        ]
+      },
+      {
+        id: 'xpd_dif_resena', expedicion_rama: 'difusion',
+        nombre: 'Voz que se lee', descripcion: 'Publica 2 resenas sustanciales.',
+        xp: 40, requiere_stats: { alcance: 20 },
+        stats_usuario: { alcance: 12 }, faltan: { alcance: 8 },
+        acciones: { total: 0, por_cobro: 2, elegibles: 0, cobros: 0 },
+        disponible: false, bloqueo: 'UMBRAL', senal_disponible: true,
+        accion_ref: null, motivo: 'SIN_ACCION', acciones_pendientes: []
+      },
+      {
+        id: 'xpd_for_album', expedicion_rama: 'hallazgo',
+        nombre: 'Hallazgo guardado', descripcion: 'Guarda 2 fotos en tus albumes.',
+        xp: 25, requiere_stats: { fortuna: 8 },
+        stats_usuario: { fortuna: 8 }, faltan: { fortuna: 0 },
+        acciones: { total: 4, por_cobro: 3, elegibles: 1, cobros: 1 },
+        disponible: false, bloqueo: 'SIN_ACCION', senal_disponible: true,
+        accion_ref: null, motivo: 'SIN_ACCION', acciones_pendientes: []
+      },
+      {
+        id: 'xpd_dif_comparte', expedicion_rama: 'difusion',
+        nombre: 'Difunde un destino', descripcion: 'Comparte un destino publicado.',
+        xp: 15, requiere_stats: { alcance: 0 },
+        stats_usuario: { alcance: 12 }, faltan: { alcance: 0 },
+        acciones: { total: 0, por_cobro: 1, elegibles: 0, cobros: 0 },
+        disponible: false, bloqueo: 'SIN_ACCION', senal_disponible: false,
+        accion_ref: null, motivo: 'SIN_ACCION', acciones_pendientes: []
+      },
+      {
+        id: 'xpd_for_visita', expedicion_rama: 'hallazgo',
+        nombre: 'Primera incursion', descripcion: 'Confirma una visita.',
+        xp: 15, requiere_stats: { fortuna: 0 },
+        stats_usuario: { fortuna: 4 }, faltan: { fortuna: 0 },
+        acciones: { total: 1, por_cobro: 1, elegibles: 1, cobros: 0 },
+        disponible: false, bloqueo: 'CAP_DIARIO', senal_disponible: true,
+        accion_ref: null, motivo: 'SIN_ACCION', acciones_pendientes: []
+      }
+    ],
+    acciones_pendientes_total: 1
+  };
+}
+
+function misionExp(id) {
+  var lista = expPayload().misiones;
+  for (var i = 0; i < lista.length; i++) if (lista[i].id === id) return lista[i];
+  return null;
+}
+
+(function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return;
+
+  assert(UI.expUrl('abc-123').indexOf('/api/interacciones?tipo=expediciones&usuario_id=abc-123') === 0,
+    'expUrl apunta al GET de expediciones con el usuario de la sesion');
+
+  var n = UI.expNormalizar(expPayload(), 200);
+  assert(n.ok === true && n.datos.misiones.length === 5
+    && n.datos.cap.limite === 5 && n.datos.cap.limite_xp === 200,
+    'expNormalizar acepta el contrato real {ok,misiones,cap} del GET');
+
+  var n401 = UI.expNormalizar({ ok: false, error: 'SESION_REQUERIDA' }, 401);
+  assert(n401.ok === false && n401.mensaje === 'Entra para expedicionar.',
+    'sin sesion el GET se degrada a "Entra para expedicionar"');
+
+  var ramas = UI.expRamasHtml(UI.expNormalizar(expPayload(), 200).datos, null);
+  assert(ramas.indexOf('data-c-exp-rama="difusion"') >= 0
+    && ramas.indexOf('data-c-exp-rama="hallazgo"') >= 0,
+    'las misiones se agrupan por rama difusion / hallazgo');
+  assert((ramas.match(/class="c-exp-m"/g) || []).length === 5,
+    'el render pinta una tarjeta por mision que manda el servidor');
+
+  var htmlUmbral = UI.expMisionHtml(misionExp('xpd_dif_resena'), null);
+  assert(htmlUmbral.indexOf('Umbral no alcanzado') >= 0
+    && htmlUmbral.indexOf('faltan 8') >= 0
+    && htmlUmbral.indexOf('c-exp-eje is-falta') >= 0,
+    'el umbral se pinta por eje con el que falta marcado y su faltan');
+
+  var htmlAcciones = UI.expMisionHtml(misionExp('xpd_for_album'), null);
+  assert(htmlAcciones.indexOf('Te faltan 2 acciones') >= 0
+    && htmlAcciones.indexOf('data-c-exp-go') < 0,
+    'con el bloque incompleto dice cuantas acciones faltan y no ofrece boton');
+
+  var htmlSinSenal = UI.expMisionHtml(misionExp('xpd_dif_comparte'), null);
+  assert(htmlSinSenal.indexOf('Sin accion disponible') >= 0
+    && htmlSinSenal.indexOf('data-c-exp-estado="sin_accion"') >= 0
+    && htmlSinSenal.indexOf('data-c-exp-go') < 0,
+    'SIN_ACCION se pinta sin boton Expedicionar');
+
+  var htmlCap = UI.expMisionHtml(misionExp('xpd_for_visita'), null);
+  assert(htmlCap.indexOf('>Cap diario<') >= 0 && htmlCap.indexOf('data-c-exp-go') < 0,
+    'con el cap agotado la mision dice Cap diario y no ofrece boton');
+
+  var htmlListo = UI.expMisionHtml(misionExp('xpd_dif_mapa'), null);
+  assert(htmlListo.indexOf('Cumplida y lista') >= 0
+    && htmlListo.indexOf('data-accion-ref="ref-a"') >= 0
+    && htmlListo.indexOf('data-c-exp-estado="listo"') >= 0,
+    'la mision disponible ofrece Expedicionar con la ref de acciones_pendientes[0]');
+
+  var cabecera = UI.expCabeceraHtml(UI.expNormalizar(expPayload(), 200).datos);
+  assert(cabecera.indexOf('<b>1</b>/5') >= 0 && cabecera.indexOf('<b>25</b>/200') >= 0,
+    'la cabecera pinta usadas/limite 24 h y xp_hoy/200 tal como llegan');
+  assert(cabecera.indexOf('Cap diario agotado') < 0,
+    'con el cap libre no se avisa de cap agotado');
+
+  var capLleno = expPayload();
+  capLleno.cap.usadas = 5;
+  capLleno.cap.xp_dia = 40;
+  var cabLleno = UI.expCabeceraHtml(capLleno);
+  assert(cabLleno.indexOf('Cap diario agotado: 5 de 5') >= 0
+    && cabLleno.indexOf('is-full') >= 0,
+    'cap agotado: aviso visible y barra marcada llena');
+
+  assert(UI.expMensaje('CAP_DIARIO', { usadas: 5, limite: 5 }).indexOf('Cap diario agotado (5/5)') >= 0,
+    'CAP_DIARIO se traduce a texto legible con el numero de cobros');
+  assert(UI.expMensaje('ACCION_NO_VERIFICADA').indexOf('ya no es cobrable') >= 0,
+    'ACCION_NO_VERIFICADA se traduce a texto legible sin volcar JSON');
+  assert(UI.expMensaje('UMBRAL_NO_ALCANZADO', { faltan: { alcance: 8, fortuna: 2 } })
+    .indexOf('faltan Alcance 8 y Fortuna 2') >= 0,
+    'UMBRAL_NO_ALCANZADO resume el faltan por eje');
+  assert(UI.expMensaje('CAP_RECOMPENSA', { remanente_xp: 10 })
+    .indexOf('quedan 10') >= 0
+    && UI.expMensaje('MISION_NO_ENCONTRADA').indexOf('{') < 0,
+    'CAP_RECOMPENSA y MISION_NO_ENCONTRADA dan frases, nunca JSON crudo');
+
+  assert(UI.expTextoConfirmacion(misionExp('xpd_dif_mapa')).indexOf('ganar 25 XP') >= 0,
+    'la confirmacion dice la XP que se va a ganar');
+
+  var vacio = UI.expVacioHtml();
+  assert(vacio.indexOf('Entra para expedicionar.') >= 0
+    && vacio.indexOf('data-c-exp-sin-sesion="1"') >= 0
+    && vacio.indexOf('data-c-exp-go') < 0,
+    'sin sesion el estado vacio pide entrar y no ofrece boton');
+
+  var sucia = misionExp('xpd_dif_mapa');
+  sucia.nombre = '<img src=x onerror=alert(1)>';
+  sucia.descripcion = '"><script>alert(1)</script>';
+  var htmlSucia = UI.expMisionHtml(sucia, null);
+  assert(htmlSucia.indexOf('<img src=x') < 0 && htmlSucia.indexOf('<script>') < 0
+    && htmlSucia.indexOf('undefined') < 0,
+    'nombre y descripcion dinamicos se escapan y nunca pintan undefined');
+
+  var ctrlPanel = {
+    datos: UI.expNormalizar(expPayload(), 200).datos,
+    aviso: { tipo: 'ok', texto: 'Cobraste 25 XP.' }
+  };
+  var panel = UI.expPanelHtml(ctrlPanel);
+  assert(panel.indexOf('data-c-exp-panel="1"') >= 0
+    && panel.indexOf('data-c-exp-aviso="ok"') >= 0
+    && panel.indexOf('Cobraste 25 XP.') >= 0
+    && (panel.match(/class="c-exp-m"/g) || []).length === 5,
+    'expPanelHtml ensambla aviso, cabecera y misiones sin recalcular caps');
+
+  var ctrlError = { datos: null, error: 'Expediciones no disponibles.' };
+  assert(UI.expPanelHtml(ctrlError).indexOf('data-c-exp-refrescar="1"') >= 0,
+    'un error de panel ofrece Reintentar sin romper el bloque');
+})();
+
+/* ---------------------------------------------------------------------------
+   12) EXPEDICIONES: cobro, repetido, errores por codigo y refresco del panel.
+   --------------------------------------------------------------------------- */
+var cadenaExpediciones = (function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return Promise.resolve();
+  var sandbox = env.sandbox;
+  var cadena = Promise.resolve();
+  var llamadas = [];
+  var postCuerpo = null;
+  var postStatus = 200;
+  var postJson = null;
+
+  function instalar(uid) {
+    sandbox.window.ExploraCO = uid ? { usuario: { id: uid } } : null;
+  }
+
+  function conRed() {
+    sandbox.fetch = function (url, opts) {
+      var o = opts || {};
+      llamadas.push({ url: String(url), cuerpo: o.body || null, metodo: o.method || 'GET' });
+      if (o.method === 'POST') {
+        return Promise.resolve({
+          status: postStatus,
+          ok: postStatus >= 200 && postStatus < 300,
+          json: function () { return Promise.resolve(postJson); }
+        });
+      }
+      return Promise.resolve({
+        status: 200, ok: true,
+        json: function () { return Promise.resolve(expPayload()); }
+      });
+    };
+  }
+
+  function nuevoCtrl() {
+    var r = UI.expNormalizar(expPayload(), 200);
+    return {
+      host: Elemento('div'), datos: r.datos, error: null, aviso: null,
+      enviando: '', cargando: false
+    };
+  }
+
+  function boton(misionId, ref) {
+    return {
+      getAttribute: function (k) {
+        if (k === 'data-mision-id') return misionId;
+        if (k === 'data-accion-ref') return ref;
+        return null;
+      }
+    };
+  }
+
+  cadena = cadena.then(function () {
+    instalar(null);
+    conRed();
+    llamadas = [];
+    var ctrl = nuevoCtrl();
+    return UI.expCargar(ctrl).then(function (r) {
+      assert(r === false && llamadas.length === 0
+        && ctrl.host.innerHTML.indexOf('Entra para expedicionar.') >= 0,
+        'sin sesion expCargar no dispara ninguna peticion (cero bucle)');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    instalar('11111111-2222-3333-4444-555555555555');
+    conRed();
+    llamadas = [];
+    var ctrl = nuevoCtrl();
+    return UI.expCargar(ctrl).then(function (r) {
+      assert(r === true && llamadas.length === 1
+        && llamadas[0].url.indexOf('tipo=expediciones') >= 0,
+        'con sesion el panel se pinta con un unico GET de expediciones');
+      assert(ctrl.host.innerHTML.indexOf('Mapa que crece') >= 0
+        && ctrl.host.innerHTML.indexOf('Cumplida y lista') >= 0,
+        'el panel pintado incluye las misiones y su estado');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    conRed();
+    llamadas = [];
+    postStatus = 200;
+    postJson = {
+      ok: true, mision_id: 'xpd_dif_mapa', xp: 25, xp_solicitado: 25,
+      recortado: false, repetido: false, accion_ref: 'ref-a',
+      usadas: 2, limite: 5, xp_dia: 50, limite_xp: 200, remanente_xp: 150
+    };
+    var ctrl = nuevoCtrl();
+    return UI.expCobrarDesdeBoton(ctrl, boton('xpd_dif_mapa', 'ref-a')).then(function () {
+      var cuerpo = JSON.parse(llamadas[0].cuerpo);
+      assert(cuerpo.mision_id === 'xpd_dif_mapa' && cuerpo.accion_ref === 'ref-a'
+        && cuerpo.usuario_id === '11111111-2222-3333-4444-555555555555',
+        'el POST manda la ref EXACTA de acciones_pendientes[0] y el usuario de la sesion');
+      assert(llamadas.length === 2 && llamadas[1].url.indexOf('tipo=expediciones') >= 0,
+        'tras cobrar se refresca el panel con un GET, sin recargar la pagina');
+      assert(ctrl.aviso && ctrl.aviso.tipo === 'ok'
+        && ctrl.aviso.texto.indexOf('Cobraste 25 XP') >= 0,
+        'el exito deja aviso con la XP cobrada');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    conRed();
+    llamadas = [];
+    postStatus = 200;
+    postJson = {
+      ok: true, mision_id: 'xpd_dif_mapa', xp: 0, xp_solicitado: 25,
+      recortado: false, repetido: true, accion_ref: null,
+      usadas: 2, limite: 5, xp_dia: 50, limite_xp: 200, remanente_xp: 150
+    };
+    var ctrl = nuevoCtrl();
+    return UI.expCobrarDesdeBoton(ctrl, boton('xpd_dif_mapa', 'ref-a')).then(function () {
+      assert(ctrl.aviso && ctrl.aviso.tipo === 'ok'
+        && ctrl.aviso.texto.indexOf('Ya la hiciste') >= 0,
+        'repetido:true con xp:0 se avisa como "Ya la hiciste", no como error');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    conRed();
+    llamadas = [];
+    postStatus = 409;
+    postJson = {
+      ok: false, code: 'CAP_DIARIO', usadas: 5, limite: 5,
+      xp_dia: 200, limite_xp: 200
+    };
+    var ctrl = nuevoCtrl();
+    return UI.expCobrarDesdeBoton(ctrl, boton('xpd_dif_mapa', 'ref-a')).then(function () {
+      assert(ctrl.aviso && ctrl.aviso.tipo === 'error'
+        && ctrl.aviso.texto.indexOf('Cap diario agotado (5/5)') >= 0,
+        'CAP_DIARIO del POST se muestra legible y marcado como error');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    conRed();
+    llamadas = [];
+    postStatus = 409;
+    postJson = { ok: false, code: 'ACCION_NO_VERIFICADA', mision_id: 'xpd_dif_mapa' };
+    var ctrl = nuevoCtrl();
+    return UI.expCobrarDesdeBoton(ctrl, boton('xpd_dif_mapa', 'ref-a')).then(function () {
+      assert(ctrl.aviso && ctrl.aviso.tipo === 'error'
+        && ctrl.aviso.texto.indexOf('ya no es cobrable') >= 0
+        && ctrl.aviso.texto.indexOf('{') < 0,
+        'ACCION_NO_VERIFICADA del POST se muestra legible y sin JSON');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    conRed();
+    llamadas = [];
+    var ctrl = nuevoCtrl();
+    return UI.expCobrarDesdeBoton(ctrl, boton('xpd_dif_resena', null)).then(function () {
+      assert(llamadas.length === 0,
+        'una mision con umbral no alcanzado no dispara ningun POST');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    assert(UI.expedicionesMontar('expediciones-inexistente') === false,
+      'sin host en la pagina las expediciones no montan ni piden nada');
+  });
+
+  return cadena;
+})();
+
+/* ---------------------------------------------------------------------------
    Resumen: se ESPERA a las cadenas con red. Sin esto, process.exit(0) se
    adelanta a los microtasks y los checks asincronos no llegan a contar.
    --------------------------------------------------------------------------- */
@@ -775,4 +1126,4 @@ function resumen() {
   process.exit(1);
 }
 
-Promise.all([cadenaSubida, cadenaAcunar, cadenaCatalogo]).then(resumen, resumen);
+Promise.all([cadenaSubida, cadenaAcunar, cadenaCatalogo, cadenaExpediciones]).then(resumen, resumen);

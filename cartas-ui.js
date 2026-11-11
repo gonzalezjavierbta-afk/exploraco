@@ -1647,13 +1647,543 @@
     return true;
   }
 
-  /* Auto-arranque: solo pinta el panel en las paginas que lo declaran. */
+  /* =====================================================================
+     EXPEDICIONES -- misiones repetibles con ventana rodante de 24 h
+     GET  /api/interacciones?tipo=expediciones&usuario_id=<uid>
+     POST /api/interacciones?tipo=expedicion_cobrar {mision_id, accion_ref}
+
+     Reglas que esta UI NO rompe:
+     - Los caps (usadas/limite, xp_dia/limite_xp) se PINTAN tal como llegan:
+       cero recalculo en cliente (el POST los re-valida de todos modos).
+     - accion_ref sale SIEMPRE de acciones_pendientes[0].ref. Ni se inventa
+       ni se reutiliza una ya cobrada: el backend solo acepta la derivada.
+     - repetido:true (xp:0) NO es error: se dice "Ya la hiciste".
+     ===================================================================== */
+  var EXP_RAMAS = { difusion: 'Difusion', hallazgo: 'Hallazgo' };
+  var EXP_RAMAS_ORDEN = ['difusion', 'hallazgo'];
+  var EXP_URL_GET = '/api/interacciones?tipo=expediciones&usuario_id=';
+  var EXP_URL_POST = '/api/interacciones?tipo=expedicion_cobrar';
+  var expCtrl = null;
+
+  /* uid de la sesion vigente. null = sin sesion (estado vacio, cero red). */
+  function expUsuarioId() {
+    var E = w.ExploraCO;
+    var u = (E && E.usuario) || null;
+    var id = fichaTexto(u && u.id);
+    return id || null;
+  }
+
+  function expUrl(uid) {
+    return EXP_URL_GET + encodeURIComponent(String(uid || ''));
+  }
+
+  /* Etiqueta de eje: 'alcance' -> 'Alcance'. Eje desconocido, tal cual. */
+  function expEjeLabel(eje) {
+    var s = fichaTexto(eje);
+    if (!s) return '';
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  /* Acciones que faltan para cerrar el siguiente bloque de cobro. */
+  function expAccionesFaltan(m) {
+    var acc = (m && m.acciones) || {};
+    var n = safeNum(acc.por_cobro, 1);
+    var total = safeNum(acc.total, 0);
+    var cobros = safeNum(acc.cobros, 0);
+    if (!(n >= 1)) n = 1;
+    var libre = total - cobros * n;
+    if (libre >= n) return 0;
+    if (libre < 0) libre = 0;
+    return n - libre;
+  }
+
+  /* Estado visible de una mision. Solo LEE lo que manda el servidor. */
+  function expEstadoMision(m) {
+    var bloqueo = fichaTexto(m && m.bloqueo).toUpperCase();
+    var pend = (m && m.acciones_pendientes) || [];
+    var ref = fichaTexto(pend[0] && pend[0].ref);
+    if (m && m.disponible === true && ref) {
+      return { clave: 'listo', texto: 'Cumplida y lista' };
+    }
+    if (bloqueo === 'UMBRAL') {
+      return { clave: 'umbral', texto: 'Umbral no alcanzado' };
+    }
+    if (bloqueo === 'CAP_DIARIO' || bloqueo === 'CAP_RECOMPENSA') {
+      return { clave: 'cap', texto: 'Cap diario' };
+    }
+    /* senal_disponible false = fail-closed del backend: no hay accion que
+       cobrar y no se inventa otra senal. */
+    if (m && m.senal_disponible === false) {
+      return { clave: 'sin_accion', texto: 'Sin accion disponible' };
+    }
+    if (bloqueo === 'SIN_ACCION' || (m && m.motivo === 'SIN_ACCION')) {
+      var falta = expAccionesFaltan(m);
+      if (falta > 0) {
+        return { clave: 'acciones', texto: 'Te faltan ' + falta
+          + (falta === 1 ? ' accion' : ' acciones') };
+      }
+      return { clave: 'sin_accion', texto: 'Sin accion disponible' };
+    }
+    return { clave: 'sin_accion', texto: 'Sin accion disponible' };
+  }
+
+  /* "faltan Alcance 4 y Fortuna 2" a partir del objeto que manda el POST. */
+  function expFaltanTexto(faltan) {
+    var f = faltan || {};
+    var ejes = Object.keys(f);
+    var out = [];
+    var i, v;
+    for (i = 0; i < ejes.length; i++) {
+      v = safeNum(f[ejes[i]], 0);
+      if (v > 0) out.push(expEjeLabel(ejes[i]) + ' ' + miles(v));
+    }
+    if (!out.length) return 'sin datos de umbral';
+    return 'faltan ' + out.join(' y ');
+  }
+
+  /* Traduccion de codigo a frase legible. Nunca vuelca JSON crudo. */
+  function expMensaje(code, body) {
+    var c = fichaTexto(code).toUpperCase();
+    var b = body || {};
+    if (c === 'UMBRAL_NO_ALCANZADO') {
+      return 'Aun no alcanzas el umbral: ' + expFaltanTexto(b.faltan) + '.';
+    }
+    if (c === 'CAP_DIARIO') {
+      var usadas = safeNum(b.usadas, null);
+      var lim = safeNum(b.limite, null);
+      var det = (usadas !== null && lim !== null) ? ' (' + usadas + '/' + lim + ')' : '';
+      return 'Cap diario agotado' + det + '. Vuelve cuando se libere la ventana de 24 h.';
+    }
+    if (c === 'CAP_RECOMPENSA') {
+      var rem = safeNum(b.remanente_xp, null);
+      return 'Ya no te queda XP de recompensa en esta ventana'
+        + (rem !== null ? ' (quedan ' + miles(rem) + ')' : '') + '.';
+    }
+    if (c === 'ACCION_NO_VERIFICADA') {
+      return 'Esa accion ya no es cobrable. Refresca el panel y vuelve a intentar.';
+    }
+    if (c === 'MISION_NO_ENCONTRADA') return 'Esa mision ya no existe.';
+    if (c === 'SESION_REQUERIDA' || c === 'USUARIO_ID_INVALIDO') return 'Entra para expedicionar.';
+    if (c === 'NO_DISPONIBLE') return 'Expediciones no disponibles.';
+    if (c === 'CONEXION') return 'Sin conexion. Revisa tu red e intenta de nuevo.';
+    return 'No se pudo cobrar la expedicion. Intenta de nuevo.';
+  }
+
+  /* Confirmacion con la XP que se va a ganar (nunca un si a ciegas). */
+  function expTextoConfirmacion(m) {
+    var xp = safeNum(m && m.xp, 0);
+    var nombre = fichaTexto(m && m.nombre) || 'esta mision';
+    return 'Vas a expedicionar "' + nombre + '" y ganar ' + miles(xp) + ' XP. Continuar?';
+  }
+
+  function expConfirmar(m) {
+    var txt = expTextoConfirmacion(m);
+    if (typeof w.confirm !== 'function') return true;
+    try {
+      return w.confirm(txt) === true;
+    } catch (eConfirm) {
+      return true;
+    }
+  }
+
+  /* GET sin rechazo: siempre resuelve {ok:true,datos} o {ok:false,error,mensaje}. */
+  function expNormalizar(json, status) {
+    var st = safeNum(status, 0);
+    if (!json || json.ok !== true) {
+      var code = fichaTexto(json && (json.error || json.code)).toUpperCase();
+      if (code === 'SESION_REQUERIDA' || st === 401) {
+        return { ok: false, error: 'SESION_REQUERIDA', mensaje: 'Entra para expedicionar.' };
+      }
+      if (st === 503 || code === 'NO_DISPONIBLE' || code === 'SCHEMA_PENDIENTE') {
+        return { ok: false, error: 'NO_DISPONIBLE', mensaje: expMensaje('NO_DISPONIBLE') };
+      }
+      return { ok: false, error: 'SERVIDOR',
+        mensaje: 'No se pudieron cargar las expediciones. Intenta de nuevo.' };
+    }
+    var misiones = json.misiones;
+    if (!misiones || typeof misiones.length !== 'number') {
+      return { ok: false, error: 'SERVIDOR',
+        mensaje: 'No se pudieron cargar las expediciones. Intenta de nuevo.' };
+    }
+    return {
+      ok: true,
+      datos: {
+        cap: json.cap || {},
+        misiones: misiones,
+        vector: json.vector || {},
+        acciones_pendientes_total: safeNum(json.acciones_pendientes_total, 0)
+      }
+    };
+  }
+
+  function expPedir(uid) {
+    var u = fichaTexto(uid);
+    if (!u) {
+      return Promise.resolve({
+        ok: false, error: 'SESION_REQUERIDA', mensaje: 'Entra para expedicionar.'
+      });
+    }
+    return Promise.resolve().then(function () {
+      return fetch(expUrl(u), {
+        method: 'GET', credentials: 'same-origin', headers: cabecerasPost()
+      });
+    }).then(function (res) {
+      var st = safeNum(res && res.status, 0);
+      return leerCuerpo(res).then(function (j) {
+        return expNormalizar(j, st);
+      }, function () {
+        return expNormalizar(null, st);
+      });
+    }, function () {
+      return { ok: false, error: 'CONEXION', mensaje: expMensaje('CONEXION') };
+    });
+  }
+
+  /* POST del cobro. La ref la pone SIEMPRE el llamador desde
+     acciones_pendientes[0].ref; aqui no se deriva nada. */
+  function expCobrar(misionId, accionRef) {
+    var uid = expUsuarioId();
+    var cuerpo = { mision_id: String(misionId), usuario_id: String(uid || '') };
+    if (accionRef) cuerpo.accion_ref = String(accionRef);
+    return Promise.resolve().then(function () {
+      return fetch(EXP_URL_POST, {
+        method: 'POST', credentials: 'same-origin',
+        headers: cabecerasPost(), body: JSON.stringify(cuerpo)
+      });
+    }).then(function (res) {
+      var st = safeNum(res && res.status, 0);
+      return leerCuerpo(res).then(function (j) {
+        if (j && j.ok === true) return { ok: true, status: st, datos: j };
+        var code = fichaTexto(j && (j.code || j.error)).toUpperCase() || 'SERVIDOR';
+        return {
+          ok: false, status: st, code: code, datos: j,
+          mensaje: expMensaje(code, j)
+        };
+      }, function () {
+        return { ok: false, status: st, code: 'SERVIDOR',
+          mensaje: expMensaje('SERVIDOR') };
+      });
+    }, function () {
+      return { ok: false, status: 0, code: 'CONEXION', mensaje: expMensaje('CONEXION') };
+    });
+  }
+
+  function expAvisoHtml(ctrl) {
+    var a = ctrl && ctrl.aviso;
+    if (!a || !a.texto) return '';
+    var tipo = a.tipo === 'error' ? 'error' : 'ok';
+    return '<div class="c-exp-aviso c-exp-aviso--' + tipo
+      + '" role="status" aria-live="polite" data-c-exp-aviso="' + tipo + '">'
+      + esc(a.texto) + '</div>';
+  }
+
+  /* Una barra por cap. El ancho es solo presentacion de lo que llega. */
+  function expCapHtml(label, valor, limite) {
+    var v = safeNum(valor, 0);
+    var lim = safeNum(limite, 0);
+    var pct = lim > 0 ? Math.min(100, Math.round((v / lim) * 100)) : 0;
+    var lleno = lim > 0 && v >= lim;
+    return '<div class="c-exp-cap' + (lleno ? ' is-full' : '') + '">'
+      + '<span class="c-exp-cap-k">' + esc(label) + '</span>'
+      + '<span class="c-exp-cap-v"><b>' + esc(miles(v)) + '</b>/' + esc(miles(lim)) + '</span>'
+      + '<span class="c-exp-bar" role="img" aria-label="' + catalogoAttr(label) + ': '
+      + catalogoAttr(miles(v)) + ' de ' + catalogoAttr(miles(lim)) + '">'
+      + '<span class="c-exp-bar-f" style="width:' + pct + '%"></span></span></div>';
+  }
+
+  function expCabeceraHtml(datos) {
+    var d = datos || {};
+    var cap = d.cap || {};
+    var usadas = safeNum(cap.usadas, 0);
+    var limite = safeNum(cap.limite, 0);
+    var xp = safeNum(cap.xp_dia, 0);
+    var limXp = safeNum(cap.limite_xp, 0);
+    var pend = safeNum(d.acciones_pendientes_total, 0);
+    var html = '<div class="c-exp-head">'
+      + '<div class="c-exp-head-t">'
+      + '<span class="c-exp-head-n">Expediciones</span>'
+      + '<span class="c-exp-head-p">' + esc(miles(pend)) + ' acciones pendientes</span>'
+      + '</div><div class="c-exp-caps">'
+      + expCapHtml('Cobros 24 h', usadas, limite)
+      + expCapHtml('XP 24 h', xp, limXp)
+      + '</div><button type="button" class="c-exp-refrescar" data-c-exp-refrescar="1">'
+      + 'Refrescar</button></div>';
+    if (limite > 0 && usadas >= limite) {
+      html += '<div class="c-exp-aviso c-exp-aviso--cap" role="status">'
+        + 'Cap diario agotado: ' + esc(miles(usadas)) + ' de ' + esc(miles(limite))
+        + ' cobros en las ultimas 24 h.</div>';
+    } else if (limXp > 0 && xp >= limXp) {
+      html += '<div class="c-exp-aviso c-exp-aviso--cap" role="status">'
+        + 'Tope de XP alcanzado: ' + esc(miles(xp)) + ' de ' + esc(miles(limXp))
+        + ' XP en las ultimas 24 h.</div>';
+    }
+    return html;
+  }
+
+  /* Ejes: valor propio frente al umbral, con el que falta marcado. */
+  function expEjesHtml(m) {
+    var req = (m && m.requiere_stats) || {};
+    var tus = (m && m.stats_usuario) || {};
+    var fal = (m && m.faltan) || {};
+    var ejes = Object.keys(req);
+    var html = '<div class="c-exp-ejes">';
+    var i, eje, min, act, falta, ok;
+    for (i = 0; i < ejes.length; i++) {
+      eje = ejes[i];
+      min = safeNum(req[eje], 0);
+      act = safeNum(tus[eje], 0);
+      falta = safeNum(fal[eje], Math.max(0, min - act));
+      ok = act >= min;
+      html += '<span class="c-exp-eje' + (ok ? ' is-ok' : ' is-falta') + '"'
+        + ' data-c-exp-eje="' + catalogoAttr(eje) + '">'
+        + '<span class="c-exp-eje-k">' + esc(expEjeLabel(eje)) + '</span>'
+        + '<b>' + esc(miles(act)) + '</b>'
+        + '<span class="c-exp-eje-min">/' + esc(miles(min)) + '</span>'
+        + (ok ? '' : '<i class="c-exp-eje-f">faltan ' + esc(miles(falta)) + '</i>')
+        + '</span>';
+    }
+    return html + '</div>';
+  }
+
+  function expMisionHtml(m, ctrl) {
+    var id = fichaTexto(m && m.id);
+    var est = expEstadoMision(m);
+    var xp = safeNum(m && m.xp, 0);
+    var pend = (m && m.acciones_pendientes) || [];
+    var ref = fichaTexto(pend[0] && pend[0].ref);
+    var enviando = fichaTexto(ctrl && ctrl.enviando) === id;
+    var puede = !enviando && m && m.disponible === true && !!ref;
+    var html = '<li class="c-exp-m" data-c-exp-id="' + catalogoAttr(id)
+      + '" data-c-exp-estado="' + est.clave + '">'
+      + '<div class="c-exp-m-top">'
+      + '<span class="c-exp-m-n">' + esc(fichaTexto(m && m.nombre) || id) + '</span>'
+      + '<span class="c-exp-m-xp">' + esc(miles(xp)) + ' XP</span></div>';
+    var desc = fichaTexto(m && m.descripcion);
+    if (desc) html += '<p class="c-exp-m-d">' + esc(desc) + '</p>';
+    html += expEjesHtml(m);
+    var det = fichaTexto(pend[0] && pend[0].detalle);
+    if (det) html += '<div class="c-exp-m-ref">Cobra: ' + esc(det) + '</div>';
+    html += '<div class="c-exp-m-pie">'
+      + '<span class="c-exp-m-est is-' + est.clave + '">' + esc(est.texto) + '</span>';
+    if (puede) {
+      html += '<button type="button" class="c-exp-go" data-c-exp-go="1"'
+        + ' data-mision-id="' + catalogoAttr(id) + '"'
+        + ' data-accion-ref="' + catalogoAttr(ref) + '">Expedicionar'
+        + ' <span class="c-exp-go-xp">' + esc(miles(xp)) + ' XP</span></button>';
+    } else if (enviando) {
+      html += '<button type="button" class="c-exp-go" data-c-exp-go="1"'
+        + ' data-mision-id="' + catalogoAttr(id) + '" disabled aria-busy="true">'
+        + 'Enviando...</button>';
+    }
+    return html + '</div></li>';
+  }
+
+  /* Agrupa por rama respetando el orden del catalogo; una rama nueva que
+     el backend anada manana no se pierde: cae en su propio grupo. */
+  function expRamasHtml(datos, ctrl) {
+    var misiones = (datos && datos.misiones) || [];
+    var orden = [];
+    var grupos = {};
+    var i, rama;
+    for (i = 0; i < EXP_RAMAS_ORDEN.length; i++) {
+      orden.push(EXP_RAMAS_ORDEN[i]);
+      grupos[EXP_RAMAS_ORDEN[i]] = [];
+    }
+    for (i = 0; i < misiones.length; i++) {
+      rama = fichaTexto(misiones[i] && misiones[i].expedicion_rama) || 'otras';
+      if (!grupos[rama]) {
+        grupos[rama] = [];
+        orden.push(rama);
+      }
+      grupos[rama].push(misiones[i]);
+    }
+    var html = '';
+    for (i = 0; i < orden.length; i++) {
+      rama = orden[i];
+      var lote = grupos[rama] || [];
+      if (!lote.length) continue;
+      html += '<div class="c-exp-rama" data-c-exp-rama="' + catalogoAttr(rama) + '">'
+        + '<div class="c-exp-rama-t">'
+        + '<span class="c-exp-rama-n">' + esc(EXP_RAMAS[rama] || expEjeLabel(rama)) + '</span>'
+        + '<span class="c-exp-rama-c">' + lote.length
+        + (lote.length === 1 ? ' mision' : ' misiones') + '</span></div>'
+        + '<ul class="c-exp-lista">';
+      for (var j = 0; j < lote.length; j++) html += expMisionHtml(lote[j], ctrl);
+      html += '</ul></div>';
+    }
+    if (!html) {
+      return '<div class="c-exp-vacio" role="status">No hay expediciones disponibles.</div>';
+    }
+    return html;
+  }
+
+  function expVacioHtml() {
+    return '<div class="c-exp-panel" data-c-exp-panel="1">'
+      + '<div class="c-exp-vacio" role="status" data-c-exp-sin-sesion="1">'
+      + '<span class="c-exp-vacio-t">Entra para expedicionar.</span>'
+      + '<a class="c-exp-entrar" href="index.html">Iniciar sesion</a>'
+      + '</div></div>';
+  }
+
+  /* Cuerpo completo del panel a partir del estado del controlador. */
+  function expPanelHtml(ctrl) {
+    var c = ctrl || {};
+    var html = expAvisoHtml(c);
+    if (c.error) {
+      return '<div class="c-exp-panel" data-c-exp-panel="1">' + html
+        + '<div class="c-exp-vacio c-exp-vacio--error" role="status">' + esc(c.error)
+        + ' <button type="button" class="c-exp-mas" data-c-exp-refrescar="1">'
+        + 'Reintentar</button></div></div>';
+    }
+    if (!c.datos) {
+      return '<div class="c-exp-panel" data-c-exp-panel="1">' + html
+        + '<div class="c-exp-vacio" role="status">Cargando expediciones...</div></div>';
+    }
+    return '<div class="c-exp-panel" data-c-exp-panel="1">' + html
+      + expCabeceraHtml(c.datos) + expRamasHtml(c.datos, c) + '</div>';
+  }
+
+  function expPintar(ctrl, html) {
+    if (!ctrl || !ctrl.host) return false;
+    ctrl.host.innerHTML = html;
+    return true;
+  }
+
+  function expMisionDe(ctrl, id) {
+    var misiones = (ctrl && ctrl.datos && ctrl.datos.misiones) || [];
+    for (var i = 0; i < misiones.length; i++) {
+      if (fichaTexto(misiones[i] && misiones[i].id) === id) return misiones[i];
+    }
+    return null;
+  }
+
+  /* Refresca SOLO el panel (un GET), nunca recarga la pagina. */
+  function expCargar(ctrl) {
+    if (!ctrl) return Promise.resolve(false);
+    var uid = expUsuarioId();
+    if (!uid) {
+      ctrl.datos = null;
+      ctrl.error = null;
+      ctrl.enviando = '';
+      expPintar(ctrl, expVacioHtml());
+      return Promise.resolve(false);
+    }
+    ctrl.cargando = true;
+    return expPedir(uid).then(function (r) {
+      ctrl.cargando = false;
+      if (!r || r.ok !== true) {
+        ctrl.datos = null;
+        ctrl.error = (r && r.mensaje) || 'No se pudieron cargar las expediciones.';
+        expPintar(ctrl, expPanelHtml(ctrl));
+        return false;
+      }
+      ctrl.error = null;
+      ctrl.datos = r.datos;
+      expPintar(ctrl, expPanelHtml(ctrl));
+      return true;
+    });
+  }
+
+  function expCobrarDesdeBoton(ctrl, btn) {
+    if (!ctrl || ctrl.enviando) return Promise.resolve(false);
+    var misionId = fichaTexto(btn && btn.getAttribute('data-mision-id'));
+    if (!misionId) return Promise.resolve(false);
+    var m = expMisionDe(ctrl, misionId);
+    if (!m || m.disponible !== true) return Promise.resolve(false);
+    var pend = m.acciones_pendientes || [];
+    var ref = fichaTexto(pend[0] && pend[0].ref);
+    if (!ref) return Promise.resolve(false);
+    if (!expConfirmar(m)) return Promise.resolve(false);
+    ctrl.enviando = misionId;
+    ctrl.aviso = { tipo: 'ok', texto: 'Enviando la expedicion...' };
+    expPintar(ctrl, expPanelHtml(ctrl));
+    return expCobrar(misionId, ref).then(function (r) {
+      ctrl.enviando = '';
+      if (!r || r.ok !== true) {
+        ctrl.aviso = {
+          tipo: 'error',
+          texto: (r && r.mensaje) || expMensaje('SERVIDOR')
+        };
+      } else if (r.datos && r.datos.repetido === true) {
+        ctrl.aviso = { tipo: 'ok', texto: 'Ya la hiciste: esta mision no da XP nueva.' };
+      } else {
+        ctrl.aviso = {
+          tipo: 'ok',
+          texto: 'Cobraste ' + miles(safeNum(r.datos && r.datos.xp, 0)) + ' XP con '
+            + (fichaTexto(m.nombre) || 'la expedicion') + '.'
+        };
+      }
+      return expCargar(ctrl).then(function () { return true; });
+    });
+  }
+
+  function expClick(ctrl, ev) {
+    if (!ctrl) return;
+    var go = catalogoCerca(ev && ev.target, 'data-c-exp-go', ctrl.host);
+    if (go) {
+      expCobrarDesdeBoton(ctrl, go);
+      return;
+    }
+    if (catalogoCerca(ev && ev.target, 'data-c-exp-refrescar', ctrl.host)) {
+      expCargar(ctrl);
+    }
+  }
+
+  function expedicionesMontar(idHost, opciones) {
+    var doc = (typeof document !== 'undefined') ? document : null;
+    if (!doc || typeof doc.getElementById !== 'function') return false;
+    var id = fichaTexto(idHost) || 'expediciones-panel';
+    var host = doc.getElementById(id);
+    if (!host) return false;
+    if (expCtrl && expCtrl.host === host) {
+      if (opciones && opciones.auto) expCargar(expCtrl);
+      return true;
+    }
+    var ctrl = {
+      host: host, datos: null, error: null, aviso: null,
+      enviando: '', cargando: false
+    };
+    expCtrl = ctrl;
+    if (typeof host.addEventListener === 'function') {
+      host.addEventListener('click', function (ev) { expClick(ctrl, ev); });
+    }
+    if (opciones && opciones.auto) {
+      expCargar(ctrl);
+      if (!expUsuarioId()) expEsperarSesion(ctrl, 0);
+    }
+    return true;
+  }
+
+  /* La pagina resuelve la sesion DESPUES de DOMContentLoaded (el perfil
+     llega por API). Sin esto el panel se quedaria en "Entra para
+     expedicionar" aunque el usuario ya tenga sesion. Sondeo ACOTADO y sin
+     red: mientras no hay uid no sale ninguna peticion. */
+  var EXP_ESPERA_MAX = 12;
+  var EXP_ESPERA_MS = 500;
+
+  function expEsperarSesion(ctrl, intentos) {
+    if (!ctrl || expCtrl !== ctrl) return;
+    if (expUsuarioId()) {
+      expCargar(ctrl);
+      return;
+    }
+    if (intentos >= EXP_ESPERA_MAX) return;
+    if (!w || typeof w.setTimeout !== 'function') return;
+    w.setTimeout(function () {
+      expEsperarSesion(ctrl, intentos + 1);
+    }, EXP_ESPERA_MS);
+  }
+
+  /* Auto-arranque: solo pinta los paneles en las paginas que los declaran. */
   if (typeof document !== 'undefined' && document.addEventListener) {
-    var catalogoArrancar = function () { catalogoMontar('catalogo-panel'); };
+    var panelesArrancar = function () {
+      catalogoMontar('catalogo-panel');
+      expedicionesMontar('expediciones-panel', { auto: true });
+    };
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', catalogoArrancar);
+      document.addEventListener('DOMContentLoaded', panelesArrancar);
     } else {
-      catalogoArrancar();
+      panelesArrancar();
     }
   }
 
@@ -1695,7 +2225,24 @@
     catalogoInfoTexto: catalogoInfoTexto,
     catalogoHayMas: catalogoHayMas,
     catalogoAplicarAcunar: catalogoAplicarAcunar,
-    catalogoMontar: catalogoMontar
+    catalogoMontar: catalogoMontar,
+    expUrl: expUrl,
+    expAccionesFaltan: expAccionesFaltan,
+    expEstadoMision: expEstadoMision,
+    expFaltanTexto: expFaltanTexto,
+    expMensaje: expMensaje,
+    expTextoConfirmacion: expTextoConfirmacion,
+    expNormalizar: expNormalizar,
+    expPedir: expPedir,
+    expCobrar: expCobrar,
+    expCabeceraHtml: expCabeceraHtml,
+    expMisionHtml: expMisionHtml,
+    expRamasHtml: expRamasHtml,
+    expPanelHtml: expPanelHtml,
+    expVacioHtml: expVacioHtml,
+    expCargar: expCargar,
+    expCobrarDesdeBoton: expCobrarDesdeBoton,
+    expedicionesMontar: expedicionesMontar
   };
 
 }(window));

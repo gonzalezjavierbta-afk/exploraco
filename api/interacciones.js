@@ -4585,6 +4585,642 @@ var MISIONES = [
   },
 ];
 
+// ============================================================
+// EXPEDICIONES (spec 11.9; cierre del contrato de 5.2)
+// ------------------------------------------------------------
+// R1 de 11.9.7: catalogo SEPARADO de MISIONES. evaluarMisiones()
+// (5999) paga todo lo que este en MISIONES con accion='mision',
+// es_exento=true y cap_aplicado='ninguno': si una expedicion
+// entrara ahi, los caps 5/24 h y 200/24 h quedarian bypassados y
+// el GET podria pagar sin cobro explicito. El unico pago valido
+// de una expedicion es accion='carta_expedicion' (R4).
+// Lo que se comparte con MISIONES es el catalogo como fuente de
+// ids, no el evaluador.
+// ============================================================
+
+var EXPEDICION_CAP_DIARIO = 5;   // cobros por ventana rodante de 24 h
+var EXPEDICION_XP_DIA = 200;     // XP por ventana rodante de 24 h
+var EXPEDICION_UUID_RE = MERCADO_UUID_RE;
+
+// Catalogo v1 (11.9.4). Ids con prefijo xpd_ para no colisionar con
+// las ramas 'exp_*' de MISIONES. requiere_stats son enteros >= 0 y
+// SOLO de ejes habilitados en v1 (11.9.3: oficio y rendimiento no
+// pueden aparecer; una rama futura que los necesite es ADR + cap).
+// total_sql cuenta acciones VIGENTES del usuario ($1::uuid).
+// ref_sql devuelve la accion del offset 0-based $2 (11.9.5) con un
+// ORDER BY estable y unico.
+// El limite de la lista (5) es EXPEDICION_ACCIONES_MAX y va LITERAL en
+// el SQL porque $2 ya es el offset; la constante recorta en JS.
+var EXPEDICION_ACCIONES_MAX = 5;
+// lista_sql (11.9.9-bis) es el ESPEJO de ref_sql para el GET: mismo WHERE,
+// mismo ORDER BY y misma expresion de ref, mas fecha y detalle. Se lee
+// desde el offset $2 = cobros_previos * acciones_por_cobro, que es el
+// INICIO del bloque no consumido; por eso la ref que el POST acepta es
+// la de indice (acciones_por_cobro - 1) de esta lista. Sin este espejo la
+// UI tendria que inventar refs, que es justo lo que 11.9.5 prohibe.
+var EXPEDICIONES = [
+  {
+    id: 'xpd_dif_comparte', expedicion_rama: 'difusion',
+    nombre: 'Difunde un destino',
+    descripcion: 'Comparte un destino publicado con un canal valido.',
+    requiere_stats: { alcance: 0 }, xp: 15, acciones_por_cobro: 1,
+    // Sin senal medible: media_compartidos no existe en la base viva (022
+    // no aplicada) y el ledger lo registra como historico_no_verificado el
+    // 2026-11-11. Fail-closed: no se ofrece lista ni se inventa otra senal.
+    senal_disponible: false,
+    total_sql: 'SELECT COUNT(*)::int AS n FROM media_compartidos'
+      + ' WHERE usuario_id = $1::uuid AND fuente = \'destino\'',
+    ref_sql: 'SELECT id::text AS ref FROM media_compartidos'
+      + ' WHERE usuario_id = $1::uuid AND fuente = \'destino\''
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+  },
+  {
+    id: 'xpd_dif_mapa', expedicion_rama: 'difusion',
+    nombre: 'Mapa que crece',
+    descripcion: 'Guarda 3 destinos mas en Tu Mapa.',
+    requiere_stats: { alcance: 8 }, xp: 25, acciones_por_cobro: 3,
+    total_sql: 'SELECT COUNT(*)::int AS n FROM interacciones'
+      + ' WHERE usuario_id = $1::uuid AND tipo = \'guardado\' AND activo = true',
+    ref_sql: 'SELECT id::text AS ref FROM interacciones'
+      + ' WHERE usuario_id = $1::uuid AND tipo = \'guardado\' AND activo = true'
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT i.id::text AS ref, i.creado_en AS fecha,'
+      + ' COALESCE(d.nombre, \'Destino\')::text AS detalle'
+      + ' FROM interacciones i LEFT JOIN destinos d ON d.id = i.destino_id'
+      + ' WHERE i.usuario_id = $1::uuid AND i.tipo = \'guardado\''
+      + ' AND i.activo = true'
+      + ' ORDER BY i.creado_en, i.id LIMIT 5 OFFSET $2',
+  },
+  {
+    id: 'xpd_dif_resena', expedicion_rama: 'difusion',
+    nombre: 'Voz que se lee',
+    descripcion: 'Publica 2 resenas sustanciales (25 XP de calidad o mas).',
+    requiere_stats: { alcance: 20 }, xp: 40, acciones_por_cobro: 2,
+    total_sql: 'SELECT COUNT(*)::int AS n FROM interacciones'
+      + ' WHERE usuario_id = $1::uuid AND tipo = \'resena\' AND activo = true'
+      + ' AND xp_ganado >= 25',
+    ref_sql: 'SELECT id::text AS ref FROM interacciones'
+      + ' WHERE usuario_id = $1::uuid AND tipo = \'resena\' AND activo = true'
+      + ' AND xp_ganado >= 25'
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT i.id::text AS ref, i.creado_en AS fecha,'
+      + ' COALESCE(d.nombre, \'Destino\')::text AS detalle'
+      + ' FROM interacciones i LEFT JOIN destinos d ON d.id = i.destino_id'
+      + ' WHERE i.usuario_id = $1::uuid AND i.tipo = \'resena\''
+      + ' AND i.activo = true AND i.xp_ganado >= 25'
+      + ' ORDER BY i.creado_en, i.id LIMIT 5 OFFSET $2',
+  },
+  {
+    id: 'xpd_for_visita', expedicion_rama: 'hallazgo',
+    nombre: 'Primera incursion',
+    descripcion: 'Confirma una visita en un destino.',
+    requiere_stats: { fortuna: 0 }, xp: 15, acciones_por_cobro: 1,
+    total_sql: 'SELECT COUNT(*)::int AS n FROM interacciones'
+      + ' WHERE usuario_id = $1::uuid AND tipo = \'visita\' AND activo = true',
+    ref_sql: 'SELECT id::text AS ref FROM interacciones'
+      + ' WHERE usuario_id = $1::uuid AND tipo = \'visita\' AND activo = true'
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT i.id::text AS ref, i.creado_en AS fecha,'
+      + ' COALESCE(d.nombre, \'Destino\')::text AS detalle'
+      + ' FROM interacciones i LEFT JOIN destinos d ON d.id = i.destino_id'
+      + ' WHERE i.usuario_id = $1::uuid AND i.tipo = \'visita\''
+      + ' AND i.activo = true'
+      + ' ORDER BY i.creado_en, i.id LIMIT 5 OFFSET $2',
+  },
+  {
+    id: 'xpd_for_album', expedicion_rama: 'hallazgo',
+    nombre: 'Hallazgo guardado',
+    descripcion: 'Guarda 2 fotos en tus albumes.',
+    requiere_stats: { fortuna: 8 }, xp: 25, acciones_por_cobro: 2,
+    total_sql: 'SELECT COUNT(*)::int AS n FROM album_fotos'
+      + ' WHERE agregador_id = $1::uuid AND activo = true',
+    ref_sql: 'SELECT id::text AS ref FROM album_fotos'
+      + ' WHERE agregador_id = $1::uuid AND activo = true'
+      + ' ORDER BY creado_en, id LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT af.id::text AS ref, af.creado_en AS fecha,'
+      + ' COALESCE(NULLIF(af.media_title, \'\'), \'Foto\')::text AS detalle'
+      + ' FROM album_fotos af'
+      + ' WHERE af.agregador_id = $1::uuid AND af.activo = true'
+      + ' ORDER BY af.creado_en, af.id LIMIT 5 OFFSET $2',
+  },
+  {
+    id: 'xpd_for_gate', expedicion_rama: 'hallazgo',
+    nombre: 'Sobre abierto',
+    descripcion: 'Cobra un drop de gate (nivel 10, 14, 20 o 25).',
+    requiere_stats: { fortuna: 20 }, xp: 40, acciones_por_cobro: 1,
+    total_sql: 'SELECT COUNT(*)::int AS n FROM cartas_gates'
+      + ' WHERE usuario_id = $1::uuid AND drop_en IS NOT NULL',
+    ref_sql: 'SELECT nivel_gate::text AS ref FROM cartas_gates'
+      + ' WHERE usuario_id = $1::uuid AND drop_en IS NOT NULL'
+      + ' ORDER BY drop_en, nivel_gate LIMIT 1 OFFSET $2',
+    lista_sql: 'SELECT cg.nivel_gate::text AS ref, cg.drop_en AS fecha,'
+      + ' (\'Gate nivel \' || cg.nivel_gate::text) AS detalle'
+      + ' FROM cartas_gates cg'
+      + ' WHERE cg.usuario_id = $1::uuid AND cg.drop_en IS NOT NULL'
+      + ' ORDER BY cg.drop_en, cg.nivel_gate LIMIT 5 OFFSET $2',
+  },
+];
+
+// Suelo de cobro DERIVADO del catalogo (11.9.4): el remanente por
+// debajo del cobro mas barato ya no se puede pagar sin mentir. Se
+// deriva y no se escribe a mano para que anadir una mision de 10 XP
+// no deje una constante mintiendo.
+var EXPEDICION_XP_MIN_COBRO = EXPEDICIONES.reduce(function (min, x) {
+  var xp = Number(x.xp) || 0;
+  return (min === 0 || xp < min) ? xp : min;
+}, 0);
+
+// Guard R2 (11.9.7): se ejecuta EN CARGA. Si una expedicion entra en
+// MISIONES o un id colisiona, el modulo no arranca: es preferible un
+// 503 visible a un faucet silencioso de XP. A1 y A2 de 11.9.10
+// quedan cubiertos por la misma funcion (el smoke la reusa).
+function validarCatalogosExpedicion() {
+  var errs = [];
+  var ids = {};
+  var ramas = { difusion: 0, hallazgo: 0 };
+  var xpValidos = { 15: true, 25: true, 40: true };
+  var reqValidos = { 0: true, 8: true, 20: true };
+  var ejesV1 = { alcance: true, fortuna: true };
+  var suma = 0;
+  var maxXp = 0;
+  var minXp = 0;
+  var i, id, m, x, xp, n, req;
+
+  if (EXPEDICIONES.length !== 6) {
+    errs.push('EXPEDICIONES debe tener 6 misiones (tiene ' + EXPEDICIONES.length + ')');
+  }
+  for (i = 0; i < EXPEDICIONES.length; i++) {
+    x = EXPEDICIONES[i] || {};
+    id = String(x.id || '');
+    if (id.indexOf('xpd_') !== 0) errs.push('id sin prefijo xpd_: ' + id);
+    if (ids[id]) errs.push('id de expedicion duplicado: ' + id);
+    ids[id] = true;
+    if (!Object.prototype.hasOwnProperty.call(ramas, String(x.expedicion_rama))) {
+      errs.push(id + ': rama invalida ' + x.expedicion_rama);
+    } else {
+      ramas[String(x.expedicion_rama)]++;
+    }
+    xp = Number(x.xp);
+    if (!xpValidos[xp]) errs.push(id + ': xp fuera de {15,25,40}');
+    suma += isFinite(xp) ? xp : 0;
+    if (xp > maxXp) maxXp = xp;
+    if (minXp === 0 || xp < minXp) minXp = xp;
+    n = Number(x.acciones_por_cobro);
+    if (n !== 1 && n !== 2 && n !== 3) {
+      errs.push(id + ': acciones_por_cobro fuera de {1,2,3}');
+    }
+    req = x.requiere_stats || {};
+    Object.keys(req).forEach(function(eje) {
+      if (!ejesV1[String(eje)]) {
+        errs.push(id + ': requiere_stats con eje no habilitado en v1: ' + eje);
+      }
+      if (!reqValidos[Number(req[eje])]) {
+        errs.push(id + ': umbral fuera de {0,8,20} en ' + eje);
+      }
+    });
+    if (typeof x.total_sql !== 'string' || typeof x.ref_sql !== 'string') {
+      errs.push(id + ': falta total_sql/ref_sql');
+    }
+    // 11.9.9-bis: una mision SIN lista_sql solo es valida si declara que no
+    // tiene senal medible (fail-closed explicito, no olvido silencioso).
+    if (typeof x.lista_sql !== 'string' && x.senal_disponible !== false) {
+      errs.push(id + ': falta lista_sql y no declara senal_disponible false');
+    }
+  }
+  for (i = 0; i < MISIONES.length; i++) {
+    m = MISIONES[i] || {};
+    if (m.expedicion_rama) {
+      errs.push('R2: MISIONES contiene expedicion_rama en ' + m.id);
+    }
+    if (ids[String(m.id || '')]) {
+      errs.push('R2: id de expedicion dentro de MISIONES: ' + m.id);
+    }
+  }
+  if (ramas.difusion !== 3 || ramas.hallazgo !== 3) {
+    errs.push('ramas: se esperan 3 difusion + 3 hallazgo');
+  }
+  if (suma !== 160) errs.push('suma de xp != 160 (es ' + suma + ')');
+  if (maxXp !== 40) errs.push('xp maximo != 40 (es ' + maxXp + ')');
+  if (minXp !== 15) errs.push('xp minimo != 15 (es ' + minXp + ')');
+  return errs;
+}
+
+var EXPEDICIONES_ERR = validarCatalogosExpedicion();
+if (EXPEDICIONES_ERR.length) {
+  throw new Error('Catalogo de expediciones invalido (11.9.7 R2): '
+    + EXPEDICIONES_ERR.join(' | '));
+}
+
+// Exigencia de umbral (11.9.6 paso 5 y contrato del GET): devuelve
+// SOLO las claves de requiere_stats, con el valor actual del vector y
+// lo que falta por eje (max(0, req - actual)).
+function expedicionFaltantes(m, vector) {
+  var req = (m && m.requiere_stats) || {};
+  var stats = {};
+  var faltan = {};
+  var alcanzado = true;
+  Object.keys(req).forEach(function(eje) {
+    var actual = numXp(vector ? vector[eje] : 0);
+    var minimo = numXp(req[eje]);
+    stats[eje] = actual;
+    faltan[eje] = Math.max(0, minimo - actual);
+    if (actual < minimo) alcanzado = false;
+  });
+  return { stats_usuario: stats, faltan: faltan, alcanzado: alcanzado };
+}
+
+// Vector del usuario (11.9.2): UNA lectura, reduccion en JS con las
+// constantes de lib/cartas-config.js. No se persiste (cero columna,
+// cero cache, cero tabla). Sin la 066 se degrada a nivel 1 (nunca se
+// inventa un bono) en vez de tumbar la lectura.
+function expedicionVector(sqlFn, usuarioId) {
+  var base = ' FROM usuarios_cartas uc'
+    + ' JOIN cartas_catalogo c ON c.id = uc.carta_id';
+  var donde = ' WHERE uc.usuario_id = $1::uuid AND uc.activo = true'
+    + ' AND uc.cantidad >= 1 AND c.activo = true';
+  var conNivel = 'SELECT uc.carta_id, uc.variante, c.stats_json,'
+    + ' COALESCE(n.nivel, 1)::int AS nivel' + base
+    + ' LEFT JOIN usuarios_cartas_nivel n'
+    + ' ON n.usuario_id = uc.usuario_id AND n.carta_id = uc.carta_id' + donde;
+  var sinNivel = 'SELECT uc.carta_id, uc.variante, c.stats_json, 1::int AS nivel'
+    + base + donde;
+  return conDegradacionMedia(sqlFn(conNivel, [usuarioId]),
+      'usuarios_cartas_nivel', null)
+    .then(function(filas) {
+      if (filas) return filas;
+      return sqlFn(sinNivel, [usuarioId]);
+    })
+    .then(function(filas) {
+      return CartasConfig.vectorExpedicion(filas);
+    });
+}
+
+// Caps medidos en xp_ledger, nunca en contadores mutables (11.9.6):
+// ventana RODANTE de 24 h, no dia calendario.
+function expedicionCaps(sqlFn, usuarioId) {
+  return sqlFn(
+    'SELECT COUNT(*)::int AS usadas,'
+    + ' COALESCE(SUM(xp_final), 0)::numeric AS xp_dia'
+    + ' FROM xp_ledger'
+    + ' WHERE usuario_id = $1::uuid AND accion = \'carta_expedicion\''
+    + ' AND creado_en > NOW() - INTERVAL \'24 hours\'',
+    [usuarioId]
+  ).then(function(r) {
+    var f = (r && r[0]) || {};
+    var usadas = parseInt(f.usadas, 10);
+    if (!isFinite(usadas) || usadas < 0) usadas = 0;
+    var xpDia = red2(numXp(f.xp_dia));
+    return {
+      usadas: usadas,
+      xp_dia: xpDia,
+      remanente_xp: Math.max(0, red2(EXPEDICION_XP_DIA - xpDia)),
+    };
+  });
+}
+
+// Cobros por mision, de por vida (11.9.5 paso 3): no hay ventana de
+// 24 h aqui porque el consumo de acciones es historico.
+function expedicionCobros(sqlFn, usuarioId) {
+  return sqlFn(
+    'SELECT contexto->>\'mision_id\' AS mision_id, COUNT(*)::int AS n'
+    + ' FROM xp_ledger'
+    + ' WHERE usuario_id = $1::uuid AND accion = \'carta_expedicion\''
+    + ' GROUP BY 1',
+    [usuarioId]
+  ).then(function(filas) {
+    var mapa = {};
+    (filas || []).forEach(function(f) {
+      if (!f || f.mision_id === null || f.mision_id === undefined) return;
+      mapa[String(f.mision_id)] = parseInt(f.n, 10) || 0;
+    });
+    return mapa;
+  });
+}
+
+// Acciones vigentes que cumplen el predicado de la mision. Si la
+// senal no es medible se degrada a 0 (fail-closed: sin accion no hay
+// cobro). Caso medido 2026-11-11: media_compartidos no existe en la
+// base viva (022 no aplicada) y el resto del fichero degrada igual
+// (conDegradacionMedia, 6307).
+function expedicionTotal(sqlFn, usuarioId, m) {
+  return conDegradacionMedia(sqlFn(m.total_sql, [usuarioId]),
+      'expedicion:' + m.id, [{ n: 0 }])
+    .then(function(r) {
+      var n = (r && r[0]) ? parseInt(r[0].n, 10) : 0;
+      return (isFinite(n) && n > 0) ? n : 0;
+    });
+}
+
+// Fecha de la accion en ISO-8601 (o null): el driver puede devolver Date o
+// texto segun la columna, y la UI no debe recibir dos formatos distintos.
+function expedicionFechaISO(v) {
+  if (v === null || v === undefined) return null;
+  if (v instanceof Date) {
+    return isNaN(v.getTime()) ? null : v.toISOString();
+  }
+  return String(v);
+}
+
+// Acciones REALES pendientes de una mision (11.9.9-bis). LECTURA PURA: no
+// escribe, no marca nada y no consume. El offset es el inicio del bloque
+// NO consumido (cobros_previos * N), asi que el elemento N-esimo de la
+// lista es exactamente la ref que expedicionCobrar derivaria en 11.9.5
+// paso 5. Una mision sin senal (senal_disponible false, p.ej. compartir)
+// devuelve lista vacia SIN consultar: no se inventa otra senal.
+function expedicionAccionesPendientes(sqlFn, usuarioId, m, hechos) {
+  if (!m || m.senal_disponible === false || typeof m.lista_sql !== 'string') {
+    return Promise.resolve([]);
+  }
+  var n = Number(m.acciones_por_cobro) || 1;
+  var h = parseInt(hechos, 10);
+  if (!isFinite(h) || h < 0) h = 0;
+  var offset = h * n;
+  return conDegradacionMedia(sqlFn(m.lista_sql, [usuarioId, offset]),
+      'expedicion:' + m.id + ':lista', [])
+    .then(function(filas) {
+      var out = [];
+      (filas || []).forEach(function(f) {
+        if (!f || f.ref === undefined || f.ref === null) return;
+        out.push({
+          ref: String(f.ref),
+          fecha: expedicionFechaISO(f.fecha),
+          detalle: (f.detalle === undefined || f.detalle === null)
+            ? null : String(f.detalle),
+        });
+      });
+      return out.slice(0, EXPEDICION_ACCIONES_MAX);
+    });
+}
+
+// Ref que el POST aceptaria AHORA: el elemento N-esimo (1-based) de la
+// lista pendiente, espejo del offset (hechos * N + N - 1) del cobro.
+// null cuando no hay bloque completo (la mision esta en repetido).
+function expedicionRefCobrable(pend, n) {
+  var k = Number(n) || 1;
+  if (!pend || pend.length < k) return null;
+  var f = pend[k - 1];
+  return (f && f.ref) ? f.ref : null;
+}
+
+// Orden de salida: la ref COBRABLE va PRIMERO porque es la unica que el
+// cliente puede mandar sin inventar (11.9.5); el resto, por fecha DESC
+// como lista de contexto. Con mas de N pendientes, un DESC puro pondria
+// delante una ref que el POST rechaza y la UI no tendria nada que cobrar.
+function expedicionOrdenAcciones(pend, ref) {
+  var lista = (pend || []).slice(0);
+  var primera = null;
+  var i;
+  if (ref) {
+    for (i = 0; i < lista.length; i++) {
+      if (lista[i].ref === ref) {
+        primera = lista.splice(i, 1)[0];
+        break;
+      }
+    }
+  }
+  lista.sort(function(a, b) {
+    var fa = a.fecha || '';
+    var fb = b.fecha || '';
+    if (fa === fb) return 0;
+    return (fa < fb) ? 1 : -1;
+  });
+  if (primera) lista.unshift(primera);
+  return lista.slice(0, EXPEDICION_ACCIONES_MAX);
+}
+
+// Lectura del GET ?tipo=expediciones (11.9.8). Sin sesion, igual que
+// tipo=misiones; no expone nada que no sea del propio usuario_id.
+// R5: NO usa entregarCatalogo(), que deriva 'estado' de
+// progreso_misiones y mostraria las expediciones mal para siempre.
+async function expedicionLectura(sqlFn, usuarioId) {
+  var vend = await expedicionVector(sqlFn, usuarioId);
+  var cap = await expedicionCaps(sqlFn, usuarioId);
+  var cobros = await expedicionCobros(sqlFn, usuarioId);
+  var totales = await Promise.all(EXPEDICIONES.map(function(m) {
+    return expedicionTotal(sqlFn, usuarioId, m);
+  }));
+  // 11.9.9-bis: la lista de refs del bloque NO consumido se lee en la
+  // misma pasada, con el numero de cobros ya conocido por mision.
+  var pendientes = await Promise.all(EXPEDICIONES.map(function(m) {
+    return expedicionAccionesPendientes(sqlFn, usuarioId, m, cobros[m.id] || 0);
+  }));
+  var misiones = [];
+  var pendientesTotal = 0;
+  for (var i = 0; i < EXPEDICIONES.length; i++) {
+    var m = EXPEDICIONES[i];
+    var n = Number(m.acciones_por_cobro) || 1;
+    var total = totales[i] || 0;
+    var hechos = cobros[m.id] || 0;
+    var elegibles = Math.floor(total / n);
+    var umbral = expedicionFaltantes(m, vend.vector);
+    var sinSenal = m.senal_disponible === false;
+    var pend = pendientes[i] || [];
+    var refCobrable = sinSenal ? null : expedicionRefCobrable(pend, n);
+    var listaAcciones = expedicionOrdenAcciones(pend, refCobrable);
+    pendientesTotal += listaAcciones.length;
+    // Prioridad = orden real del POST (11.9.6): caps antes que umbral y
+    // umbral antes que falta de accion. Es una pista: el POST re-valida.
+    var bloqueo = null;
+    if (cap.usadas >= EXPEDICION_CAP_DIARIO || cap.xp_dia >= EXPEDICION_XP_DIA) {
+      bloqueo = 'CAP_DIARIO';
+    } else if (cap.remanente_xp < EXPEDICION_XP_MIN_COBRO) {
+      bloqueo = 'CAP_RECOMPENSA';
+    } else if (!umbral.alcanzado) {
+      bloqueo = 'UMBRAL';
+    } else if (elegibles <= hechos) {
+      bloqueo = 'SIN_ACCION';
+    }
+    // Una mision sin senal medible NUNCA es cobrable, aunque el cap y el
+    // umbral esten limpios: fail-closed y motivo explicito (11.9.9-bis).
+    if (sinSenal) bloqueo = bloqueo || 'SIN_ACCION';
+    misiones.push({
+      id: m.id,
+      expedicion_rama: m.expedicion_rama,
+      nombre: m.nombre,
+      descripcion: m.descripcion,
+      xp: m.xp,
+      requiere_stats: Object.assign({}, m.requiere_stats),
+      stats_usuario: umbral.stats_usuario,
+      faltan: umbral.faltan,
+      acciones: {
+        total: total,
+        por_cobro: n,
+        elegibles: elegibles,
+        cobros: hechos,
+      },
+      disponible: bloqueo === null,
+      bloqueo: bloqueo,
+      // Claves NUEVAS de 11.9.9-bis (retrocompatible: 'acciones' se queda
+      // como objeto y la lista viaja en acciones_pendientes).
+      senal_disponible: !sinSenal,
+      accion_ref: refCobrable,
+      acciones_pendientes: listaAcciones,
+      motivo: refCobrable ? null : 'SIN_ACCION',
+    });
+  }
+  return {
+    ok: true,
+    vector: vend.vector,
+    poder: vend.poder,
+    cap: {
+      usadas: cap.usadas,
+      limite: EXPEDICION_CAP_DIARIO,
+      xp_dia: cap.xp_dia,
+      limite_xp: EXPEDICION_XP_DIA,
+      remanente_xp: cap.remanente_xp,
+      min_cobro_xp: EXPEDICION_XP_MIN_COBRO,
+    },
+    misiones: misiones,
+    // Indicador global para la UI: acciones reales pendientes devueltas
+    // (tope EXPEDICION_ACCIONES_MAX por mision). No es un contador de XP.
+    acciones_pendientes_total: pendientesTotal,
+  };
+}
+
+// Asiento del cobro + subida de xp_total en UNA sentencia (11.9.6):
+// si el INSERT no devuelve fila, el UPDATE no corre. El choque con el
+// indice unico parcial 073 (23505) NO es error: es la carrera o el
+// reintento, y se resuelve como repetido sin segundo asiento.
+async function expedicionInsertarAsiento(sqlFn, d) {
+  var datos = d || {};
+  try {
+    var r = await sqlFn(
+      'WITH led AS ('
+      + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, mult_nivel,'
+      + '  mult_stack, mult_final, cap_aplicado, bonos_planos, xp_final,'
+      + '  es_exento, contexto)'
+      + ' VALUES ($1::uuid, \'carta_expedicion\', $2::numeric, 1, 1, 1, $3, 0,'
+      + '  $4::numeric, true, $5::jsonb)'
+      + ' RETURNING id),'
+      + ' up AS ('
+      + ' UPDATE usuarios SET xp_total = xp_total + $4::numeric'
+      + ' WHERE id = $1::uuid AND EXISTS (SELECT 1 FROM led)'
+      + ' RETURNING xp_total)'
+      + ' SELECT (SELECT id FROM led) AS ledger_id,'
+      + ' (SELECT xp_total FROM up) AS xp_total',
+      [
+        datos.usuario_id,
+        red2(datos.xp_base),
+        datos.cap_aplicado === 'accion' ? 'accion' : 'ninguno',
+        red2(datos.xp_final),
+        JSON.stringify(datos.contexto || {}),
+      ]
+    );
+    var fila = (r && r[0]) || {};
+    return { insertado: true, ledger_id: fila.ledger_id, xp_total: fila.xp_total };
+  } catch (e) {
+    if (e && e.code === '23505') {
+      return { insertado: false, repetido: true };
+    }
+    throw e;
+  }
+}
+
+// Cobro de una expedicion (11.9.6). Orden de validacion determinista:
+// el primer fallo devuelve y NO escribe nada. Devuelve {status, body}
+// para que el handler solo traduzca a HTTP (y el smoke ejercite el
+// MISMO codigo dentro de una transaccion con ROLLBACK).
+async function expedicionCobrar(sqlFn, usuarioId, body) {
+  var b = body || {};
+  var misionId = String(b.mision_id || '').trim();
+  var m = null;
+  for (var i = 0; i < EXPEDICIONES.length; i++) {
+    if (EXPEDICIONES[i].id === misionId) m = EXPEDICIONES[i];
+  }
+  if (!m) {
+    return { status: 404, body: {
+      ok: false, code: 'MISION_NO_ENCONTRADA', mision_id: misionId } };
+  }
+
+  var cap = await expedicionCaps(sqlFn, usuarioId);
+  if (cap.usadas >= EXPEDICION_CAP_DIARIO || cap.xp_dia >= EXPEDICION_XP_DIA) {
+    return { status: 409, body: {
+      ok: false, code: 'CAP_DIARIO',
+      usadas: cap.usadas, limite: EXPEDICION_CAP_DIARIO,
+      xp_dia: cap.xp_dia, limite_xp: EXPEDICION_XP_DIA } };
+  }
+  if (cap.remanente_xp < EXPEDICION_XP_MIN_COBRO) {
+    return { status: 409, body: {
+      ok: false, code: 'CAP_RECOMPENSA',
+      xp_dia: cap.xp_dia, remanente_xp: cap.remanente_xp,
+      min_cobro_xp: EXPEDICION_XP_MIN_COBRO } };
+  }
+
+  var vend = await expedicionVector(sqlFn, usuarioId);
+  var umbral = expedicionFaltantes(m, vend.vector);
+  if (!umbral.alcanzado) {
+    return { status: 409, body: {
+      ok: false, code: 'UMBRAL_NO_ALCANZADO',
+      faltan: umbral.faltan, vector: vend.vector,
+      requiere_stats: Object.assign({}, m.requiere_stats) } };
+  }
+
+  var n = Number(m.acciones_por_cobro) || 1;
+  var total = await expedicionTotal(sqlFn, usuarioId, m);
+  var cobros = await expedicionCobros(sqlFn, usuarioId);
+  var hechos = cobros[m.id] || 0;
+  var elegibles = Math.floor(total / n);
+
+  function repetido() {
+    return { status: 200, body: {
+      ok: true, mision_id: m.id, xp: 0, xp_solicitado: m.xp,
+      recortado: false, repetido: true, accion_ref: null,
+      usadas: cap.usadas, limite: EXPEDICION_CAP_DIARIO,
+      xp_dia: cap.xp_dia, limite_xp: EXPEDICION_XP_DIA,
+      remanente_xp: cap.remanente_xp } };
+  }
+
+  // 11.9.5 paso 6: sin bloque nuevo de acciones no hay cobro.
+  if (elegibles <= hechos) return repetido();
+
+  // 11.9.5 paso 5: la accion consumida es la ULTIMA del bloque recien
+  // completado, derivada por el servidor. Sin esto cualquiera inventa refs.
+  var offset = hechos * n + n - 1;
+  var refFilas = await sqlFn(m.ref_sql, [usuarioId, offset]);
+  var ref = (refFilas && refFilas[0] && refFilas[0].ref !== undefined)
+    ? String(refFilas[0].ref) : null;
+  if (!ref) return repetido();
+
+  // Si el cliente manda accion_ref solo vale EXACTAMENTE la derivada:
+  // una ref ajena, inventada o vieja no se cobra nunca (fail-closed).
+  if (b.accion_ref !== undefined && b.accion_ref !== null
+      && String(b.accion_ref) !== ref) {
+    return { status: 409, body: {
+      ok: false, code: 'ACCION_NO_VERIFICADA', mision_id: m.id } };
+  }
+
+  // Politica de remanente (11.9.6): recortar al remanente y registrar el
+  // importe REAL. xp_base conserva lo solicitado (auditable sin reconstruir).
+  var xp = red2(Math.min(Number(m.xp) || 0, cap.remanente_xp));
+  var recortado = xp < (Number(m.xp) || 0);
+  var ins = await expedicionInsertarAsiento(sqlFn, {
+    usuario_id: usuarioId,
+    xp_base: m.xp,
+    xp_final: xp,
+    cap_aplicado: recortado ? 'accion' : 'ninguno',
+    contexto: {
+      mision_id: m.id,
+      expedicion_rama: m.expedicion_rama,
+      acciones_por_cobro: n,
+      accion_ref: ref,
+      cobros_previos: hechos,
+      usadas: cap.usadas,
+      xp_dia_previo: cap.xp_dia,
+      recortado: recortado,
+    },
+  });
+  if (!ins.insertado) return repetido();
+
+  var usadasPost = cap.usadas + 1;
+  var xpDiaPost = red2(cap.xp_dia + xp);
+  return { status: 200, body: {
+    ok: true, mision_id: m.id, xp: xp, xp_solicitado: m.xp,
+    recortado: recortado, repetido: false, accion_ref: ref,
+    usadas: usadasPost, limite: EXPEDICION_CAP_DIARIO,
+    xp_dia: xpDiaPost, limite_xp: EXPEDICION_XP_DIA,
+    remanente_xp: Math.max(0, red2(EXPEDICION_XP_DIA - xpDiaPost)) } };
+}
+
 // -- Catalogo de logros (v5, estilo consola + Upland) ---------------
 // Mismo patron que MISIONES: codigo estatico, DAG via 'requiere',
 // check() server-side. Anade tier (bronce/plata/oro/platino) para el
@@ -5106,6 +5742,10 @@ var BONO_EXCLUIDAS = {
   // Fase 2 UGC (spec 6): el envio de una obra a moderacion es un COBRO de XP.
   // Un cargo nunca recibe el bono % de consumibles (ADR-120).
   carta_media_envio: true,
+  // Fase 2 expediciones (spec 11.9.6): la recompensa de una expedicion es
+  // XP FIJO de catalogo, exento de multiplicadores. La lista es la
+  // documentacion ejecutable de "nunca recibe bono" (5.2:496).
+  carta_expedicion: true,
   // D-17 (spec 6.4): el royalty del autor y el tithe de parche son DETRACCIONES
   // del bruto de una venta; jamas reciben bono.
   carta_royalty: true, carta_tithe: true,
@@ -5673,8 +6313,13 @@ function validarSesion(req, usuarioIdEsperado) {
 }
 
 // Respuesta 401 unica para fallos de sesion (contrato de la Entrega 016).
-function responderSesion(res, razon) {
-  return res.status(401).json({ ok: false, error: razon });
+// 'codigo' es opcional: solo las ramas que lo declaran en su contrato lo
+// anaden (11.9.6: code:'SESION_REQUERIDA'). El shape historico {ok,error}
+// se conserva intacto para el resto de llamadores.
+function responderSesion(res, razon, codigo) {
+  var cuerpo = { ok: false, error: razon };
+  if (codigo) cuerpo.code = codigo;
+  return res.status(401).json(cuerpo);
 }
 
 // Consumo atomico de nonce anti-replay (ADR-025): un solo uso, expira
@@ -7839,6 +8484,20 @@ module.exports = async function handler(req, res) {
           desbloqueadas: resMisiones.desbloqueados,
           total: resMisiones.data.length,
         });
+      }
+
+      // Expediciones (spec 11.9.8). R5: mapper EXPLICITO, no
+      // entregarCatalogo(), porque 'estado' se deriva de progreso_misiones
+      // y una expedicion repetible no tiene estado final. No exige sesion
+      // (igual que tipo=misiones) y no expone nada ajeno al usuario_id.
+      if (tipo === 'expediciones' && usuarioId) {
+        if (!EXPEDICION_UUID_RE.test(String(usuarioId)))
+          return res.status(400).json({ ok: false, error: 'USUARIO_ID_INVALIDO' });
+        var expUsr = await sql('SELECT id FROM usuarios WHERE id=$1::uuid', [usuarioId]);
+        if (!expUsr.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        var expLectura = await expedicionLectura(sql, usuarioId);
+        return res.status(200).json(expLectura);
       }
 
       // Mapas tematicos del usuario (spec mapas publicos/privados
@@ -15751,6 +16410,22 @@ module.exports = async function handler(req, res) {
         return res.status(200).json(cpResp);
       }
 
+      // -- Expedicion: cobro (spec 11.9.6 y 11.9.8) --------------------
+      // {tipo:'expedicion_cobrar', usuario_id, mision_id, accion_ref?}.
+      // El cobro NUNCA se delega a evaluarMisiones: ese camino paga con
+      // accion='mision', exenta y sin caps (11.9.7 R1/R4). Aqui todo pasa
+      // por accion='carta_expedicion' con cap 5/24 h y 200 XP/24 h.
+      if (tipo2 === 'expedicion_cobrar') {
+        if (!usuarioId2)
+          return responderSesion(res, 'SESION_REQUERIDA', 'SESION_REQUERIDA');
+        if (!EXPEDICION_UUID_RE.test(String(usuarioId2)))
+          return res.status(400).json({ ok: false, error: 'USUARIO_ID_INVALIDO' });
+        var exSes = validarSesion(req, usuarioId2);
+        if (!exSes.ok) return responderSesion(res, exSes.razon, 'SESION_REQUERIDA');
+        var exCobro = await expedicionCobrar(sql, usuarioId2, body);
+        return res.status(exCobro.status).json(exCobro.body);
+      }
+
       // -- Completar atributos de un spot (ADR-053 Dec 9, v25) ---------
       // {tipo:'spot_atributos', usuario_id, destino_id}. Otorga +10 XP con
       // M_nivel UNA SOLA VEZ por (usuario, destino), SOLO a quien completa
@@ -21004,3 +21679,16 @@ topes_bloqueados: ['REF_SIN_SOPORTE'],
     return res.status(500).json({ ok: false, error: err.message });
   }
 };
+
+// Superficie de TEST (spec 11.9): el handler sigue siendo la unica
+// exportacion funcional. Estas referencias permiten a
+// scripts/smoke_expedicion.js ejercitar el MISMO codigo (catalogo, guard
+// R2, lectura y CTE de cobro) dentro de una transaccion con ROLLBACK.
+module.exports.EXPEDICIONES = EXPEDICIONES;
+module.exports.MISIONES = MISIONES;
+module.exports.validarCatalogosExpedicion = validarCatalogosExpedicion;
+module.exports.expedicionLectura = expedicionLectura;
+module.exports.expedicionCobrar = expedicionCobrar;
+module.exports.expedicionInsertarAsiento = expedicionInsertarAsiento;
+module.exports.expedicionCaps = expedicionCaps;
+module.exports.accionConBono = accionConBono;

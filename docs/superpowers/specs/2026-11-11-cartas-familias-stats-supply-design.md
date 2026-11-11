@@ -1331,3 +1331,321 @@ La formula tiene **autoridad unica** en `lib/cartas-config.js`: `CARTA_PRECIO_BA
 **Lo que NO cambia:** las 45 cartas y sus `stats_json` (solo los 4 ejes), la tabla de precios de 11.7 (`precioAcunacion()` como autoridad unica), `chk_cartas_catalogo_fusionable` ni `carta_acunar` (sigue leyendo `precio_xp` de la base). **D-15** (una carta de `producto`/`consumible` se puede listar por XP) **se mantiene abierta**, y es justo el predicado que la tienda necesitara.
 
 **Verificacion de esta enmienda (documental):** `personaje` y `marca` aparecen como **Fusionable = No** en 2.1; `historico` con **0 cartas**; **0 bytes > 127** en el archivo; seccion 11.8 presente al final.
+
+---
+
+### 11.9. Contrato de expedicion v1
+
+**Estado:** cierra el contrato de **5.2 (483-498)**. **No crea endpoint** (presupuesto 8/8: `api/` tiene exactamente 8 archivos), **no toca `exploraco desarrollo/*.md`** (R2) y **no habilita `obra` ni `economia`**. Es fase 2: duenno `@backend-dev` (gate SI) y, solo para 11.9.9, `@sql-security` (gate SI).
+
+**Cifras cerradas (no se reabren):** 5 expediciones por ventana de 24 h, 200 XP por ventana de 24 h, **<= 40 XP por cobro**, 6 misiones v1, solo ramas `difusion` (alcance) y `hallazgo` (fortuna). Todo lo que sigue las usa como dadas; ninguna regla las recalcula.
+
+**Tres correcciones a 5.2, verificadas contra el archivo real** (ADR-006: el archivo manda):
+
+| # | 5.2 dice | El archivo real dice | Contrato en 11.9 |
+|---|---|---|---|
+| C1 | 487: "se implementa extendiendo `MISIONES`" | `evaluarMisiones` paga todo lo que este en `MISIONES` con `accion='mision'`, exenta y sin cap (`5999-6070`) | **Las expediciones NO viven en `MISIONES`** (11.9.7). Se comparte el catalogo como fuente de ids, no el evaluador |
+| C2 | 495: "indice existente sobre `xp_ledger (usuario_id, accion, creado_en)`" | Hay **dos** indices separados: `(usuario_id, creado_en DESC)` y `(accion, creado_en DESC)` (`031:296-302`) | No se crea indice nuevo: el predicado usa la columna guia `usuario_id` + rango de `creado_en` |
+| C3 | 496: "`carta_expedicion`, **anadida** a `BONO_EXCLUIDAS`" | `carta_expedicion` **NO existe** en `BONO_EXCLUIDAS` (`5097-5117`) | Es una **edicion obligatoria**, no un no-op (11.9.6) |
+
+#### 11.9.1 Superficie: dos tipos nuevos en la funcion existente
+
+Cero endpoints nuevos. Ambos tipos se despachan dentro de `api/interacciones.js`, que ya esta desplegada:
+
+| Metodo | Tipo | Dispatch real (archivo:linea) |
+|---|---|---|
+| GET | `?tipo=expediciones&usuario_id=<uuid>` | patron `tipo === 'misiones'` en `api/interacciones.js:7804` |
+| POST | `?tipo=expedicion_cobrar` (o `body.tipo`) | `var tipo2 = body.tipo || req.query.tipo` en `api/interacciones.js:11595`; patron de rama en `:15614` |
+
+#### 11.9.2 Vector del usuario: formula literal (confirma 3.5 con 3 precisiones)
+
+3.5 (231-240) dice `LEAST(40, SUM de puntos_carta[eje])`. El termino `puntos_carta` **no esta definido alli**; se resuelve juntando 3.2 (153-179), 3.4 (200-213) y `lib/cartas-config.js` (autoridad ya escrita). Formula ejecutable, sin ambiguedad:
+
+```
+s           = statsNormalizados(stats_json)                        // lib/cartas-config.js:250-272
+base        = s.alcance + s.oficio + s.fortuna + s.rendimiento     // pesos 1, presencia 0: :238-240
+bono_var    = (variante === 'shiny') ? max(1, floor(base * 0.25)) : 0   // :241-242, :289-291
+bono_nivel  = max(0, min(5, nivel) - 1) * 1                        // :243, :293-296
+puntos[eje] = s[eje] + ((eje === s.primario) ? bono_var + bono_nivel : 0)   // :285-297
+vector[eje] = min(40, SUM sobre cartas distintas de (MAX sobre variantes de puntos[eje]))   // 3.6:246
+poder       = vector.alcance + vector.oficio + vector.fortuna + vector.rendimiento        // 3.5:235
+```
+
+Precisiones (las 3 que la spec no dice literal y el implementador necesita):
+
+1. **Shiny y nivel bonifican el eje primario de la CARTA**, y la base del shiny es la suma de los **4 ejes jugables** (presencia pesa 0), no el primario. Es exactamente `poderCarta()` (`lib/cartas-config.js:278-298`), que sigue siendo la autoridad de `poder`.
+2. **MAX por variante es por eje** y equivale a elegir la variante shiny cuando existe: la unica diferencia entre variantes es un bono **no negativo** en el primario (3.2:164), luego el max componente a componente no puede mezclar ejes.
+3. **`LEAST(40)` se aplica a la SUMA, no a la carta:** una dorada shiny nivel 5 llega a 34 (3.4:212) y dos cartas superan 40.
+
+Fuentes (verificadas, archivo:linea):
+
+| Dato | Fuente real |
+|---|---|
+| Posesion valida | `usuarios_cartas` PK `(usuario_id, carta_id, variante)` (`061:175-178`); `cantidad >= 1` y `activo = true` (`040:155-163`; ambos en el CHECK de `060:214-217`) |
+| Catalogo | `cartas_catalogo.stats_json` (`060:255`); `cartas_catalogo.activo = true` (filtro real en `api/interacciones.js:17408`, `:17433`) |
+| Nivel por carta | `usuarios_cartas_nivel` PK `(usuario_id, carta_id)`, `nivel` 1..5 (`066:406-414`, CHECK `:421-423`), indice `:436-437` |
+| Constantes | `CARTA_EJES_STATS` y `CARTA_STATS_TOPE = 40` (`lib/cartas-config.js:120-121`); shiny y nivel (`:241-243`); todas exportadas (`:300-336`) |
+
+Lectura exacta (una sola consulta, reduccion en JS):
+
+```sql
+SELECT uc.carta_id, uc.variante, c.stats_json, COALESCE(n.nivel, 1)::int AS nivel
+  FROM usuarios_cartas uc
+  JOIN cartas_catalogo c ON c.id = uc.carta_id
+  LEFT JOIN usuarios_cartas_nivel n
+         ON n.usuario_id = uc.usuario_id AND n.carta_id = uc.carta_id
+ WHERE uc.usuario_id = $1::uuid
+   AND uc.activo = true
+   AND uc.cantidad >= 1
+   AND c.activo = true;
+```
+
+Reglas duras:
+
+- **No se persiste.** Cero columna, cero cache, cero tabla (3.5:239; 3.6:246).
+- **Ausente = 0.** Eje fuera de `stats_json`, `stats_json` nulo o basura -> 0, nunca NaN (`statsNormalizados`, `:250-272`).
+- **Nivel ausente = 1.** Sin fila no hay bono (`LEFT JOIN` + `COALESCE`).
+- **Cero constantes duplicadas en SQL.** `floor(base * 0.25)` en SQL seria una segunda autoridad del shiny: se reduce en JS con las constantes exportadas.
+- **Invariante:** `poder == SUM(poderCarta(stats, nivel, variante) de la mejor variante por carta)`. Con el `LEAST`, `poder` es la suma de los 4 ejes ya capados y por tanto **<= 160**.
+
+#### 11.9.3 `rendimiento` en v1: existe, se muestra, NO bonifica
+
+**Decision: no se aplica.** No hay formula, no hay tope, no hay consumidor nuevo.
+
+- 3.1:146 ya lo declara "sin consumidor en v1" y 11.8:1329 declara el vector **display-only** hasta que exista expedicion.
+- Un bono de `rendimiento` sobre el XP de expedicion seria una **segunda autoridad** de pago y exigiria su propio tope para no romper `<= 40 XP/cobro`. Superficie nueva, riesgo nuevo, valor cero hoy.
+- `rendimiento` sigue entrando en `poder` (3.5:235) y se muestra. `oficio` igual. Ninguno habilita mision en v1.
+- Regla derivada: `requiere_stats` **no puede contener** `oficio` ni `rendimiento` en v1. Si una rama futura los necesita, es ADR + cap propio, no un parametro.
+
+#### 11.9.4 Catalogo v1 (6 misiones)
+
+Ids con prefijo `xpd_` para no colisionar con `rama: 'exp_*'` (`api/interacciones.js:4000`). `requiere_stats` son enteros, comparados con `>=`. `acciones_por_cobro` = N (11.9.5).
+
+| id | `expedicion_rama` | nombre | descripcion (ASCII) | `requiere_stats` | `xp` | N |
+|---|---|---|---|---|---|---|
+| `xpd_dif_comparte` | `difusion` | Difunde un destino | Comparte un destino publicado con un canal valido. | `{alcance: 0}` | 15 | 1 |
+| `xpd_dif_mapa` | `difusion` | Mapa que crece | Guarda 3 destinos mas en Tu Mapa. | `{alcance: 8}` | 25 | 3 |
+| `xpd_dif_resena` | `difusion` | Voz que se lee | Publica 2 resenas sustanciales (25 XP de calidad o mas). | `{alcance: 20}` | 40 | 2 |
+| `xpd_for_visita` | `hallazgo` | Primera incursion | Confirma una visita en un destino. | `{fortuna: 0}` | 15 | 1 |
+| `xpd_for_album` | `hallazgo` | Hallazgo guardado | Guarda 2 fotos en tus albumes. | `{fortuna: 8}` | 25 | 2 |
+| `xpd_for_gate` | `hallazgo` | Sobre abierto | Cobra un drop de gate (nivel 10, 14, 20 o 25). | `{fortuna: 20}` | 40 | 1 |
+
+**Aritmetica del catalogo (verificable, no opinable):**
+
+- **Una pasada completa = 160 XP** (15+25+40+15+25+40) **<= 200**. Nunca puede superar el cap diario por si sola.
+- **Las 5 mejores de una pasada = 145 XP**, tambien por debajo de 200. El cap de 200 **solo** se alcanza repitiendo misiones (5 x 40), que es justo lo que el cap 5/24 h existe para acotar.
+- **Ningun `xp` supera 40.** `min(xp) = 15` es el `EXPEDICION_XP_MIN_COBRO` del remanente (11.9.6) y se **deriva** del catalogo, no se escribe a mano.
+- **Acciones reales de una pasada completa = 10** (1+3+2+1+2+1). Una pasada no se compra con clics: exige 10 acciones distintas y vigentes.
+
+**Justificacion de umbrales 0 / 8 / 20** (20% y 50% del cap de 40, simetricos en las dos ramas para que ninguna sea mas barata):
+
+- `0`: entrada sin cartas; la mision ensena el bucle.
+- `8`: 20% del cap. Alcanzable con 3 `lugar` comunes (alcance 3 cada una = 9) o 3 raras (fortuna 3 cada una = 9).
+- `20`: 50% del cap. Exige coleccionar de verdad (7 comunes, 4 epicas o 2 doradas de `lugar`).
+- El cap 40 deja sitio a un cuarto tramo futuro (30) sin tocar el vector.
+
+**Accion real que valida cada mision** (solo senales que existen; `$2` = offset de 11.9.5):
+
+| id | `total` (COUNT) y `accion_ref` (OFFSET $2 LIMIT 1) | Evidencia |
+|---|---|---|
+| `xpd_dif_comparte` | `FROM media_compartidos WHERE usuario_id=$1 AND fuente='destino'`; ref `id::text`; `ORDER BY creado_en, id` | tabla `022:42-52`; escritura `15614-15645` |
+| `xpd_dif_mapa` | `FROM interacciones WHERE usuario_id=$1 AND tipo='guardado' AND activo=true`; ref `id::text`; `ORDER BY creado_en, id` | `4029` (predicado identico); reactivacion sin XP `20139-20156` |
+| `xpd_dif_resena` | `FROM interacciones WHERE usuario_id=$1 AND tipo='resena' AND activo=true AND xp_ganado>=25`; ref `id::text`; `ORDER BY creado_en, id` | `4008-4011`; unicidad `012:88-90` |
+| `xpd_for_visita` | `FROM interacciones WHERE usuario_id=$1 AND tipo='visita' AND activo=true`; ref `id::text`; `ORDER BY creado_en, id` | `6009`; geocerca `20307-20325`; insercion y 23505 `20406-20413` |
+| `xpd_for_album` | `FROM album_fotos WHERE agregador_id=$1 AND activo=true`; ref `id::text`; `ORDER BY creado_en, id` | tabla `009:46-58`; XP `13674` |
+| `xpd_for_gate` | `FROM cartas_gates WHERE usuario_id=$1 AND drop_en IS NOT NULL`; ref `nivel_gate::text`; `ORDER BY drop_en, nivel_gate` | tabla `040:168-176`; columna `060:384-385`; cobro `17420-17443` |
+
+**Anti-farm por construccion (no por promesa):** el conteo es sobre acciones **vigentes**, y las senales no se pueden inflar por toggling:
+
+- `visita`: el indice unico **no incluye `activo`** (`014:234-236`); quitar y re-visitar la misma fila viola 23505 y devuelve `ya_visitado` (`20406-20413`). Una visita por destino, **de por vida**.
+- `resena`: indice unico por `(usuario_id, destino_id)` para `resena`/`rating` (`012:88-90`). Una resena por destino.
+- `guardado`: quitar y volver a guardar **reactiva la fila original sin XP** (`20147-20156`); el total activo no sube.
+- `gate`: una fila por nivel y usuario (`040:168-176`, PK); maximo **4 cobros de por vida**.
+
+Consecuencia declarada: en v1 el techo **alcanzable** en 24 h es menor que 200 para casi todos los usuarios (la oferta de acciones reales manda). El cap de 200 sigue siendo el limite **duro** y se verifica igual (A5).
+
+#### 11.9.5 Consumo de accion: doble clic y "accion vieja" (decision de 5)
+
+**Decision: ni cap solo, ni `run_id` del cliente. Cada cobro CONSUME una accion real distinta.** El idempotente es la accion, derivado por el servidor.
+
+Mecanica:
+
+1. Cada mision declara `acciones_por_cobro` N en `{1,2,3}`.
+2. `total` = acciones vigentes que cumplen el predicado de 11.9.4.
+3. `cobros` = filas del ledger de esa mision, **de por vida**: `accion='carta_expedicion' AND contexto->>'mision_id' = $m` (no ventana de 24 h: el consumo es historico).
+4. `elegibles = floor(total / N)`. Hay cobro **solo si** `elegibles > cobros`.
+5. `accion_ref` = accion en el offset 0-based `cobros * N + N - 1` (la ultima del bloque recien completado), con `ORDER BY` estable y unico.
+6. Una fila por `(usuario_id, mision_id, accion_ref)`: indice unico parcial (11.9.9).
+7. Si el offset no devuelve fila, o el `INSERT` choca: **200** con `{ok:true, xp:0, repetido:true}`. No se escribe ledger, no se consume cupo.
+
+**Por que esto y no las dos opciones de 5:**
+
+- **"Basta el cap" no basta.** Con un `EXISTS` ingenuo, UNA comparticion de hace un mes mantiene la mision "cumplida" para siempre: el cliente puede cobrar 5 veces/dia sin volver a hacer nada. Eso es el faucet que 5.2:491 prohibe ("si la accion no ocurrio, la mision no esta cumplida"): con `EXISTS` la accion ocurrio **una vez** y la mision queda cumplida **siempre**.
+- **`run_id` solo protege el reintento, no la accion vieja.** El cliente podria rotar `run_id` y cobrar igual. Ademas obliga a confiar en una clave del cliente.
+- **Consumo server-side cubre las dos cosas con el mismo coste:** el reintento recalcula el offset desde `cobros` (ya incrementado) y no encuentra accion nueva -> `xp: 0`; la accion vieja no se puede re-cobrar porque `cobros` ya la contabilizo. **No hay `run_id` en v1.**
+- **Sin carrera relevante:** dos POST concurrentes leen el mismo `cobros` y calculan el **mismo** `accion_ref`; el indice unico deja pasar uno y el otro devuelve `xp: 0`. No se pierde cupo ni se paga dos veces.
+- **Falla cerrado:** si una accion consumida deja de estar vigente (p.ej. revision moderada), `total` baja y `elegibles` puede quedar por debajo de `cobros`: el siguiente cobro se rechaza hasta que haya acciones nuevas. Nunca se paga de mas.
+
+Regla de lectura: `elegibles` y `cobros` se **calculan**, no se guardan. Cero tabla de progreso de expedicion (coherente con 0.2 y 5.2:498).
+
+#### 11.9.6 Cobro: orden de validacion, caps y remanente
+
+**Ventana: 24 h RODANTES, no dia calendario**, para los dos caps. Es el patron ya vigente: `compartir` (50 XP en ventana rodante, `15690`) y `visitas` (`20356`). Formula unica:
+
+```
+usadas    = COUNT(*)            FROM xp_ledger WHERE usuario_id=$1 AND accion='carta_expedicion' AND creado_en > NOW() - INTERVAL '24 hours'
+xp_dia    = COALESCE(SUM(xp_final),0)  mismo predicado
+remanente = EXPEDICION_XP_DIA - xp_dia          -- EXPEDICION_XP_DIA = 200
+```
+
+**Orden de validacion (determinista, barato primero).** El primer fallo devuelve y **no escribe nada**:
+
+| # | Condicion | Respuesta |
+|---|---|---|
+| 1 | sesion invalida (`validarSesion`, `15617-15618`) | **401** `{ok:false, error:<razon>, code:'SESION_REQUERIDA'}` |
+| 2 | `mision_id` ausente de `EXPEDICIONES` (o rama no publicada) | **404** `{ok:false, code:'MISION_NO_ENCONTRADA', mision_id}` |
+| 3 | `usadas >= 5` **o** `xp_dia >= 200` | **409** `{ok:false, code:'CAP_DIARIO', usadas, limite:5, xp_dia, limite_xp:200}` |
+| 4 | `0 <= remanente < 15` | **409** `{ok:false, code:'CAP_RECOMPENSA', xp_dia, remanente_xp, min_cobro_xp:15}` |
+| 5 | algun `vector[eje] < requiere_stats[eje]` | **409** `{ok:false, code:'UMBRAL_NO_ALCANZADO', faltan:{eje:int}, vector:{...}, requiere_stats:{...}}` |
+| 6 | `elegibles <= cobros` | **200** `{ok:true, xp:0, repetido:true}` |
+| 7 | cobra | **200** (payload en 11.9.8) |
+
+Nota: `code:'SESION_REQUERIDA'` se **anade** al shape actual de `responderSesion` (`{ok:false, error:razon}`, `5676-5678`); `error` conserva la razon del helper (`SIN_TOKEN`, `SESION_INVALIDA`, ...).
+
+**Politica de remanente (decision de 4): recortar al remanente y registrar el importe real.** Se rechaza con `CAP_RECOMPENSA` solo si `remanente < EXPEDICION_XP_MIN_COBRO` (15, el minimo del catalogo).
+
+```
+xp        = min(mision.xp, remanente)
+recortado = xp < mision.xp
+```
+
+Justificacion:
+
+- **Precedente identico:** `compartir` recorta al remanente y marca `cap_aplicado='accion'` (`15695-15717`). No se inventa semantica.
+- **El ledger no miente:** `xp_base` = `mision.xp` (solicitado) y `xp_final` = `xp` (pagado). Auditable sin reconstruir nada.
+- **Rechazar siempre** dejaria a un usuario con 199 XP y 5/5 cupos usados sin camino hasta que ruede la ventana, por 1 XP. Con 15 como suelo, el recorte nunca paga menos que la mision mas barata.
+- El cobro recortado **consume accion y cupo** (fue trabajo real). No hay reembolso de slots.
+
+**Unica escritura (CTE atomico, patron `17420-17443` y 3.4:217-224).** Insert + `UPDATE usuarios SET xp_total = xp_total + xp` en la misma sentencia; si el `INSERT` no devuelve fila, el `UPDATE` no corre.
+
+```
+accion='carta_expedicion', es_exento=true,
+mult_nivel=1, mult_stack=1, mult_final=1, bonos_planos=0,
+xp_base=mision.xp, xp_final=xp,
+cap_aplicado = recortado ? 'accion' : 'ninguno',
+contexto = { mision_id, expedicion_rama, acciones_por_cobro, accion_ref,
+             cobros_previos, usadas, xp_dia_previo, recortado }
+```
+
+- **`carta_expedicion: true` DEBE anadirse a `BONO_EXCLUIDAS`** (`5097-5117`; hoy **no esta**, correccion C3). `es_exento` ya corta el bono en `5205` y `accionConBono` en `5208`, pero la lista es la documentacion ejecutable de "nunca recibe bono" y 5.2:496 la exige.
+- **No se toca nada mas:** ni `total_guardados`, ni `total_visitas`, ni `progreso_misiones`, ni `progreso_arbol`, ni `acreditarClaseYCofre`, ni referidos, ni pandilla. Precedente exacto: el flujo `mision` escribe solo `xp_total` + ledger (`6052-6101`).
+- El XP de expedicion **si** sube `xp_total` y por tanto el nivel (`calcularNivel`, 3.4:228). Es XP normal, solo que exento de multiplicadores y de bonos.
+
+#### 11.9.7 REGLA DURA: una expedicion NO se auto-evalua ni se auto-paga
+
+Esto es el punto critico del contrato. Si se olvida, es un faucet infinito.
+
+`evaluarMisiones()` (`5999`) corre en el GET `tipo=misiones` (`7812`) y **despues de cada acreditacion de XP** (`11962`, `15736`, `20451`, ...). Itera **todas** las entradas de `MISIONES` (`6032`), marca `progreso_misiones` (`6045`) y paga con `accion='mision'` (`6065`), `es_exento=true` (`6067`) y `cap_aplicado='ninguno'` (`6066`). Ese camino **no pasa por `carta_expedicion`**, luego **no lo ven ni `usadas` ni `xp_dia`**.
+
+Si una mision con `expedicion_rama` entra en `MISIONES`:
+
+1. Su XP se paga **fuera** de `carta_expedicion`: los caps 5/24 h y 200/24 h quedan **bypassados por completo**.
+2. `progreso_misiones` la marca `completada` para siempre: se rompe la repetibilidad (5.2:490) y el consumo de accion (11.9.5).
+3. Se paga en un **GET**, sin cobro explicito y sin consumir accion; dos GET concurrentes pueden pagar antes de que se escriba el progreso.
+
+Por tanto, reglas no negociables:
+
+- **R1.** Las expediciones viven en un array **`EXPEDICIONES` separado**. `MISIONES` no gana ni un campo de expedicion.
+- **R2.** Asercion en carga (o en test): `MISIONES.every(m => !m.expedicion_rama)` y `MISIONES.every(m => EXPEDICIONES.every(x => x.id !== m.id))`.
+- **R3.** Ningun id `xpd_*` se escribe **jamas** en `progreso_misiones`.
+- **R4.** La unica accion del ledger que puede pagar una expedicion es **`carta_expedicion`**. Prohibido `accion='mision'` para un `xpd_*`.
+- **R5.** El GET **no usa `entregarCatalogo()`** (`6259-6277`): deriva `estado` de `progreso_misiones` y mostraria las expediciones como `pendiente` para siempre (o `completada` si alguien las guardo ahi). Mapper explicito (11.9.8).
+
+**R1 prevalece sobre la lectura literal de 5.2:487.** Lo que se comparte con `MISIONES` es el **catalogo como fuente de ids**, no el evaluador. Es la unica forma de que los caps de 5.2:494-495 sean ciertos.
+
+#### 11.9.8 UI minima: contrato exacto del GET y del POST
+
+`GET /api/interacciones?tipo=expediciones&usuario_id=<uuid>` -> **200**:
+
+```
+{
+  ok: true,
+  vector:  { alcance: int, oficio: int, fortuna: int, rendimiento: int, presencia: int },
+  poder:   int,
+  cap: { usadas: int, limite: 5, xp_dia: number, limite_xp: 200,
+         remanente_xp: number, min_cobro_xp: 15 },
+  misiones: [
+    { id: string, expedicion_rama: 'difusion'|'hallazgo',
+      nombre: string, descripcion: string, xp: int,
+      requiere_stats: { alcance?: int, oficio?: int, fortuna?: int, rendimiento?: int },
+      stats_usuario:  { ...solo las claves de requiere_stats... },
+      faltan:         { ...mismas claves; max(0, req - actual)... },
+      acciones: { total: int, por_cobro: int, elegibles: int, cobros: int },
+      disponible: boolean,
+      bloqueo: null|'UMBRAL'|'CAP_DIARIO'|'CAP_RECOMPENSA'|'SIN_ACCION' }
+  ]
+}
+```
+
+- `disponible` y `bloqueo` son **pistas de presentacion**. El POST **re-valida todo**; el cliente nunca decide.
+- `stats_usuario` y `faltan` llevan **exactamente** las claves de `requiere_stats` (hoy una por mision). Nada de devolver el vector entero dentro de cada mision.
+- El GET **no exige sesion** (igual que `tipo=misiones`, `7804`); no expone nada que no sea del propio `usuario_id`.
+- **Cero `estado: 'completada'`** en expediciones: `cobros`/`elegibles` son la verdad, y una mision repetible no tiene estado final.
+
+`POST /api/interacciones?tipo=expedicion_cobrar` con `{ usuario_id, mision_id }` -> **200**:
+
+```
+{ ok: true, mision_id: string, xp: number, xp_solicitado: number,
+  recortado: boolean, repetido: boolean, accion_ref: string|null,
+  usadas: int, limite: 5, xp_dia: number, limite_xp: 200, remanente_xp: number }
+```
+
+En `repetido`: `xp: 0`, `recortado: false`, `accion_ref: null`.
+
+#### 11.9.9 Migracion 073: idempotencia del cobro (unica pieza de esquema)
+
+Siguiente numero libre verificado: **072 es el ultimo** (`db/migrations/072_cartas_precio_mult_familia.sql`). Fichero: `db/migrations/073_cartas_expedicion_idempotencia.sql`. Aditivo, cero filas afectadas hoy (`carta_expedicion` no existe aun), cero backfill.
+
+```sql
+-- 1) Una accion real no puede respaldar dos cobros de la misma mision.
+CREATE UNIQUE INDEX IF NOT EXISTS xp_ledger_expedicion_accion_uq
+  ON xp_ledger (usuario_id, (contexto->>'mision_id'), (contexto->>'accion_ref'))
+  WHERE accion = 'carta_expedicion';
+
+-- 2) Sin las dos claves el indice anterior tendria un agujero NULL.
+DO $m073$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'chk_xp_ledger_expedicion_contexto'
+                    AND conrelid = 'public.xp_ledger'::regclass) THEN
+    ALTER TABLE xp_ledger
+      ADD CONSTRAINT chk_xp_ledger_expedicion_contexto CHECK (
+        accion <> 'carta_expedicion'
+        OR (contexto->>'mision_id' IS NOT NULL
+            AND contexto->>'accion_ref' IS NOT NULL));
+  END IF;
+END
+$m073$;
+```
+
+- **Por que no basta el cap:** sin el indice, dos POST concurrentes insertan dos filas para el mismo `accion_ref` y consumen dos cupos por una accion. El cap 5/24 h acota el dano, pero no cumple 11.9.5.
+- **Por que no `run_id`:** el `accion_ref` es del servidor; el indice cubre reintento y carrera sin clave de cliente (11.9.5).
+- **Rollback:** `DROP INDEX IF EXISTS xp_ledger_expedicion_accion_uq;` + `ALTER TABLE xp_ledger DROP CONSTRAINT IF EXISTS chk_xp_ledger_expedicion_contexto;`. Sin perdida de datos.
+- Indice funcional sobre `jsonb ->> text` es inmutable y valido; el predicado parcial deja fuera el 100% de las filas actuales.
+
+#### 11.9.10 Criterios de aceptacion (10)
+
+Cada uno es una afirmacion que el backend puede ejecutar o un `SELECT` que se puede correr. **No hay criterio "visual".**
+
+- [ ] **A1. Catalogo.** `EXPEDICIONES.length === 6`; 3 `difusion` + 3 `hallazgo`; 6 ids unicos; `MISIONES.filter(m => m.expedicion_rama).length === 0` (R2).
+- [ ] **A2. Aritmetica.** `Math.max(...xp) === 40`; `sum(xp) === 160`; `min(xp) === 15`; `xp` en `{15,25,40}`; `requiere_stats` en `{0,8,20}` enteros; `acciones_por_cobro` en `{1,2,3}`.
+- [ ] **A3. Sin bono.** `BONO_EXCLUIDAS.carta_expedicion === true`; con un `bono_consumible_24h` activo, un cobro produce `xp_final === min(xp, remanente)` y **cero** filas nuevas de `bono_consumible_24h` (guardas `5205` y `5208`).
+- [ ] **A4. Cap de 5.** 6 cobros en < 24 h: el 6o devuelve **409** `CAP_DIARIO` con `usadas === 5` y `limite === 5`; `SELECT COUNT(*) FROM xp_ledger WHERE accion='carta_expedicion'` = 5.
+- [ ] **A5. Cap de 200 y remanente.** Con `xp_dia = 180` y mision de 40: paga **20**, fila con `xp_final = 20` y `cap_aplicado = 'accion'`, respuesta `recortado: true`. Con `xp_dia = 195`: **409** `CAP_RECOMPENSA` y **0** filas nuevas. Con `xp_dia = 200`: **409** `CAP_DIARIO`.
+- [ ] **A6. Doble clic.** Una sola accion vigente y dos POST identicos: **una** fila de ledger, `usadas` sube **1**, el segundo responde **200** `xp: 0`, `repetido: true` (no 5xx, no segundo cobro); el indice `xp_ledger_expedicion_accion_uq` existe en `pg_indexes`.
+- [ ] **A7. Consumo.** `N=3` con 2 acciones: `elegibles = 0`, sin cobro. Con 3 acciones: primer cobro usa el 3er `accion_ref`. Con 4 acciones: el segundo cobro queda bloqueado (`elegibles = 1 === cobros`) hasta la 6a.
+- [ ] **A8. Vector.** Fixture 2 doradas `lugar` (una shiny nivel 2, una base): `alcance = 35` (14+6+1 y 14) y `poder = suma de los 4 ejes`. Fixture 0 cartas: 5 ejes a 0, `poder = 0`, sin error. Fixture 3 doradas base: `alcance = 40` (LEAST aplicado).
+- [ ] **A9. Cero auto-pago.** Tras N GET `tipo=misiones` (que disparan `evaluarMisiones`, `7812`) con acciones elegibles: **0** filas `accion='carta_expedicion'` y **0** filas `accion='mision'` cuyo `contexto->'misiones'` contenga un id `xpd_*` (R3/R4).
+- [ ] **A10. Escudo.** `node --check api/interacciones.js` en verde; la seccion 11.9 con **0 bytes > 127**; `exploraco desarrollo/*.md` sin modificar (R2); `db/migrations/073_*.sql` con 0 bytes > 127, idempotente en segunda corrida.
+
+**Lo que NO cambia:** las 45 cartas y sus `stats_json`, `precioAcunacion()`, `chk_cartas_catalogo_fusionable`, `carta_acunar`, la tirada y el supply. Esta seccion solo fija como se paga una expedicion, no cuanto vale una carta.
