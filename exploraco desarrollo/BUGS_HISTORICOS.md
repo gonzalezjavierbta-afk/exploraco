@@ -2727,6 +2727,23 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 - **Por que no es un BUG:** no hay defecto de producto ni de dato; es **riesgo declarado** en **ADR-120** (esquema por delante del codigo) y se mitiga **por dato**, de forma **reversible** y **sin borrar filas** (ADR-003). Deja **38** activos de **44** totales; las **3 botellas** siguen activas.
 - **Condicion de salida:** tras el deploy hay que ejecutar el bloque de **REACTIVACION** del mismo fichero (mismo `IN (...)` sobre `activo=false`). **Si se olvida, el set 4/4 queda incomprable y las 4 cartas de faccion desaparecen del mercado sin ningun error visible** -- el sintoma es **ausencia**, no fallo, y por eso queda escrito aqui y en `TASKS.md` TSK-256.
 
+### CIERRE POST-DEPLOY del cleanup `007` (2026-11-10, cierre R2): `008` aplicado -- **activos 38 -> 43**, `ancestral_premio_set` inactiva **por decision**
+
+- **Que paso:** el deploy llego a produccion (`?tipo=consumibles` sirve ya `bono_pct`, `bono_tope_xp`, `es_permanente`, `desbloquea_set`, `otorga_carta`; catalogo **43 filas**) y se ejecuto `db/cleanups/008_reactivar_consumibles_postdeploy_064.sql` (**5.242 B**), que reactiva **5** claves (las **4** cartas de faccion + `ancestral_base`).
+- **Conteos:** activos **38 -> 43**, inactivos **6 -> 1**, total **44** sin cambios; **solo 5 filas** cambiaron (`false -> true`), **cero borrados** (ADR-003). La contencion de `007` queda **levantada**: **no hay nada mas que reactivar**.
+- **Excepcion deliberada:** **`ancestral_premio_set` sigue `activo=false` por decision del operador** (fila tecnica de premio, **0 XP**). Queda **fuera del catalogo** de forma **permanente** hasta que exista flujo de entrega de premio. **No es un BUG, no es deuda y no debe "arreglarse" en un pase futuro sin decision previa.**
+- **Deudas que este cierre NO cierra (viven en `TASKS.md` TSK-256):** lamina unica del set **4/4** (4 cartas identicas) y `cta_ancestral_01..04` sin entrada en el manifiesto `ARTE` de `cartas-arte.js` (`PREFIJOS` solo cubre `ancestral_`, `:100`): **son deuda de arte/manifiesto, no defecto medido**, por eso **no** abren ficha aqui.
+
+## BUG-155: `?tipo=cartas_ofertas` no cruza el `activo` de la carta -- ofertas de cartas desactivadas siguen visibles en el mercado -- **ABIERTO (severidad BAJA; detectado en el cierre post-deploy de TSK-256 / ADR-120, 2026-11-10)**
+
+- **Severidad:** BAJA. No rompe datos ni cobra XP: es **incoherencia de visibilidad**. Una carta retirada del catalogo **conserva escaparate**.
+- **Sintoma:** el libro publico de ofertas sigue mostrando ofertas de una carta que el operador desactivo (`cartas_catalogo.activo = false`), y por tanto el mercado ofrece comprar algo que ya no deberia existir.
+- **Evidencia (archivo real, ADR-006):** en `api/interacciones.js`, el bloque `tipo === 'cartas_ofertas'` (`:7568`) arma su `WHERE` con **cuatro** condiciones -- `o.activo = true`, `o.estado IN ('abierta','parcial')`, `o.cantidad_restante > 0` y `(o.expira_en IS NULL OR o.expira_en > NOW())` (`:7570-7575`) -- y hace `JOIN cartas_catalogo c ON c.id = o.carta_id` (`:7589`), pero **nunca** filtra `c.activo`. El filtro existe para la **oferta**, no para la **carta**.
+- **Causa:** el `activo` de la carta es un estado **administrativo** que se introdujo como contencion operativa y el libro de ofertas se escribio contra el `activo` de la **oferta**; nadie cruzo ambos. Es el patron de **dos verdades de visibilidad** (la del catalogo y la del mercado), no un error de calculo.
+- **Impacto acotado:** no hay fuga de PII (solo nombre publico del vendedor), ni XP mal cobrado; el dano es **coherencia de producto** y confianza del jugador (una oferta visible que no se puede honrar).
+- **Mitigacion / fix propuesto:** anadir `c.activo = true` al `WHERE` del bloque (una condicion, sin endpoint nuevo: **8/8 funciones**, ADR-001/ADR-010), con **degradacion** si el esquema antiguo no tuviera la columna (**42703**, mismo criterio que el resto del fichero), y smoke que desactive una carta con oferta abierta y afirme **0 filas**. Dueno `@backend-dev` (**GATE**).
+- **Nota de alcance:** **no** es regresion de la tanda de ADR-120 -- la consulta no se toco ahi; se detecto al revisar el catalogo tras reactivar por dato. Queda **abierta** y **no bloqueante** para el deploy ya hecho.
+
 
 
 
