@@ -284,10 +284,21 @@ async function main() {
       // PREPARACION: 3 cartas temporales. Si no entran, los casos siguientes
       // serian un falso negativo (sin fila objetivo no se evalua ningun CHECK).
       // ===================================================================
+      // FIXTURE (069): familia y subtipo son NOT NULL desde la 069 y NO tienen
+      // DEFAULT (066 las creo sin default; 069 solo cerro el dominio), asi que
+      // la lista de columnas vieja falla con 23502. Los ids de este smoke son
+      // sinteticos (cartas_tx_*), sin prefijo de familia: se clasifican como
+      // lugar/territorio. La familia es constante a proposito: no participa en
+      // ninguno de los CHECK que aqui se miden (060 y 061).
+      // precio_xp NO se declara: queda NULL, legal para lugar
+      // (chk_cartas_catalogo_precio, 066:243-253) y obligatorio NULL para
+      // producto/consumible, cuyo precio es el del SKU.
       var SQL_CARTA_SISTEMA =
         'INSERT INTO cartas_catalogo'
-        + ' (id, nombre, set_slug, rareza, nivel_gate, es_evento, emisor_tipo, fusionable)'
-        + " VALUES ($1, $2, 'smoke_tx', 'comun', NULL, false, 'sistema', true)";
+        + ' (id, nombre, set_slug, rareza, nivel_gate, es_evento, emisor_tipo,'
+        + ' fusionable, familia, subtipo)'
+        + " VALUES ($1, $2, 'smoke_tx', 'comun', NULL, false, 'sistema', true,"
+        + " 'lugar', 'territorio')";
       var pv = await qn(SQL_CARTA_SISTEMA, [idVariante, 'smoke tx variante']);
       var pm = await qn(SQL_CARTA_SISTEMA, [idMuseo, 'smoke tx museo']);
       var pp = await qn(SQL_CARTA_SISTEMA, [idPk, 'smoke tx pk']);
@@ -409,10 +420,15 @@ async function main() {
       if (m.n !== 1) throw new Error('sin marca temporal para C4');
       var mId = String(m.rows[0].id);
 
+      // FIXTURE (069): familia/subtipo NOT NULL. Id sintetico -> lugar/territorio.
+      // Lo que este caso mide es la FK marca_id y el ON DELETE RESTRICT: la
+      // familia no interviene.
       var SQL_CARTA_MARCA =
         'INSERT INTO cartas_catalogo'
-        + ' (id, nombre, set_slug, rareza, nivel_gate, es_evento, emisor_tipo, marca_id, fusionable)'
-        + " VALUES ($1, $2, 'smoke_tx', 'comun', NULL, false, 'marca', $3::uuid, false)";
+        + ' (id, nombre, set_slug, rareza, nivel_gate, es_evento, emisor_tipo,'
+        + ' marca_id, fusionable, familia, subtipo)'
+        + " VALUES ($1, $2, 'smoke_tx', 'comun', NULL, false, 'marca', $3::uuid,"
+        + " false, 'lugar', 'territorio')";
       var cm = await qn(SQL_CARTA_MARCA, [idMarca, 'smoke tx carta de marca', mId]);
       check('C4d carta de marca con marca_id insertada (rowCount)', cm.n === 1, 'rowCount=' + cm.n);
 
@@ -429,17 +445,26 @@ async function main() {
     // =====================================================================
     var c6a = await qn(SQL_CARTA_SISTEMA, [idC6, 'smoke tx c6']);
     check('C6a carta sistema con emisor_id y marca_id NULL entra (rowCount)', c6a.n === 1, 'rowCount=' + c6a.n);
+    // FIXTURE (069): familia/subtipo NOT NULL. Id sintetico -> lugar/territorio.
+    // Objetivo del caso: sigue siendo el CHECK de coherencia de emisor_tipo
+    // (23514), no el NOT NULL de familia.
     var SQL_CARTA_MARCA_SIN_ID =
       'INSERT INTO cartas_catalogo'
-      + ' (id, nombre, set_slug, rareza, nivel_gate, es_evento, emisor_tipo, fusionable)'
-      + " VALUES ($1, $2, 'smoke_tx', 'comun', NULL, false, 'marca', false)";
+      + ' (id, nombre, set_slug, rareza, nivel_gate, es_evento, emisor_tipo,'
+      + ' fusionable, familia, subtipo)'
+      + " VALUES ($1, $2, 'smoke_tx', 'comun', NULL, false, 'marca', false,"
+      + " 'lugar', 'territorio')";
     var c6b = await qfalla('sp_c6b', SQL_CARTA_MARCA_SIN_ID, ['cartas_tx_' + tag + '_x1', 'smoke tx incoherente']);
     check('C6b emisor_tipo marca sin marca_id recibe 23514', c6b.code === '23514',
       'code=' + String(c6b.code) + ' filas=' + c6b.n);
+    // FIXTURE (069): familia/subtipo NOT NULL. Id sintetico -> lugar/territorio.
+    // Objetivo del caso: fusionable true con nivel_gate (23514), no la familia.
     var SQL_CARTA_FUSIONABLE_GATE =
       'INSERT INTO cartas_catalogo'
-      + ' (id, nombre, set_slug, rareza, nivel_gate, es_evento, emisor_tipo, fusionable)'
-      + " VALUES ($1, $2, 'smoke_tx', 'comun', 10, false, 'sistema', true)";
+      + ' (id, nombre, set_slug, rareza, nivel_gate, es_evento, emisor_tipo,'
+      + ' fusionable, familia, subtipo)'
+      + " VALUES ($1, $2, 'smoke_tx', 'comun', 10, false, 'sistema', true,"
+      + " 'lugar', 'territorio')";
     var c6c = await qfalla('sp_c6c', SQL_CARTA_FUSIONABLE_GATE, ['cartas_tx_' + tag + '_x2', 'smoke tx fusionable']);
     check('C6c fusionable true con nivel_gate recibe 23514', c6c.code === '23514',
       'code=' + String(c6c.code) + ' filas=' + c6c.n);

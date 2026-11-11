@@ -12,7 +12,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ### Tareas no completadas / estado actual
 
-- **TSK-257 IMPLEMENTADO EN NEON / FASE 0+1 CERRADA / FASE 2 PENDIENTE (2026-11-11, pase documental unico R2; ADR-121) -- LO PRIMERO QUE HAY QUE LEER.** Sistema de cartas: **7 familias de 3 capas** (`lugar`/`personaje`/`artista`/`marca` = juego; `producto`/`consumible` = economia; `cosmetica` = estatus), vector de **4 ejes jugables + `presencia` cosmetica**, tirada por **pesos 5000/1000/250/50**, valor de acunacion **base por rareza x multiplicador de familia** y supply por **`emitidas` + `supply_max`**; la UGC va de **obra (`cartas_media`) a N ediciones**. **Dato:** **066, 067 y 068 APLICADAS** en Neon, ledger **65 filas / max 68**, checksums 066 `5a5d6b0f` / 067 `30fd9f81` / 068 `bd3887a5`, **segunda corrida = 0 cambios de dato**; catalogo **31 cartas** (24 lugar/territorio, 3 consumible/entrada_evento, 4 producto/fisico) con **0 NULL** en `familia`/`subtipo`; `precio_xp` **numeric(12,2)**; `cartas_media` **vacia** con `licencia` + `chk_cartas_media_licencia` y **0 escritores**. **`familia`/`subtipo` NULLABLE es TRANSITORIO** (el `NOT NULL` es el paso 2, tras parchear `cartas_crear`). **Cero codigo de producto tocado, cero endpoint nuevo (8/8), cero deploy.** **Deudas abiertas:** D-12/D-19 (vista `cartas_jugables` sin DDL), D-15 (producto/consumible listable por XP), D-16 (acunacion y nivel son contrato), D-17 (royalty/tithe P2P); **D-18 CERRADA** por 068 y **D-5 CERRADA** por el ADR-121. **Siguiente, con gates:** `@admin-dev` (familia/subtipo + `SET NOT NULL`) -> `@backend-dev` (acunacion, nivel, D-15, D-17, media) -> `@frontend-tpl` (UI) -> `@content-loader` (cartas de lugar) -> `@qa-auditor`. Detalle en la seccion TSK-257.
+- **TSK-257 FASE 2 IMPLEMENTADA Y DESPLEGADA / PRECIOS SEMBRADOS (2026-11-11, pase documental unico R2; ADR-121 Enmienda 3) -- LO PRIMERO QUE HAY QUE LEER.** Sistema de cartas: **7 familias de 3 capas**, vector de **4 ejes jugables + `presencia`**, tirada por **pesos 5000/1000/250/50**, valor de acunacion **base por rareza x multiplicador de familia** y supply por **`emitidas` + `supply_max`**; UGC de **obra (`cartas_media`) a N ediciones**. **Dato:** **066, 067, 068, 069 y 070 APLICADAS**, cada una con **1 fila** en el ledger; **069** deja `familia`/`subtipo` **NOT NULL** (**0 NULL**, **31/31**, segunda corrida **no-op**); **070** siembra **24** `lugar` con `edicion='limitada'` y precio/tirada por rareza real: **9** x **150/5000**, **7** x **400/1000**, **5** x **1000/250**, **3** x **2500/50**; **24/24 comprables**; las **7** de `producto`/`consumible` siguen `precio_xp` **NULL** (CHECK de 066); **6** `ct_comun_01..06` reclasificadas `subtipo='natural'` (operador, 2026-11-11). **md5 del dato** tras segunda corrida: `a3bc72bfb611ef9b9741b0f1bf42c580` (**0 cambios**). **Codigo:** desplegado **`e9be424`** en `origin/main` y verificado en produccion (`fichaPoderNivel` en `cartas-ui.js`, `cartas-media-lista` en `admin.html`). **Verificacion:** UI **63/63**, economia **43/43**, `smoke_cartas_db_tx` **40/40**, divs admin **1405/1405**, **`npm test` exit 0**. **D-15 y D-17 CERRADAS**, **D-16 CERRADA** (acunacion/nivel); siguen **D-12/D-19**, **D-13** (sin tabla de copias por serial) y **D-14**. **Deudas vivas:** C7 opcional (`23502`, subiria db_tx a 41), retirada de obra aprobada con cartas emitidas, `moderado_por` NULL, md5 obsoleto del header 070, assets UGC URL/texto (sin storage) y **0 cartas** de `personaje`/`artista`/`marca`/`cosmetica` (ramas de `oficio`/`rendimiento` sin alimento). El **`?v=4`** y el boton **ACUNAR** estan en el **arbol**, **no** en `origin`. Detalle en la seccion TSK-257.
 
 - **TSK-256 CERRADO TAMBIEN EN POST-DEPLOY: DEPLOY EN PRODUCCION CON LOS 5 CAMPOS, `008` APLICADO (ACTIVOS 38 -> 43), `ancestral_premio_set` INACTIVA PERMANENTE POR DECISION DEL OPERADOR (2026-11-10, cierre R2; ADR-120) -- LO PRIMERO QUE HAY QUE LEER.** **Dato:** `db/cleanups/008_reactivar_consumibles_postdeploy_064.sql` (**5.242 B**, `Test-Path` = True) reactiva **5** claves (las **4** cartas de faccion + `ancestral_base`) con el mismo `IN (...)` sobre `activo=false`. **Conteos:** activos **38 -> 43**, inactivos **6 -> 1**, total **44** sin cambios; **solo 5 filas cambiaron** (`false -> true`) y **cero borrados** (ADR-003). **`ancestral_premio_set` SIGUE `activo=false` POR DECISION DEL OPERADOR** (fila tecnica de premio, **0 XP**): queda **fuera del catalogo** y su inactividad es **permanente** hasta que exista flujo de entrega de premio -- **no es un olvido ni una contencion pendiente**. **Produccion verificada:** `https://latawel.com/api/interacciones?tipo=consumibles` sirve `bono_pct`, `bono_tope_xp`, `es_permanente`, `desbloquea_set` y `otorga_carta`; catalogo **43 filas**. **Precios intactos:** las **3 botellas** siguen en **1166.67 / 3416.67 / 6333.33 XP** y **14000 / 41000 / 76000 COP**, con `otorga_carta` **cta_ancestral_02/03/04**. **Arte en produccion (HTTP HEAD 200):** `assets/cartas/marca_ancestral.png` (**187.545 B**) y los **4** PNG `consumible_*` (**527.218 / 519.247 / 474.715 / 545.447 B**); las **8** cartas del set se sirven (4 consumibles + base + 3 botellas): la base resuelve por manifiesto (`cartas-arte.js:37`) y las 4 de faccion por manifiesto (`:24-27`); `cartas_catalogo` set `ancestral_esencia` = **4 filas ACTIVAS**, las 4 con `imagen_url='assets/cartas/marca_ancestral.png'`. **Deudas NUEVAS que abre el post-deploy:** **(a)** las **4** cartas del set comparten **la MISMA lamina**, asi que en la coleccion se ven **4 cartas identicas** -- falta arte por volumen o decision de producto de que sea intencional; **(b)** `cta_ancestral_01..04` **no** tienen entrada en el mapa `ARTE` de `cartas-arte.js` ni prefijo `cta_ancestral_` (`PREFIJOS` solo cubre `ancestral_`, `:100`): hoy dependen **solo de `imagen_url`** de la BD y, si ese campo llega vacio, caen a "Diseno pendiente"; **(c)** **BUG-155**: `?tipo=cartas_ofertas` filtra `o.activo` pero **no** `c.activo` (`api/interacciones.js:7570-7575`), asi que una carta desactivada con oferta abierta se sigue mostrando. **Sigue abierto de la tanda:** premio 4/4 **no cableado** en intercambio/drop, `premio_set` **null** en replay, **BUG-154** y los **2** rojos pre-existentes (`smoke_090`, `smoke_test_epic_prompt`). *(Estado pre-deploy anterior conservado abajo, ADR-003.)*
 
@@ -7085,19 +7085,26 @@ El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 evento
 
 **Enlaces (no argumentos; ADR-084 D1).** **ADR-120** (decision, D1-D12) | **ADR-106** (acotado: gate de nivel 4 y objeto singular vigentes) | **ADR-110 R2** (acotado: contrato de compra) | **ADR-108** (emisor de cartas) | **ADR-118** (topes de compra retirados) | **ADR-002** (ASCII-safe) | **ADR-003** (cero borrado logico) | **ADR-006** (baseline medido) | **ADR-084 D1** (argumento una sola vez).
 
-## TSK-257 - Sistema de cartas: 7 familias de 3 capas, vector de 4 ejes + presencia, tirada por pesos, supply por `emitidas`/`supply_max` y UGC obra -> ediciones (ADR-121; 066, 067 y 068 aplicadas en Neon) - 2026-11-11 - IMPLEMENTADO EN NEON / FASE 0+1 CERRADA / FASE 2 PENDIENTE
+## TSK-257 - Sistema de cartas: 7 familias de 3 capas, vector de 4 ejes + presencia, tirada por pesos, supply por `emitidas`/`supply_max` y UGC obra -> ediciones (ADR-121; 066-070 aplicadas en Neon) - 2026-11-11 - FASE 2 IMPLEMENTADA Y DESPLEGADA / PRECIOS SEMBRADOS
 
-**Estado: IMPLEMENTADO EN NEON / FASE 0+1 CERRADA / FASE 2 PENDIENTE -- 2026-11-11** (pase documental unico R2). **El argumento de la decision vive SOLO en `DECISIONS.md` ADR-121** (ADR-084 D1) y el detalle de la matriz V1..V24 en `docs/superpowers/specs/2026-11-11-cartas-familias-stats-supply-design.md`; aqui solo el **alcance real**, la **evidencia medida** y el **relevo**. **Cero codigo de producto tocado, cero endpoint nuevo (`api/*.js` = 8, ADR-001/ADR-010) y cero deploy.**
+**Estado: FASE 2 IMPLEMENTADA Y DESPLEGADA / PRECIOS SEMBRADOS -- 2026-11-11** (pase documental unico R2; **ADR-121 Enmienda 3**). **El argumento de la decision vive SOLO en `DECISIONS.md` ADR-121** (ADR-084 D1) y el detalle de la matriz V1..V24 + 11.6 en `docs/superpowers/specs/2026-11-11-cartas-familias-stats-supply-design.md`; aqui solo el **alcance real**, la **evidencia medida** y el **relevo**. **Cero endpoint nuevo (`api/*.js` = 8, ADR-001/ADR-010).** Codigo desplegado en **`e9be424`** (`origin/main`), verificado en produccion.
 
 **Datos APLICADOS y medidos (Neon, ledger `schema_migrations`).**
 
-1. **066** (`db/migrations/066_cartas_familias_stats_supply.sql`, **21.484 B**), **067** (`067_cartas_media.sql`, **10.705 B**) y **068** (`068_cartas_enmienda_licencia_precio.sql`, **7.286 B**): las **3 APLICADAS** y registradas en el ledger. **Ledger: 65 filas, max 68.** Checksums registrados: 066 `5a5d6b0f`, 067 `30fd9f81`, 068 `bd3887a5`. **Segunda corrida de las 3 = 0 cambios de dato.**
+1. **(FOTO DE FASE 0+1)** **066** (`db/migrations/066_cartas_familias_stats_supply.sql`, **21.484 B**), **067** (`067_cartas_media.sql`, **10.705 B**) y **068** (`068_cartas_enmienda_licencia_precio.sql`, **7.286 B**): las **3 APLICADAS** y registradas en el ledger. **Ledger en esa foto: 65 filas, max 68.** Checksums registrados: 066 `5a5d6b0f`, 067 `30fd9f81`, 068 `bd3887a5`. **Segunda corrida de las 3 = 0 cambios de dato.** La **069** y la **070** anaden **1 fila** cada una (ver fase 2).
 2. **Catalogo 31 cartas:** `lugar`/`territorio` **24**, `consumible`/`entrada_evento` **3**, `producto`/`fisico` **4**; **0 filas con `familia` o `subtipo` NULL**.
-3. **`familia`/`subtipo` siguen NULLABLE** (`is_nullable='YES'` x2): es **expand/contract a proposito**. El `NOT NULL` es el **paso 2 de fase 2**, despues de parchear `cartas_crear` (`api/admin.js:1438-1446`, lista explicita de columnas que hoy no las escribe).
+3. *(SUPERADO POR LA FASE 2; ADR-003) **`familia`/`subtipo` siguen NULLABLE** en la foto de fase 0+1.* **069 APLICADA (fase 2):** `familia`/`subtipo` pasan a **NOT NULL**; **0 NULL**, **31/31** clasificadas y segunda corrida **no-op**. El defecto que lo impedia (`cartas_crear` no escribia esas columnas) se corrigio antes del `SET NOT NULL`.
 4. **`precio_xp` = `numeric(12,2)`** por la **068** (la 066 lo creo `integer`; la 068 lo convierte sin tocar datos). **`cartas_media`** creada **vacia** con `licencia` y `licencia_aceptada_en` (`text`/`timestamptz`, ambas NULLABLE) y `chk_cartas_media_licencia`: **0 escritores todavia**, luego el CHECK nace en verde.
-5. **Cero `DELETE`/`DROP COLUMN` ejecutable, cero toque a `usuarios_cartas`, cero cambio a `cromos_catalogo`** (ADR-003). **`db/migrations/*.sql` = 65 ficheros** en el arbol.
+5. **Cero `DELETE`/`DROP COLUMN` ejecutable, cero toque a `usuarios_cartas`, cero cambio a `cromos_catalogo`** (ADR-003). **`db/migrations/*.sql` = 67 ficheros** en el arbol (65 en la foto de fase 0+1 + 069 y 070).
 
-**Evidencia (matriz de la seccion 8 + 11.5.2 de la spec; este pase NO re-ejecuta consultas contra Neon -- ADR-006: se registra lo medido, no se reafirma lo no medido).**
+**Fase 2 aplicada y medida (ADR-121 Enmienda 3).**
+
+6. **069 `069_cartas_familia_not_null.sql` (6.396 B):** `familia`/`subtipo` **NOT NULL**; **0 NULL** y **31/31** clasificadas; **2a corrida no-op**.
+7. **070 `070_cartas_seed_precio_supply_lugar.sql` (15.460 B):** **24** cartas `lugar` con `edicion='limitada'` y `supply_max`/`precio_xp` por rareza real: **9** x **150 XP / 5000**, **7** x **400 / 1000**, **5** x **1000 / 250**, **3** x **2500 / 50**. Las **7** `producto`/`consumible` siguen **`precio_xp` NULL** (CHECK de 066: se pagan por SKU). **24/24 comprables** (`activo=true`, `emitidas < supply_max`). **6** `ct_comun_01..06` reclasificadas `subtipo='natural'` (decision del operador, 2026-11-11); siguen `familia='lugar'`. **md5 del dato tras 2a corrida:** `a3bc72bfb611ef9b9741b0f1bf42c580` (**0 cambios**).
+8. **Defecto DOCUMENTAL de la 070 (no bug de dato):** el comentario `md5 POST` del header (`f2ae6007...`) es una **prediccion FALSA**; el real es `a3bc72bf...`. El operador **acepta el comentario como obsoleto** y **NO autoriza cirugia del ledger** (su `sha256` coincide con el disco; editarlo crearia deriva permanente). Se registra como **deuda documental**.
+9. **Codigo desplegado `e9be424` (`origin/main`), verificado en produccion:** `cartas-ui.js` sirve `fichaPoderNivel` y `admin.html` sirve `cartas-media-lista`. **No** incluye el `?v=4` ni el boton **ACUNAR** (estan en el arbol, no en `origin`).
+
+**Evidencia de FASE 0+1 (matriz de la seccion 8 + 11.5.2 de la spec; foto historica, superada por la tabla de fase 2 de abajo).**
 
 | Grupo | Criterio | Resultado registrado |
 |---|---|---|
@@ -7111,24 +7118,48 @@ El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 evento
 | V23 | CHECK fail-closed de licencia | `chk_cartas_media_licencia` presente; **0 escritores**, tabla vacia |
 | V15/V16 | 8/8 endpoints y numeracion del ADR | `api/*.js` = **8**; **`^## ADR-121` = 1** en `DECISIONS.md` |
 
+**Evidencia de FASE 2 (medida en el pase de implementacion; ADR-006: no se re-ejecuta aqui).**
+
+| Grupo | Criterio | Resultado registrado |
+|---|---|---|
+| 069 | `familia`/`subtipo` NOT NULL | **0 NULL**, **31/31** clasificadas; **2a corrida no-op**; **1 fila** en ledger |
+| 070 | Seed de precio/supply de `lugar` | **24** `limitada`; **9/7/5/3** en 150/5000, 400/1000, 1000/250, 2500/50; **24/24 comprables**; **7** `producto`/`consumible` con `precio_xp` **NULL**; **1 fila** en ledger |
+| 070 idempotencia | md5 del dato | `a3bc72bfb611ef9b9741b0f1bf42c580` tras **2a corrida** = **0 cambios** |
+| Reclasificacion | `ct_comun_01..06` | `subtipo='natural'`, `familia='lugar'` (operador 2026-11-11) |
+| UI | `smoke_cartas_ui.js` | **63/63**; admin sub-pestanas Catalogo/Media UGC; divs **1405/1405** |
+| Economia | `smoke_cartas_economia.js` | **43/43** (`carta_acunar`, `carta_subir_nivel`, D-15, D-17, media) |
+| Fixtures | `smoke_cartas_db_tx.js` | **40/40** adaptado al NOT NULL |
+| Gate | `npm test` | **exit 0** en el ultimo pase |
+| Produccion | `e9be424` en `origin/main` | `fichaPoderNivel` servido por `cartas-ui.js`; `cartas-media-lista` en `admin.html` |
+
 **Documentos y artefactos de la tanda.**
 
-- `db/migrations/066_cartas_familias_stats_supply.sql` (aplicada), `067_cartas_media.sql` (aplicada) y `068_cartas_enmienda_licencia_precio.sql` (aplicada, aditiva).
-- `docs/superpowers/specs/2026-11-11-cartas-familias-stats-supply-design.md` (v3, **1247** lineas) -- fuente de verdad del diseno y de las **2** enmiendas.
-- `DECISIONS.md` **ADR-121** (publicado en este pase) y `docs/superpowers/specs/README.md` (alta de la spec).
-- **No se toco** `api/`, `db/` (salvo las 3 migraciones ya aplicadas, que **no se editan**), `admin.html` ni ningun HTML.
+- `db/migrations/066_cartas_familias_stats_supply.sql` (aplicada), `067_cartas_media.sql` (aplicada), `068_cartas_enmienda_licencia_precio.sql` (aplicada, aditiva), `069_cartas_familia_not_null.sql` (aplicada) y `070_cartas_seed_precio_supply_lugar.sql` (aplicada).
+- `docs/superpowers/specs/2026-11-11-cartas-familias-stats-supply-design.md` (**v4 tras la Enmienda 3**; fuente de verdad del diseno, 11.6 con la fase 2).
+- `DECISIONS.md` **ADR-121 + Enmienda 3** y `docs/superpowers/specs/README.md` (alta de la spec).
+- **No se toco** `api/`, `db/` (salvo las **5** migraciones ya aplicadas, que **no se editan**), `admin.html` ni ningun HTML.
 
-**Deudas ABIERTAS que deja la tanda (detalle en ADR-121 y en 9.2 / 11.5 de la spec).**
+**Deudas al cierre de fase 0+1 (foto historica; estado actualizado por la Enmienda 3).**
 
-- **D-12 / D-19 (documental):** ADR-117 nombra la vista `cartas_jugables` y **no tiene DDL**; ninguna rama nueva depende de ella y la 068 tampoco la toca. Cierra con un `0NN_cartas_jugables_view.sql` idempotente (`@backend-dev` + operador).
-- **D-13:** no hay ledger de acunacion: `emitidas` es contador, no libro.
-- **D-14:** `personaje`, `artista` y `cosmetica` tienen **0 cartas**; por eso v1 solo publica expediciones de `alcance`/`fortuna`.
-- **D-15:** una carta de `producto`/`consumible` **se puede listar y vender por XP** (`carta_publicar` solo exige `activo=true`, `api/interacciones.js:16200-16209`) hasta que exista el predicado de familia de fase 2.
-- **D-16:** acunacion y nivel **son contrato, no codigo**; incluye que la fusion resta de `xp_total` (`:16657-16661`) contra el patron de `046:40-44` -- **no se repara aqui**.
-- **D-17:** royalty y tithe **P2P no implementados**: la venta acredita el bruto (`:16334-16337`).
-- **D-18 CERRADA por la 068** (licencia UGC). **D-5 CERRADA** por ADR-121 (se retira `stats_json.bonus_xp_pct` del contrato; la clave se tolera en filas existentes).
+- **D-12 / D-19 (documental, ABIERTA):** ADR-117 nombra la vista `cartas_jugables` y **no tiene DDL**; ninguna rama nueva depende de ella y la 068 tampoco la toca. Cierra con un `0NN_cartas_jugables_view.sql` idempotente (`@backend-dev` + operador).
+- **D-13 (ABIERTA en lo que toca a copias):** el ledger de acunacion ya existe como **asiento dentro del CTE** de `carta_acunar`; sigue **sin tabla de copias por serial** (v1 usa `emitidas` como contador).
+- **D-14 (ABIERTA):** `personaje`, `artista`, `marca` y `cosmetica` tienen **0 cartas**; por eso v1 solo publica expediciones de `alcance`/`fortuna` y las ramas de `oficio`/`rendimiento` siguen sin alimento.
+- **D-15 (CERRADA en fase 2):** `CARTA_NO_COMERCIABLE` en `carta_publicar` y en `carta_comprar`; el libro publico excluye `producto`/`consumible` y exige `c.activo=true` (**BUG-155 cerrado**).
+- **D-16 (CERRADA en fase 2):** acunacion (`carta_acunar`) y subida de nivel (`carta_subir_nivel`, `CARTA_NIVEL_XP=[150,400,900,1800]`, tope 5) ya son codigo atomico con `nivel_esperado`; **la fusion que resta de `xp_total` NO se repara aqui** (fuera de alcance).
+- **D-17 (CERRADA en fase 2):** royalty **10% solo UGC** + tithe `LEAST(tithe_pct,10)%`, detraccion total **<= 20%**, `neto = bruto - royalty - tithe >= 0`; asientos `carta_royalty`/`carta_tithe` y **409 `OFERTA_NO_DISPONIBLE`** si la carta esta inactiva.
+- **D-18 CERRADA por la 068** (licencia UGC). **D-5 CERRADA** por ADR-121.
 
-**Siguiente con GATES (fase 2, en este orden recomendado).**
+**Deudas NUEVAS que abre la fase 2 (detalle en ADR-121 Enmienda 3 y spec 11.6).**
+
+- **(a) C7 opcional del `smoke_cartas_db_tx`:** el caso `23502` de la lista vieja subiria el smoke a **41**; hoy no bloquea.
+- **(b) Politica de retirada** de una obra `aprobada` con cartas ya emitidas: no definida.
+- **(c) `moderado_por` sin identidad de admin:** el panel usa `ADMIN_SECRET` y no hay uuid; la columna queda **NULL**.
+- **(d) md5 obsoleto del header 070** (`f2ae6007...` predicho vs `a3bc72bf...` real): deuda documental, sin cirugia de ledger.
+- **(e) Assets UGC son URL/texto:** no hay storage ni subida binaria.
+- **(f) 0 cartas** de `personaje`/`artista`/`marca`/`cosmetica`: las ramas de expedicion de `oficio`/`rendimiento` siguen sin cartas que las alimenten.
+- **(g) Fuera de este release:** `expedicion_rama` + misiones repetibles (**5.2**) siguen como contrato pendiente del ADR-121; **no** se declaran implementadas.
+
+**Plan original de fase 2 (EJECUTADO en este pase; se conserva como referencia, ADR-003).**
 
 1. **`@admin-dev` (GATE SI):** `familia`/`subtipo` en `cartas_crear`/`cartas_editar` y despues **`SET NOT NULL`** (paso 2); cola de moderacion y alta de obra en `admin.html`.
 2. **`@backend-dev` (GATE SI):** sumidero de acunacion (4.8), subida de nivel atomica (4.9), predicado de familia en `carta_publicar` (**D-15**), royalty + tithe (**D-17**), `expedicion_rama` + misiones repetibles (5.2) y el handler de `cartas_media` (licencia obligatoria antes de `aprobada`).
@@ -7136,7 +7167,7 @@ El criterio esperaba **"31 publicado / 5 en draft"**. **Medido:** hay **6 evento
 4. **`@content-loader` (GATE SI):** cartas de `lugar` (las 24 ya clasificadas) y el seed de fase 4 para `personaje`/`artista`/`cosmetica` (**D-14**).
 5. **`@qa-auditor` (sin gate):** certificacion de la fase 2 y smoke del CHECK de licencia (V23) con su primer escritor.
 
-**Advertencia de lectura:** `familia`/`subtipo` NULLABLE **es transitorio y correcto hoy**; cualquier documento o consulta que lo lea como "falta el NOT NULL" debe remitirse al paso 2. **La fase 2 NO esta empezada: no hay codigo escrito, ni commit, ni deploy de esta tanda.**
+**Advertencia de lectura:** `familia`/`subtipo` **ya son NOT NULL** (069 aplicada) y la **fase 2 esta implementada y desplegada** en `e9be424`. Cualquier linea de arriba que describa el `NULLABLE` como transitorio o la fase 2 como no iniciada describe el **estado al cierre de fase 0+1** y esta **SUPERADA**; se conserva por ADR-003. **Lo que NO esta en `origin`:** el cache-busting **`?v=4`** (`comunidad.html`, `mi-perfil.html`, `perfil.html`) y el boton **ACUNAR** de `cartas-ui.js`, que viven en el arbol de trabajo.
 
 **Enlaces (no argumentos; ADR-084 D1).** **ADR-121** (decision: 10 puntos + contratos de fase 2) | **ADR-120** (acotado solo en el valor de canje del set Ancestral) | **ADR-108** (acotado: taxonomia de emisor y variante) | **ADR-117** (vigente: jugable = tiene diseno) | **ADR-018** (vigente: los sinks no tocan `xp_total`) | **ADR-003** y **ADR-035** (marco de datos).
 

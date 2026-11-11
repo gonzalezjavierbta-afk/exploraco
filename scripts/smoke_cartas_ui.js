@@ -253,10 +253,10 @@ function render(UI, carta, opciones) {
 /* ---------------------------------------------------------------------------
    5) Subida de nivel: exito y errores legibles, sin red real.
    --------------------------------------------------------------------------- */
-(function () {
+var cadenaSubida = (function () {
   var env = crearEntorno();
   var UI = env.UI;
-  if (!UI) return;
+  if (!UI) return Promise.resolve();
   var sandbox = env.sandbox;
 
   function conRespuesta(status, cuerpo) {
@@ -347,13 +347,213 @@ function render(UI, carta, opciones) {
 })();
 
 /* ---------------------------------------------------------------------------
-   Resumen
+   7) Acunar: el boton aparece SOLO con precio y familia comerciable.
    --------------------------------------------------------------------------- */
-console.log('');
-console.log('Checks: ' + total + ' total, ' + pass + ' PASS, ' + fails + ' FAIL');
-if (fails === 0) {
-  console.log('RESULTADO: OK - ' + pass + ' verificaciones pasaron.');
-  process.exit(0);
+(function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return;
+
+  var html = render(UI, cartaCompleta());
+  assert(html.indexOf('data-c-acunar="1"') >= 0,
+    'carta comerciable con precio ofrece el boton de acunar');
+  assert(html.indexOf('c-acunar-xp">1.500 XP') >= 0
+    && html.indexOf('data-precio="1500" disabled') < 0,
+    'el boton de acunar muestra el coste exacto y nace habilitado');
+  assert(html.indexOf('id="c-acunar-btn"') >= 0,
+    'el boton de acunar lleva id nuevo');
+
+  var c0 = cartaCompleta();
+  c0.precio_xp = 0;
+  assert(render(UI, c0).indexOf('data-c-acunar') < 0,
+    'precio_xp 0 no ofrece acunar');
+
+  var cn = cartaCompleta();
+  cn.precio_xp = null;
+  var htmlNull = render(UI, cn);
+  assert(htmlNull.indexOf('data-c-acunar') < 0,
+    'precio_xp null no ofrece acunar (degradacion)');
+  assert(htmlNull.indexOf('undefined') < 0 && htmlNull.indexOf('NaN') < 0,
+    'sin precio_xp no aparece undefined ni NaN');
+
+  var cp = cartaCompleta();
+  cp.familia = 'producto';
+  assert(render(UI, cp).indexOf('data-c-acunar') < 0,
+    'producto (familia economica) no se acuna');
+
+  var ca = cartaCompleta();
+  ca.emitidas = 500;
+  var htmlAgotada = render(UI, ca);
+  assert(htmlAgotada.indexOf('data-precio="1500" disabled') >= 0
+    && htmlAgotada.indexOf('>Agotada</button>') >= 0,
+    'sin stock el boton sale disabled con el texto Agotada');
+
+  var htmlVitrina = render(UI, cartaCompleta(), { contexto: 'vitrina-publica' });
+  assert(htmlVitrina.indexOf('data-c-acunar') < 0,
+    'la vitrina publica sigue sin acciones');
+})();
+
+/* ---------------------------------------------------------------------------
+   8) Acunar: confirmacion, estados y errores legibles (fetch en stub).
+   --------------------------------------------------------------------------- */
+var cadenaAcunar = (function () {
+  var env = crearEntorno();
+  var UI = env.UI;
+  if (!UI) return Promise.resolve();
+  var sandbox = env.sandbox;
+
+  /* Boton real del DOM minimo, con su caja y su aviso. */
+  function cajaAcunar() {
+    var caja = Elemento('div');
+    var msg = Elemento('span');
+    msg.classList.add('c-acunar-msg');
+    caja.querySelector = function (sel) {
+      return sel === '.c-acunar-msg' ? msg : null;
+    };
+    var btn = Elemento('button');
+    btn.setAttribute('data-c-acunar', '1');
+    btn.setAttribute('data-carta-id', 'ct_leyenda_01');
+    btn.setAttribute('data-variante', 'base');
+    btn.setAttribute('data-precio', '1500');
+    btn.innerHTML = 'Acunar';
+    caja.appendChild(btn);
+    return { btn: btn, msg: msg };
+  }
+
+  function conRespuesta(status, cuerpo, contador) {
+    sandbox.fetch = function () {
+      contador.n++;
+      return Promise.resolve({
+        status: status,
+        ok: status >= 200 && status < 300,
+        json: function () { return Promise.resolve(cuerpo); }
+      });
+    };
+  }
+
+  /* Microtasks suficientes para que la cadena del handler se asiente. */
+  function ticks(n) {
+    var p = Promise.resolve();
+    for (var i = 0; i < n; i++) p = p.then(function () {});
+    return p;
+  }
+
+  var cadena = Promise.resolve();
+
+  cadena = cadena.then(function () {
+    var t = cajaAcunar();
+    var contador = { n: 0 };
+    var pregunta = '';
+    env.win.confirm = function (txt) { pregunta = txt; return false; };
+    sandbox.fetch = function () {
+      contador.n++;
+      return Promise.reject(new Error('sin red'));
+    };
+    UI.acunarDesdeBoton(t.btn);
+    assert(contador.n === 0, 'cancelar la confirmacion no llama a fetch');
+    assert(pregunta.indexOf('Acunar por 1.500 XP') >= 0,
+      'la confirmacion muestra el coste exacto en XP');
+    assert(t.btn.disabled === false, 'cancelar deja el boton habilitado');
+  });
+
+  cadena = cadena.then(function () {
+    var t = cajaAcunar();
+    var contador = { n: 0 };
+    env.win.confirm = function () { return true; };
+    conRespuesta(200, {
+      ok: true,
+      data: {
+        carta_id: 'ct_leyenda_01', variante: 'base', cantidad: 3,
+        emitidas: 121, nivel: 1, xp_gastado: 1500, xp_disponible: 500
+      }
+    }, contador);
+    UI.acunarDesdeBoton(t.btn);
+    assert(t.btn.disabled === true && t.btn.getAttribute('aria-busy') === 'true',
+      'mientras envia el boton queda disabled con aria-busy');
+    return ticks(8).then(function () {
+      assert(contador.n === 1, 'el exito hace un solo POST');
+      assert(t.btn.disabled === true && t.btn.innerHTML === 'Acunada',
+        'tras acunar el boton queda deshabilitado: cero doble clic');
+      assert(t.btn.getAttribute('aria-busy') === null,
+        'tras acunar se retira aria-busy');
+      assert(t.msg.textContent.indexOf('Copia acunada') >= 0
+        && t.msg.textContent.indexOf('Tienes 3') >= 0,
+        'el exito deja un aviso breve con la cantidad');
+      assert(!t.msg.classList.contains('is-error'),
+        'el aviso de exito no se pinta como error');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    var t = cajaAcunar();
+    var contador = { n: 0 };
+    env.win.confirm = function () { return true; };
+    conRespuesta(409, { ok: false, error: 'SIN_STOCK' }, contador);
+    UI.acunarDesdeBoton(t.btn);
+    return ticks(8).then(function () {
+      assert(t.msg.textContent.indexOf('No quedan copias') >= 0,
+        'SIN_STOCK se explica en texto legible');
+      assert(t.btn.disabled === false && t.btn.innerHTML === 'Acunar',
+        'un error rehabilita el boton y restaura su texto');
+      assert(t.msg.classList.contains('is-error'), 'el error se marca como error');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    var t = cajaAcunar();
+    var contador = { n: 0 };
+    env.win.confirm = function () { return true; };
+    conRespuesta(400, { ok: false, error: 'PUNTOS_INSUFICIENTES', xp_disponible: 40 }, contador);
+    UI.acunarDesdeBoton(t.btn);
+    return ticks(8).then(function () {
+      assert(t.msg.textContent.indexOf('1.500 XP') >= 0
+        && t.msg.textContent.indexOf('40') >= 0,
+        'PUNTOS_INSUFICIENTES dice el coste y el saldo disponible');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    var t = cajaAcunar();
+    var contador = { n: 0 };
+    env.win.confirm = function () { return true; };
+    conRespuesta(409, { ok: false, error: 'MEDIA_NO_APROBADA' }, contador);
+    UI.acunarDesdeBoton(t.btn);
+    return ticks(8).then(function () {
+      assert(t.msg.textContent.indexOf('no esta aprobada') >= 0,
+        'MEDIA_NO_APROBADA se explica en texto legible');
+    });
+  });
+
+  cadena = cadena.then(function () {
+    var t = cajaAcunar();
+    var contador = { n: 0 };
+    env.win.confirm = function () { return true; };
+    conRespuesta(400, { ok: false, error: 'CARTA_NO_COMPRABLE' }, contador);
+    UI.acunarDesdeBoton(t.btn);
+    return ticks(8).then(function () {
+      assert(t.msg.textContent.indexOf('no se compra con XP') >= 0,
+        'CARTA_NO_COMPRABLE se explica en texto legible');
+      assert(t.msg.textContent.indexOf('{') < 0 && t.msg.textContent.indexOf('undefined') < 0,
+        'el mensaje de error no vuelca JSON crudo ni undefined');
+    });
+  });
+
+  return cadena;
+})();
+
+/* ---------------------------------------------------------------------------
+   Resumen: se ESPERA a las cadenas con red. Sin esto, process.exit(0) se
+   adelanta a los microtasks y los checks asincronos no llegan a contar.
+   --------------------------------------------------------------------------- */
+function resumen() {
+  console.log('');
+  console.log('Checks: ' + total + ' total, ' + pass + ' PASS, ' + fails + ' FAIL');
+  if (fails === 0) {
+    console.log('RESULTADO: OK - ' + pass + ' verificaciones pasaron.');
+    process.exit(0);
+  }
+  console.log('RESULTADO: FAIL - ' + fails + ' de ' + total + ' verificaciones fallaron.');
+  process.exit(1);
 }
-console.log('RESULTADO: FAIL - ' + fails + ' de ' + total + ' verificaciones fallaron.');
-process.exit(1);
+
+Promise.all([cadenaSubida, cadenaAcunar]).then(resumen, resumen);

@@ -565,6 +565,55 @@
       + '</div>';
   }
 
+  /* --- Acunacion con XP (spec 4.8, handler YA existente) -------------- */
+  /* Familias comerciables: espejo de CARTA_FAMILIAS_SIN_PRECIO_XP
+     (lib/cartas-config.js). El catalogo economico (producto/consumible)
+     no se acuna: el backend lo rechaza con CARTA_NO_COMPRABLE. */
+  var FAMILIAS_ACUNABLES = {
+    lugar: 1,
+    personaje: 1,
+    artista: 1,
+    marca: 1,
+    cosmetica: 1
+  };
+
+  /* Precio de acunacion, o null si la carta no es acunable. */
+  function fichaAcunable(carta) {
+    if (!FAMILIAS_ACUNABLES[familiaDe(carta)]) return null;
+    if (!fichaTexto(fichaCampo(carta, ['id', 'carta_id']))) return null;
+    var p = safeNum(carta && carta.precio_xp, null);
+    if (p === null || p <= 0) return null;
+    return p;
+  }
+
+  /* Tirada cerrada y sin copias: el boton se pinta, pero agotado. */
+  function fichaAgotada(carta) {
+    var supply = safeNum(carta && carta.supply_max, null);
+    if (supply === null) return false;
+    var emitidas = safeNum(carta && carta.emitidas, 0);
+    return emitidas >= supply;
+  }
+
+  /* Boton de acunar, junto al precio en XP del bloque de detalle. */
+  function fichaAcunar(carta, contexto, variante) {
+    /* Vitrina ajena: sin acciones, igual que el resto de la ficha. */
+    if (contexto === 'vitrina-publica') return '';
+    var precio = fichaAcunable(carta);
+    if (precio === null) return '';
+    var id = fichaTexto(fichaCampo(carta, ['id', 'carta_id']));
+    var agotada = fichaAgotada(carta);
+    var etiqueta = agotada
+      ? 'Agotada'
+      : 'Acunar<span class="c-acunar-xp">' + esc(miles(precio)) + ' XP</span>';
+    return '<div class="c-acunar" id="c-acunar">'
+      + '<button type="button" class="c-acunar-btn" id="c-acunar-btn" data-c-acunar="1"'
+      + ' data-carta-id="' + esc(id) + '" data-variante="' + esc(variante) + '"'
+      + ' data-precio="' + esc(precio) + '"' + (agotada ? ' disabled' : '') + '>'
+      + etiqueta + '</button>'
+      + '<span class="c-acunar-msg" role="status" aria-live="polite"></span>'
+      + '</div>';
+  }
+
   /* --- POST de subida de nivel: NUNCA rechaza, siempre resuelve -------- */
   var NIVEL_ERRORES = {
     PUNTOS_INSUFICIENTES: 'XP insuficiente para subir el nivel.',
@@ -575,7 +624,11 @@
     SESION_REQUERIDA: 'Inicia sesion para subir el nivel.',
     SCHEMA_NOT_MIGRATED: 'El nivel de carta aun no esta disponible.',
     CONEXION: 'Sin conexion. Intenta de nuevo.',
-    SERVIDOR: 'No se pudo subir el nivel. Intenta de nuevo.'
+    SERVIDOR: 'No se pudo subir el nivel. Intenta de nuevo.',
+    /* Solo acunacion (carta_acunar). */
+    CARTA_NO_COMPRABLE: 'Esta carta no se compra con XP.',
+    SIN_STOCK: 'No quedan copias de esta carta.',
+    MEDIA_NO_APROBADA: 'La obra de esta carta aun no esta aprobada.'
   };
 
   /* JWT de la sesion, con el mismo contrato que el resto del sitio. */
@@ -692,6 +745,122 @@
     });
   }
 
+  /* --- Acunacion: POST y handler del boton ----------------------------- */
+  /* Los codigos que el mapa hereda con la palabra "nivel" se reescriben
+     aqui: un solo mapa de errores, cero copia de la tabla. */
+  function mensajeAcunar(code) {
+    if (code === 'PUNTOS_INSUFICIENTES') return 'XP insuficiente para acunar esta carta.';
+    if (code === 'SESION_REQUERIDA') return 'Inicia sesion para acunar esta carta.';
+    if (code === 'SERVIDOR') return 'No se pudo acunar la carta. Intenta de nuevo.';
+    return NIVEL_ERRORES[code] || 'No se pudo acunar la carta. Intenta de nuevo.';
+  }
+
+  /* POST /api/interacciones?tipo=carta_acunar (handler ya desplegado).
+     Resuelve {ok:true, data} o {ok:false, error, mensaje}. Nunca rechaza. */
+  function acunarCarta(cartaId, variante, precioXp) {
+    var precio = safeNum(precioXp, null);
+    var cuerpo = { carta_id: String(cartaId) };
+    if (variante) cuerpo.variante = String(variante);
+    return Promise.resolve().then(function () {
+      return fetch('/api/interacciones?tipo=carta_acunar', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: cabecerasPost(),
+        body: JSON.stringify(cuerpo)
+      });
+    }).then(function (res) {
+      return leerCuerpo(res).then(function (j) {
+        if (j && j.ok === true && j.data) return { ok: true, data: j.data };
+        var code = j && j.error ? String(j.error) : 'SERVIDOR';
+        var msg = mensajeAcunar(code);
+        if (code === 'PUNTOS_INSUFICIENTES') {
+          var disp = safeNum(j && j.xp_disponible, null);
+          /* El handler de acunar no manda coste: se usa el precio del boton. */
+          if (precio !== null && disp !== null) {
+            msg = 'Necesitas ' + miles(precio) + ' XP y tienes ' + miles(disp) + '.';
+          }
+        }
+        return { ok: false, error: code, mensaje: msg };
+      }, function () {
+        return { ok: false, error: 'SERVIDOR', mensaje: mensajeAcunar('SERVIDOR') };
+      });
+    }, function () {
+      return { ok: false, error: 'CONEXION', mensaje: NIVEL_ERRORES.CONEXION };
+    });
+  }
+
+  /* Handler del boton de acunar. Confirmacion con el coste exacto y un
+     solo vuelo por boton: cancelar NO toca la red. */
+  function acunarDesdeBoton(btn) {
+    if (!btn || btn.disabled) return;
+    var cartaId = fichaTexto(btn.getAttribute('data-carta-id'));
+    var variante = fichaTexto(btn.getAttribute('data-variante')) || 'base';
+    var precio = safeNum(btn.getAttribute('data-precio'), null);
+    if (!cartaId || precio === null || precio <= 0) return;
+    if (typeof w.confirm === 'function') {
+      var pregunta = 'Acunar por ' + miles(precio) + ' XP. Continuar?';
+      var acepta = false;
+      try {
+        acepta = w.confirm(pregunta) === true;
+      } catch (eConf) {
+        acepta = false;
+      }
+      if (!acepta) return;
+    }
+    var caja = btn.parentNode;
+    var msg = caja && caja.querySelector ? caja.querySelector('.c-acunar-msg') : null;
+    var htmlPrevio = btn.innerHTML;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    if (msg) {
+      msg.textContent = 'Acunando...';
+      if (msg.classList) msg.classList.remove('is-error');
+    }
+    acunarCarta(cartaId, variante, precio).then(function (res) {
+      if (!res || res.ok !== true) {
+        if (msg) {
+          msg.textContent = (res && res.mensaje) || mensajeAcunar('SERVIDOR');
+          if (msg.classList) msg.classList.add('is-error');
+        }
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+        btn.innerHTML = htmlPrevio;
+        return;
+      }
+      var data = res.data || {};
+      var cant = safeNum(data.cantidad, null);
+      if (msg) {
+        msg.textContent = 'Copia acunada.'
+          + (cant !== null ? ' Tienes ' + miles(cant) + ' en tu coleccion.' : '');
+        if (msg.classList) msg.classList.remove('is-error');
+      }
+      /* Queda deshabilitado a proposito: cero doble clic y cero doble cobro. */
+      btn.innerHTML = 'Acunada';
+      btn.removeAttribute('aria-busy');
+      var detalle = {
+        carta_id: cartaId,
+        variante: variante,
+        cantidad: cant,
+        precio_xp: precio,
+        emitidas: safeNum(data.emitidas, null),
+        xp_disponible: safeNum(data.xp_disponible, null)
+      };
+      /* Mismo patron que la subida de nivel: evento + callback de la pagina.
+         Aqui NO se cierra la ficha: el aviso tiene que verse. */
+      if (typeof document !== 'undefined' && document.dispatchEvent && w.CustomEvent) {
+        try {
+          document.dispatchEvent(new w.CustomEvent('cartas:acunar', { detail: detalle }));
+        } catch (eEv) {}
+      }
+      var cb = fichaOnNivel;
+      if (typeof cb === 'function') {
+        try {
+          cb(detalle);
+        } catch (eCb) {}
+      }
+    });
+  }
+
   /* Lamina: delega en CartasArte.slotHtml y NUNCA deja la ficha rota. */
   function fichaArte(clave, imagenUrl, marca, nombre) {
     var CA = w.CartasArte;
@@ -794,6 +963,7 @@
     var varianteNivel = fichaTexto(opciones.variante).toLowerCase()
       || varianteDeCarta(carta);
     var bloqueNivel = fichaSubirNivel(carta, contexto, varianteNivel);
+    var bloqueAcunar = fichaAcunar(carta, contexto, varianteNivel);
 
     return '<div class="c-ficha-bd" data-c-ficha-cerrar></div>'
       + '<div class="c-ficha-box" role="dialog" aria-modal="true" aria-labelledby="c-ficha-tit">'
@@ -808,6 +978,7 @@
       + '<p class="c-ficha-desc">' + esc(desc) + '</p>'
       + bloqueCf
       + bloqueDet
+      + bloqueAcunar
       + bloqueNivel
       + '</div>'
       /* Vitrina publica: sin acciones, aunque la pagina las mande. */
@@ -840,6 +1011,12 @@
         var subir = t.closest('[data-c-subir-nivel]');
         if (subir && host.contains(subir)) {
           subirNivelDesdeBoton(subir);
+          return;
+        }
+        /* Acunar tampoco cierra: la confirmacion y el aviso viven dentro. */
+        var acunar = t.closest('[data-c-acunar]');
+        if (acunar && host.contains(acunar)) {
+          acunarDesdeBoton(acunar);
           return;
         }
         marca = t.closest('[data-c-ficha-cerrar]');
@@ -970,7 +1147,9 @@
     abrirFicha: abrirFicha,
     cerrarFicha: cerrarFicha,
     fichaAbierta: fichaAbierta,
-    subirNivelCarta: subirNivelCarta
+    subirNivelCarta: subirNivelCarta,
+    acunarCarta: acunarCarta,
+    acunarDesdeBoton: acunarDesdeBoton
   };
 
 }(window));

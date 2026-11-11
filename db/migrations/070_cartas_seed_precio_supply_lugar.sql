@@ -64,6 +64,10 @@
 --   6. Guardas POST, todas fail-closed: 0 lugar con precio_xp NULL o <= 0,
 --      0 lugar con supply_max NULL, 0 lugar con emitidas > supply_max y 0
 --      carta producto/consumible con precio_xp NOT NULL (CHECK de 066).
+--   7. RECLASIFICACION pedida por el OPERADOR (2026-11-11): ct_comun_01..06
+--      pasan de subtipo 'territorio' a 'natural'. Siguen siendo familia
+--      'lugar'. Es independiente del seed de precio/tirada y va guardada por
+--      id + familia='lugar' + subtipo='territorio', luego idempotente.
 --
 -- QUE NO HACE
 --   - NO toca familia IN ('producto','consumible'): se pagan por su SKU y su
@@ -71,13 +75,18 @@
 --     4 cta_ancestral y las 3 ce_evento.
 --   - NO toca personaje / artista / marca / cosmetica: no existen aun (0 filas).
 --   - NO toca emitidas (contador de circulacion medida: solo lo mueve el
---     acunado de 4.5), ni activo, ni stats_json, ni ninguna otra columna.
+--     acunado de 4.5), ni activo, ni stats_json, ni rareza. La UNICA columna
+--     fuera del trio de valor (precio_xp/supply_max/edicion) que este fichero
+--     escribe es subtipo, y solo para ct_comun_01..06 (paso 7): esas seis
+--     SIGUEN en familia 'lugar'.
 --   - NO hace DELETE, TRUNCATE ni DROP (ADR-003): cero borrado fisico.
 --   - NO escribe schema_migrations: lo hace el runner (contrato de 045).
 --
 -- IDEMPOTENCIA (ADR-008)
 --   - El UPDATE lleva IS DISTINCT FROM en las TRES columnas: la segunda corrida
 --     actualiza 0 filas y lo reporta con NOTICE, sin reescribir nada.
+--   - La reclasificacion del paso 7 lleva subtipo = 'territorio' en el
+--     predicado: la segunda corrida tampoco reescribe esas seis filas.
 --   - Las guardas son aserciones, no acumulaciones: no suman ni multiplican.
 --   - Todo el cuerpo es UN bloque DO: para el runner es una sola sentencia.
 --
@@ -88,8 +97,18 @@
 --   familia lugar: 24 filas = 9 comun + 7 raro + 5 epico + 3 dorado; todas con
 --   precio_xp NULL, supply_max NULL, edicion 'abierta', activo true, emitidas 0.
 --   producto+consumible: 7 filas, todas con precio_xp NULL.
---   md5 del estado (id|precio|supply|edicion ordenado por id) =
---   44b9437697529411cf4ad32d9c6e89b8
+--   md5 del estado, re-medido el 2026-11-11 con la formula REPRODUCIBLE
+--   (los NULL se marcan con '~' porque la concatenacion cruda los propaga y
+--   deja el string_agg entero en NULL, sin hash posible):
+--     md5(string_agg(id||coalesce(precio_xp::text,'~')
+--                       ||coalesce(supply_max::text,'~')||edicion,
+--                    '|' ORDER BY id))
+--     PRE = 3613e980a85be08786dc8e909ae33bc0
+--   Nota: el valor 44b9437697529411cf4ad32d9c6e89b8 que figuraba aqui no se
+--   reproduce con ninguna variante de la formula; la DESCRIPCION de estado si
+--   (24 lugar con precio/supply NULL y edicion 'abierta', 7 producto/consumible
+--   sin precio). Se sustituye por el medido para que la comprobacion de 0
+--   cambios de dato de la segunda corrida sea verificable.
 --   Contexto de supply: usuarios_cartas = 0 filas, cartas_ofertas = 0 filas. No
 --   hay inventario ni escrow, luego emitidas = 0 es coherente y no existe
 --   ninguna unidad en circulacion que pueda superar el techo propuesto.
@@ -98,6 +117,9 @@
 --   9 x (150.00, 5000, limitada) + 7 x (400.00, 1000, limitada)
 --   + 5 x (1000.00, 250, limitada) + 3 x (2500.00, 50, limitada) = 24.
 --   0 lugar con precio_xp NULL. 7 producto/consumible con precio_xp NULL.
+--   md5 POST predicho (calculado en lectura el 2026-11-11 con la misma formula
+--   antes de aplicar) = f2ae6007c6b67a92ca3688bf075be704
+--   Tras la reclasificacion del paso 7: familia lugar subtipo natural = 6.
 --   Las 24 quedan COMPRABLES si siguen con activo = true (activo no se toca
 --   aqui; la consulta POST del informe cuenta cuantas estan inactivas).
 --
@@ -124,6 +146,9 @@ DECLARE
   v_ids    text;
   v_upd    int;
   v_lugar  int;
+  v_nat    int;
+  v_nat_ok int;
+  v_nat_tot int;
   v_pnull  int;
   v_snull  int;
   v_over   int;
@@ -204,6 +229,25 @@ BEGIN
        OR c.edicion    IS DISTINCT FROM 'limitada');
   GET DIAGNOSTICS v_upd = ROW_COUNT;
 
+  -- (4b) RECLASIFICACION ct_comun_01..06 DE 'territorio' A 'natural' ------
+  -- Decision del OPERADOR del 2026-11-11, no de la spec. Las seis cartas
+  -- ct_comun_01..06 son de familia 'lugar' y siguen siendo 'lugar': lo unico
+  -- que cambia es el SUBTIPO. 'natural' es un subtipo VALIDO de 'lugar' en las
+  -- dos fuentes que mandan (ADR-006), comprobadas antes de escribir esto:
+  --   - lib/cartas-config.js:61  lugar: ['territorio', 'patrimonio', 'natural']
+  --   - chk_cartas_catalogo_subtipo vivo en Neon (pg_get_constraintdef):
+  --     familia='lugar' AND subtipo = ANY (ARRAY['territorio','patrimonio',
+  --     'natural']), luego el UPDATE no puede violar el CHECK.
+  -- Idempotente: el predicado subtipo = 'territorio' deja 0 filas en la
+  -- segunda corrida. NO toca rareza, precio_xp, supply_max, edicion ni activo.
+  UPDATE cartas_catalogo
+     SET subtipo = 'natural'
+   WHERE id IN ('ct_comun_01', 'ct_comun_02', 'ct_comun_03',
+                'ct_comun_04', 'ct_comun_05', 'ct_comun_06')
+     AND familia = 'lugar'
+     AND subtipo = 'territorio';
+  GET DIAGNOSTICS v_nat = ROW_COUNT;
+
   -- (5) GUARDAS POST (fail-closed) ----------------------------------------
   SELECT count(*),
          count(*) FILTER (WHERE precio_xp IS NULL OR precio_xp <= 0),
@@ -238,6 +282,23 @@ BEGIN
     RAISE EXCEPTION 'MIG070 ABORTA: lugar con emitidas > supply_max: %', v_ids;
   END IF;
 
+  -- (5b) POST de la reclasificacion. Se cuenta POR ID (6) y no el total de la
+  -- tabla, para que el guardia siga siendo cierto si en el futuro se crean mas
+  -- cartas 'natural'. v_nat_tot solo informa en el NOTICE.
+  SELECT count(*) INTO v_nat_ok
+    FROM cartas_catalogo
+   WHERE id IN ('ct_comun_01', 'ct_comun_02', 'ct_comun_03',
+                'ct_comun_04', 'ct_comun_05', 'ct_comun_06')
+     AND familia = 'lugar'
+     AND subtipo = 'natural';
+  IF v_nat_ok <> 6 THEN
+    RAISE EXCEPTION 'MIG070 ABORTA: solo % de 6 ct_comun_* quedaron en subtipo natural', v_nat_ok;
+  END IF;
+
+  SELECT count(*) INTO v_nat_tot
+    FROM cartas_catalogo
+   WHERE familia = 'lugar' AND subtipo = 'natural';
+
   -- El CHECK de 066 sigue mandando en producto/consumible: precio_xp NULL.
   SELECT count(*) INTO v_pc_bad
     FROM cartas_catalogo
@@ -252,5 +313,7 @@ BEGIN
 
   RAISE NOTICE 'MIG070 OK: % carta(s) lugar con precio y tirada; % fila(s) actualizadas en esta corrida (0 en la segunda)',
     v_lugar, v_upd;
+  RAISE NOTICE 'MIG070 OK: reclasificacion ct_comun_01..06 -> natural; % fila(s) reclasificadas en esta corrida (0 en la segunda); % carta(s) lugar con subtipo natural en total',
+    v_nat, v_nat_tot;
 END
 $m070$;

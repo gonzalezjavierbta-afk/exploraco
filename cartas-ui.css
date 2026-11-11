@@ -932,9 +932,70 @@
   outline-offset: 2px;
 }
 
+/* --- Acunar: sumidero de XP del catalogo (spec 4.8) ------------------ */
+.c-ficha .c-acunar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.c-ficha .c-acunar-btn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 40px;
+  padding: 9px 16px;
+  border: 1px solid rgba(201, 162, 39, .6);
+  border-radius: 8px;
+  background: rgba(201, 162, 39, .16);
+  color: #F6F2E8;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+
+.c-ficha .c-acunar-btn:hover:not(:disabled) {
+  background: rgba(201, 162, 39, .28);
+  border-color: #C9A227;
+}
+
+.c-ficha .c-acunar-btn:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.c-ficha .c-acunar-btn[aria-busy="true"] { cursor: progress; }
+
+.c-ficha .c-acunar-btn .c-acunar-xp {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: #E8C766;
+  opacity: .9;
+}
+
+.c-ficha .c-acunar-msg {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #A3AAB2;
+}
+
+.c-ficha .c-acunar-msg.is-error { color: #FF9B8A; }
+
+.c-ficha .c-acunar-btn:focus-visible {
+  outline: 2px solid #C9A227;
+  outline-offset: 2px;
+}
+
 /* Accesibilidad: sin transiciones si se pide calma. */
 @media (prefers-reduced-motion: reduce) {
   .c-ficha .c-subir { transition: none; }
+  .c-ficha .c-acunar-btn { transition: none; }
 }
 
 /* --- Foco visible dorado en todos los controles -------------------- */

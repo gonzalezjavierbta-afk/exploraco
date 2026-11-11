@@ -255,7 +255,7 @@ poder               = alcance + oficio + fortuna + rendimiento      (presencia E
 
 | Columna | Tipo | NULL/DEFAULT | Semantica |
 |---|---|---|---|
-| `precio_xp` | **`numeric(12,2)`** (enmendado: nacio `integer` en la 066 aplicada; la 068 lo convierte) | NULL | Precio de **acunacion** resuelto (rareza x multiplicador de familia). **NULL prohibido** en `producto`/`consumible`. |
+| `precio_xp` | **`numeric(12,2)`** (enmendado: nacio `integer` en la 066 aplicada; la 068 lo convierte) | NULL | Precio de **acunacion** resuelto (rareza x multiplicador de familia). **Debe ser NULL en `producto`/`consumible`** (CHECK de 066: se pagan por su SKU; la 070 dejo esas 7 filas en NULL). |
 | `edicion` | `varchar(10)` | `NOT NULL DEFAULT 'abierta'` | `abierta` (sin techo) / `limitada` (techo fijo) / `serial` (techo fijo + numeracion, seccion 4.4). |
 | `supply_max` | `integer` | NULL | Techo de unidades. NULL solo si `edicion='abierta'`. |
 | `emitidas` | `integer` | `NOT NULL DEFAULT 0` | Unidades en **circulacion medidas**: inventario propio + escrow de ofertas abiertas/parciales (4.5). Monotono no decreciente. |
@@ -960,7 +960,7 @@ Todas las consultas se ejecutan con `node scripts/neon_select.js -f <archivo.sql
 | V8 | Vector solo en familias jugables | Consulta V4 de 7.1 | 0 |
 | V9 | `emitidas` coherente | Consulta V5 de 7.1 (**inventario + escrow**) | 0 |
 | V10 | `emitidas <= supply_max` | Consulta V6 de 7.1 | 0 |
-| V11 | CHECKs probados (23514 esperado) | `DO` de autotest: (a) `familia='legendaria'`; (b) `familia='producto'` con `precio_xp=100`; (c) `edicion='limitada'` con `supply_max=NULL`; (d) `supply_max=1` con `emitidas=2`; (e) `stats_json->'alcance' = 'quince'`; (f) `usuarios_cartas_nivel.nivel=6`; (g) `cartas_media` `rechazada` sin `motivo`; (h) `cartas_media` `pendiente` con `moderado_en`; (i) `familia='producto'` sin `stats_json.sku` | **9/9** capturados como `check_violation` (23514); el `DO` hace `RAISE NOTICE` por cada PASS y **no deja filas** |
+| V11 | CHECKs probados (23514 esperado) | `DO` de autotest: (a) `familia='invalida'`; (b) `familia='producto'` con `precio_xp=100`; (c) `edicion='limitada'` con `supply_max=NULL`; (d) `supply_max=1` con `emitidas=2`; (e) `stats_json->'alcance' = 'quince'`; (f) `usuarios_cartas_nivel.nivel=6`; (g) `cartas_media` `rechazada` sin `motivo`; (h) `cartas_media` `pendiente` con `moderado_en`; (i) `familia='producto'` sin `stats_json.sku` | **9/9** capturados como `check_violation` (23514); el `DO` hace `RAISE NOTICE` por cada PASS y **no deja filas** |
 | V12 | Idempotencia de 067 | Segunda corrida de 067 + `SELECT count(*) FROM cartas_media;` y `SELECT count(*) FROM cartas_catalogo WHERE media_id IS NOT NULL;` | exit 0, 0 y 0 |
 | V13 | Vista `cartas_jugables` no se rompio | `SELECT count(*) FROM information_schema.views WHERE table_schema='public' AND table_name='cartas_jugables';` y, si = 1, comparar `information_schema.columns` de la vista vs tabla | La vista existe (=1) o no (=0); en ningun caso 067/066 la recrean y **ninguna consulta de producto la usa** |
 | V14 | ASCII-safe (ADR-002) | `$t = Get-Content -Raw db/migrations/066_cartas_familias_stats_supply.sql; if ($t -match '[^\x00-\x7F]') { 'FAIL' } else { 'PASS' }` | PASS en 066, 067 y esta spec |
@@ -1245,3 +1245,26 @@ END $m068chk$;
 | V24 | `SELECT count(*) FROM cartas_catalogo;` y `md5(string_agg(id||'|'||familia||'|'||subtipo||'|'||emitidas::text||'|'||COALESCE(precio_xp::text,'-'), ',' ORDER BY id)) FROM cartas_catalogo;` antes y despues de la 2a corrida | **31 filas intactas** y **md5 identico** = 0 cambios de dato |
 
 **Ninguna bloqueante. La 068 puede implementarse tal como queda contratada.**
+
+### 11.6. Enmienda 3 (fase 2 implementada y desplegada, 2026-11-11)
+
+**Estado medido:** **069** y **070 APLICADAS** en Neon con **1 fila** de ledger cada una. Codigo desplegado en **`e9be424`** (`origin/main`) y verificado en produccion: `cartas-ui.js` sirve `fichaPoderNivel` y `admin.html` sirve `cartas-media-lista`. **El `?v=4`** de `comunidad.html`/`mi-perfil.html`/`perfil.html` y el boton **ACUNAR** estan en el **arbol de trabajo**, **no** en `origin`.
+
+| Contrato | Estado | Evidencia / contrato final |
+|---|---|---|
+| 7.1 `familia`/`subtipo` NOT NULL | **APLICADA** (069) | **0 NULL**, **31/31** clasificadas; 2a corrida **no-op**; 6.396 B |
+| Seed de precio/supply `lugar` | **APLICADA** (070) | **24** `edicion='limitada'`; tirada/precio por rareza real: **9** x 150/5000, **7** x 400/1000, **5** x 1000/250, **3** x 2500/50; **24/24 comprables**; 15.460 B |
+| `producto`/`consumible` sin precio | **VIGENTE** | **7** filas con `precio_xp` **NULL** por el CHECK de 066 (se pagan por SKU) |
+| Reclasificacion `ct_comun_01..06` | **APLICADA** | `subtipo='natural'`, `familia='lugar'` (decision del operador, 2026-11-11) |
+| Idempotencia 070 | **PASS** | md5 del dato tras 2a corrida: `a3bc72bfb611ef9b9741b0f1bf42c580` (**0 cambios**) |
+| Admin (familia/subtipo + economia) | **DESPLEGADO** | `FAMILIA_REQUERIDA`, `FAMILIA_INVALIDA`, `SUBTIPO_REQUERIDO`, `SUBTIPO_INVALIDO`, `SUPPLY_REQUERIDO`, `SUPPLY_INCOHERENTE`, `PRECIO_INCOHERENTE`, `SKU_REQUERIDO`, `CARTA_CON_OFERTAS`; `stats_json` con MERGE; `emitidas` nunca del body |
+| 4.8 Sumidero de acunacion | **DESPLEGADO** | `carta_acunar` (la vieja `carta_comprar` era P2P y sigue siendo el mercado), asiento en el CTE; `SIN_STOCK`, `PUNTOS_INSUFICIENTES`, `CARTA_NO_COMPRABLE`, `CARTA_NO_ENCONTRADA`, `VARIANTE_INVALIDA` |
+| 4.9 Subida de nivel | **DESPLEGADO** | `carta_subir_nivel` con `CARTA_NIVEL_XP=[150,400,900,1800]`, tope **5**, `vincular/crear` de `usuarios_cartas_nivel`; `NIVEL_DESACTUALIZADO`, `NIVEL_MAX` |
+| D-15 comerciabilidad | **CERRADA** | `CARTA_NO_COMERCIABLE` en `carta_publicar` y `carta_comprar`; libro publico excluye `producto`/`consumible` y exige `c.activo=true`; **BUG-155 cerrado** |
+| D-17 royalty + tithe | **CERRADA** | royalty **10% solo UGC**; tithe `LEAST(tithe_pct,10)%`; detraccion total **<= 20%**; `neto = bruto - royalty - tithe >= 0`; asientos `carta_royalty`/`carta_tithe`; `carta_tithe` atribuido al vendedor con `contexto.pandilla_id`; **409 `OFERTA_NO_DISPONIBLE`** si la carta esta inactiva |
+| 6.2/6.3 Media UGC | **DESPLEGADO** | `carta_media_subir` cuesta **50 XP** con asiento `carta_media_envio` en el CTE y fail-closed; `cartas_media_mias`; **3 pendientes / 10 aprobadas-30d**; gate de **3 resenas con `xp_ganado>=25`**; transiciones `pendiente->aprobada|rechazada`, `aprobada->retirada`, `rechazada->pendiente`; `MOTIVO_REQUERIDO`; `LICENCIA_REQUERIDA` traducido desde 23514; **409 `MEDIA_NO_APROBADA`** en `carta_acunar`; `cartas_crear/editar` validan `media_id` aprobado y `emisor_id==autor_id` en UGC; **sin idempotencia por diseno** (2 envios = 2 obras y 2 cargos); `moderado_por` NULL (panel con `ADMIN_SECRET`, sin uuid) |
+| UI y verificacion | **PASS** | `smoke_cartas_ui.js` **63/63**; `smoke_cartas_economia.js` **43/43**; `smoke_cartas_db_tx.js` **40/40**; divs admin **1405/1405**; `npm test` **exit 0** |
+
+**Defecto documental conocido (no de dato):** el comentario `md5 POST` del header de la 070 (`f2ae6007...`) es una prediccion **FALSA**; el md5 real es `a3bc72bf...`. El operador acepta el comentario como obsoleto y **no autoriza cirugia del ledger** (su `sha256` coincide con el disco; editarlo crearia deriva permanente).
+
+**Deudas vivas:** (a) C7 opcional del `smoke_cartas_db_tx` (**23502**, subiria a **41**); (b) politica de retirada de obra `aprobada` con cartas ya emitidas; (c) `moderado_por` sin identidad de admin; (d) md5 obsoleto del header 070; (e) assets UGC son URL/texto, sin storage ni subida binaria; (f) **0 cartas** de `personaje`/`artista`/`marca`/`cosmetica`, luego las ramas de expedicion de `oficio`/`rendimiento` siguen sin cartas que las alimenten (**D-14**). **Fuera de este release:** `expedicion_rama` + misiones repetibles (5.2) siguen como contrato pendiente; no se declaran implementadas.
