@@ -5100,6 +5100,12 @@ var BONO_EXCLUIDAS = {
   bono_faccion_era1: true, bono_consumible_24h: true,
   dm_nuevo: true, tithe_parche: true, pandilla_reto: true,
   carta_evento: true, carta_fusion: true, carta_venta_debito: true,
+  // Fase 2 (spec 3.4 / 4.8): la acunacion y la subida de nivel son COBROS.
+  // Un cargo nunca puede recibir el bono % de consumibles (ADR-120).
+  carta_compra: true, carta_nivel: true,
+  // D-17 (spec 6.4): el royalty del autor y el tithe de parche son DETRACCIONES
+  // del bruto de una venta; jamas reciben bono.
+  carta_royalty: true, carta_tithe: true,
   carta_venta_credito: true, orden_compra_escrow: true, orden_match_venta: true,
   mercado_compra: true, mercado_venta: true, mercado_producir: true,
   contrato_escrow: true, contrato_pago: true, contrato_devolucion: true,
@@ -7573,6 +7579,14 @@ module.exports = async function handler(req, res) {
           'o.cantidad_restante > 0',
           '(o.expira_en IS NULL OR o.expira_en > NOW())'
         ];
+        // BUG-155 + D-15: el libro publico NO anuncia ofertas de cartas
+        // retiradas (c.activo=false) ni de familia producto/consumible, aunque
+        // la fila de la oferta siga activa. La lista de familias es la de
+        // lib/cartas-config.js, enviada como JSON para no duplicarla.
+        coWhere.push('c.activo = true');
+        coParams.push(JSON.stringify(CartasConfig.CARTA_FAMILIAS_SIN_PRECIO_XP));
+        coWhere.push('c.familia NOT IN (SELECT jsonb_array_elements_text($'
+          + coParams.length + '::jsonb))');
         var coCarta = req.query.carta_id ? String(req.query.carta_id).trim() : null;
         if (coCarta) { coParams.push(coCarta); coWhere.push('o.carta_id = $' + coParams.length); }
         coParams.push(CARTA_OFERTA_LIMITE);
@@ -16197,11 +16211,20 @@ module.exports = async function handler(req, res) {
         if (CARTA_VARIANTES.indexOf(cpVar) === -1)
           return res.status(400).json({ ok: false, error: 'PARAMETROS_INVALIDOS', campo: 'variante' });
 
+        // D-15 (spec 6.4 / 9.2): producto y consumible NO son comerciables como
+        // carta. Un producto se compra por su SKU, no se revende por XP. El
+        // predicado vive en la MISMA sentencia y ANTES del escrow: la lista es
+        // la de lib/cartas-config.js (sin duplicar familias en el SQL).
+        var cpSinPrecio = JSON.stringify(CartasConfig.CARTA_FAMILIAS_SIN_PRECIO_XP);
+
         var cpRes;
         try {
           cpRes = await sql(
             'WITH ok_carta AS ('
-            + ' SELECT id FROM cartas_catalogo WHERE id=$2 AND activo=true LIMIT 1'
+            + ' SELECT id, familia FROM cartas_catalogo WHERE id=$2 AND activo=true LIMIT 1'
+            + '), comerciable AS ('
+            + ' SELECT id FROM ok_carta'
+            + '  WHERE familia NOT IN (SELECT jsonb_array_elements_text($7::jsonb))'
             + '), escrow AS ('
             + ' UPDATE usuarios_cartas SET cantidad = cantidad - $3::int,'
             + '  activo = CASE WHEN cantidad - $3::int <= 0 THEN false ELSE activo END,'
@@ -16209,7 +16232,7 @@ module.exports = async function handler(req, res) {
             + '  orden_museo = CASE WHEN cantidad - $3::int <= 0 THEN NULL ELSE orden_museo END'
             + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=$6'
             + '  AND activo=true AND cantidad >= $3::int'
-            + '  AND EXISTS (SELECT 1 FROM ok_carta)'
+            + '  AND EXISTS (SELECT 1 FROM comerciable)'
             + ' RETURNING cantidad, activo'
             + '), oferta AS ('
             + ' INSERT INTO cartas_ofertas (vendedor_id, carta_id, variante, cantidad,'
@@ -16220,12 +16243,13 @@ module.exports = async function handler(req, res) {
             + ' RETURNING id, estado, expira_en'
             + ')'
             + ' SELECT (SELECT COUNT(*)::int FROM ok_carta) AS carta_ok,'
+            + ' (SELECT COUNT(*)::int FROM comerciable) AS comerciable_n,'
             + ' (SELECT cantidad FROM escrow) AS vendedor_cantidad,'
             + ' (SELECT activo FROM escrow) AS vendedor_activo,'
             + ' (SELECT id::text FROM oferta) AS oferta_id,'
             + ' (SELECT estado FROM oferta) AS estado,'
             + ' (SELECT expira_en FROM oferta) AS expira_en',
-            [cpUid, cpCarta, cpCant, cpPrecio, cpHoras, cpVar]
+            [cpUid, cpCarta, cpCant, cpPrecio, cpHoras, cpVar, cpSinPrecio]
           );
         } catch (eCp) {
           if (esEsquemaFaltante(eCp)) return responderCartasMercadoAusente(res, eCp, 'carta_publicar');
@@ -16236,6 +16260,8 @@ module.exports = async function handler(req, res) {
         var cpR = cpRes[0] || {};
         if (Number(cpR.carta_ok) !== 1)
           return res.status(404).json({ ok: false, error: 'CARTA_NO_ENCONTRADA' });
+        if (Number(cpR.comerciable_n) !== 1)
+          return res.status(400).json({ ok: false, error: 'CARTA_NO_COMERCIABLE', carta_id: cpCarta });
         if (!cpR.oferta_id)
           return res.status(400).json({
             ok: false, error: 'CARTA_INSUFICIENTE',
@@ -16273,12 +16299,26 @@ module.exports = async function handler(req, res) {
         try {
           cbcOf = await sql(
             'SELECT o.id, o.vendedor_id, o.carta_id, o.cantidad_restante,'
-            + ' o.precio_xp, o.estado, o.expira_en'
-            + ' FROM cartas_ofertas o WHERE o.id=$1::uuid LIMIT 1',
+            + ' o.precio_xp, o.estado, o.expira_en, c.familia,'
+            + ' (c.activo = true) AS carta_activa'
+            + ' FROM cartas_ofertas o LEFT JOIN cartas_catalogo c ON c.id = o.carta_id'
+            + ' WHERE o.id=$1::uuid LIMIT 1',
             [cbcId]
           );
           if (!cbcOf.length)
             return res.status(404).json({ ok: false, error: 'OFERTA_NO_ENCONTRADA' });
+          // D-15: ofertas PREEXISTENTES de producto/consumible se rechazan antes
+          // de tocar XP (el CTE mantiene la guarda atomica; esto da el 400).
+          if (CartasConfig.CARTA_FAMILIAS_SIN_PRECIO_XP
+              .indexOf(String(cbcOf[0].familia)) !== -1)
+            return res.status(400).json({
+              ok: false, error: 'CARTA_NO_COMERCIABLE',
+              carta_id: String(cbcOf[0].carta_id)
+            });
+          if (cbcOf[0].carta_activa !== true)
+            return res.status(409).json({
+              ok: false, error: 'OFERTA_NO_DISPONIBLE', estado: cbcOf[0].estado
+            });
           if (String(cbcOf[0].vendedor_id) === cbcUid)
             return res.status(403).json({ ok: false, error: 'AUTOCOMPRA_PROHIBIDA' });
           if (CARTA_OFERTA_ESTADOS_ACTIVOS.indexOf(String(cbcOf[0].estado)) === -1
@@ -16311,11 +16351,20 @@ module.exports = async function handler(req, res) {
         var cbcRes;
         try {
           cbcRes = await sql(
-            'WITH ok_oferta AS ('
-            + ' SELECT id, vendedor_id, carta_id, variante, precio_xp FROM cartas_ofertas'
-            + ' WHERE id=$1::uuid AND activo=true AND estado IN (\'abierta\',\'parcial\')'
-            + '  AND cantidad_restante >= $2::int AND vendedor_id <> $3::uuid'
-            + '  AND (expira_en IS NULL OR expira_en > NOW())'
+            // D-15: raw conserva la oferta aunque NO sea comerciable para
+            // poder distinguir 409 (no disponible) de 400 CARTA_NO_COMERCIABLE.
+            // ok_oferta es el unico conjunto que habilita el debito: un
+            // producto/consumible jamas llega a debit.
+            'WITH raw AS ('
+            + ' SELECT o.id, o.vendedor_id, o.carta_id, o.variante, o.precio_xp,'
+            + '  (c.activo = true AND c.familia NOT IN'
+            + '   (SELECT jsonb_array_elements_text($6::jsonb))) AS comerciable'
+            + ' FROM cartas_ofertas o LEFT JOIN cartas_catalogo c ON c.id = o.carta_id'
+            + ' WHERE o.id=$1::uuid AND o.activo=true AND o.estado IN (\'abierta\',\'parcial\')'
+            + '  AND o.cantidad_restante >= $2::int AND o.vendedor_id <> $3::uuid'
+            + '  AND (o.expira_en IS NULL OR o.expira_en > NOW())'
+            + '), ok_oferta AS ('
+            + ' SELECT * FROM raw WHERE comerciable'
             + '), ok_xp AS ('
             + ' SELECT id FROM usuarios WHERE id=$3::uuid AND xp_total >= $4::numeric'
             + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $4::numeric'
@@ -16331,8 +16380,44 @@ module.exports = async function handler(req, res) {
             + '  ejecutada_en = NOW()'
             + ' WHERE id=$1::uuid AND EXISTS (SELECT 1 FROM debit)'
             + ' RETURNING cantidad_restante, estado'
+            // D-17 (spec 6.4): reparto INTERNO del bruto, en el mismo statement.
+            // royalty = floor(bruto*0.10) solo si la carta es UGC Y el autor
+            // sigue existiendo (emisor_id sin FK, 060:238-242: si desaparecio no
+            // se paga a nadie y no queda escrow huerfano -> royalty 0).
+            // tithe = floor(bruto * LEAST(tithe_pct,10)/100); sin pandilla -> 0.
+            // neto = bruto - royalty - tithe (>= 0 por construccion: <= 20%).
+            + '), rep AS ('
+            + ' SELECT $4::numeric AS bruto,'
+            + '  CASE WHEN EXISTS ('
+            + '   SELECT 1 FROM cartas_catalogo c JOIN usuarios au ON au.id = c.emisor_id'
+            + '    WHERE c.id = (SELECT carta_id FROM ok_oferta)'
+            + '      AND c.emisor_tipo = \'ugc\' AND c.emisor_id IS NOT NULL)'
+            + '   THEN floor($4::numeric * 0.10) ELSE 0 END AS royalty,'
+            + '  COALESCE((SELECT floor($4::numeric'
+            + '    * LEAST(GREATEST(COALESCE(p.tithe_pct, 0), 0), 10) / 100)'
+            + '    FROM pandillas_miembros pm JOIN pandillas p ON p.id = pm.pandilla_id'
+            + '   WHERE pm.usuario_id = (SELECT vendedor_id FROM ok_oferta)'
+            + '     AND pm.activo = true AND p.activo = true LIMIT 1), 0) AS tithe,'
+            + '  (SELECT pm.pandilla_id FROM pandillas_miembros pm'
+            + '    JOIN pandillas p ON p.id = pm.pandilla_id'
+            + '   WHERE pm.usuario_id = (SELECT vendedor_id FROM ok_oferta)'
+            + '     AND pm.activo = true AND p.activo = true LIMIT 1) AS pandilla_id'
+            + '), roy AS ('
+            + ' UPDATE usuarios u SET xp_total = u.xp_total + (SELECT royalty FROM rep)'
+            + '  WHERE (SELECT royalty FROM rep) > 0'
+            + '   AND EXISTS (SELECT 1 FROM debit)'
+            + '   AND u.id = (SELECT c.emisor_id FROM cartas_catalogo c'
+            + '    WHERE c.id = (SELECT carta_id FROM ok_oferta))'
+            + ' RETURNING u.id'
+            + '), tax AS ('
+            + ' UPDATE pandillas p SET fama_total = p.fama_total + (SELECT tithe FROM rep)'
+            + '  WHERE (SELECT tithe FROM rep) > 0'
+            + '   AND EXISTS (SELECT 1 FROM debit)'
+            + '   AND p.id = (SELECT pandilla_id FROM rep)'
+            + ' RETURNING p.id'
             + '), cred AS ('
-            + ' UPDATE usuarios SET xp_total = xp_total + $4::numeric'
+            + ' UPDATE usuarios SET xp_total = xp_total + ($4::numeric'
+            + '  - (SELECT royalty FROM rep) - (SELECT tithe FROM rep))'
             + ' WHERE id=(SELECT vendedor_id FROM ok_oferta) AND EXISTS (SELECT 1 FROM debit)'
             + ' RETURNING id'
             + '), cartas AS ('
@@ -16358,18 +16443,45 @@ module.exports = async function handler(req, res) {
             + ' FROM debit RETURNING id'
             + '), led_c AS ('
             + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final, es_exento, contexto)'
-            + ' SELECT (SELECT vendedor_id FROM ok_oferta), \'carta_venta_credito\', $4::numeric,'
-            + '  $4::numeric, true,'
-            + '  jsonb_build_object(\'oferta_id\', $1::text, \'cantidad\', $2::int, \'comprador_id\', $3::text)'
+            + ' SELECT (SELECT vendedor_id FROM ok_oferta), \'carta_venta_credito\','
+            + '  ($4::numeric - (SELECT royalty FROM rep) - (SELECT tithe FROM rep)),'
+            + '  ($4::numeric - (SELECT royalty FROM rep) - (SELECT tithe FROM rep)), true,'
+            + '  jsonb_build_object(\'oferta_id\', $1::text, \'cantidad\', $2::int,'
+            + '   \'comprador_id\', $3::text, \'bruto\', $4::numeric,'
+            + '   \'royalty\', (SELECT royalty FROM rep), \'tithe\', (SELECT tithe FROM rep))'
             + ' FROM debit RETURNING id'
+            + '), led_roy AS ('
+            + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final, es_exento, contexto)'
+            + ' SELECT (SELECT c.emisor_id FROM cartas_catalogo c'
+            + '   WHERE c.id = (SELECT carta_id FROM ok_oferta)), \'carta_royalty\','
+            + '  (SELECT royalty FROM rep), (SELECT royalty FROM rep), true,'
+            + '  jsonb_build_object(\'oferta_id\', $1::text, \'cantidad\', $2::int,'
+            + '   \'bruto\', $4::numeric, \'pct\', 0.10)'
+            + ' WHERE EXISTS (SELECT 1 FROM roy)'
+            + ' RETURNING id'
+            + '), led_tax AS ('
+            + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final, es_exento, contexto)'
+            + ' SELECT (SELECT vendedor_id FROM ok_oferta), \'carta_tithe\','
+            + '  (SELECT tithe FROM rep), 0, true,'
+            + '  jsonb_build_object(\'oferta_id\', $1::text, \'cantidad\', $2::int,'
+            + '   \'bruto\', $4::numeric, \'pandilla_id\', (SELECT pandilla_id FROM rep))'
+            + ' WHERE EXISTS (SELECT 1 FROM tax)'
+            + ' RETURNING id'
             + ')'
-            + ' SELECT EXISTS(SELECT 1 FROM ok_oferta) AS oferta_ok,'
+            + ' SELECT (SELECT COUNT(*)::int FROM raw) AS oferta_n,'
+            + ' COALESCE((SELECT comerciable FROM raw), false) AS comerciable,'
+            + ' EXISTS(SELECT 1 FROM ok_oferta) AS oferta_ok,'
             + ' EXISTS(SELECT 1 FROM ok_xp) AS xp_ok,'
             + ' (SELECT xp_total FROM debit) AS comprador_xp,'
             + ' (SELECT cantidad_restante FROM dec) AS cantidad_restante,'
             + ' (SELECT estado FROM dec) AS estado,'
-            + ' (SELECT id::text FROM venta) AS venta_id',
-            [cbcId, cbcCant, cbcUid, cbcSubtotal, cbcPrecio]
+            + ' (SELECT id::text FROM venta) AS venta_id,'
+            + ' (SELECT bruto FROM rep) AS bruto,'
+            + ' (SELECT royalty FROM rep) AS royalty,'
+            + ' (SELECT tithe FROM rep) AS tithe,'
+            + ' (SELECT bruto - royalty - tithe FROM rep) AS neto',
+            [cbcId, cbcCant, cbcUid, cbcSubtotal, cbcPrecio,
+              JSON.stringify(CartasConfig.CARTA_FAMILIAS_SIN_PRECIO_XP)]
           );
         } catch (eCbc) {
           if (esEsquemaFaltante(eCbc)) return responderCartasMercadoAusente(res, eCbc, 'carta_comprar');
@@ -16378,6 +16490,13 @@ module.exports = async function handler(req, res) {
           throw eCbc;
         }
         var cbcR = cbcRes[0] || {};
+        if (Number(cbcR.oferta_n) !== 1)
+          return res.status(409).json({ ok: false, error: 'OFERTA_NO_DISPONIBLE' });
+        if (cbcR.comerciable !== true)
+          return res.status(400).json({
+            ok: false, error: 'CARTA_NO_COMERCIABLE',
+            carta_id: String(cbcOf[0].carta_id)
+          });
         if (cbcR.oferta_ok !== true)
           return res.status(409).json({ ok: false, error: 'OFERTA_NO_DISPONIBLE' });
         if (cbcR.xp_ok !== true)
@@ -16386,6 +16505,10 @@ module.exports = async function handler(req, res) {
           ok: true, venta_id: cbcR.venta_id, oferta_id: cbcId,
           carta_id: String(cbcOf[0].carta_id), cantidad: cbcCant,
           precio_unitario: cbcPrecio, subtotal_xp: cbcSubtotal,
+          bruto_xp: red2(numXp(cbcR.bruto)),
+          royalty_xp: red2(numXp(cbcR.royalty)),
+          tithe_xp: red2(numXp(cbcR.tithe)),
+          neto_vendedor_xp: red2(numXp(cbcR.neto)),
           estado_oferta: cbcR.estado, cantidad_restante: Number(cbcR.cantidad_restante),
           xp_total_nuevo: red2(numXp(cbcR.comprador_xp))
         });
@@ -16738,6 +16861,275 @@ module.exports = async function handler(req, res) {
             cantidad_shiny: Number(cfuR.cantidad_shiny),
             xp_gastado: CARTA_FUSION_XP,
             xp_disponible: red2(Math.max(cfuXpFinal, 0))
+          }
+        });
+      }
+
+      // ============ FASE 2 CARTAS: ACUNACION CON XP (spec 4.8) ==============
+      // OJO AL NOMBRE: el tipo es carta_acunar, NO carta_comprar.
+      // carta_comprar YA existia (T11.2, arriba) y significa COMPRAR UNA
+      // OFERTA DEL MERCADO P2P con oferta_id. Reutilizarlo para acunar del
+      // catalogo seria un mismo tipo con dos shapes y dos precios: la rama de
+      // mercado responde primero y esta quedaria muerta. Se usa el verbo del
+      // contrato (spec 4.8: "sumidero de acunacion", accion carta_acunar).
+      // Compra una carta coleccionable con XP. El cargo sube
+      // usuarios.xp_gastado_sinks y NUNCA resta de xp_total (patron 046:40-44):
+      // restar de xp_total haria bajar calcularNivel(xp_total) y violaria
+      // ADR-018. La emision (emitidas), el debito, el inventario, el bootstrap
+      // de nivel y el asiento del ledger van en el MISMO statement: si el
+      // proceso muere no hay cobro sin carta ni carta sin asiento.
+      // Fail-closed: 0 filas en un CTE = no se cobro, no se emitio ni se
+      // entrego. El codigo de aplicacion distingue por subconsulta.
+      if (tipo2 === 'carta_acunar') {
+        var ccoSes = usuarioDeSesion(req);
+        if (!ccoSes.ok) return responderSesion(res, ccoSes.razon);
+        var ccoUid = ccoSes.usuario_id;
+        var ccoCarta = String(body.carta_id || '').trim();
+        if (!ccoCarta)
+          return res.status(400).json({ ok: false, error: 'CARTA_ID_REQUERIDO' });
+        // ADR-108: variante opcional, por omision 'base'. El stock y el
+        // inventario se miden por (carta, variante), nunca por la suma.
+        var ccoVar = String(body.variante || CARTA_VARIANTE_DEFECTO).trim().toLowerCase();
+        if (!ccoVar) ccoVar = CARTA_VARIANTE_DEFECTO;
+        if (CARTA_VARIANTES.indexOf(ccoVar) === -1)
+          return res.status(400).json({ ok: false, error: 'VARIANTE_INVALIDA' });
+
+        // Familias sin precio_xp: fuente unica en lib/cartas-config.js. Se
+        // envian como JSON para no duplicar la lista en el SQL.
+        var ccoSinPrecio = JSON.stringify(CartasConfig.CARTA_FAMILIAS_SIN_PRECIO_XP);
+
+        var ccoRes;
+        try {
+          ccoRes = await sql(
+            'WITH cat AS ('
+            + ' SELECT c.id, c.precio_xp, c.emitidas, c.supply_max,'
+            + '  (c.precio_xp IS NOT NULL AND c.precio_xp > 0'
+            + '   AND c.familia NOT IN (SELECT jsonb_array_elements_text($4::jsonb))) AS comprable,'
+            + '  (c.supply_max IS NULL OR c.emitidas < c.supply_max) AS stock_ok'
+            + ' FROM cartas_catalogo c WHERE c.id=$2 AND c.activo=true LIMIT 1'
+            + '), ok_carta AS ('
+            + ' SELECT * FROM cat WHERE comprable AND stock_ok'
+            + '), ok_saldo AS ('
+            + ' SELECT u.id FROM usuarios u, ok_carta k'
+            + '  WHERE u.id=$1::uuid AND u.xp_total >= k.precio_xp'
+            + '  AND GREATEST(u.xp_total - COALESCE(u.xp_gastado_sinks,0),0) >= k.precio_xp'
+            + '), deb AS ('
+            + ' UPDATE usuarios u SET xp_gastado_sinks = COALESCE(u.xp_gastado_sinks,0)'
+            + '  + (SELECT precio_xp FROM ok_carta)'
+            + '  WHERE u.id=$1::uuid AND EXISTS (SELECT 1 FROM ok_saldo)'
+            + ' RETURNING u.xp_total, u.xp_gastado_sinks'
+            + '), emit AS ('
+            + ' UPDATE cartas_catalogo c SET emitidas = c.emitidas + 1'
+            + '  WHERE c.id=$2 AND EXISTS (SELECT 1 FROM deb)'
+            + '  AND (c.supply_max IS NULL OR c.emitidas < c.supply_max)'
+            + ' RETURNING c.emitidas'
+            + '), inv AS ('
+            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, variante, cantidad, activo, obtenida_en)'
+            + ' SELECT $1::uuid, $2, $3, 1, true, NOW() FROM emit LIMIT 1'
+            + ' ON CONFLICT (usuario_id, carta_id, variante) DO UPDATE SET'
+            + '  cantidad = usuarios_cartas.cantidad + 1, activo = true, obtenida_en = NOW()'
+            + ' RETURNING cantidad'
+            + '), nvl AS ('
+            + ' INSERT INTO usuarios_cartas_nivel (usuario_id, carta_id, nivel, xp_invertido)'
+            + ' SELECT $1::uuid, $2, 1, 0 WHERE EXISTS (SELECT 1 FROM inv)'
+            + ' ON CONFLICT (usuario_id, carta_id) DO NOTHING'
+            + ' RETURNING nivel'
+            + '), led AS ('
+            + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final, es_exento, contexto)'
+            + ' SELECT $1::uuid, \'carta_compra\', (SELECT precio_xp FROM ok_carta), 0, true,'
+            + '  jsonb_build_object(\'carta_id\',$2,\'variante\',$3,'
+            + '   \'emitidas\',(SELECT emitidas FROM emit),'
+            + '   \'precio_xp\',(SELECT precio_xp FROM ok_carta))'
+            + ' WHERE EXISTS (SELECT 1 FROM inv)'
+            + ' RETURNING id'
+            + ')'
+            + ' SELECT (SELECT COUNT(*)::int FROM cat) AS carta_n,'
+            + ' COALESCE((SELECT comprable FROM cat), false) AS comprable,'
+            + ' COALESCE((SELECT stock_ok FROM cat), false) AS stock_ok,'
+            + ' (SELECT emitidas FROM emit) AS emitidas,'
+            + ' (SELECT cantidad FROM inv) AS cantidad,'
+            + ' (SELECT nivel FROM usuarios_cartas_nivel'
+            + '   WHERE usuario_id=$1::uuid AND carta_id=$2) AS nivel,'
+            + ' (SELECT xp_total FROM deb) AS xp_total,'
+            + ' (SELECT xp_gastado_sinks FROM deb) AS xp_gastado_sinks,'
+            + ' (SELECT GREATEST(xp_total - COALESCE(xp_gastado_sinks,0),0) FROM usuarios'
+            + '   WHERE id=$1::uuid) AS xp_disponible',
+            [ccoUid, ccoCarta, ccoVar, ccoSinPrecio]
+          );
+        } catch (eCco) {
+          if (esEsquemaFaltante(eCco))
+            return responderCartasAusente(res, eCco, 'carta_comprar');
+          throw eCco;
+        }
+        var ccoR = ccoRes[0] || {};
+        if (Number(ccoR.carta_n) !== 1)
+          return res.status(404).json({ ok: false, error: 'CARTA_NO_ENCONTRADA', carta_id: ccoCarta });
+        if (ccoR.comprable !== true)
+          return res.status(400).json({ ok: false, error: 'CARTA_NO_COMPRABLE', carta_id: ccoCarta });
+        if (ccoR.stock_ok !== true)
+          return res.status(409).json({ ok: false, error: 'SIN_STOCK', carta_id: ccoCarta });
+        if (ccoR.cantidad === null || ccoR.cantidad === undefined)
+          return res.status(400).json({
+            ok: false, error: 'PUNTOS_INSUFICIENTES', carta_id: ccoCarta,
+            xp_disponible: red2(numXp(ccoR.xp_disponible))
+          });
+        var ccoDisp = numXp(ccoR.xp_total) - numXp(ccoR.xp_gastado_sinks);
+        return res.status(200).json({
+          ok: true,
+          data: {
+            carta_id: ccoCarta, variante: ccoVar,
+            cantidad: Number(ccoR.cantidad),
+            emitidas: Number(ccoR.emitidas),
+            nivel: Number(ccoR.nivel) || 1,
+            xp_gastado: red2(numXp(ccoR.xp_total) - ccoDisp),
+            xp_disponible: red2(Math.max(ccoDisp, 0))
+          }
+        });
+      }
+
+      // ============ FASE 2 CARTAS: SUBIDA DE NIVEL (spec 4.9) ===============
+      // Cargo + incremento en el MISMO statement y condicionado a nivel < 5
+      // (lib/cartas-config.js: CARTA_NIVEL_TOPE). El nivel es del par
+      // (usuario, carta): la variante solo es guarda de posesion y token de
+      // idempotencia, nunca dimension de almacenamiento (066: PK de 2).
+      // Doble clic: el token nivel_esperado (opcional) hace que un segundo
+      // request con el nivel ya viejo devuelva 0 filas SIN cobrar; sin token se
+      // usa el nivel vigente leido del propio statement (nunca se asume).
+      if (tipo2 === 'carta_subir_nivel') {
+        var cnuSes = usuarioDeSesion(req);
+        if (!cnuSes.ok) return responderSesion(res, cnuSes.razon);
+        var cnuUid = cnuSes.usuario_id;
+        var cnuCarta = String(body.carta_id || '').trim();
+        if (!cnuCarta)
+          return res.status(400).json({ ok: false, error: 'CARTA_ID_REQUERIDO' });
+        var cnuVar = String(body.variante || CARTA_VARIANTE_DEFECTO).trim().toLowerCase();
+        if (!cnuVar) cnuVar = CARTA_VARIANTE_DEFECTO;
+        if (CARTA_VARIANTES.indexOf(cnuVar) === -1)
+          return res.status(400).json({ ok: false, error: 'VARIANTE_INVALIDA' });
+        var cnuEsp = body.nivel_esperado;
+        if (cnuEsp === undefined || cnuEsp === null || cnuEsp === '') {
+          cnuEsp = null;
+        } else {
+          cnuEsp = parseInt(cnuEsp, 10);
+          if (!isFinite(cnuEsp) || cnuEsp < 1
+              || cnuEsp > CartasConfig.CARTA_NIVEL_TOPE)
+            return res.status(400).json({ ok: false, error: 'NIVEL_ESPERADO_INVALIDO' });
+        }
+
+        var cnuCostes = CartasConfig.CARTA_NIVEL_XP;
+
+        try {
+          // Bootstrap idempotente: una carta poseida sin fila de nivel nace en
+          // 1 (gratis). Va en su propio statement porque un INSERT ... SELECT
+          // del mismo statement no es visible al UPDATE que lo sigue.
+          await sql(
+            'INSERT INTO usuarios_cartas_nivel (usuario_id, carta_id, nivel, xp_invertido)'
+            + ' SELECT $1::uuid, $2, 1, 0'
+            + ' WHERE EXISTS (SELECT 1 FROM usuarios_cartas uc'
+            + '  WHERE uc.usuario_id=$1::uuid AND uc.carta_id=$2 AND uc.variante=$3'
+            + '  AND uc.activo=true AND uc.cantidad >= 1)'
+            + ' ON CONFLICT (usuario_id, carta_id) DO NOTHING',
+            [cnuUid, cnuCarta, cnuVar]
+          );
+        } catch (eCnuB) {
+          if (esEsquemaFaltante(eCnuB))
+            return responderCartasAusente(res, eCnuB, 'carta_subir_nivel');
+          throw eCnuB;
+        }
+
+        var cnuRes;
+        try {
+          cnuRes = await sql(
+            'WITH posee AS ('
+            + ' SELECT 1 FROM usuarios_cartas uc'
+            + '  WHERE uc.usuario_id=$1::uuid AND uc.carta_id=$2 AND uc.variante=$3'
+            + '  AND uc.activo=true AND uc.cantidad >= 1'
+            + '), base AS ('
+            + ' SELECT n.nivel,'
+            + '  CASE n.nivel WHEN 1 THEN $4::numeric WHEN 2 THEN $5::numeric'
+            + '   WHEN 3 THEN $6::numeric WHEN 4 THEN $7::numeric END AS coste'
+            + '  FROM usuarios_cartas_nivel n'
+            + '  WHERE n.usuario_id=$1::uuid AND n.carta_id=$2'
+            + '  AND n.nivel < ' + String(CartasConfig.CARTA_NIVEL_TOPE)
+            + '  AND ($8::int IS NULL OR n.nivel = $8::int)'
+            + '), up AS ('
+            + ' UPDATE usuarios_cartas_nivel n'
+            + '  SET nivel = n.nivel + 1,'
+            + '   xp_invertido = n.xp_invertido + (SELECT coste FROM base),'
+            + '   actualizado_en = NOW()'
+            + '  WHERE n.usuario_id=$1::uuid AND n.carta_id=$2'
+            + '  AND n.nivel = (SELECT nivel FROM base)'
+            + '  AND EXISTS (SELECT 1 FROM posee)'
+            + '  AND EXISTS (SELECT 1 FROM usuarios u, base b'
+            + '   WHERE u.id=$1::uuid AND u.xp_total >= b.coste'
+            + '   AND GREATEST(u.xp_total - COALESCE(u.xp_gastado_sinks,0),0) >= b.coste)'
+            + ' RETURNING n.nivel'
+            + '), deb AS ('
+            + ' UPDATE usuarios u SET xp_gastado_sinks = COALESCE(u.xp_gastado_sinks,0)'
+            + '  + (SELECT coste FROM base)'
+            + '  WHERE u.id=$1::uuid AND EXISTS (SELECT 1 FROM up)'
+            + ' RETURNING u.xp_total, u.xp_gastado_sinks'
+            + '), led AS ('
+            + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final, es_exento, contexto)'
+            + ' SELECT $1::uuid, \'carta_nivel\', (SELECT coste FROM base), 0, true,'
+            + '  jsonb_build_object(\'carta_id\',$2,\'variante\',$3,'
+            + '   \'nivel_nuevo\',(SELECT nivel FROM up),\'coste_xp\',(SELECT coste FROM base))'
+            + ' WHERE EXISTS (SELECT 1 FROM up)'
+            + ' RETURNING id'
+            + ')'
+            + ' SELECT (SELECT COUNT(*)::int FROM cartas_catalogo'
+            + '   WHERE id=$2 AND activo=true) AS carta_n,'
+            + ' (SELECT COUNT(*)::int FROM posee) AS posee_n,'
+            + ' (SELECT nivel FROM usuarios_cartas_nivel'
+            + '   WHERE usuario_id=$1::uuid AND carta_id=$2) AS nivel_actual,'
+            + ' (SELECT nivel FROM up) AS nivel_nuevo,'
+            + ' (SELECT coste FROM base) AS coste,'
+            + ' (SELECT xp_total FROM deb) AS xp_total,'
+            + ' (SELECT xp_gastado_sinks FROM deb) AS xp_gastado_sinks,'
+            + ' (SELECT GREATEST(xp_total - COALESCE(xp_gastado_sinks,0),0) FROM usuarios'
+            + '   WHERE id=$1::uuid) AS xp_disponible',
+            [cnuUid, cnuCarta, cnuVar, cnuCostes[0], cnuCostes[1],
+              cnuCostes[2], cnuCostes[3], cnuEsp]
+          );
+        } catch (eCnu) {
+          if (esEsquemaFaltante(eCnu))
+            return responderCartasAusente(res, eCnu, 'carta_subir_nivel');
+          throw eCnu;
+        }
+        var cnuR = cnuRes[0] || {};
+        if (Number(cnuR.carta_n) !== 1)
+          return res.status(404).json({ ok: false, error: 'CARTA_NO_ENCONTRADA', carta_id: cnuCarta });
+        if (Number(cnuR.posee_n) !== 1)
+          return res.status(400).json({ ok: false, error: 'NO_POSEE', carta_id: cnuCarta });
+        if (cnuR.nivel_nuevo === null || cnuR.nivel_nuevo === undefined) {
+          var cnuActual = Number(cnuR.nivel_actual) || 1;
+          if (cnuActual >= CartasConfig.CARTA_NIVEL_TOPE)
+            return res.status(409).json({
+              ok: false, error: 'NIVEL_MAX', carta_id: cnuCarta,
+              nivel: cnuActual, nivel_tope: CartasConfig.CARTA_NIVEL_TOPE
+            });
+          if (cnuEsp !== null && cnuEsp !== cnuActual)
+            return res.status(409).json({
+              ok: false, error: 'NIVEL_DESACTUALIZADO', carta_id: cnuCarta,
+              nivel_actual: cnuActual, nivel_esperado: cnuEsp
+            });
+          return res.status(400).json({
+            ok: false, error: 'PUNTOS_INSUFICIENTES', carta_id: cnuCarta,
+            nivel_actual: cnuActual,
+            coste_xp: CartasConfig.costeSubidaNivel(cnuActual),
+            xp_disponible: red2(numXp(cnuR.xp_disponible))
+          });
+        }
+        var cnuDisp = numXp(cnuR.xp_total) - numXp(cnuR.xp_gastado_sinks);
+        return res.status(200).json({
+          ok: true,
+          data: {
+            carta_id: cnuCarta, variante: cnuVar,
+            nivel: Number(cnuR.nivel_nuevo),
+            coste_xp: red2(numXp(cnuR.coste)),
+            xp_gastado: red2(numXp(cnuR.xp_total) - cnuDisp),
+            xp_disponible: red2(Math.max(cnuDisp, 0)),
+            nivel_tope: CartasConfig.CARTA_NIVEL_TOPE
           }
         });
       }

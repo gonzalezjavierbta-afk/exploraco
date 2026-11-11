@@ -982,7 +982,7 @@ module.exports = async (req, res) => {
         var cmId = String(req.query.usuario_id || '').trim();
         if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(cmId))
           return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
-        var cmUsr, cmCartas, cmGates, cmReq, cmMuseo;
+        var cmUsr, cmCartas, cmGates, cmReq, cmMuseo, cmNiveles;
         try {
           cmUsr = await sql('SELECT xp_total, nivel_max FROM usuarios WHERE id=$1 LIMIT 1', [cmId]);
           if (!cmUsr.length)
@@ -996,12 +996,17 @@ module.exports = async (req, res) => {
           // ADR-120 (065): set_coleccion marca las cartas del set Ancestral.
           // Va con reintento degradado: sin la 065 (42703) se repite la
           // consulta sin la columna y el contrato historico queda intacto.
-          var cmSqlCartas = function (conSet) {
+          var cmSqlCartas = function (conSet, conExtras) {
             return 'SELECT c.id, c.nombre, c.set_slug, c.rareza, c.nivel_gate, c.es_evento,'
               + ' c.imagen_url, c.emisor_tipo, c.emisor_id, c.marca_id,'
               + ' m.nombre AS marca_nombre, c.descripcion, c.stats_json,'
               + ' c.es_canjeable_qr, c.fusionable,'
               + (conSet ? ' c.set_coleccion,' : '')
+              // 066: familia / subtipo / edicion / supply_max / emitidas /
+              // precio_xp. Aditivo y con reintento degradado: sin la 066 la
+              // lectura historica queda intacta (nunca 503).
+              + (conExtras ? ' c.familia, c.subtipo, c.edicion, c.supply_max,'
+                + ' c.emitidas, c.precio_xp,' : '')
               + ' COALESCE(uc.inv, \'[]\'::jsonb) AS variantes'
               + ' FROM cartas_catalogo c'
               + ' LEFT JOIN marcas m ON m.id = c.marca_id'
@@ -1017,11 +1022,17 @@ module.exports = async (req, res) => {
               + ' ORDER BY c.set_slug ASC, c.nivel_gate ASC NULLS LAST, c.id ASC';
           };
           try {
-            cmCartas = await sql(cmSqlCartas(true), [cmId]);
+            cmCartas = await sql(cmSqlCartas(true, true), [cmId]);
           } catch (eCmSet) {
             if (!eCmSet || eCmSet.code !== '42703') throw eCmSet;
-            console.warn('[usuarios] cartas_mias sin 065: ' + eCmSet.message);
-            cmCartas = await sql(cmSqlCartas(false), [cmId]);
+            console.warn('[usuarios] cartas_mias sin 065/066: ' + eCmSet.message);
+            try {
+              cmCartas = await sql(cmSqlCartas(false, true), [cmId]);
+            } catch (eCm066) {
+              if (!eCm066 || eCm066.code !== '42703') throw eCm066;
+              console.warn('[usuarios] cartas_mias sin 066: ' + eCm066.message);
+              cmCartas = await sql(cmSqlCartas(false, false), [cmId]);
+            }
           }
           cmGates = await sql(
             'SELECT nivel_gate, set_slug, consumido_en FROM cartas_gates'
@@ -1071,12 +1082,31 @@ module.exports = async (req, res) => {
             + ' ORDER BY uc.orden_museo ASC NULLS LAST, c.id ASC LIMIT $2',
             [cmId, MUSEO_TOPE]
           );
+          // 066: nivel por carta. Best-effort: sin la 066 (42P01) la lectura
+          // sigue devolviendo nivel 1 y poder base, nunca 503.
+          cmNiveles = [];
+          try {
+            cmNiveles = await sql(
+              'SELECT carta_id, nivel FROM usuarios_cartas_nivel WHERE usuario_id = $1',
+              [cmId]
+            );
+          } catch (eCmNiv) {
+            if (!eCmNiv || (eCmNiv.code !== '42P01' && eCmNiv.code !== '42703')) throw eCmNiv;
+            console.warn('[usuarios] cartas_mias sin 066 (nivel): ' + eCmNiv.message);
+            cmNiveles = [];
+          }
         } catch (eCm) {
           if (!eCm || (eCm.code !== '42P01' && eCm.code !== '42703')) throw eCm;
           return responderSchemaPendiente(res, 'cartas_mias', eCm);
         }
         // Agregacion defensiva por carta: neon devuelve jsonb ya parseado, pero
         // si llegara como texto se normaliza aqui (nunca se duplica la carta).
+        // Nivel por carta (066): mapa carta_id -> nivel, 1 por omision.
+        var cmNivelMap = {};
+        (cmNiveles || []).forEach(function (n) {
+          var nNum = parseInt(n && n.nivel, 10);
+          cmNivelMap[String(n && n.carta_id)] = (isFinite(nNum) && nNum >= 1) ? nNum : 1;
+        });
         cmCartas = (cmCartas || []).map(function (c) {
           var vArr = c.variantes;
           if (typeof vArr === 'string') {
@@ -1103,6 +1133,18 @@ module.exports = async (req, res) => {
               vPosesion = true;
             }
           });
+          // 066 + spec 3.5: nivel del par (usuario, carta) y poder derivado.
+          // Una carta cuenta UNA vez: se toma el MAXIMO de la variante poseida
+          // (sin apilar cantidad ni sumar base + shiny). Nada se persiste: el
+          // poder se calcula aqui con el helper de lib/cartas-config.js.
+          var cmNv = cmNivelMap[String(c.id)] || 1;
+          var cmPoder = 0;
+          vNorm.forEach(function (v) {
+            if (!(v.activa && v.cantidad >= 1)) return;
+            var pv = CartasConfig.poderCarta(c.stats_json, cmNv, v.variante);
+            if (pv > cmPoder) cmPoder = pv;
+          });
+          if (!cmPoder) cmPoder = CartasConfig.poderCarta(c.stats_json, cmNv, CARTA_VARIANTE_DEFECTO);
           return {
             id: c.id,
             nombre: c.nombre,
@@ -1125,6 +1167,25 @@ module.exports = async (req, res) => {
             // carta de set (el 4/4 se perderia para siempre).
             set_coleccion: c.set_coleccion === true,
             fusion_coste_xp: CARTA_FUSION_XP,
+            // 066 (aditivo): taxonomia, supply y valor de acunacion. Los
+            // numericos llegan como string desde pg (numeric(12,2)); se
+            // normalizan para que el cliente nunca reciba "150.00".
+            familia: c.familia || null,
+            subtipo: c.subtipo || null,
+            edicion: c.edicion || null,
+            supply_max: (c.supply_max === null || c.supply_max === undefined)
+              ? null : Number(c.supply_max),
+            emitidas: (c.emitidas === null || c.emitidas === undefined)
+              ? null : Number(c.emitidas),
+            precio_xp: (c.precio_xp === null || c.precio_xp === undefined)
+              ? null : Number(c.precio_xp),
+            // Vector normalizado (spec 3.3). bonus_xp_pct NO se lee: deprecada
+            // e inerte (spec 4.7, cierre de D-5).
+            stats: CartasConfig.statsNormalizados(c.stats_json),
+            nivel: cmNv,
+            poder: cmPoder,
+            nivel_tope: CartasConfig.CARTA_NIVEL_TOPE,
+            coste_nivel_xp: CartasConfig.costeSubidaNivel(cmNv),
             variantes: vNorm
           };
         });
@@ -1193,37 +1254,78 @@ module.exports = async (req, res) => {
             data: { nombre: mpU.nombre, nivel: mpNivel }
           });
         }
-        var mpCartas;
-        try {
-          mpCartas = await sql(
-            'SELECT c.id, c.nombre, c.rareza, c.set_slug, c.imagen_url,'
+        var mpCartas, mpNiveles;
+        var mpSqlCartas = function (conExtras) {
+          return 'SELECT c.id, c.nombre, c.rareza, c.set_slug, c.imagen_url,'
             + ' c.descripcion, c.emisor_tipo, m.nombre AS marca_nombre,'
             + ' c.stats_json, uc.variante'
+            // 066: aditivo y con reintento degradado (pre-066 = shape historico).
+            + (conExtras ? ', c.familia, c.subtipo, c.edicion, c.supply_max,'
+              + ' c.emitidas, c.precio_xp' : '')
             + ' FROM usuarios_cartas uc JOIN cartas_catalogo c ON c.id = uc.carta_id'
             + ' LEFT JOIN marcas m ON m.id = c.marca_id'
             + ' WHERE uc.usuario_id = $1 AND uc.en_museo = true'
             + ' AND uc.activo = true AND uc.cantidad >= 1 AND c.activo = true'
-            + ' ORDER BY uc.orden_museo ASC NULLS LAST, c.id ASC LIMIT $2',
-            [mpId, MUSEO_TOPE]
-          );
+            + ' ORDER BY uc.orden_museo ASC NULLS LAST, c.id ASC LIMIT $2';
+        };
+        try {
+          try {
+            mpCartas = await sql(mpSqlCartas(true), [mpId, MUSEO_TOPE]);
+          } catch (eMp066) {
+            if (!eMp066 || eMp066.code !== '42703') throw eMp066;
+            console.warn('[usuarios] museo_cartas sin 066: ' + eMp066.message);
+            mpCartas = await sql(mpSqlCartas(false), [mpId, MUSEO_TOPE]);
+          }
+          // Nivel de las piezas equipadas: best-effort (sin 066 -> nivel 1).
+          mpNiveles = [];
+          try {
+            mpNiveles = await sql(
+              'SELECT carta_id, nivel FROM usuarios_cartas_nivel WHERE usuario_id = $1',
+              [mpId]
+            );
+          } catch (eMpNiv) {
+            if (!eMpNiv || (eMpNiv.code !== '42P01' && eMpNiv.code !== '42703')) throw eMpNiv;
+            mpNiveles = [];
+          }
         } catch (eMp) {
           if (!eMp || (eMp.code !== '42P01' && eMp.code !== '42703')) throw eMp;
           return responderSchemaPendiente(res, 'museo_cartas', eMp);
         }
         // Vitrina vacia = 200 con cartas: []. Nunca 404 ni error: el perfil
         // publico no debe romperse por un museo sin equipar.
+        var mpNivelMap = {};
+        (mpNiveles || []).forEach(function (n) {
+          var nNum = parseInt(n && n.nivel, 10);
+          mpNivelMap[String(n && n.carta_id)] = (isFinite(nNum) && nNum >= 1) ? nNum : 1;
+        });
         var mpLista = (mpCartas || []).map(function (c) {
+          var mpVar = String(c.variante || CARTA_VARIANTE_DEFECTO);
+          var mpNv = mpNivelMap[String(c.id)] || 1;
           return {
             id: c.id,
             nombre: c.nombre,
             rareza: c.rareza,
-            variante: String(c.variante || CARTA_VARIANTE_DEFECTO),
+            variante: mpVar,
             set_slug: c.set_slug,
             imagen_url: c.imagen_url || null,
             descripcion: c.descripcion || null,
             emisor_tipo: c.emisor_tipo || null,
             marca_nombre: c.marca_nombre || null,
-            stats_json: c.stats_json || null
+            stats_json: c.stats_json || null,
+            // 066 (aditivo): taxonomia, supply, valor y poder derivado. El
+            // poder NO se persiste: se calcula aqui (spec 3.5).
+            familia: c.familia || null,
+            subtipo: c.subtipo || null,
+            edicion: c.edicion || null,
+            supply_max: (c.supply_max === null || c.supply_max === undefined)
+              ? null : Number(c.supply_max),
+            emitidas: (c.emitidas === null || c.emitidas === undefined)
+              ? null : Number(c.emitidas),
+            precio_xp: (c.precio_xp === null || c.precio_xp === undefined)
+              ? null : Number(c.precio_xp),
+            stats: CartasConfig.statsNormalizados(c.stats_json),
+            nivel: mpNv,
+            poder: CartasConfig.poderCarta(c.stats_json, mpNv, mpVar)
           };
         });
         return res.json({

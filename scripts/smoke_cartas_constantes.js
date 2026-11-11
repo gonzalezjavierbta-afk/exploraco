@@ -146,22 +146,30 @@ assert(/'museo_cartas'/.test(tUsu), USU + ' expone la ruta de lectura museo_cart
 assert(!/museo_publico/.test(tUsu), USU + ' NO contiene el nombre antiguo museo_publico',
   'quedan ' + cuenta(tUsu, /museo_publico/g) + ' ocurrencia(s)');
 
-// --- (e) Invariancia del upsert de inventario ------------------------------
-// ADR-120: el numero de upserts NO es una constante (una rama nueva de compra
-// anade un INSERT mas). Lo que SI es invariante: TODO INSERT INTO usuarios_cartas
-// declara el conflicto de 3 columnas. El conteo es dinamico contra el numero
-// real de INSERT, para que una rama nueva no rompa el gate y una regresion a 2
-// columnas si lo rompa.
-var nInsCartas = cuenta(tInter, /INSERT INTO usuarios_cartas/g);
-var nTresCol = cuenta(tInter, /ON CONFLICT \(usuario_id, carta_id, variante\)/g);
+// (e) Invariancia del upsert de inventario: TODO INSERT en usuarios_cartas
+// declara el conflicto de 3 columnas. El conteo es dinamico y POR TABLA: se
+// corta el texto en bloques por INSERT y solo cuenta los que apuntan a
+// usuarios_cartas (el prefijo `INSERT INTO usuarios_cartas` tambien casaba con
+// usuarios_cartas_nivel, que tiene PK de 2 columnas y es otra tabla). Una rama
+// nueva de compra anade un INSERT mas y no rompe el gate; una regresion a 2
+// columnas si lo rompe.
+var bloquesIns = tInter.split(/INSERT INTO /).slice(1);
+var nInsCartas = 0;
+var nTresCol = 0;
+var nDosColCarta = 0;
+bloquesIns.forEach(function (b) {
+  if (b.indexOf('usuarios_cartas (') !== 0) return;
+  nInsCartas++;
+  if (/ON CONFLICT \(usuario_id, carta_id, variante\)/.test(b)) nTresCol++;
+  if (/ON CONFLICT \(usuario_id, carta_id\)/.test(b)) nDosColCarta++;
+});
 assert(nInsCartas >= 1, INTER + ' conserva al menos un INSERT INTO usuarios_cartas',
   'encontrados ' + nInsCartas);
 assert(nTresCol === nInsCartas,
   INTER + ' tiene 1 upsert de 3 columnas por cada INSERT INTO usuarios_cartas',
   'INSERT ' + nInsCartas + ' vs ON CONFLICT (usuario_id, carta_id, variante) ' + nTresCol);
-var nDosCol = cuenta(tInter, /ON CONFLICT \(usuario_id, carta_id\)/g);
-assert(nDosCol === 0, INTER + ' no conserva ningun ON CONFLICT de 2 columnas',
-  'encontrados ' + nDosCol);
+assert(nDosColCarta === 0, INTER + ' no conserva ningun ON CONFLICT de 2 columnas sobre usuarios_cartas',
+  'encontrados ' + nDosColCarta);
 
 // --- Resumen ---------------------------------------------------------------
 console.log('');

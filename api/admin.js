@@ -78,6 +78,13 @@
 
 const { neon } = require('@neondatabase/serverless');
 const crypto = require('crypto');
+// ADR-108 D9 (una sola fuente, dos lectores): familias, subtipos, ediciones y
+// el validador del vector de stats de las cartas viven en lib/. lib/ NO es
+// endpoint (8/8 funciones serverless agotadas, ADR-001): viaja en el bundle
+// por trazado de dependencias, igual que lib/score.js. admin.html no puede
+// requirear: lleva un espejo de las listas solo para pintar los selects y la
+// AUTORIDAD sigue siendo este modulo (400 tipado, no 23514).
+var CartasConfig = require('../lib/cartas-config.js');
 
 var RESEND_API  = 'https://api.resend.com/emails';
 var FROM_EMAIL  = 'LATAWEL <noreply@latawel.com>';
@@ -590,16 +597,142 @@ function normalizarStatsCarta(valor) {
     try { obj = JSON.parse(valor); } catch (e) { return undefined; }
   }
   if (!obj || typeof obj !== 'object' || Object.prototype.toString.call(obj) === '[object Array]') return undefined;
-  if (obj.bonus_xp_pct !== undefined && obj.bonus_xp_pct !== null) {
-    if (typeof obj.bonus_xp_pct !== 'number' || !isFinite(obj.bonus_xp_pct)) return undefined;
+  // El vector (alcance/oficio/fortuna/rendimiento/presencia + primario) lo
+  // valida lib/cartas-config.js: espejo del CHECK de la 066. bonus_xp_pct
+  // queda tolerada e inerte (ADR-003).
+  if (CartasConfig.validarStatsCarta(obj) !== '') return undefined;
+  // Un valor null explicito no es un dato del vector y SI viola el CHECK de
+  // 066 (jsonb_typeof(null) = 'null'): se omite en vez de dejar caer el 23514.
+  var limpio = {};
+  var k;
+  for (k in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+    if (obj[k] === null) continue;
+    limpio[k] = obj[k];
   }
-  return obj;
+  return limpio;
+}
+// MERGE de stats_json en memoria, espejo EXACTO de
+// COALESCE(stats_json,'{}'::jsonb) || $n::jsonb (ADR-003: nunca se reemplaza
+// el objeto, para no borrar claves de otros consumidores como sku, volumen_ml
+// o el bonus_xp_pct heredado). Se usa solo para validar el RESULTADO antes de
+// escribir; la escritura la hace el SQL.
+function fusionarStatsCarta(base, encima) {
+  var out = {};
+  var k;
+  if (base && typeof base === 'object' && Object.prototype.toString.call(base) !== '[object Array]') {
+    for (k in base) if (Object.prototype.hasOwnProperty.call(base, k)) out[k] = base[k];
+  }
+  if (encima && typeof encima === 'object' && Object.prototype.toString.call(encima) !== '[object Array]') {
+    for (k in encima) if (Object.prototype.hasOwnProperty.call(encima, k)) out[k] = encima[k];
+  }
+  return out;
 }
 function normalizarDescripcionCarta(valor) {
   var s = String(valor == null ? '' : valor).trim();
   if (!s) return null;
   if (s.length > 2000) return undefined;
   return s;
+}
+// -- FAMILIA / SUBTIPO / EDICION / SUPPLY / PRECIO (ADR-121; 066 + 068) -----
+// Mismo contrato que normalizarNivelGateCarta: null = el campo NO viene (en
+// crear se deriva/rechaza, en editar se conserva la fila), undefined = viene
+// mal (400 tipado). Los dominios cerrados viven en lib/cartas-config.js.
+function normalizarFamiliaCarta(valor) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return null;
+  var s = String(valor).trim().toLowerCase();
+  if (CartasConfig.FAMILIAS_CARTA.indexOf(s) < 0) return undefined;
+  return s;
+}
+function normalizarSubtipoCarta(valor) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return null;
+  return String(valor).trim().toLowerCase();
+}
+function normalizarEdicionCarta(valor) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') {
+    return CartasConfig.CARTA_EDICION_DEFECTO;
+  }
+  var s = String(valor).trim().toLowerCase();
+  if (CartasConfig.EDICIONES_CARTA.indexOf(s) < 0) return undefined;
+  return s;
+}
+// supply_max: entero > 0. Vacio -> null (la coherencia con edicion decide).
+function normalizarSupplyCarta(valor) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return null;
+  var n = Number(valor);
+  if (!isFinite(n) || n !== Math.floor(n) || n <= 0) return undefined;
+  return n;
+}
+// precio_xp: numeric(12,2) desde la 068. 0 se normaliza a NULL porque el CHECK
+// chk_cartas_catalogo_precio exige NULL en producto/consumible y > 0 en el
+// resto (066:243-253): un 0 literal viola las dos ramas y caeria como 23514.
+function normalizarPrecioCarta(valor) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return null;
+  var n = Number(valor);
+  if (!isFinite(n) || n < 0) return undefined;
+  if (n === 0) return null;
+  return Math.round(n * 100) / 100;
+}
+// Coherencia del RESULTADO que se va a escribir (nunca del body suelto): los
+// CHECK de la 066 miran la fila, no el payload. Devuelve null o
+// { error, detalle } con el codigo que la UI ya sabe traducir.
+function coherenciaFamiliaCarta(c) {
+  if (!c.familia) {
+    return { error:'FAMILIA_REQUERIDA',
+      detalle:'familia es obligatoria: ' + CartasConfig.FAMILIAS_CARTA.join(', ') };
+  }
+  if (CartasConfig.FAMILIAS_CARTA.indexOf(c.familia) < 0) {
+    return { error:'FAMILIA_INVALIDA',
+      detalle:'familia debe ser una de: ' + CartasConfig.FAMILIAS_CARTA.join(', ') };
+  }
+  var subs = CartasConfig.SUBTIPOS_CARTA[c.familia] || [];
+  if (subs.length) {
+    if (!c.subtipo) {
+      return { error:'SUBTIPO_REQUERIDO',
+        detalle:'subtipo es obligatorio para familia ' + c.familia + ': ' + subs.join(', ') };
+    }
+    if (subs.indexOf(c.subtipo) < 0) {
+      return { error:'SUBTIPO_INVALIDO',
+        detalle:'subtipo de ' + c.familia + ' debe ser uno de: ' + subs.join(', ') };
+    }
+  }
+  var conSupply = CartasConfig.CARTA_EDICIONES_CON_SUPPLY.indexOf(c.edicion) >= 0;
+  if (conSupply && !(typeof c.supply_max === 'number' && c.supply_max > 0)) {
+    return { error:'SUPPLY_REQUERIDO',
+      detalle:'edicion=' + c.edicion + ' exige supply_max entero > 0' };
+  }
+  if (!conSupply && c.supply_max !== null && c.supply_max !== undefined) {
+    return { error:'SUPPLY_INCOHERENTE',
+      detalle:'edicion=' + c.edicion + ' exige supply_max en null' };
+  }
+  // emitidas es del SERVIDOR (nunca del body): si ya supera el techo pedido,
+  // el UPDATE caeria por chk_cartas_catalogo_emitidas (23514). Se avisa antes.
+  if (typeof c.supply_max === 'number' && typeof c.emitidas === 'number'
+      && c.emitidas > c.supply_max) {
+    return { error:'SUPPLY_INCOHERENTE',
+      detalle:'emitidas (' + c.emitidas + ') ya supera supply_max (' + c.supply_max + ')' };
+  }
+  var sinPrecio = CartasConfig.CARTA_FAMILIAS_SIN_PRECIO_XP.indexOf(c.familia) >= 0;
+  if (sinPrecio && c.precio_xp !== null && c.precio_xp !== undefined) {
+    return { error:'PRECIO_INCOHERENTE',
+      detalle:'familia ' + c.familia + ' no admite precio_xp (su precio es el SKU)' };
+  }
+  if (!sinPrecio && typeof c.precio_xp === 'number' && c.precio_xp <= 0) {
+    return { error:'PRECIO_INCOHERENTE', detalle:'precio_xp debe ser > 0 o null' };
+  }
+  if (c.familia === 'producto') {
+    var sku = (c.stats_json && c.stats_json.sku != null)
+      ? String(c.stats_json.sku).trim() : '';
+    if (!sku) {
+      return { error:'SKU_REQUERIDO',
+        detalle:'familia producto exige stats_json.sku (espejo de chk_cartas_catalogo_sku)' };
+    }
+  }
+  if (c.familia === 'cosmetica' && c.fusionable === true) {
+    return { error:'FUSION_INCOHERENTE',
+      detalle:'familia cosmetica no es fusionable (chk_cartas_catalogo_no_fusion_cosmetica)' };
+  }
+  return null;
 }
 // Boolean tolerante (la UI manda booleanos, pero el formulario puede mandar
 // '0'/'1'/'false' como texto). Cualquier otra cosa no vacia cuenta como true.
@@ -633,6 +766,9 @@ function motivoNoFusionableCarta(f) {
   if (f.es_evento === true) m.push('es_evento=true');
   if (f.es_canjeable_qr === true) m.push('es_canjeable_qr=true');
   if (f.emisor_tipo === 'marca') m.push('emisor_tipo=marca');
+  // ADR-121 (066:283-289): cosmetica no es fusionable. Solo se evalua si el
+  // llamador pasa la familia; los llamadores viejos no la pasan y no cambian.
+  if (f.familia === 'cosmetica') m.push('familia=cosmetica');
   return m.join(', ');
 }
 
@@ -1363,6 +1499,7 @@ module.exports = async function handler(req, res) {
         var filasCa = await sql(
           'SELECT id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en, '
           + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, '
+          + 'familia, subtipo, edicion, supply_max, emitidas, precio_xp, '
           + '(imagen_url IS NOT NULL AND btrim(imagen_url) <> \'\') AS tiene_diseno, '
           + '(activo AND imagen_url IS NOT NULL AND btrim(imagen_url) <> \'\') AS jugable '
           + 'FROM cartas_catalogo '
@@ -1422,8 +1559,31 @@ module.exports = async function handler(req, res) {
         var errEmiCa = coherenciaEmisorCarta(emiTipoCa, emiCa, marCa);
         if (errEmiCa)
           return res.status(400).json({ ok:false, error:'EMISOR_INCOHERENTE', detalle: errEmiCa });
+        // ADR-121 (migraciones 066/068): familia y subtipo son OBLIGATORIOS en
+        // el alta. Se valida la coherencia sobre el RESULTADO (familia <->
+        // subtipo, edicion <-> supply, familia <-> precio, producto -> sku)
+        // para responder 400 tipado en vez de dejar caer el 23514/23502 como
+        // 500. emitidas NO se acepta del body: es del servidor (DEFAULT 0).
+        var famCa = normalizarFamiliaCarta(body.familia);
+        if (famCa === undefined)
+          return res.status(400).json({ ok:false, error:'FAMILIA_INVALIDA',
+            detalle:'familia debe ser una de: ' + CartasConfig.FAMILIAS_CARTA.join(', ') });
+        var subCa = normalizarSubtipoCarta(body.subtipo);
+        var ediCa = normalizarEdicionCarta(body.edicion);
+        if (ediCa === undefined)
+          return res.status(400).json({ ok:false, error:'EDICION_INVALIDA',
+            detalle:'edicion debe ser abierta, limitada o serial' });
+        var supCa = normalizarSupplyCarta(body.supply_max);
+        if (supCa === undefined)
+          return res.status(400).json({ ok:false, error:'SUPPLY_INVALIDO',
+            detalle:'supply_max debe ser un entero > 0 o null' });
+        var preCa = normalizarPrecioCarta(body.precio_xp);
+        if (preCa === undefined)
+          return res.status(400).json({ ok:false, error:'PRECIO_INVALIDO',
+            detalle:'precio_xp debe ser numerico >= 0 o null' });
         var motFusCa = motivoNoFusionableCarta({
-          nivel_gate: nivCa, es_evento: evCa, es_canjeable_qr: qrCa, emisor_tipo: emiTipoCa
+          nivel_gate: nivCa, es_evento: evCa, es_canjeable_qr: qrCa, emisor_tipo: emiTipoCa,
+          familia: famCa
         });
         if (fusPedCa && fusCa === true && motFusCa)
           return res.status(400).json({ ok:false, error:'FUSION_INCOHERENTE', detalle:'fusionable=true no es compatible con: ' + motFusCa });
@@ -1432,17 +1592,26 @@ module.exports = async function handler(req, res) {
         // y la carta no se podria crear. No se rechaza porque el operador no
         // pidio fusionar; solo se rechaza lo que se pide de forma explicita.
         if (!fusPedCa && motFusCa) fusCa = false;
+        var cohCa = coherenciaFamiliaCarta({
+          familia: famCa, subtipo: subCa, edicion: ediCa, supply_max: supCa,
+          precio_xp: preCa, stats_json: statsCa, fusionable: fusCa, emitidas: 0
+        });
+        if (cohCa)
+          return res.status(400).json({ ok:false, error: cohCa.error, detalle: cohCa.detalle });
         var existCa = await sql('SELECT 1 FROM cartas_catalogo WHERE id=$1 LIMIT 1',[idCa]);
         if (existCa.length)
           return res.status(409).json({ ok:false, error:'Ya existe una carta con ese id' });
         var insCa = await sql(
           'INSERT INTO cartas_catalogo (id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, '
-          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable) '
-          + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15) '
+          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, '
+          + 'familia, subtipo, edicion, supply_max, precio_xp) '
+          + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17,$18,$19,$20) '
           + 'RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en, '
-          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable',
+          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, '
+          + 'familia, subtipo, edicion, supply_max, emitidas, precio_xp',
           [idCa, nomCa, setCa, rarCa, nivCa, evCa, imgCa, actCa,
-           emiTipoCa, emiCa, marCa, descCa, JSON.stringify(statsCa), qrCa, fusCa]
+           emiTipoCa, emiCa, marCa, descCa, JSON.stringify(statsCa), qrCa, fusCa,
+           famCa, subCa, ediCa, supCa, preCa]
         );
         var respCa = { ok:true, data: insCa[0], mensaje:'Carta creada' };
         if (!imgCa) {
@@ -1464,13 +1633,20 @@ module.exports = async function handler(req, res) {
         var tocaEmiCa = ('emisor_tipo' in body) || ('emisor_id' in body) || ('marca_id' in body);
         var tocaInvCa = tocaEmiCa || ('fusionable' in body) || ('nivel_gate' in body)
           || ('es_evento' in body) || ('es_canjeable_qr' in body);
+        // ADR-121 (066/068): familia, subtipo, edicion, supply y precio se
+        // validan sobre el RESULTADO del merge, asi que exigen leer la fila
+        // actual. tocaFamCa separa ese caso del resto: una edicion de nombre,
+        // lamina o emisor NO arrastra la validacion de familia.
+        var tocaFamCa = ('familia' in body) || ('subtipo' in body) || ('edicion' in body)
+          || ('supply_max' in body) || ('precio_xp' in body);
         // ADR-117 D3.2: tocar imagen_url exige leer activo para no dejar sin
         // lamina una carta ACTIVA (el invariante I1 se romperia por detras).
         var tocaImgCa = ('imagen_url' in body);
         var curCa = [];
-        if (tocaInvCa || tocaImgCa) {
+        if (tocaInvCa || tocaImgCa || tocaFamCa) {
           curCa = await sql(
-            'SELECT nivel_gate, es_evento, es_canjeable_qr, emisor_tipo, emisor_id, marca_id, fusionable, activo '
+            'SELECT nivel_gate, es_evento, es_canjeable_qr, emisor_tipo, emisor_id, marca_id, fusionable, activo, '
+            + 'familia, subtipo, edicion, supply_max, precio_xp, emitidas, stats_json '
             + 'FROM cartas_catalogo WHERE id=$1 LIMIT 1',
             [body.id]
           );
@@ -1483,6 +1659,18 @@ module.exports = async function handler(req, res) {
         var effTipoCa = curCa.length ? curCa[0].emisor_tipo : 'sistema';
         var effEmiCa  = curCa.length ? curCa[0].emisor_id : null;
         var effMarCa  = curCa.length ? curCa[0].marca_id : null;
+        // ADR-121: valores de la fila actual para validar el RESULTADO del
+        // merge (la UI puede mandar solo familia y dejar subtipo viejo).
+        var effFamCa  = curCa.length ? (curCa[0].familia || null) : null;
+        var famCurCa  = effFamCa;
+        var effSubCa  = curCa.length ? (curCa[0].subtipo || null) : null;
+        var effEdiCa  = curCa.length ? (curCa[0].edicion || CartasConfig.CARTA_EDICION_DEFECTO)
+                                     : CartasConfig.CARTA_EDICION_DEFECTO;
+        var effSupCa  = curCa.length ? (curCa[0].supply_max == null ? null : Number(curCa[0].supply_max)) : null;
+        var effPreCa  = curCa.length ? (curCa[0].precio_xp == null ? null : Number(curCa[0].precio_xp)) : null;
+        var effEmiNum = curCa.length ? (Number(curCa[0].emitidas) || 0) : 0;
+        var effStatsCa = curCa.length ? curCa[0].stats_json : null;
+        var statsResCa = effStatsCa;
         var setsCa = []; var paramsCa = []; var piCa = 1;
         if ('nombre' in body) {
           var nomE2 = String(body.nombre || '').trim();
@@ -1534,8 +1722,13 @@ module.exports = async function handler(req, res) {
         if ('stats_json' in body) {
           var statsE2 = normalizarStatsCarta(body.stats_json);
           if (statsE2 === undefined)
-            return res.status(400).json({ ok:false, error:'STATS_JSON_INVALIDO', detalle:'stats_json debe ser un objeto JSON y bonus_xp_pct numerico si viene' });
-          setsCa.push('stats_json=$' + piCa++ + '::jsonb'); paramsCa.push(JSON.stringify(statsE2));
+            return res.status(400).json({ ok:false, error:'STATS_JSON_INVALIDO', detalle:'stats_json debe ser un objeto JSON con el vector en 0..40 y bonus_xp_pct numerico si viene' });
+          // ADR-003 (cero borrado logico en JSONB): MERGE, nunca reemplazo.
+          // Un reemplazo borraria sku / volumen_ml / set_slug / premio_set de
+          // las cartas Ancestrales y el bonus_xp_pct heredado.
+          setsCa.push('stats_json=COALESCE(stats_json, \'{}\'::jsonb) || $' + piCa++ + '::jsonb');
+          paramsCa.push(JSON.stringify(statsE2));
+          statsResCa = fusionarStatsCarta(effStatsCa, statsE2);
         }
         if ('es_canjeable_qr' in body) {
           effQrCa = boolCarta(body.es_canjeable_qr);
@@ -1561,6 +1754,48 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ ok:false, error:'MARCA_ID_INVALIDO', detalle:'marca_id debe ser un uuid valido o null' });
           effMarCa = marIdE2;
           setsCa.push('marca_id=$' + piCa++); paramsCa.push(marIdE2);
+        }
+        if ('familia' in body) {
+          var famE2 = normalizarFamiliaCarta(body.familia);
+          if (famE2 === undefined || famE2 === null)
+            return res.status(400).json({ ok:false, error:'FAMILIA_INVALIDA',
+              detalle:'familia debe ser una de: ' + CartasConfig.FAMILIAS_CARTA.join(', ') });
+          effFamCa = famE2;
+          setsCa.push('familia=$' + piCa++); paramsCa.push(famE2);
+        }
+        if ('subtipo' in body) {
+          var subE2 = normalizarSubtipoCarta(body.subtipo);
+          // Vaciarlo dejaria la fila sin clasificar (y desde la 069 viola el
+          // NOT NULL): se rechaza en vez de aceptar null a medias.
+          if (subE2 === null)
+            return res.status(400).json({ ok:false, error:'SUBTIPO_REQUERIDO',
+              detalle:'subtipo no puede quedar vacio; coherencia en servidor con la familia resultante' });
+          effSubCa = subE2;
+          setsCa.push('subtipo=$' + piCa++); paramsCa.push(subE2);
+        }
+        if ('edicion' in body) {
+          var ediE2 = normalizarEdicionCarta(body.edicion);
+          if (ediE2 === undefined)
+            return res.status(400).json({ ok:false, error:'EDICION_INVALIDA',
+              detalle:'edicion debe ser abierta, limitada o serial' });
+          effEdiCa = ediE2;
+          setsCa.push('edicion=$' + piCa++); paramsCa.push(ediE2);
+        }
+        if ('supply_max' in body) {
+          var supE2 = normalizarSupplyCarta(body.supply_max);
+          if (supE2 === undefined)
+            return res.status(400).json({ ok:false, error:'SUPPLY_INVALIDO',
+              detalle:'supply_max debe ser un entero > 0 o null' });
+          effSupCa = supE2;
+          setsCa.push('supply_max=$' + piCa++); paramsCa.push(supE2);
+        }
+        if ('precio_xp' in body) {
+          var preE2 = normalizarPrecioCarta(body.precio_xp);
+          if (preE2 === undefined)
+            return res.status(400).json({ ok:false, error:'PRECIO_INVALIDO',
+              detalle:'precio_xp debe ser numerico >= 0 o null' });
+          effPreCa = preE2;
+          setsCa.push('precio_xp=$' + piCa++); paramsCa.push(preE2);
         }
         // Coherencia de emisor sobre el RESULTADO del merge (nunca dejar que
         // el 23514 de chk_cartas_catalogo_emisor_coherente caiga como 500).
@@ -1594,7 +1829,8 @@ module.exports = async function handler(req, res) {
         // no se corrige en silencio a false, el operador pidio algo
         // incoherente y debe saberlo.
         var motFusE2 = motivoNoFusionableCarta({
-          nivel_gate: effNivCa, es_evento: effEvCa, es_canjeable_qr: effQrCa, emisor_tipo: effTipoCa
+          nivel_gate: effNivCa, es_evento: effEvCa, es_canjeable_qr: effQrCa, emisor_tipo: effTipoCa,
+          familia: effFamCa
         });
         if (effFusCa === true && motFusE2) {
           var detFusE2 = ('fusionable' in body)
@@ -1602,13 +1838,45 @@ module.exports = async function handler(req, res) {
             : ('la carta ya es fusionable=true y el cambio pide: ' + motFusE2 + '; envia fusionable=false');
           return res.status(400).json({ ok:false, error:'FUSION_INCOHERENTE', detalle: detFusE2 });
         }
+        // ADR-121: coherencia de familia/subtipo/edicion/supply/precio sobre el
+        // RESULTADO del merge. Solo si el body toca alguno de esos campos: una
+        // edicion de nombre o lamina no debe quedar bloqueada por la
+        // clasificacion de una fila heredada.
+        if (tocaFamCa) {
+          var cohE2 = coherenciaFamiliaCarta({
+            familia: effFamCa, subtipo: effSubCa, edicion: effEdiCa, supply_max: effSupCa,
+            precio_xp: effPreCa, stats_json: statsResCa, fusionable: effFusCa, emitidas: effEmiNum
+          });
+          if (cohE2)
+            return res.status(400).json({ ok:false, error: cohE2.error, detalle: cohE2.detalle });
+        }
+        // Guarda de cambio de familia: una carta con ofertas abiertas o
+        // parciales esta LISTADA en el mercado P2P; reciclarla a otra familia
+        // cambiaria el significado de un activo que ya tiene compradores
+        // potenciales. 409 y que el operador cancele las ofertas primero.
+        if (('familia' in body) && curCa.length && famCurCa !== effFamCa) {
+          var ofCa = [];
+          try {
+            ofCa = await sql(
+              'SELECT 1 FROM cartas_ofertas WHERE carta_id=$1 AND estado IN (\'abierta\',\'parcial\') LIMIT 1',
+              [body.id]
+            );
+          } catch (eOfCa) {
+            // Entorno sin la 041: no hay mercado, no hay nada que proteger.
+            if (!esquemaAusente(eOfCa)) throw eOfCa;
+          }
+          if (ofCa.length)
+            return res.status(409).json({ ok:false, error:'CARTA_CON_OFERTAS',
+              detalle:'La carta tiene ofertas abiertas o parciales: cancelalas antes de cambiar la familia' });
+        }
         if (!setsCa.length)
-          return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr o fusionable' });
+          return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, familia, subtipo, edicion, supply_max o precio_xp' });
         paramsCa.push(body.id);
         var updCa = await sql(
           'UPDATE cartas_catalogo SET ' + setsCa.join(', ') + ' WHERE id=$' + piCa
           + ' RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, '
-          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable',
+          + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, '
+          + 'familia, subtipo, edicion, supply_max, emitidas, precio_xp',
           paramsCa
         );
         if (!updCa.length) return res.status(404).json({ ok:false, error:'Carta no encontrada' });

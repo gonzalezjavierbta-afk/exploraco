@@ -142,10 +142,21 @@ check('X2: api/usuarios.js expone museo_cartas y no queda museo_publico',
   srcUsu.indexOf('museo_cartas') !== -1
   && contar(srcUsu, /museo_publico/g) === 0);
 
-// 7.3 PK con variante: ON CONFLICT migrado en interacciones
-check('X3: ON CONFLICT (usuario_id, carta_id, variante) >= 3 y el par viejo = 0',
-  contar(srcInt, /ON CONFLICT \(usuario_id, carta_id, variante\)/g) >= 3
-  && contar(srcInt, /ON CONFLICT \(usuario_id, carta_id\)/g) === 0);
+// 7.3 PK con variante: ON CONFLICT migrado en interacciones. Se cuenta POR
+// TABLA (usuarios_cartas, no usuarios_cartas_nivel): el bootstrap de nivel usa
+// PK de 2 columnas legitimamente y no es una regresion de la PK del inventario.
+var bloquesCc = srcInt.split(/INSERT INTO /).slice(1);
+var ccCartas = 0;
+var ccTres = 0;
+var ccDos = 0;
+bloquesCc.forEach(function (b) {
+  if (b.indexOf('usuarios_cartas (') !== 0) return;
+  ccCartas++;
+  if (/ON CONFLICT \(usuario_id, carta_id, variante\)/.test(b)) ccTres++;
+  if (/ON CONFLICT \(usuario_id, carta_id\)/.test(b)) ccDos++;
+});
+check('X3: ON CONFLICT (usuario_id, carta_id, variante) en cada upsert de usuarios_cartas y el par viejo = 0',
+  ccCartas >= 3 && ccTres === ccCartas && ccDos === 0);
 
 // 7.4 el album no duplica cartas: agrega por c.id
 check('X4: cartas_mias agrega por carta con COUNT(DISTINCT c.id)',

@@ -2571,6 +2571,49 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <textarea class="form-input" id="carta-stats" rows="2" placeholder="{}" style="width:100%;font-family:monospace;font-size:11px"></textarea>
         </div>
       </div>
+      <!-- ADR-121 (066/068/069): familia, subtipo, edicion, supply y precio.
+           El SERVIDOR es la autoridad (400 tipado FAMILIA_REQUERIDA /
+           SUBTIPO_REQUERIDO / SUPPLY_REQUERIDO / PRECIO_INCOHERENTE /
+           SKU_REQUERIDO / CARTA_CON_OFERTAS): aqui solo se pinta el dominio
+           cerrado de lib/cartas-config.js. emitidas NUNCA se manda: es del
+           servidor. -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)">
+        <div style="flex:0 0 140px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Familia</div>
+          <select class="form-input" id="carta-familia" style="width:100%" onchange="cartasPintarSubtipos('carta-familia','carta-subtipo','')">
+            <option value="">-- elige --</option>
+            <option value="lugar">lugar</option>
+            <option value="personaje">personaje</option>
+            <option value="artista">artista</option>
+            <option value="marca">marca</option>
+            <option value="producto">producto</option>
+            <option value="consumible">consumible</option>
+            <option value="cosmetica">cosmetica</option>
+          </select>
+        </div>
+        <div style="flex:0 0 140px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Subtipo</div>
+          <select class="form-input" id="carta-subtipo" style="width:100%">
+            <option value="">-- elige familia --</option>
+          </select>
+        </div>
+        <div style="flex:0 0 120px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Edicion</div>
+          <select class="form-input" id="carta-edicion" style="width:100%">
+            <option value="abierta" selected>abierta</option>
+            <option value="limitada">limitada</option>
+            <option value="serial">serial</option>
+          </select>
+        </div>
+        <div style="flex:0 0 120px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Supply max</div>
+          <input class="form-input" id="carta-supply" type="number" min="1" step="1" placeholder="limitada/serial" style="width:100%">
+        </div>
+        <div style="flex:0 0 120px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Precio XP</div>
+          <input class="form-input" id="carta-precio" type="number" min="0" step="0.01" placeholder="vacio = sin precio" style="width:100%">
+        </div>
+      </div>
       <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5">El ID es identidad (slug ASCII) y no se puede editar despues de crear. El nivel gate es opcional (vacio = carta sin gate).</div>
     </div>
 
@@ -2721,6 +2764,49 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <option value="1">Si</option>
             <option value="0">No</option>
           </select>
+        </div>
+      </div>
+      <!-- ADR-121: clasificacion y economia de la carta. emitidas es SOLO
+           LECTURA: lo escribe el servidor (inventario + escrow), jamas el body. -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1 1 130px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Familia</div>
+          <select class="form-input" id="carta-edit-familia" style="width:100%" onchange="cartasPintarSubtipos('carta-edit-familia','carta-edit-subtipo','')">
+            <option value="">-- elige --</option>
+            <option value="lugar">lugar</option>
+            <option value="personaje">personaje</option>
+            <option value="artista">artista</option>
+            <option value="marca">marca</option>
+            <option value="producto">producto</option>
+            <option value="consumible">consumible</option>
+            <option value="cosmetica">cosmetica</option>
+          </select>
+        </div>
+        <div style="flex:1 1 130px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Subtipo</div>
+          <select class="form-input" id="carta-edit-subtipo" style="width:100%">
+            <option value="">-- elige familia --</option>
+          </select>
+        </div>
+        <div style="flex:1 1 110px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Edicion</div>
+          <select class="form-input" id="carta-edit-edicion" style="width:100%">
+            <option value="abierta">abierta</option>
+            <option value="limitada">limitada</option>
+            <option value="serial">serial</option>
+          </select>
+        </div>
+        <div style="flex:1 1 110px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Supply max</div>
+          <input class="form-input" id="carta-edit-supply" type="number" min="1" step="1" placeholder="limitada/serial" style="width:100%">
+        </div>
+        <div style="flex:1 1 110px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Precio XP</div>
+          <input class="form-input" id="carta-edit-precio" type="number" min="0" step="0.01" placeholder="vacio = sin precio" style="width:100%">
+        </div>
+        <div style="flex:1 1 100px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Emitidas</div>
+          <input class="form-input" id="carta-edit-emitidas" type="text" readonly placeholder="0" style="width:100%;opacity:.7;cursor:not-allowed">
         </div>
       </div>
       <div style="font-size:11px;color:var(--muted);line-height:1.5">El ID es identidad y no se edita. Cero Borrado Logico: desactivar una carta no la borra del catalogo.</div>
@@ -11427,10 +11513,13 @@ function cargarSaludRed() {
         es_evento,imagen_url,activo,creado_en}] }
    POST cartas_crear  {id,nombre,set_slug,rareza,nivel_gate,es_evento,imagen_url,
         emisor_tipo:sistema|ugc|marca, emisor_id, marca_id, descripcion,
-        stats_json:{}, es_canjeable_qr, fusionable}
+        stats_json:{}, es_canjeable_qr, fusionable,
+        familia, subtipo, edicion, supply_max, precio_xp}
    POST cartas_editar {id, nombre|set_slug|rareza|nivel_gate|es_evento|imagen_url|
         emisor_tipo|emisor_id|marca_id|descripcion|stats_json|es_canjeable_qr|
-        fusionable}  (D-6 del ADR-108, migracion 060)
+        fusionable|familia|subtipo|edicion|supply_max|precio_xp}
+        (D-6 del ADR-108, migracion 060; ADR-121, migraciones 066/068/069)
+        emitidas NUNCA viaja en el body: es del servidor.
    POST cartas_toggle {id, activo?}
    El id es identidad (slug ASCII) y NO se edita. Cero Borrado Logico:
    toggle alterna activo. Degradacion 503 SCHEMA_NOT_MIGRATED si la 040 no
@@ -11486,6 +11575,79 @@ function cartaCamposD6(esModal) {
     es_canjeable_qr: (document.getElementById(p + 'qr') || {}).value === '1',
     fusionable: ((document.getElementById(p + 'fusion') || {}).value || '1') === '1'
   };
+}
+
+/* ADR-121 (migraciones 066/068/069): ESPEJO de lib/cartas-config.js solo para
+   pintar los selects. La autoridad es el SERVIDOR (400 tipado
+   FAMILIA_REQUERIDA / FAMILIA_INVALIDA / SUBTIPO_REQUERIDO / SUBTIPO_INVALIDO
+   / SUPPLY_REQUERIDO / SUPPLY_INCOHERENTE / PRECIO_INCOHERENTE /
+   SKU_REQUERIDO / CARTA_CON_OFERTAS): si una lista cambia alli y no aqui, el
+   alta falla con el codigo, nunca con un 500. Prefijo "carta" para evitar
+   colisiones (BUG-006/018/019). */
+var CARTAS_SUBTIPOS = {
+  lugar:      ['territorio', 'patrimonio', 'natural'],
+  personaje:  ['historico', 'ficcion', 'folclor'],
+  artista:    ['musica', 'cine', 'grafica', 'literatura'],
+  marca:      ['licor', 'gastronomia', 'artesania', 'otra'],
+  producto:   ['fisico', 'digital'],
+  consumible: ['entrada_evento', 'bono', 'servicio'],
+  cosmetica:  ['marco', 'fondo', 'insignia']
+};
+function cartasPintarSubtipos(idFamilia, idSubtipo, valor) {
+  var fam = (document.getElementById(idFamilia) || {}).value || '';
+  var sel = document.getElementById(idSubtipo);
+  if (!sel) return;
+  var subs = CARTAS_SUBTIPOS[fam] || [];
+  var html = '';
+  var i;
+  if (!subs.length) {
+    html = '<option value="">-- elige familia --</option>';
+  } else {
+    for (i = 0; i < subs.length; i++) {
+      html += '<option value="' + subs[i] + '"'
+        + (subs[i] === valor ? ' selected' : '') + '>' + subs[i] + '</option>';
+    }
+  }
+  sel.innerHTML = html;
+}
+/* Lee los cinco campos de clasificacion/economia del formulario (crear) o del
+   modal (editar). Devuelve { ok:false, motivo } si un numero no es valido:
+   NaN se serializaria como null en JSON.stringify y el error viajaria en
+   silencio, asi que se corta aqui. emitidas NO viaja nunca. */
+function cartaCamposFamilia(esModal) {
+  var p = esModal ? 'carta-edit-' : 'carta-';
+  var fam = String((document.getElementById(p + 'familia') || {}).value || '').trim();
+  var sub = String((document.getElementById(p + 'subtipo') || {}).value || '').trim();
+  var edi = String((document.getElementById(p + 'edicion') || {}).value || 'abierta').trim();
+  var supRaw = String((document.getElementById(p + 'supply') || {}).value || '').trim();
+  var preRaw = String((document.getElementById(p + 'precio') || {}).value || '').trim();
+  var out = {
+    ok: true, motivo: '',
+    familia: fam ? fam : null,
+    subtipo: sub ? sub : null,
+    edicion: edi ? edi : 'abierta',
+    supply_max: null,
+    precio_xp: null
+  };
+  if (supRaw !== '') {
+    var s = Number(supRaw);
+    if (!isFinite(s) || s !== Math.floor(s) || s <= 0) {
+      out.ok = false;
+      out.motivo = 'Supply max debe ser un entero mayor que 0 (o vacio en edicion abierta)';
+      return out;
+    }
+    out.supply_max = s;
+  }
+  if (preRaw !== '') {
+    var pr = Number(preRaw);
+    if (!isFinite(pr) || pr < 0) {
+      out.ok = false;
+      out.motivo = 'Precio XP debe ser numerico >= 0 (o vacio)';
+      return out;
+    }
+    out.precio_xp = (pr === 0) ? null : Math.round(pr * 100) / 100;
+  }
+  return out;
 }
 
 async function loadCartas() {
@@ -11994,6 +12156,8 @@ async function crearCarta() {
   try { statsCa = cartaLeerStats('carta-stats'); }
   catch (eS) { showAdminToast('stats_json invalido: ' + eS.message, 'error'); return; }
   var d6Ca = cartaCamposD6(false);
+  var famCa = cartaCamposFamilia(false);
+  if (!famCa.ok) { showAdminToast(famCa.motivo, 'error'); return; }
   try {
     var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_crear', {
       method: 'POST',
@@ -12002,7 +12166,9 @@ async function crearCarta() {
         nivel_gate: nivel_gate, es_evento: es_evento, imagen_url: imagen_url,
         emisor_tipo: d6Ca.emisor_tipo, emisor_id: d6Ca.emisor_id, marca_id: d6Ca.marca_id,
         descripcion: d6Ca.descripcion, stats_json: statsCa,
-        es_canjeable_qr: d6Ca.es_canjeable_qr, fusionable: d6Ca.fusionable })
+        es_canjeable_qr: d6Ca.es_canjeable_qr, fusionable: d6Ca.fusionable,
+        familia: famCa.familia, subtipo: famCa.subtipo, edicion: famCa.edicion,
+        supply_max: famCa.supply_max, precio_xp: famCa.precio_xp })
     });
     var data = await resp.json();
     if (!data.ok) throw new Error(data.detalle || data.error || 'No se pudo crear');
@@ -12018,6 +12184,11 @@ async function crearCarta() {
     cartaSetValor('carta-stats', '');
     cartaSetValor('carta-qr', '0');
     cartaSetValor('carta-fusion', '1');
+    cartaSetValor('carta-familia', '');
+    cartasPintarSubtipos('carta-familia', 'carta-subtipo', '');
+    cartaSetValor('carta-edicion', 'abierta');
+    cartaSetValor('carta-supply', '');
+    cartaSetValor('carta-precio', '');
     if (data.activo === false || data.motivo === 'SIN_DISENO') {
       showAdminToast('Carta creada FUERA DE JUEGO: sube el diseno para activarla', 'success');
     } else {
@@ -12047,6 +12218,13 @@ function abrirEditarCarta(id) {
   cartaSetValor('carta-edit-stats', (c.stats_json && Object.keys(c.stats_json).length) ? JSON.stringify(c.stats_json) : '');
   cartaSetValor('carta-edit-qr', c.es_canjeable_qr ? '1' : '0');
   cartaSetValor('carta-edit-fusion', (c.fusionable === false) ? '0' : '1');
+  cartaSetValor('carta-edit-familia', c.familia || '');
+  cartasPintarSubtipos('carta-edit-familia', 'carta-edit-subtipo', c.subtipo || '');
+  cartaSetValor('carta-edit-edicion', c.edicion || 'abierta');
+  cartaSetValor('carta-edit-supply', (c.supply_max == null) ? '' : c.supply_max);
+  cartaSetValor('carta-edit-precio', (c.precio_xp == null) ? '' : c.precio_xp);
+  // Solo lectura: el servidor escribe emitidas (inventario + escrow).
+  cartaSetValor('carta-edit-emitidas', (c.emitidas == null) ? '0' : c.emitidas);
   document.getElementById('carta-modal').style.display = 'flex';
 }
 
@@ -12075,6 +12253,8 @@ async function guardarEdicionCarta() {
   try { statsECa = cartaLeerStats('carta-edit-stats'); }
   catch (eSE) { showAdminToast('stats_json invalido: ' + eSE.message, 'error'); return; }
   var d6ECa = cartaCamposD6(true);
+  var famECa = cartaCamposFamilia(true);
+  if (!famECa.ok) { showAdminToast(famECa.motivo, 'error'); return; }
   try {
     var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_editar', {
       method: 'POST',
@@ -12083,7 +12263,9 @@ async function guardarEdicionCarta() {
         nivel_gate: nivel_gate, es_evento: es_evento, imagen_url: imagen_url,
         emisor_tipo: d6ECa.emisor_tipo, emisor_id: d6ECa.emisor_id, marca_id: d6ECa.marca_id,
         descripcion: d6ECa.descripcion, stats_json: statsECa,
-        es_canjeable_qr: d6ECa.es_canjeable_qr, fusionable: d6ECa.fusionable })
+        es_canjeable_qr: d6ECa.es_canjeable_qr, fusionable: d6ECa.fusionable,
+        familia: famECa.familia, subtipo: famECa.subtipo, edicion: famECa.edicion,
+        supply_max: famECa.supply_max, precio_xp: famECa.precio_xp })
     });
     var data = await resp.json();
     if (!data.ok) throw new Error(data.detalle || data.error || 'No se pudo actualizar');
