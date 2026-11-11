@@ -492,6 +492,17 @@
 
 .c-ficha .c-ficha-tags > * { max-width: 100%; }
 
+/* Subtipo del contrato 066: texto pequeno, sin pildora (no es un chip). */
+.c-ficha .c-ficha-sub {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: #8C939B;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
 /* Chip: pildora dorada translucida, texto corto y sin desbordar. */
 .c-ficha .c-ficha-tag {
   display: inline-flex;
@@ -595,6 +606,335 @@
 .c-ficha .c-ficha-cerrar:hover {
   background: #C9A227;
   color: #14171A;
+}
+
+/* =====================================================================
+   METADATOS 066 -- familia / subtipo / poder / nivel (ADR-121)
+   Los pinta CartasUI.cardMeta() en la rejilla y CartasUI.abrirFicha() en
+   el detalle. El COLOR por capa vive en un punto y en el filo del chip,
+   nunca en la tipografia: asi el texto hereda el contraste del contexto
+   (rejilla clara del perfil y ficha oscura) sin duplicar reglas.
+   Todo cuelga de .cartas-silo o de .c-ficha (ADR-004).
+   ===================================================================== */
+.cartas-silo .c-meta,
+.c-ficha .c-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: 4px 0 0;
+  max-width: 100%;
+}
+
+/* --- Chip de familia: la CAPA da el color --------------------------- */
+.cartas-silo .c-chip,
+.c-ficha .c-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .4em;
+  padding: .1em .5em .1em .42em;
+  border: 1px solid var(--c-capa-filo, rgba(15, 20, 25, .18));
+  border-radius: 999px;
+  background: var(--c-capa-fondo, rgba(15, 20, 25, .06));
+  color: inherit;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .7rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* El punto es la unica superficie que lleva el tono saturado. */
+.cartas-silo .c-chip::before,
+.c-ficha .c-chip::before {
+  content: '';
+  width: .45em;
+  height: .45em;
+  border-radius: 50%;
+  background: var(--c-capa-punto, #6B7280);
+  flex: 0 0 auto;
+}
+
+/* Capa juego: jade. Capa economia: ambar. Capa estatus: violeta. */
+.cartas-silo .c-chip--juego,
+.c-ficha .c-chip--juego {
+  --c-capa-punto: #2E9E77;
+  --c-capa-filo: rgba(46, 158, 119, .45);
+  --c-capa-fondo: rgba(46, 158, 119, .12);
+}
+
+.cartas-silo .c-chip--economia,
+.c-ficha .c-chip--economia {
+  --c-capa-punto: #B8791F;
+  --c-capa-filo: rgba(184, 121, 31, .45);
+  --c-capa-fondo: rgba(184, 121, 31, .12);
+}
+
+.cartas-silo .c-chip--estatus,
+.c-ficha .c-chip--estatus {
+  --c-capa-punto: #7B5BD6;
+  --c-capa-filo: rgba(123, 91, 214, .45);
+  --c-capa-fondo: rgba(123, 91, 214, .12);
+}
+
+/* Sobre la ficha (fondo carbon) el tono sube de luz para no apagarse. */
+.c-ficha .c-chip--juego { --c-capa-punto: #5FD3A8; }
+.c-ficha .c-chip--economia { --c-capa-punto: #E8B15A; }
+.c-ficha .c-chip--estatus { --c-capa-punto: #B99CFF; }
+
+.cartas-silo .c-meta-sub,
+.c-ficha .c-meta-sub {
+  font-size: .7rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: .04em;
+  text-transform: lowercase;
+  opacity: .72;
+  white-space: nowrap;
+}
+
+.cartas-silo .c-meta-poder,
+.c-ficha .c-meta-poder {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: .9;
+}
+
+.cartas-silo .c-meta-poder b,
+.c-ficha .c-meta-poder b {
+  font-size: .95rem;
+  font-weight: 700;
+}
+
+.cartas-silo .c-meta-nivel,
+.c-ficha .c-meta-nivel {
+  padding: .05em .45em;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .7rem;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: .06em;
+  opacity: .8;
+  white-space: nowrap;
+}
+
+/* =====================================================================
+   DETALLE 066 EN LA FICHA -- poder/nivel, vector, tirada, valor, subida
+   ===================================================================== */
+.c-ficha .c-ficha-pn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 14px;
+  margin: 2px 0 6px;
+}
+
+/* El poder es el numero que manda: grande, condensado, en dorado. */
+.c-ficha .c-pn-poder {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #C9A227;
+}
+
+.c-ficha .c-pn-poder b {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #E8C766;
+}
+
+.c-ficha .c-pn-nivel {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #A3AAB2;
+}
+
+.c-ficha .c-pn-nivel b {
+  font-size: 18px;
+  color: #F6F2E8;
+}
+
+/* --- Vector: barras finas, cero librerias --------------------------- */
+.c-ficha .c-det {
+  padding: 10px 12px;
+  border: 1px solid #2A2E33;
+  border-radius: 8px;
+  background: #1A1E22;
+}
+
+.c-ficha .c-det-t {
+  margin: 0 0 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #C9A227;
+}
+
+.c-ficha .c-eje {
+  display: grid;
+  grid-template-columns: minmax(96px, 42%) 1fr 32px;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 5px;
+}
+
+.c-ficha .c-eje:last-of-type { margin-bottom: 0; }
+
+.c-ficha .c-eje-l {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #D6D1C4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.c-ficha .c-eje-bar {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: #2A2E33;
+  overflow: hidden;
+}
+
+.c-ficha .c-eje-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #C9A227;
+}
+
+.c-ficha .c-eje-n {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  color: #F6F2E8;
+}
+
+/* Eje primario: barra dorada viva. */
+.c-ficha .c-eje .c-eje-l .c-eje-p {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(232, 199, 102, .16);
+  color: #E8C766;
+  font-size: 9px;
+  letter-spacing: .1em;
+}
+
+/* Presencia: violeta y marcada como cosmetica (no da poder). */
+.c-ficha .c-eje--cosm .c-eje-bar i { background: #7B5BD6; }
+
+.c-ficha .c-eje--cosm .c-eje-l .c-eje-cosm {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(123, 91, 214, .18);
+  color: #B99CFF;
+  font-size: 9px;
+  letter-spacing: .1em;
+}
+
+.c-ficha .c-det-pie {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #8C939B;
+}
+
+.c-ficha .c-det-datos {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #A3AAB2;
+}
+
+.c-ficha .c-det-datos li { margin: 0 0 3px; }
+.c-ficha .c-det-datos li:last-child { margin-bottom: 0; }
+
+/* --- Subida de nivel: un boton, un estado, un mensaje --------------- */
+.c-ficha .c-nivel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.c-ficha .c-subir {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 40px;
+  padding: 9px 16px;
+  border: 1px solid rgba(232, 199, 102, .5);
+  border-radius: 8px;
+  background: rgba(232, 199, 102, .12);
+  color: #E8C766;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+
+.c-ficha .c-subir:hover:not(:disabled) {
+  background: rgba(232, 199, 102, .2);
+  border-color: #E8C766;
+}
+
+.c-ficha .c-subir:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.c-ficha .c-subir .c-subir-xp {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  opacity: .85;
+}
+
+.c-ficha .c-nivel-msg {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #A3AAB2;
+}
+
+.c-ficha .c-nivel-msg.is-error { color: #FF9B8A; }
+
+.c-ficha .c-subir:focus-visible {
+  outline: 2px solid #E8C766;
+  outline-offset: 2px;
+}
+
+/* Accesibilidad: sin transiciones si se pide calma. */
+@media (prefers-reduced-motion: reduce) {
+  .c-ficha .c-subir { transition: none; }
 }
 
 /* --- Foco visible dorado en todos los controles -------------------- */

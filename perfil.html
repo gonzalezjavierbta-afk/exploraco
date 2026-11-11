@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=Outfit:wght@400;500;600;700&family=Geist:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="cartas-ui.css?v=2"/>
+<link rel="stylesheet" href="cartas-ui.css?v=3"/>
 <style>
 /* ============================================================
    perfil.html - Museo publico de viajero (ADR-028, WP-3)
@@ -348,7 +348,7 @@ body{background:#E5E7EB}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="usuario-session.js"></script>
-<script src="cartas-ui.js?v=2"></script>
+<script src="cartas-ui.js?v=3"></script>
 <script src="cartas-arte.js"></script>
 <script>
 /* ============================================================
@@ -1011,6 +1011,9 @@ body{background:#E5E7EB}
     var rKey = String((c && c.rareza) || '').toLowerCase();
     var rLabel = (rKey && dic[rKey] && dic[rKey].label) ? String(dic[rKey].label) : rKey;
     var stats = typeof UI.statsTexto === 'function' ? UI.statsTexto(c && c.stats_json) : '';
+    /* 066: familia/subtipo/poder/nivel de la vitrina publica. Cadena vacia si
+       el backend no manda los campos nuevos (degradacion total, ADR-008). */
+    var meta = typeof UI.cardMeta === 'function' ? UI.cardMeta(c) : '';
     var desc = pfRecorte(c && c.descripcion, 110);
     /* Hueco de arte compartido con el inventario (cartas-arte.js). Sin lamina
        o sin el modulo cargado se pinta la ficha de siempre: degradacion total. */
@@ -1047,6 +1050,7 @@ body{background:#E5E7EB}
       + (conArte ? '' : (rLabel ? '<div class="pf-trofeo-tier">' + e2(rLabel) + '</div>' : ''))
       + '<div class="pf-trofeo-meta">' + badge
       +   ((stats && !conArte) ? '<span>' + pfIcon('chart') + ' ' + e2(stats) + '</span>' : '') + '</div>'
+      + meta
       + (desc ? '<p class="pf-trofeo-date" style="margin:0;line-height:1.45">' + e2(desc) + '</p>' : '')
       + '</article>';
   }

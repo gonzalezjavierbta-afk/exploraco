@@ -222,6 +222,8 @@
 
   /* Listeners vivos de la ficha (uno solo a la vez, nunca huerfanos). */
   var fichaListeners = null;
+  /* Callback de la pagina tras subir nivel (repintado sin recargar). */
+  var fichaOnNivel = null;
   /* Elemento disparador al que se devuelve el foco al cerrar. */
   var fichaFocoPrev = null;
   /* Valor previo de body.overflow, para no pisarlo al cerrar. */
@@ -258,12 +260,33 @@
     return obj;
   }
 
+  /* Numero seguro: helper unico del fichero. Devuelve 'def' cuando el dato no
+     es numerico, asi que jamas se pinta NaN, Infinity ni undefined. */
+  function safeNum(v, def) {
+    if (v === null || v === undefined || v === '' || typeof v === 'boolean') return def;
+    var n = Number(v);
+    if (!isFinite(n)) return def;
+    return n;
+  }
+
   /* Entero seguro, o null si el dato no es numerico. */
   function fichaEntero(v) {
-    if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
-    var n = Number(v);
-    if (!isFinite(n)) return null;
-    return n;
+    return safeNum(v, null);
+  }
+
+  /* Separador de miles con punto (es-CO) y sin decimales. ASCII puro. */
+  function miles(v) {
+    var n = safeNum(v, null);
+    if (n === null) return '';
+    var ent = Math.round(n);
+    var s = String(Math.abs(ent));
+    var out = '';
+    var i = s.length;
+    while (i > 3) {
+      out = '.' + s.slice(i - 3, i) + out;
+      i -= 3;
+    }
+    return (ent < 0 ? '-' : '') + s.slice(0, i) + out;
   }
 
   /* Booleano tolerante: jsonb puede traer true, 1 o "true". */
@@ -289,6 +312,108 @@
   function fichaVarianteLabel(variante) {
     var v = VARIANTES[fichaTexto(variante).toLowerCase()];
     return v ? v.label : '';
+  }
+
+  /* ==================================================================
+     TAXONOMIA Y METADATOS NUEVOS (066 / ADR-121)
+     ------------------------------------------------------------------
+     familia, subtipo, edicion, supply_max, emitidas, precio_xp,
+     stats, nivel y poder YA viajan en cartas_mias y museo_cartas.
+     Aqui solo se PINTAN: cero calculo de poder en cliente (el servidor manda
+     poder ya derivado) y cero claves inventadas. Si un campo no llega, no
+     se pinta NADA: la carta se ve exactamente como antes de la 066.
+     La capa NO se persiste: se deriva de la familia (spec 2.1).
+     ================================================================== */
+  var FAMILIAS = {
+    lugar: { label: 'Lugar', capa: 'juego' },
+    personaje: { label: 'Personaje', capa: 'juego' },
+    artista: { label: 'Artista', capa: 'juego' },
+    marca: { label: 'Marca', capa: 'juego' },
+    producto: { label: 'Producto', capa: 'economia' },
+    consumible: { label: 'Consumible', capa: 'economia' },
+    cosmetica: { label: 'Cosmetica', capa: 'estatus' }
+  };
+  var CAPAS = { juego: 'Juego', economia: 'Economia', estatus: 'Estatus' };
+
+  /* Orden EXACTO de CARTA_EJES_STATS. 'presencia' es estatus puro: se pinta
+     marcada como cosmetica y NUNCA entra en poder (peso 0 en el servidor). */
+  var EJES = [
+    { k: 'alcance', l: 'Alcance' },
+    { k: 'oficio', l: 'Oficio' },
+    { k: 'fortuna', l: 'Fortuna' },
+    { k: 'rendimiento', l: 'Rendimiento' },
+    { k: 'presencia', l: 'Presencia', cosmetica: 1 }
+  ];
+  var STATS_TOPE = 40;
+  var NIVEL_TOPE = 5;
+
+  function familiaDe(carta) {
+    var k = fichaTexto(carta && carta.familia).toLowerCase();
+    if (!k || !Object.prototype.hasOwnProperty.call(FAMILIAS, k)) return '';
+    return k;
+  }
+
+  /* Vector normalizado del contrato (spec 3.3). null cuando la carta NO trae
+     el objeto stats (dato viejo): entonces no hay bloque que pintar. */
+  function vectorStats(carta) {
+    var src = carta && carta.stats;
+    if (!src || typeof src !== 'object'
+        || Object.prototype.toString.call(src) === '[object Array]') return null;
+    var out = { valores: [], suma: 0, primario: '' };
+    out.primario = fichaTexto(src.primario).toLowerCase();
+    for (var i = 0; i < EJES.length; i++) {
+      var n = safeNum(src[EJES[i].k], 0);
+      if (n < 0) n = 0;
+      if (n > STATS_TOPE) n = STATS_TOPE;
+      out.valores.push(n);
+      if (!EJES[i].cosmetica) out.suma += n;
+    }
+    return out;
+  }
+
+  /* Chip de familia con color por CAPA (juego / economia / estatus). */
+  function chipFamilia(carta) {
+    var k = familiaDe(carta);
+    if (!k) return '';
+    var f = FAMILIAS[k];
+    return '<span class="c-chip c-chip--' + f.capa + '" title="Capa ' + CAPAS[f.capa] + '">'
+      + esc(f.label) + '</span>';
+  }
+
+  /* Metadatos de carta para la REJILLA (coleccion y museo). Cadena vacia si
+     no hay ningun campo nuevo: el markup de la carta no cambia ni un byte. */
+  function cardMeta(carta) {
+    if (!carta || typeof carta !== 'object') return '';
+    var partes = chipFamilia(carta);
+    var sub = fichaTexto(carta.subtipo).toLowerCase();
+    if (sub) partes += '<span class="c-meta-sub">' + esc(sub) + '</span>';
+    var poder = safeNum(carta.poder, null);
+    if (poder !== null) {
+      partes += '<span class="c-meta-poder" title="Poder de la carta">'
+        + '<b>' + esc(miles(poder)) + '</b> poder</span>';
+    }
+    var nivel = safeNum(carta.nivel, null);
+    if (nivel !== null && nivel >= 1) {
+      partes += '<span class="c-meta-nivel" title="Nivel de la carta">'
+        + esc(nivel) + '/' + NIVEL_TOPE + '</span>';
+    }
+    return partes ? '<div class="c-meta">' + partes + '</div>' : '';
+  }
+
+  /* Poder y nivel destacados dentro de la ficha. Solo si el servidor los mando. */
+  function fichaPoderNivel(carta) {
+    var poder = safeNum(carta.poder, null);
+    var nivel = safeNum(carta.nivel, null);
+    var conNivel = nivel !== null && nivel >= 1;
+    if (poder === null && !conNivel) return '';
+    var out = '<div class="c-ficha-pn">';
+    if (poder !== null) {
+      out += '<span class="c-pn-poder"><b>' + esc(miles(poder)) + '</b> poder</span>';
+    }
+    if (conNivel) {
+      out += '<span class="c-pn-nivel">Nivel <b>' + esc(nivel) + '</b>/' + NIVEL_TOPE + '</span>';
+    }
+    return out + '</div>';
   }
 
   /* Como se obtiene la carta: dato de stats si existe, si no el emisor. */
@@ -328,6 +453,245 @@
     return out;
   }
 
+  /* --- Vector de stats: 4 ejes jugables + presencia cosmetica --------- */
+  function fichaEjes(vec) {
+    if (!vec) return '';
+    var filas = '';
+    for (var i = 0; i < EJES.length; i++) {
+      var v = vec.valores[i];
+      var esPrim = !!(vec.primario && vec.primario === EJES[i].k);
+      var pct = Math.round((v / STATS_TOPE) * 100);
+      if (pct < 0) pct = 0;
+      if (pct > 100) pct = 100;
+      filas += '<div class="c-eje' + (EJES[i].cosmetica ? ' c-eje--cosm' : '') + '">'
+        + '<span class="c-eje-l">' + esc(EJES[i].l)
+        + (esPrim ? ' <span class="c-eje-p">primario</span>' : '')
+        + (EJES[i].cosmetica ? ' <span class="c-eje-cosm">estetica</span>' : '')
+        + '</span>'
+        + '<span class="c-eje-bar" aria-hidden="true"><i style="width:' + pct + '%"></i></span>'
+        + '<span class="c-eje-n">' + esc(v) + '</span>'
+        + '</div>';
+    }
+    return '<div class="c-det">'
+      + '<div class="c-det-t">Vector</div>'
+      + filas
+      + '<div class="c-det-pie">Poder = alcance + oficio + fortuna + rendimiento. '
+      + 'La presencia es estatus: no da poder ni XP.</div>'
+      + '</div>';
+  }
+
+  /* --- Tirada y valor de acunacion (spec 4.1) ------------------------ */
+  function fichaTirada(carta) {
+    var ed = fichaTexto(carta.edicion).toLowerCase();
+    var supply = safeNum(carta.supply_max, null);
+    var emitidas = safeNum(carta.emitidas, null);
+    /* Sin NINGUN campo de tirada (dato pre 066) no se pinta nada: "tirada
+       abierta" solo se afirma cuando el backend lo dijo, nunca por ausencia. */
+    if (!ed && supply === null && emitidas === null) return '';
+    if (ed === 'abierta' && supply === null && emitidas === null) return 'Tirada abierta';
+    var partes = [];
+    if (ed) partes.push('Edicion ' + ed);
+    if (supply !== null) {
+      partes.push(emitidas !== null
+        ? 'tirada ' + miles(emitidas) + ' / ' + miles(supply)
+        : 'tirada maxima ' + miles(supply));
+    } else if (emitidas !== null) {
+      partes.push('emitidas ' + miles(emitidas));
+    } else if (!ed) {
+      partes.push('tirada abierta');
+    }
+    return partes.join(' - ');
+  }
+
+  function fichaPrecio(carta) {
+    var p = safeNum(carta.precio_xp, null);
+    if (p === null || p <= 0) return '';
+    return 'Acunacion: ' + miles(p) + ' XP';
+  }
+
+  /* Bloque completo de detalle. Devuelve '' si no hay NADA nuevo que decir. */
+  function fichaDetalle(carta) {
+    var vec = vectorStats(carta);
+    var ejeHtml = (vec && (vec.suma > 0 || vec.primario)) ? fichaEjes(vec) : '';
+    var lineas = [];
+    var tirada = fichaTirada(carta);
+    if (tirada) lineas.push(tirada);
+    var precio = fichaPrecio(carta);
+    if (precio) lineas.push(precio);
+    var datosHtml = '';
+    if (lineas.length) {
+      var lis = [];
+      for (var i = 0; i < lineas.length; i++) lis.push('<li>' + esc(lineas[i]) + '</li>');
+      datosHtml = '<ul class="c-det-datos">' + lis.join('') + '</ul>';
+    }
+    if (!ejeHtml && !datosHtml) return '';
+    return '<div class="c-ficha-det">' + ejeHtml + datosHtml + '</div>';
+  }
+
+  /* --- Subida de nivel (spec 4.9, handler YA existente) -------------- */
+  /* Variante de posesion: la de la carta, o la primera poseida, o base. */
+  function varianteDeCarta(carta) {
+    var v = fichaTexto(carta && carta.variante).toLowerCase();
+    if (VARIANTES[v]) return v;
+    var arr = carta ? carta.variantes : null;
+    if (Object.prototype.toString.call(arr) === '[object Array]') {
+      for (var i = 0; i < arr.length; i++) {
+        var it = arr[i];
+        if (!it || it.activa !== true) continue;
+        if (safeNum(it.cantidad, 0) < 1) continue;
+        var k = fichaTexto(it.variante).toLowerCase();
+        if (VARIANTES[k]) return k;
+      }
+    }
+    return 'base';
+  }
+
+  function fichaSubirNivel(carta, contexto, variante) {
+    if (contexto !== 'coleccion' && contexto !== 'album') return '';
+    var id = fichaTexto(fichaCampo(carta, ['id', 'carta_id']));
+    if (!id) return '';
+    var nivel = safeNum(carta.nivel, null);
+    if (nivel === null || nivel < 1 || nivel >= NIVEL_TOPE) return '';
+    /* El coste lo manda el servidor (costeSubidaNivel). Si no llega, no se
+       inventa: sin coste no hay boton. */
+    var coste = safeNum(carta.coste_nivel_xp, null);
+    if (coste === null || coste <= 0) return '';
+    return '<div class="c-nivel">'
+      + '<button type="button" class="c-subir" data-c-subir-nivel="1"'
+      + ' data-carta-id="' + esc(id) + '" data-variante="' + esc(variante) + '"'
+      + ' data-nivel="' + esc(nivel) + '">Subir a nivel ' + esc(nivel + 1)
+      + '<span class="c-subir-xp">' + esc(miles(coste)) + ' XP</span></button>'
+      + '<span class="c-nivel-msg" role="status" aria-live="polite"></span>'
+      + '</div>';
+  }
+
+  /* --- POST de subida de nivel: NUNCA rechaza, siempre resuelve -------- */
+  var NIVEL_ERRORES = {
+    PUNTOS_INSUFICIENTES: 'XP insuficiente para subir el nivel.',
+    NIVEL_MAX: 'Esta carta ya esta en el nivel maximo.',
+    NIVEL_DESACTUALIZADO: 'El nivel cambio en otra pestana. Vuelve a abrir la ficha.',
+    CARTA_NO_ENCONTRADA: 'La carta ya no esta en el catalogo.',
+    NO_POSEE: 'Necesitas una copia activa de esta carta.',
+    SESION_REQUERIDA: 'Inicia sesion para subir el nivel.',
+    SCHEMA_NOT_MIGRATED: 'El nivel de carta aun no esta disponible.',
+    CONEXION: 'Sin conexion. Intenta de nuevo.',
+    SERVIDOR: 'No se pudo subir el nivel. Intenta de nuevo.'
+  };
+
+  /* JWT de la sesion, con el mismo contrato que el resto del sitio. */
+  function cabecerasPost() {
+    var h = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    var E = w.ExploraCO;
+    if (E && typeof E.authHeaders === 'function') {
+      try {
+        var a = E.authHeaders() || {};
+        for (var k in a) {
+          if (Object.prototype.hasOwnProperty.call(a, k)) h[k] = a[k];
+        }
+      } catch (eAuth) {}
+    }
+    return h;
+  }
+
+  function leerCuerpo(res) {
+    try {
+      return Promise.resolve(res && res.json ? res.json() : null);
+    } catch (eJson) {
+      return Promise.resolve(null);
+    }
+  }
+
+  /* POST /api/interacciones?tipo=carta_subir_nivel (handler ya desplegado).
+     Resuelve {ok:true, data} o {ok:false, error, mensaje}. */
+  function subirNivelCarta(cartaId, variante, nivelEsperado) {
+    var cuerpo = { carta_id: String(cartaId), variante: String(variante || 'base') };
+    var esp = safeNum(nivelEsperado, null);
+    if (esp !== null) cuerpo.nivel_esperado = esp;
+    return Promise.resolve().then(function () {
+      return fetch('/api/interacciones?tipo=carta_subir_nivel', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: cabecerasPost(),
+        body: JSON.stringify(cuerpo)
+      });
+    }).then(function (res) {
+      var st = res && res.status ? Number(res.status) : 0;
+      return leerCuerpo(res).then(function (j) {
+        if (j && j.ok === true && j.data) return { ok: true, data: j.data };
+        var code = j && j.error ? String(j.error) : '';
+        if (!code) code = (st === 402) ? 'PUNTOS_INSUFICIENTES' : 'SERVIDOR';
+        var msg = NIVEL_ERRORES[code] || NIVEL_ERRORES.SERVIDOR;
+        if (code === 'PUNTOS_INSUFICIENTES') {
+          var coste = safeNum(j && j.coste_xp, null);
+          var disp = safeNum(j && j.xp_disponible, null);
+          if (coste !== null && disp !== null) {
+            msg = 'Necesitas ' + miles(coste) + ' XP y tienes ' + miles(disp) + '.';
+          }
+        }
+        return { ok: false, error: code, mensaje: msg };
+      }, function () {
+        return { ok: false, error: 'SERVIDOR', mensaje: NIVEL_ERRORES.SERVIDOR };
+      });
+    }, function () {
+      return { ok: false, error: 'CONEXION', mensaje: NIVEL_ERRORES.CONEXION };
+    });
+  }
+
+  /* Handler del boton de la ficha. Un solo vuelo por boton (disabled). */
+  function subirNivelDesdeBoton(btn) {
+    if (!btn || btn.disabled) return;
+    var cartaId = fichaTexto(btn.getAttribute('data-carta-id'));
+    var variante = fichaTexto(btn.getAttribute('data-variante')) || 'base';
+    var nivel = safeNum(btn.getAttribute('data-nivel'), null);
+    if (!cartaId || nivel === null) return;
+    var caja = btn.parentNode;
+    var msg = caja && caja.querySelector ? caja.querySelector('.c-nivel-msg') : null;
+    var htmlPrevio = btn.innerHTML;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    if (msg) {
+      msg.textContent = 'Subiendo nivel...';
+      if (msg.classList) msg.classList.remove('is-error');
+    }
+    subirNivelCarta(cartaId, variante, nivel).then(function (res) {
+      if (!res || res.ok !== true) {
+        if (msg) {
+          msg.textContent = (res && res.mensaje) || NIVEL_ERRORES.SERVIDOR;
+          if (msg.classList) msg.classList.add('is-error');
+        }
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+        btn.innerHTML = htmlPrevio;
+        return;
+      }
+      var data = res.data || {};
+      var nuevo = safeNum(data.nivel, nivel + 1);
+      if (msg) {
+        msg.textContent = 'Nivel ' + nuevo + ' alcanzado.';
+        if (msg.classList) msg.classList.remove('is-error');
+      }
+      btn.innerHTML = 'Nivel ' + esc(nuevo) + ' de ' + NIVEL_TOPE;
+      var nodoNivel = fichaHost();
+      var pn = nodoNivel && nodoNivel.querySelector ? nodoNivel.querySelector('.c-pn-nivel') : null;
+      if (pn) pn.innerHTML = 'Nivel <b>' + esc(nuevo) + '</b>/' + NIVEL_TOPE;
+      /* El poder lo DERIVA el servidor: se avisa a la pagina para que repinte
+         desde cartas_mias. Aqui no se reimplementa la suma (una sola fuente). */
+      var detalle = { carta_id: cartaId, variante: variante, nivel: nuevo };
+      var cb = fichaOnNivel;
+      if (typeof document !== 'undefined' && document.dispatchEvent && w.CustomEvent) {
+        try {
+          document.dispatchEvent(new w.CustomEvent('cartas:nivel', { detail: detalle }));
+        } catch (eEv) {}
+      }
+      if (typeof cb === 'function') {
+        try {
+          cb(detalle);
+        } catch (eCb) {}
+        cerrarFicha();
+      }
+    });
+  }
+
   /* Lamina: delega en CartasArte.slotHtml y NUNCA deja la ficha rota. */
   function fichaArte(clave, imagenUrl, marca, nombre) {
     var CA = w.CartasArte;
@@ -362,6 +726,10 @@
 
     /* --- Identidad: una linea de lectura ---------------------------- */
     var tags = [];
+    var chipFam = chipFamilia(carta);
+    if (chipFam) tags.push(chipFam);
+    var subTipo = fichaTexto(carta.subtipo).toLowerCase();
+    if (subTipo) tags.push('<span class="c-ficha-sub">' + esc(subTipo) + '</span>');
     var rl = fichaRarezaLabel(rareza);
     if (rl) tags.push('<span class="c-ficha-tag">' + esc(rl) + '</span>');
     var vl = fichaVarianteLabel(variante);
@@ -420,6 +788,13 @@
     var arte = fichaArte(id, imagenUrl, marca, nombre);
     if (!arte) arte = '<div class="c-ficha-arte-hueco" aria-hidden="true"></div>';
 
+    /* --- 066: poder/nivel, vector+tirada+valor y subida de nivel ------ */
+    var bloquePn = fichaPoderNivel(carta);
+    var bloqueDet = fichaDetalle(carta);
+    var varianteNivel = fichaTexto(opciones.variante).toLowerCase()
+      || varianteDeCarta(carta);
+    var bloqueNivel = fichaSubirNivel(carta, contexto, varianteNivel);
+
     return '<div class="c-ficha-bd" data-c-ficha-cerrar></div>'
       + '<div class="c-ficha-box" role="dialog" aria-modal="true" aria-labelledby="c-ficha-tit">'
       + '<button type="button" class="c-ficha-x" data-c-ficha-cerrar aria-label="Cerrar">&times;</button>'
@@ -428,9 +803,12 @@
       + '<h3 id="c-ficha-tit" class="c-ficha-n ' + esc(claseRareza(rareza, variante)) + '">'
       + esc(nombre || 'Carta') + '</h3>'
       + '<div class="c-ficha-tags">' + tags.join('') + '</div>'
+      + bloquePn
       + '<div class="c-ficha-qty">' + esc(qtyPartes.join(' - ')) + '</div>'
       + '<p class="c-ficha-desc">' + esc(desc) + '</p>'
       + bloqueCf
+      + bloqueDet
+      + bloqueNivel
       + '</div>'
       /* Vitrina publica: sin acciones, aunque la pagina las mande. */
       + (contexto !== 'vitrina-publica' && typeof opciones.acciones === 'string'
@@ -458,6 +836,12 @@
       if (!t) return;
       var marca = null;
       if (t.closest) {
+        /* 066: el boton de subir nivel vive DENTRO del host y NO cierra. */
+        var subir = t.closest('[data-c-subir-nivel]');
+        if (subir && host.contains(subir)) {
+          subirNivelDesdeBoton(subir);
+          return;
+        }
         marca = t.closest('[data-c-ficha-cerrar]');
       } else {
         var n = t;
@@ -504,6 +888,7 @@
     if (typeof document === 'undefined' || !document.body) return null;
     var c = carta && typeof carta === 'object' ? carta : {};
     var o = opciones && typeof opciones === 'object' ? opciones : {};
+    fichaOnNivel = typeof o.onNivelSubido === 'function' ? o.onNivelSubido : null;
     var ctx = fichaTexto(o.contexto).toLowerCase();
     if (!FICHA_CONTEXTOS[ctx]) ctx = 'coleccion';
 
@@ -548,6 +933,7 @@
     var prev = fichaFocoPrev;
     fichaFocoPrev = null;
     fichaOverflowPrev = null;
+    fichaOnNivel = null;
     if (prev && prev.focus && document.documentElement.contains(prev)) {
       try {
         prev.focus();
@@ -572,12 +958,19 @@
     badgeEmisor: badgeEmisor,
     esc: esc,
     statsTexto: statsTexto,
+    safeNum: safeNum,
+    miles: miles,
+    FAMILIAS: FAMILIAS,
+    CAPAS: CAPAS,
+    cardMeta: cardMeta,
+    chipFamilia: chipFamilia,
     urlMuseo: urlMuseo,
     fetchMuseo: fetchMuseo,
     TOPE_MUSEO: TOPE_MUSEO,
     abrirFicha: abrirFicha,
     cerrarFicha: cerrarFicha,
-    fichaAbierta: fichaAbierta
+    fichaAbierta: fichaAbierta,
+    subirNivelCarta: subirNivelCarta
   };
 
 }(window));

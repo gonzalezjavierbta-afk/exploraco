@@ -5103,6 +5103,9 @@ var BONO_EXCLUIDAS = {
   // Fase 2 (spec 3.4 / 4.8): la acunacion y la subida de nivel son COBROS.
   // Un cargo nunca puede recibir el bono % de consumibles (ADR-120).
   carta_compra: true, carta_nivel: true,
+  // Fase 2 UGC (spec 6): el envio de una obra a moderacion es un COBRO de XP.
+  // Un cargo nunca recibe el bono % de consumibles (ADR-120).
+  carta_media_envio: true,
   // D-17 (spec 6.4): el royalty del autor y el tithe de parche son DETRACCIONES
   // del bruto de una venta; jamas reciben bono.
   carta_royalty: true, carta_tithe: true,
@@ -16905,10 +16908,13 @@ module.exports = async function handler(req, res) {
             + ' SELECT c.id, c.precio_xp, c.emitidas, c.supply_max,'
             + '  (c.precio_xp IS NOT NULL AND c.precio_xp > 0'
             + '   AND c.familia NOT IN (SELECT jsonb_array_elements_text($4::jsonb))) AS comprable,'
-            + '  (c.supply_max IS NULL OR c.emitidas < c.supply_max) AS stock_ok'
+            + '  (c.supply_max IS NULL OR c.emitidas < c.supply_max) AS stock_ok,'
+            + '  (c.media_id IS NULL OR EXISTS (SELECT 1 FROM cartas_media m'
+            + '   WHERE m.id=c.media_id AND m.estado_moderacion=\'aprobada\''
+            + '   AND m.activo=true)) AS media_ok'
             + ' FROM cartas_catalogo c WHERE c.id=$2 AND c.activo=true LIMIT 1'
             + '), ok_carta AS ('
-            + ' SELECT * FROM cat WHERE comprable AND stock_ok'
+            + ' SELECT * FROM cat WHERE comprable AND stock_ok AND media_ok'
             + '), ok_saldo AS ('
             + ' SELECT u.id FROM usuarios u, ok_carta k'
             + '  WHERE u.id=$1::uuid AND u.xp_total >= k.precio_xp'
@@ -16946,6 +16952,7 @@ module.exports = async function handler(req, res) {
             + ' SELECT (SELECT COUNT(*)::int FROM cat) AS carta_n,'
             + ' COALESCE((SELECT comprable FROM cat), false) AS comprable,'
             + ' COALESCE((SELECT stock_ok FROM cat), false) AS stock_ok,'
+            + ' COALESCE((SELECT media_ok FROM cat), true) AS media_ok,'
             + ' (SELECT emitidas FROM emit) AS emitidas,'
             + ' (SELECT cantidad FROM inv) AS cantidad,'
             + ' (SELECT nivel FROM usuarios_cartas_nivel'
@@ -16968,6 +16975,14 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ ok: false, error: 'CARTA_NO_COMPRABLE', carta_id: ccoCarta });
         if (ccoR.stock_ok !== true)
           return res.status(409).json({ ok: false, error: 'SIN_STOCK', carta_id: ccoCarta });
+        // Spec 6.2 (regla de handler, no expresable con CHECK entre tablas):
+        // una carta con media_id solo se acuna si la obra esta APROBADA y
+        // activa. Se evalua antes del saldo para no confundir un 409 de
+        // moderacion con un 400 de XP.
+        if (ccoR.media_ok !== true)
+          return res.status(409).json({
+            ok: false, error: 'MEDIA_NO_APROBADA', carta_id: ccoCarta
+          });
         if (ccoR.cantidad === null || ccoR.cantidad === undefined)
           return res.status(400).json({
             ok: false, error: 'PUNTOS_INSUFICIENTES', carta_id: ccoCarta,
@@ -17132,6 +17147,221 @@ module.exports = async function handler(req, res) {
             nivel_tope: CartasConfig.CARTA_NIVEL_TOPE
           }
         });
+      }
+
+      // ============ FASE 2 CARTAS: MEDIA UGC (spec 6) ======================
+      // ?tipo=carta_media_subir (POST, sesion firmada): el AUTOR envia una
+      // obra (musica/foto/video/poema) que nace 'pendiente'. Se COBRA en XP
+      // (decision del operador: "moderacion y se paga con xp") subiendo
+      // xp_gastado_sinks (ADR-018: el nivel no baja) y el asiento va en el
+      // MISMO statement (no best-effort). Limites de la spec 6.3: 3
+      // pendientes y 10 aprobadas por ventana de 30 dias; gate de acciones
+      // reales: 3 resenas largas o 1 obra aprobada.
+      // SIN IDEMPOTENCIA POR DISENO: la spec 6 no define clave; dos envios
+      // identicos son DOS obras y DOS cargos (el autor las ve en
+      // cartas_media_mias). Si se quisiera, la clave seria un nonce del body,
+      // que hoy no existe en el contrato.
+      if (tipo2 === 'carta_media_subir') {
+        if (req.method !== 'POST') return res.status(405).end();
+        var cmsSes = usuarioDeSesion(req);
+        if (!cmsSes.ok) return responderSesion(res, cmsSes.razon);
+        var cmsUid = cmsSes.usuario_id;
+        var cmsTipo = String(body.tipo || '').trim().toLowerCase();
+        if (CartasConfig.MEDIA_TIPOS.indexOf(cmsTipo) === -1)
+          return res.status(400).json({
+            ok: false, error: 'MEDIA_TIPO_INVALIDO',
+            detalle: 'tipo debe ser uno de: ' + CartasConfig.MEDIA_TIPOS.join(', ')
+          });
+        var cmsTit = String(body.titulo == null ? '' : body.titulo).trim();
+        if (!cmsTit || cmsTit.length > 200)
+          return res.status(400).json({
+            ok: false, error: 'TITULO_INVALIDO',
+            detalle: 'titulo es obligatorio y admite hasta 200 caracteres'
+          });
+        var cmsUrl = String(body.media_url || body.url || body.asset || '').trim();
+        var cmsTex = String(body.texto == null ? '' : body.texto).trim() || null;
+        // El asset es una URL o un TEXTO (poema). media_url es NOT NULL en la
+        // 067 y chk_cartas_media_url exige no vacio: un poema sin URL usa su
+        // propio cuerpo como media_url; no se inventa un esquema de URL.
+        if (cmsTipo === 'poema' && !cmsUrl && cmsTex) cmsUrl = cmsTex;
+        if (!cmsUrl || (cmsTipo === 'poema' && !cmsTex))
+          return res.status(400).json({
+            ok: false, error: 'MEDIA_VACIA',
+            detalle: 'envia media_url (o url/asset) y, si es poema, texto'
+          });
+        if (cmsUrl.length > 2000)
+          return res.status(400).json({ ok: false, error: 'MEDIA_URL_INVALIDA' });
+        var cmsThumb = String(body.thumb_url == null ? '' : body.thumb_url).trim() || null;
+        if (cmsThumb && cmsThumb.length > 2000)
+          return res.status(400).json({ ok: false, error: 'THUMB_URL_INVALIDA' });
+        var cmsDur = null;
+        if (body.duracion_seg !== undefined && body.duracion_seg !== null
+            && String(body.duracion_seg).trim() !== '') {
+          cmsDur = parseInt(body.duracion_seg, 10);
+          if (!isFinite(cmsDur) || cmsDur <= 0)
+            return res.status(400).json({ ok: false, error: 'DURACION_INVALIDA' });
+        }
+        // chk_cartas_media_av exige duracion en musica: 400 tipado antes del
+        // 23514, nunca un 500.
+        if (cmsTipo === 'musica' && cmsDur === null)
+          return res.status(400).json({ ok: false, error: 'DURACION_REQUERIDA' });
+        var cmsLic = String(body.licencia == null ? '' : body.licencia).trim();
+        if (!cmsLic)
+          return res.status(400).json({ ok: false, error: 'LICENCIA_REQUERIDA' });
+        if (cmsLic.length > 500)
+          return res.status(400).json({ ok: false, error: 'LICENCIA_INVALIDA' });
+        var cmsLicEn = body.licencia_aceptada_en;
+        if (cmsLicEn === undefined || cmsLicEn === null
+            || String(cmsLicEn).trim() === '')
+          return res.status(400).json({ ok: false, error: 'LICENCIA_NO_ACEPTADA' });
+        var cmsLicTs = new Date(String(cmsLicEn).trim());
+        if (!isFinite(cmsLicTs.getTime()))
+          return res.status(400).json({
+            ok: false, error: 'LICENCIA_NO_ACEPTADA',
+            detalle: 'licencia_aceptada_en debe ser una fecha ISO'
+          });
+
+        var cmsCoste = CartasConfig.CARTA_MEDIA_XP_COSTE;
+        var cmsRes;
+        try {
+          cmsRes = await sql(
+            'WITH u AS ('
+            + ' SELECT id, xp_total, COALESCE(xp_gastado_sinks,0) AS gastado'
+            + ' FROM usuarios WHERE id=$1::uuid'
+            + '), pend AS ('
+            + ' SELECT COUNT(*)::int AS n FROM cartas_media'
+            + '  WHERE autor_id=$1::uuid AND estado_moderacion=\'pendiente\''
+            + '  AND activo=true'
+            + '), aprob AS ('
+            + ' SELECT COUNT(*)::int AS n FROM cartas_media'
+            + '  WHERE autor_id=$1::uuid AND estado_moderacion=\'aprobada\''
+            + '  AND creado_en > NOW() - ($8::int * INTERVAL \'1 day\')'
+            + '), gate AS ('
+            + ' SELECT ((SELECT COUNT(*) FROM cartas_media m'
+            + '   WHERE m.autor_id=$1::uuid AND m.estado_moderacion=\'aprobada\') > 0'
+            + '  OR (SELECT COUNT(*) FROM interacciones i'
+            + '   WHERE i.usuario_id=$1::uuid AND i.tipo=\'resena\''
+            + '   AND i.xp_ganado >= $9::numeric) >= $10::int) AS ok'
+            + '), ok_envio AS ('
+            + ' SELECT u.id FROM u, pend, aprob, gate'
+            + '  WHERE u.xp_total >= $11::numeric'
+            + '   AND GREATEST(u.xp_total - u.gastado, 0) >= $11::numeric'
+            + '   AND pend.n < $12::int AND aprob.n < $13::int AND gate.ok'
+            + '), deb AS ('
+            + ' UPDATE usuarios u SET xp_gastado_sinks = COALESCE(u.xp_gastado_sinks,0)'
+            + '  + $11::numeric'
+            + '  WHERE u.id=$1::uuid AND EXISTS (SELECT 1 FROM ok_envio)'
+            + ' RETURNING u.xp_total, u.xp_gastado_sinks'
+            + '), ins AS ('
+            + ' INSERT INTO cartas_media (autor_id, tipo, titulo, media_url,'
+            + '  thumb_url, texto, duracion_seg, licencia, licencia_aceptada_en)'
+            + ' SELECT $1::uuid, $2, $3, $4, $5, $6, $7::int, $14, $15::timestamptz'
+            + '  WHERE EXISTS (SELECT 1 FROM deb)'
+            + ' RETURNING id, estado_moderacion, creado_en'
+            + '), led AS ('
+            + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final, es_exento, contexto)'
+            + ' SELECT $1::uuid, \'carta_media_envio\', $11::numeric, 0, true,'
+            + '  jsonb_build_object(\'media_id\',(SELECT id FROM ins),'
+            + '   \'tipo\',$2,\'titulo\',$3)'
+            + '  WHERE EXISTS (SELECT 1 FROM ins)'
+            + ' RETURNING id'
+            + ')'
+            + ' SELECT (SELECT n FROM pend) AS pendientes,'
+            + ' (SELECT n FROM aprob) AS aprobadas_30d,'
+            + ' COALESCE((SELECT ok FROM gate), false) AS gate_ok,'
+            + ' (SELECT id FROM ins) AS id,'
+            + ' (SELECT estado_moderacion FROM ins) AS estado_moderacion,'
+            + ' (SELECT creado_en FROM ins) AS creado_en,'
+            + ' (SELECT xp_total FROM deb) AS xp_total,'
+            + ' (SELECT xp_gastado_sinks FROM deb) AS xp_gastado_sinks,'
+            + ' (SELECT GREATEST(xp_total - gastado,0) FROM u) AS xp_disponible',
+            [cmsUid, cmsTipo, cmsTit, cmsUrl, cmsThumb, cmsTex, cmsDur,
+             CartasConfig.CARTA_MEDIA_VENTANA_APROBADAS_DIAS,
+             CartasConfig.CARTA_MEDIA_RESENA_XP_MIN,
+             CartasConfig.CARTA_MEDIA_RESENAS_LARGAS_MIN,
+             cmsCoste, CartasConfig.CARTA_MEDIA_PENDIENTES_MAX,
+             CartasConfig.CARTA_MEDIA_APROBADAS_30D_MAX,
+             cmsLic, cmsLicTs.toISOString()]
+          );
+        } catch (eCms) {
+          if (esEsquemaFaltante(eCms))
+            return responderCartasAusente(res, eCms, 'carta_media_subir');
+          throw eCms;
+        }
+        var cmsR = cmsRes[0] || {};
+        if (cmsR.id) {
+          return res.status(201).json({
+            ok: true,
+            data: {
+              id: cmsR.id,
+              tipo: cmsTipo,
+              titulo: cmsTit,
+              estado_moderacion: cmsR.estado_moderacion,
+              creado_en: cmsR.creado_en,
+              coste_xp: red2(cmsCoste),
+              xp_gastado: red2(cmsCoste),
+              xp_disponible: red2(Math.max(numXp(cmsR.xp_disponible), 0))
+            }
+          });
+        }
+        if (Number(cmsR.pendientes) >= CartasConfig.CARTA_MEDIA_PENDIENTES_MAX)
+          return res.status(409).json({
+            ok: false, error: 'LIMITE_MEDIA_PENDIENTE',
+            detalle: 'maximo ' + CartasConfig.CARTA_MEDIA_PENDIENTES_MAX
+              + ' obras pendientes por autor',
+            pendientes: Number(cmsR.pendientes)
+          });
+        if (Number(cmsR.aprobadas_30d) >= CartasConfig.CARTA_MEDIA_APROBADAS_30D_MAX)
+          return res.status(409).json({
+            ok: false, error: 'LIMITE_MEDIA_APROBADA',
+            detalle: 'maximo ' + CartasConfig.CARTA_MEDIA_APROBADAS_30D_MAX
+              + ' obras aprobadas por ventana de '
+              + CartasConfig.CARTA_MEDIA_VENTANA_APROBADAS_DIAS + ' dias',
+            aprobadas_30d: Number(cmsR.aprobadas_30d)
+          });
+        if (cmsR.gate_ok !== true)
+          return res.status(403).json({
+            ok: false, error: 'GATE_OFICIO',
+            detalle: 'publicar exige '
+              + CartasConfig.CARTA_MEDIA_RESENAS_LARGAS_MIN
+              + ' resenas largas o 1 obra aprobada'
+          });
+        return res.status(400).json({
+          ok: false, error: 'PUNTOS_INSUFICIENTES',
+          coste_xp: red2(cmsCoste),
+          xp_disponible: red2(Math.max(numXp(cmsR.xp_disponible), 0))
+        });
+      }
+
+      // ?tipo=cartas_media_mias (GET, sesion firmada): las obras del autor con
+      // su estado, motivo de rechazo y las cartas (ediciones) que usan cada
+      // obra. autor_id SIN FK (067:35-38): se filtra por la sesion, nunca por
+      // un body. 503 tipado si falta la 067.
+      if (tipo2 === 'cartas_media_mias') {
+        if (req.method !== 'GET') return res.status(405).end();
+        var cmmSes = usuarioDeSesion(req);
+        if (!cmmSes.ok) return responderSesion(res, cmmSes.razon);
+        var cmmUid = cmmSes.usuario_id;
+        var cmmFilas;
+        try {
+          cmmFilas = await sql(
+            'SELECT m.id, m.tipo, m.titulo, m.media_url, m.thumb_url, m.texto,'
+            + ' m.duracion_seg, m.estado_moderacion, m.motivo, m.licencia,'
+            + ' m.licencia_aceptada_en, m.activo, m.creado_en,'
+            + ' COALESCE((SELECT json_agg(json_build_object('
+            + '   \'id\', c.id, \'nombre\', c.nombre, \'rareza\', c.rareza,'
+            + '   \'activo\', c.activo) ORDER BY c.id)'
+            + '  FROM cartas_catalogo c WHERE c.media_id = m.id), \'[]\'::json) AS cartas'
+            + ' FROM cartas_media m WHERE m.autor_id=$1::uuid'
+            + ' ORDER BY m.creado_en DESC',
+            [cmmUid]
+          );
+        } catch (eCmm) {
+          if (esEsquemaFaltante(eCmm))
+            return responderCartasAusente(res, eCmm, 'cartas_media_mias');
+          throw eCmm;
+        }
+        return res.status(200).json({ ok: true, data: cmmFilas, total: cmmFilas.length });
       }
 
       // ADR-108 D5 (migracion 060): reclama el drop pendiente del gate ya

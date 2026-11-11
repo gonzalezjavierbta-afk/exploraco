@@ -14,7 +14,7 @@
 <!-- T7 (ADR-039): Leaflet para el map-picker de localizacion del Museo -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="dictado-voz.css?v=1"/>
-<link rel="stylesheet" href="cartas-ui.css?v=2"/>
+<link rel="stylesheet" href="cartas-ui.css?v=3"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -7828,6 +7828,7 @@ function v61RenderVitrina(d, ui, mapa) {
       + (vArte ? '' : '<div class="v61-card-n">' + esc(vNom) + '</div>')
       + '<span class="v61-rareza">' + esc(v61VarianteLabel(varKey)) + '</span>'
       + ui.badgeEmisor(cat.emisor_tipo, cat.marca_nombre)
+      + (typeof ui.cardMeta === 'function' ? ui.cardMeta(cat) : '')
       + '<button type="button" class="v61-btn ghost" onclick="v61RetirarMuseo(\'' + esc(cid) + '\',\'' + esc(varKey) + '\')">Retirar</button>'
       + '</div>';
   });
@@ -7893,6 +7894,7 @@ function v61RenderAlbum(d, ui) {
       + (aArte ? '' : '<div class="v61-card-n">' + esc(aNom) + '</div>')
       + (aArte ? '' : '<span class="v61-rareza">' + esc(c.rareza || 'comun') + '</span>')
       + ui.badgeEmisor(c.emisor_tipo, c.marca_nombre)
+      + (typeof ui.cardMeta === 'function' ? ui.cardMeta(c) : '')
       + ((stats && !aArte) ? '<div class="c-museo-stats">' + esc(stats) + '</div>' : '')
       + '<div class="v61-meta">Tienes <b class="v61-qty">' + total + '</b></div>';
     vars.forEach(function (v) {
@@ -8077,6 +8079,11 @@ function v61FichaDesde(el) {
   if (!c) return false;
   var opciones = {
     contexto: (sup === 'coleccion') ? 'coleccion' : 'album',
+    /* 066: la variante poseida viaja como guarda de posesion del POST
+       carta_subir_nivel, y el repintado tras subir nivel lo hace la propia
+       pagina (v61MuseoRefrescar) en vez de recargar la pagina entera. */
+    variante: varKey,
+    onNivelSubido: function () { v61MuseoRefrescar(); },
     acciones: v61FichaAcciones(c, varKey, sup)
   };
   if (sup === 'coleccion') opciones.cantidad = parseInt(c.cantidad, 10) || 0;
@@ -9244,7 +9251,7 @@ else if (PF_TAB_ACTIVO === 'inventario') {
 window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>
   <script src="usuario-session.js"></script>
-<script src="cartas-ui.js?v=2"></script>
+<script src="cartas-ui.js?v=3"></script>
 <script src="cartas-arte.js"></script>
   <script src="album-comments.js?v=2"></script>
   <script>

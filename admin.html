@@ -2485,7 +2485,14 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
     </div>
   </div>
 
-  <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
+  <!-- Sub-pestanas de CARTAS: catalogo y cola de moderacion de media UGC.
+       Se alternan con cartasSubTab(); no tocan el router de showScreen(). -->
+  <div style="display:flex;gap:6px;padding:10px 28px 0;border-bottom:1px solid var(--border);background:var(--white)">
+    <div class="cartas-subtab active" id="cartas-subtab-catalogo" onclick="cartasSubTab('catalogo')" style="padding:10px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--black);cursor:pointer;border-bottom:2px solid var(--black);margin-bottom:-2px;transition:all .15s">&#127183; Catalogo</div>
+    <div class="cartas-subtab" id="cartas-subtab-media" onclick="cartasSubTab('media')" style="padding:10px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s">&#128247; Media UGC</div>
+  </div>
+
+  <div id="cartas-tab-catalogo" style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
 
     <!-- Nueva carta -->
     <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
@@ -2561,6 +2568,12 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         <div style="flex:1 1 240px;min-width:200px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Marca ID (uuid, solo Marca)</div>
           <input class="form-input" id="carta-marca-id" placeholder="uuid de marcas.id" style="width:100%">
+        </div>
+        <div style="flex:1 1 240px;min-width:200px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Media UGC (obra aprobada)</div>
+          <select class="form-input" id="carta-media" style="width:100%">
+            <option value="">Sin media</option>
+          </select>
         </div>
         <div style="flex:1 1 100%;min-width:220px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Descripcion</div>
@@ -2676,6 +2689,24 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       </div>
     </div>
   </div>
+
+  <!-- Cola de moderacion de MEDIA UGC (spec 6.2). Panel hermano del
+       catalogo; se muestra con cartasSubTab('media'). -->
+  <div id="cartas-tab-media" style="display:none;flex:1;overflow-y:auto;padding:20px 28px;flex-direction:column;gap:16px">
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">&#128247; Media UGC</div>
+      <select class="form-input" id="cartas-media-estado" onchange="cartasMediaFiltroSet(this.value)" style="max-width:190px;font-size:11px;padding:6px 10px">
+        <option value="pendiente" selected>Pendiente</option>
+        <option value="aprobada">Aprobada</option>
+        <option value="rechazada">Rechazada</option>
+        <option value="retirada">Retirada</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="cargarCartasMedia()">&#8635; Actualizar</button>
+      <span id="cartas-media-estado-txt" style="font-size:11px;font-weight:700;color:var(--muted)"></span>
+    </div>
+    <div style="font-size:10px;color:var(--muted);line-height:1.5">Aprobar exige licencia declarada; rechazar exige motivo. Cero Borrado Logico: retirar cambia el estado, nunca borra la obra.</div>
+    <div id="cartas-media-lista"><div class="mod-empty"><div class="mod-empty-icon">&#128247;</div><div style="font-size:13px;font-weight:600">Sin obras en este estado</div></div></div>
+  </div>
 </div>
 
 <!-- ==== MODAL: EDITAR CARTA (Gaming v6.1 / ADR-062) ==== -->
@@ -2765,6 +2796,12 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <option value="0">No</option>
           </select>
         </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Media UGC (obra aprobada)</div>
+        <select class="form-input" id="carta-edit-media" style="width:100%">
+          <option value="">Sin media</option>
+        </select>
       </div>
       <!-- ADR-121: clasificacion y economia de la carta. emitidas es SOLO
            LECTURA: lo escribe el servidor (inventario + escrow), jamas el body. -->
@@ -3377,7 +3414,11 @@ function showScreen(name) {
   if(name === 'consumibles') loadConsumibles();
   if(name === 'salud') cargarSaludRed();
   if(name === 'mercado') cargarMercado();
-  if(name === 'cartas') loadCartas();
+  if(name === 'cartas') {
+    loadCartas();
+    cargarCartasMediaAprobadas();
+    if(_cartasMediaSubTab === 'media') cargarCartasMedia();
+  }
   if(name === 'gobernanza') cargarGobernanza();
   if(name === 'marcas') cargarMarcasSpots();
   if(name === 'hero') cargarHeroHome();
@@ -12158,6 +12199,7 @@ async function crearCarta() {
   var d6Ca = cartaCamposD6(false);
   var famCa = cartaCamposFamilia(false);
   if (!famCa.ok) { showAdminToast(famCa.motivo, 'error'); return; }
+  var mediaCa = cartaMediaLeer('carta-media');
   try {
     var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_crear', {
       method: 'POST',
@@ -12168,7 +12210,7 @@ async function crearCarta() {
         descripcion: d6Ca.descripcion, stats_json: statsCa,
         es_canjeable_qr: d6Ca.es_canjeable_qr, fusionable: d6Ca.fusionable,
         familia: famCa.familia, subtipo: famCa.subtipo, edicion: famCa.edicion,
-        supply_max: famCa.supply_max, precio_xp: famCa.precio_xp })
+        supply_max: famCa.supply_max, precio_xp: famCa.precio_xp, media_id: mediaCa })
     });
     var data = await resp.json();
     if (!data.ok) throw new Error(data.detalle || data.error || 'No se pudo crear');
@@ -12189,6 +12231,7 @@ async function crearCarta() {
     cartaSetValor('carta-edicion', 'abierta');
     cartaSetValor('carta-supply', '');
     cartaSetValor('carta-precio', '');
+    cartaSetValor('carta-media', '');
     if (data.activo === false || data.motivo === 'SIN_DISENO') {
       showAdminToast('Carta creada FUERA DE JUEGO: sube el diseno para activarla', 'success');
     } else {
@@ -12223,6 +12266,7 @@ function abrirEditarCarta(id) {
   cartaSetValor('carta-edit-edicion', c.edicion || 'abierta');
   cartaSetValor('carta-edit-supply', (c.supply_max == null) ? '' : c.supply_max);
   cartaSetValor('carta-edit-precio', (c.precio_xp == null) ? '' : c.precio_xp);
+  cartasMediaSetSelect('carta-edit-media', c.media_id || '');
   // Solo lectura: el servidor escribe emitidas (inventario + escrow).
   cartaSetValor('carta-edit-emitidas', (c.emitidas == null) ? '0' : c.emitidas);
   document.getElementById('carta-modal').style.display = 'flex';
@@ -12255,6 +12299,7 @@ async function guardarEdicionCarta() {
   var d6ECa = cartaCamposD6(true);
   var famECa = cartaCamposFamilia(true);
   if (!famECa.ok) { showAdminToast(famECa.motivo, 'error'); return; }
+  var mediaECa = cartaMediaLeer('carta-edit-media');
   try {
     var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_editar', {
       method: 'POST',
@@ -12265,7 +12310,7 @@ async function guardarEdicionCarta() {
         descripcion: d6ECa.descripcion, stats_json: statsECa,
         es_canjeable_qr: d6ECa.es_canjeable_qr, fusionable: d6ECa.fusionable,
         familia: famECa.familia, subtipo: famECa.subtipo, edicion: famECa.edicion,
-        supply_max: famECa.supply_max, precio_xp: famECa.precio_xp })
+        supply_max: famECa.supply_max, precio_xp: famECa.precio_xp, media_id: mediaECa })
     });
     var data = await resp.json();
     if (!data.ok) throw new Error(data.detalle || data.error || 'No se pudo actualizar');
@@ -12296,6 +12341,234 @@ async function toggleCarta(id) {
     if (data.museo_limpiado > 0) msgCa += ' (' + data.museo_limpiado + ' cartas retiradas del museo)';
     showAdminToast(msgCa, 'success');
     loadCartas();
+  } catch (e) {
+    showAdminToast('Error: ' + e.message, 'error');
+  }
+}
+
+/* ===== COLA DE MODERACION DE MEDIA UGC (cartas) =====
+   GET  /api/admin?recurso=cartas&tipo=cartas_media_lista&estado=pendiente
+        -> { ok, data:[{id,autor_id,autor_nombre,autor_email,tipo,titulo,
+             media_url,thumb_url,texto,duracion_seg,estado_moderacion,motivo,
+             licencia,licencia_aceptada_en,moderado_por,moderado_en,activo,
+             creado_en,cartas_n}], total, estado }
+        estado: pendiente (default) | aprobada | rechazada | retirada.
+   POST /api/admin?recurso=cartas&tipo=cartas_media_moderar
+        {id, estado:pendiente|aprobada|rechazada|retirada, motivo?}
+        Errores tipados: MOTIVO_REQUERIDO, LICENCIA_REQUERIDA,
+        TRANSICION_INVALIDA, MEDIA_NO_ENCONTRADA, SCHEMA_NOT_MIGRATED.
+   Maquina de estados del servidor: pendiente -> aprobada|rechazada;
+   aprobada -> retirada; rechazada -> pendiente (reabrir).
+   Cero Borrado Logico: se cambia estado_moderacion, nunca se borra la fila.
+   Prefijo "cartas"/"carta" para evitar colisiones (BUG-006/018/019). */
+
+var _cartasMediaEstado = 'pendiente';
+var _cartasMediaCache = [];
+var _cartasMediaAprob = [];
+var _cartasMediaSubTab = 'catalogo';
+
+/* Sub-pestanas Catalogo / Media UGC dentro de screen-cartas. No toca el
+   router showScreen(): solo alterna paneles hermanos. */
+function cartasSubTab(tab) {
+  _cartasMediaSubTab = (tab === 'media') ? 'media' : 'catalogo';
+  var esMedia = (_cartasMediaSubTab === 'media');
+  var panelCat = document.getElementById('cartas-tab-catalogo');
+  var panelMed = document.getElementById('cartas-tab-media');
+  if (panelCat) panelCat.style.display = esMedia ? 'none' : 'flex';
+  if (panelMed) panelMed.style.display = esMedia ? 'flex' : 'none';
+  var ids = { catalogo: 'cartas-subtab-catalogo', media: 'cartas-subtab-media' };
+  for (var k in ids) {
+    if (!Object.prototype.hasOwnProperty.call(ids, k)) continue;
+    var el = document.getElementById(ids[k]);
+    if (!el) continue;
+    var on = (k === _cartasMediaSubTab);
+    el.className = 'cartas-subtab' + (on ? ' active' : '');
+    el.style.color = on ? 'var(--black)' : 'var(--muted)';
+    el.style.borderBottomColor = on ? 'var(--black)' : 'transparent';
+  }
+  if (esMedia) cargarCartasMedia();
+}
+
+function cartasMediaFiltroSet(estado) {
+  var validos = ['pendiente', 'aprobada', 'rechazada', 'retirada'];
+  var v = String(estado || '');
+  _cartasMediaEstado = (validos.indexOf(v) >= 0) ? v : 'pendiente';
+  cargarCartasMedia();
+}
+
+function cartasMediaFecha(v) {
+  if (!v) return '-';
+  var d = new Date(v);
+  if (!isFinite(d.getTime())) return '-';
+  return d.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+/* Lee el uuid del select de media; vacio => null (desvincular). */
+function cartaMediaLeer(id) {
+  var el = document.getElementById(id);
+  var v = el ? String(el.value || '').trim() : '';
+  return v ? v : null;
+}
+
+/* Precarga el media_id actual. Si la obra ya no esta aprobada (retirada),
+   el select no la trae: se anade la opcion para no perder el vinculo
+   existente (ADR-003: nada se borra por un filtro de UI). */
+function cartasMediaSetSelect(id, valor) {
+  var sel = document.getElementById(id);
+  if (!sel) return;
+  var v = String(valor || '');
+  if (v) {
+    var existe = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === v) { existe = true; break; }
+    }
+    if (!existe) {
+      var op = document.createElement('option');
+      op.value = v;
+      op.textContent = v + ' (no aprobada)';
+      sel.appendChild(op);
+    }
+  }
+  sel.value = v;
+}
+
+function cartasMediaPintarSelects() {
+  var ids = ['carta-media', 'carta-edit-media'];
+  for (var i = 0; i < ids.length; i++) {
+    var sel = document.getElementById(ids[i]);
+    if (!sel) continue;
+    var valor = sel.value || '';
+    var html = '<option value="">Sin media</option>';
+    for (var j = 0; j < _cartasMediaAprob.length; j++) {
+      var m = _cartasMediaAprob[j] || {};
+      if (!m.id) continue;
+      var et = (m.titulo || '(sin titulo)') + ' - ' + (m.tipo || 'media');
+      html += '<option value="' + escH(m.id) + '">' + escH(et) + '</option>';
+    }
+    sel.innerHTML = html;
+    cartasMediaSetSelect(ids[i], valor);
+  }
+}
+
+/* Obras APROBADAS para el select del modal. Si falla, degradacion: el
+   select queda solo con "Sin media" y el alta de cartas no se rompe. */
+async function cargarCartasMediaAprobadas() {
+  try {
+    var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_media_lista&estado=aprobada&limite=200',
+      { headers: _adminHeaders() });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo cargar');
+    _cartasMediaAprob = data.data || [];
+  } catch (eApr) {
+    _cartasMediaAprob = [];
+  }
+  cartasMediaPintarSelects();
+}
+
+async function cargarCartasMedia() {
+  var cont = document.getElementById('cartas-media-lista');
+  if (!cont) return;
+  cont.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--muted)">'
+    + '<div style="font-size:24px;margin-bottom:8px">&#9203;</div>'
+    + '<div style="font-size:13px;font-weight:600">Cargando media...</div></div>';
+  var url = '/api/admin?recurso=cartas&tipo=cartas_media_lista&estado=' + encodeURIComponent(_cartasMediaEstado);
+  try {
+    var resp = await fetch(url, { headers: _adminHeaders() });
+    var data = await resp.json();
+    if (!data.ok) throw new Error((data.error || 'No se pudo cargar') + (data.detalle ? ': ' + data.detalle : ''));
+    _cartasMediaCache = data.data || [];
+    renderCartasMedia();
+  } catch (e) {
+    cont.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#9888;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Error al cargar media</div>'
+      + '<div style="font-size:11px;color:var(--muted)">' + escH(e.message || '') + '</div></div>';
+  }
+}
+
+function cartasMediaAcciones(m) {
+  var est = String(m.estado_moderacion || '');
+  var id = escH(m.id || '');
+  if (est === 'pendiente') {
+    return '<button class="btn btn-gold btn-sm" type="button" onclick="cartasMediaModerar(\'' + id + '\',\'aprobada\')">Aprobar</button> '
+      + '<button class="btn btn-danger btn-sm" type="button" onclick="cartasMediaModerar(\'' + id + '\',\'rechazada\')">Rechazar</button>';
+  }
+  if (est === 'aprobada') {
+    return '<button class="btn btn-danger btn-sm" type="button" onclick="cartasMediaModerar(\'' + id + '\',\'retirada\')">Retirar</button>';
+  }
+  if (est === 'rechazada') {
+    return '<button class="btn btn-ghost btn-sm" type="button" onclick="cartasMediaModerar(\'' + id + '\',\'pendiente\')">Reabrir</button>';
+  }
+  return '<span style="font-size:10px;color:var(--muted)">Sin acciones</span>';
+}
+
+function renderCartasMedia() {
+  var cont = document.getElementById('cartas-media-lista');
+  if (!cont) return;
+  var filas = _cartasMediaCache || [];
+  var stTxt = document.getElementById('cartas-media-estado-txt');
+  if (stTxt) stTxt.textContent = filas.length + ' obra(s) en ' + _cartasMediaEstado;
+  if (!filas.length) {
+    cont.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#128247;</div>'
+      + '<div style="font-size:13px;font-weight:600">Sin obras en este estado</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:4px">Cambia el selector de estado o espera nuevas subidas UGC.</div></div>';
+    return;
+  }
+  var html = '<table class="data-table" style="margin-top:0"><thead><tr>'
+    + '<th>Autor</th><th>Tipo</th><th>Titulo</th><th>Licencia</th><th>Fecha</th>'
+    + '<th style="text-align:right">Cartas</th><th style="text-align:right">Acciones</th>'
+    + '</tr></thead><tbody>';
+  for (var i = 0; i < filas.length; i++) {
+    var m = filas[i] || {};
+    var autor = m.autor_nombre || m.autor_email || (m.autor_id ? String(m.autor_id).slice(0, 8) : 'desconocido');
+    var titulo = escH(m.titulo || '(sin titulo)');
+    if (m.media_url) {
+      titulo = '<a href="' + escH(m.media_url) + '" target="_blank" rel="noopener" style="color:var(--black);text-decoration:underline">' + titulo + '</a>';
+    }
+    var lic = escH(m.licencia || 'sin licencia');
+    if (m.licencia_aceptada_en) {
+      lic += '<div style="font-size:10px;color:var(--muted)">aceptada ' + escH(cartasMediaFecha(m.licencia_aceptada_en)) + '</div>';
+    }
+    var motivo = m.motivo
+      ? '<div style="font-size:10px;color:#B00020">Motivo: ' + escH(m.motivo) + '</div>' : '';
+    var nCartas = Number(m.cartas_n);
+    if (!isFinite(nCartas)) nCartas = 0;
+    html += '<tr>'
+      + '<td><div style="font-weight:700">' + escH(autor) + '</div>'
+      + '<div style="font-size:10px;color:var(--muted)">' + escH(m.autor_email || '') + '</div></td>'
+      + '<td>' + escH(m.tipo || '-') + '</td>'
+      + '<td>' + titulo + motivo + '</td>'
+      + '<td>' + lic + '</td>'
+      + '<td>' + escH(cartasMediaFecha(m.creado_en)) + '</td>'
+      + '<td style="text-align:right;font-weight:700;white-space:nowrap">' + nCartas + ' cartas</td>'
+      + '<td style="text-align:right;white-space:nowrap">' + cartasMediaAcciones(m) + '</td>'
+      + '</tr>';
+  }
+  html += '</tbody></table>';
+  cont.innerHTML = html;
+}
+
+/* Rechazo: motivo obligatorio (MOTIVO_REQUERIDO). Se pide con prompt y se
+   aborta sin llamar al servidor si el operador lo deja vacio. */
+async function cartasMediaModerar(id, estado) {
+  if (!id) return;
+  var motivo = null;
+  if (estado === 'rechazada') {
+    motivo = window.prompt('Motivo del rechazo (obligatorio):', '');
+    if (motivo === null) return;
+    motivo = String(motivo).trim();
+    if (!motivo) { showAdminToast('MOTIVO_REQUERIDO: el rechazo exige motivo', 'error'); return; }
+  }
+  try {
+    var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_media_moderar', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ id: id, estado: estado, motivo: motivo })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error((data.error || 'ERROR') + (data.detalle ? ': ' + data.detalle : ''));
+    showAdminToast(data.mensaje || ('Obra ' + estado), 'success');
+    cargarCartasMedia();
+    cargarCartasMediaAprobadas();
   } catch (e) {
     showAdminToast('Error: ' + e.message, 'error');
   }

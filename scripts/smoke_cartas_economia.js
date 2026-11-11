@@ -210,14 +210,16 @@ var Q_CONTEO =
   + ' (SELECT count(*) FROM usuarios_cartas)::int AS usuarios_cartas,'
   + ' (SELECT count(*) FROM cartas_catalogo)::int AS cartas_catalogo,'
   + ' (SELECT count(*) FROM xp_ledger)::int AS xp_ledger,'
-  + ' (SELECT count(*) FROM usuarios_cartas_nivel)::int AS niveles';
+  + ' (SELECT count(*) FROM usuarios_cartas_nivel)::int AS niveles,'
+  + ' (SELECT count(*) FROM cartas_media)::int AS cartas_media';
 
 function resumen(pre, post) {
   return 'usuarios ' + pre.usuarios + '->' + post.usuarios
     + ' / usuarios_cartas ' + pre.usuarios_cartas + '->' + post.usuarios_cartas
     + ' / cartas_catalogo ' + pre.cartas_catalogo + '->' + post.cartas_catalogo
     + ' / xp_ledger ' + pre.xp_ledger + '->' + post.xp_ledger
-    + ' / niveles ' + pre.niveles + '->' + post.niveles;
+    + ' / niveles ' + pre.niveles + '->' + post.niveles
+    + ' / cartas_media ' + pre.cartas_media + '->' + post.cartas_media;
 }
 
 // -- CASOS PUROS: helpers de lib (corren sin base) ---------------------------
@@ -281,6 +283,36 @@ function casosPuros() {
     && ints.indexOf("tipo2 === 'carta_comprar'") !== -1
     && ints.indexOf("tipo2 === 'carta_comprar'") < ints.indexOf("tipo2 === 'carta_acunar'"),
     'carta_comprar es del mercado (T11.2)');
+
+  // E0 (spec 6): media UGC. Las constantes y la maquina de estados se prueban
+  // desde lib (una sola fuente), y el contrato de los handlers por su fuente.
+  check('E0.1 media: 4 tipos, coste 50 XP y limites 3 pendientes / 10 aprobadas',
+    CartasConfig.MEDIA_TIPOS.length === 4
+    && CartasConfig.MEDIA_TIPOS.indexOf('poema') !== -1
+    && CartasConfig.CARTA_MEDIA_XP_COSTE === 50
+    && CartasConfig.CARTA_MEDIA_PENDIENTES_MAX === 3
+    && CartasConfig.CARTA_MEDIA_APROBADAS_30D_MAX === 10);
+  check('E0.2 transiciones: pendiente->aprobada/rechazada; retirada es final',
+    CartasConfig.transicionMediaValida('pendiente', 'aprobada')
+    && CartasConfig.transicionMediaValida('pendiente', 'rechazada')
+    && !CartasConfig.transicionMediaValida('pendiente', 'retirada')
+    && CartasConfig.transicionMediaValida('rechazada', 'pendiente')
+    && CartasConfig.transicionMediaValida('aprobada', 'retirada')
+    && !CartasConfig.transicionMediaValida('retirada', 'aprobada'));
+  check('E0.3 handler: cobro sin bono y guard MEDIA_NO_APROBADA en carta_acunar',
+    ints.indexOf('carta_media_envio: true') !== -1
+    && ints.indexOf('MEDIA_NO_APROBADA') !== -1
+    && ints.indexOf('AS media_ok') !== -1
+    && ints.indexOf("tipo2 === 'carta_media_subir'") !== -1
+    && ints.indexOf("tipo2 === 'cartas_media_mias'") !== -1
+    && ints.indexOf('LICENCIA_NO_ACEPTADA') !== -1);
+  var adm = fs.readFileSync(path.join(__dirname, '..', 'api', 'admin.js'), 'utf8');
+  check('E0.4 admin: cola, moderar y validacion del vinculo carta -> obra',
+    adm.indexOf("tipoCa === 'cartas_media_lista'") !== -1
+    && adm.indexOf("tipoCa === 'cartas_media_moderar'") !== -1
+    && adm.indexOf('validarMediaCarta') !== -1
+    && adm.indexOf('MEDIA_AUTOR_INCOHERENTE') !== -1
+    && adm.indexOf('MEDIA_CON_OFERTAS') !== -1);
 }
 
 async function main() {
@@ -515,6 +547,139 @@ async function main() {
         mkLibroSrc.indexOf("coWhere.push('c.activo = true')") !== -1
         && mkLibroSrc.indexOf("c.familia NOT IN (SELECT jsonb_array_elements_text($") !== -1);
 
+      // ============ E: MEDIA UGC (spec 6) ==================================
+      // SQL_ENVIO se EXTRAE del handler con mkSql: no hay copia que derive.
+      // Los CHECK de cartas_media (067/068) se prueban contra Neon de verdad,
+      // con SAVEPOINT por caso para que un 23514 esperado no aborte la tx.
+      if (!uid || !cartaId) {
+        skip('E media UGC', 'sin usuario o carta real para el fixture');
+      } else {
+        var SQL_ENVIO = mkSql('cmsRes = await sql(', "AS xp_disponible'");
+        async function esperaMed(fn) {
+          await q('SAVEPOINT sp_media');
+          try {
+            await fn();
+            await q('RELEASE SAVEPOINT sp_media');
+            return '';
+          } catch (eMed) {
+            await q('ROLLBACK TO SAVEPOINT sp_media');
+            return String((eMed && eMed.code) || '') + ' '
+              + String((eMed && eMed.message) || '');
+          }
+        }
+        var autMed = (await q1('SELECT gen_random_uuid()::text AS id')).id;
+
+        var e1m = await q1('INSERT INTO cartas_media (autor_id, tipo, titulo, media_url,'
+          + ' licencia_aceptada_en)'
+          + " VALUES ($1::uuid,'foto','smk_media','https://x/m.jpg',NOW())"
+          + ' RETURNING estado_moderacion, licencia', [autMed]);
+        check('E1 media pendiente sin licencia: se RECIBE (nada nace aprobado)',
+          e1m && e1m.estado_moderacion === 'pendiente' && e1m.licencia === null);
+
+        var e2m = await esperaMed(function () {
+          return q('INSERT INTO cartas_media (autor_id, tipo, titulo, media_url)'
+            + " VALUES ($1::uuid,'foto','x','   ')", [autMed]);
+        });
+        check('E2 media vacia (media_url en blanco) -> 23514', e2m.indexOf('23514') === 0);
+
+        var e3m = await esperaMed(function () {
+          return q('INSERT INTO cartas_media (autor_id, tipo, titulo, media_url)'
+            + " VALUES ($1::uuid,'podcast','x','https://x/a.mp3')", [autMed]);
+        });
+        check('E3 tipo invalido -> 23514 chk_cartas_media_tipo', e3m.indexOf('23514') === 0);
+
+        var e4m = await esperaMed(function () {
+          return q('INSERT INTO cartas_media (autor_id, tipo, titulo, media_url)'
+            + " VALUES ($1::uuid,'poema','x','https://x/p.txt')", [autMed]);
+        });
+        check('E4 poema sin texto -> 23514 chk_cartas_media_poema', e4m.indexOf('23514') === 0);
+
+        var pendMed = await q1('INSERT INTO cartas_media (autor_id, tipo, titulo, media_url)'
+          + " VALUES ($1::uuid,'foto','smk_pend','https://x/p.jpg') RETURNING id", [autMed]);
+        var e5m = await esperaMed(function () {
+          return q("UPDATE cartas_media SET estado_moderacion='aprobada', moderado_en=NOW()"
+            + ' WHERE id=$1::uuid', [pendMed.id]);
+        });
+        check('E5 aprobar sin licencia -> 23514 chk_cartas_media_licencia',
+          e5m.indexOf('23514') === 0 && e5m.indexOf('chk_cartas_media_licencia') >= 0);
+
+        var e6m = await q1("UPDATE cartas_media SET licencia='cc-by',"
+          + " estado_moderacion='aprobada', moderado_en=NOW() WHERE id=$1::uuid"
+          + ' RETURNING estado_moderacion', [pendMed.id]);
+        check('E6 aprobar con licencia -> aprobada',
+          e6m && e6m.estado_moderacion === 'aprobada');
+
+        var e7m = await esperaMed(function () {
+          return q("UPDATE cartas_media SET estado_moderacion='rechazada', moderado_en=NOW()"
+            + ' WHERE id=$1::uuid', [pendMed.id]);
+        });
+        var e7mA = await q1("UPDATE cartas_media SET motivo='sin derechos',"
+          + " estado_moderacion='rechazada', moderado_en=NOW() WHERE id=$1::uuid"
+          + ' RETURNING motivo', [pendMed.id]);
+        check('E7 rechazo sin motivo -> 23514; con motivo -> OK',
+          e7m.indexOf('23514') === 0 && e7mA && e7mA.motivo === 'sin derechos');
+
+        var e8m = await esperaMed(function () {
+          return q('UPDATE cartas_catalogo SET media_id=gen_random_uuid() WHERE id=$1',
+            [cartaId]);
+        });
+        check('E8 FK media inexistente -> 23503 (no se vincula una obra fantasma)',
+          e8m.indexOf('23503') === 0);
+
+        var e9pend = await q1('INSERT INTO cartas_media (autor_id, tipo, titulo, media_url)'
+          + " VALUES ($1::uuid,'foto','smk_pred','https://x/pr.jpg') RETURNING id", [autMed]);
+        await q('UPDATE cartas_catalogo SET media_id=$2::uuid WHERE id=$1',
+          [cartaId, e9pend.id]);
+        var SQL_MEDIA_OK = 'SELECT (c.media_id IS NULL OR EXISTS (SELECT 1 FROM cartas_media m'
+          + " WHERE m.id=c.media_id AND m.estado_moderacion='aprobada' AND m.activo=true))"
+          + ' AS media_ok FROM cartas_catalogo c WHERE c.id=$1';
+        var e9a = await q1(SQL_MEDIA_OK, [cartaId]);
+        await q("UPDATE cartas_media SET licencia='cc-by', estado_moderacion='aprobada',"
+          + ' moderado_en=NOW() WHERE id=$1::uuid', [e9pend.id]);
+        var e9b = await q1(SQL_MEDIA_OK, [cartaId]);
+        check('E9 carta con media no aprobada: media_ok=false; aprobada: true',
+          e9a && e9a.media_ok === false && e9b && e9b.media_ok === true);
+
+        await q("INSERT INTO cartas_media (autor_id, tipo, titulo, media_url, licencia,"
+          + " estado_moderacion, moderado_en) VALUES ($1::uuid,'foto','smk_gate',"
+          + " 'https://x/g.jpg','cc-by','aprobada',NOW())", [uid]);
+        await q('UPDATE usuarios SET xp_total=100000, xp_gastado_sinks=0 WHERE id=$1::uuid', [uid]);
+        var e10p = [uid, 'foto', 'smk_envio', 'https://x/e.jpg', null, null, null,
+          30, CartasConfig.CARTA_MEDIA_RESENA_XP_MIN,
+          CartasConfig.CARTA_MEDIA_RESENAS_LARGAS_MIN, CartasConfig.CARTA_MEDIA_XP_COSTE,
+          CartasConfig.CARTA_MEDIA_PENDIENTES_MAX, CartasConfig.CARTA_MEDIA_APROBADAS_30D_MAX,
+          'cc-by', new Date().toISOString()];
+        var e10m = await q1(SQL_ENVIO, e10p);
+        var e10led = await q1("SELECT COUNT(*)::int AS n FROM xp_ledger"
+          + " WHERE usuario_id=$1::uuid AND accion='carta_media_envio'", [uid]);
+        check('E10 envio UGC: obra pendiente + cargo 50 + asiento carta_media_envio',
+          e10m && e10m.id && e10m.estado_moderacion === 'pendiente'
+          && Number(e10m.xp_gastado_sinks) === CartasConfig.CARTA_MEDIA_XP_COSTE
+          && Number(e10led.n) === 1);
+
+        await q('UPDATE usuarios SET xp_total=49, xp_gastado_sinks=0 WHERE id=$1::uuid', [uid]);
+        var e11m = await q1(SQL_ENVIO, e10p);
+        var e11led = await q1("SELECT COUNT(*)::int AS n FROM xp_ledger"
+          + " WHERE usuario_id=$1::uuid AND accion='carta_media_envio'", [uid]);
+        check('E11 sin XP: 0 filas, sin obra y sin asiento (fail-closed)',
+          e11m && e11m.id === null && Number(e11led.n) === 1);
+
+        await q('UPDATE usuarios SET xp_total=100000, xp_gastado_sinks=0 WHERE id=$1::uuid', [uid]);
+        await q(SQL_ENVIO, e10p);
+        await q(SQL_ENVIO, e10p);
+        var e12led = await q1("SELECT COUNT(*)::int AS n FROM xp_ledger"
+          + " WHERE usuario_id=$1::uuid AND accion='carta_media_envio'", [uid]);
+        check('E12 doble envio = 2 obras y 2 cargos (sin idempotencia por diseno)',
+          Number(e12led.n) === 3);
+
+        await q("UPDATE cartas_media SET estado_moderacion='retirada', activo=false"
+          + ' WHERE id=$1::uuid', [e9pend.id]);
+        var e13m = await q1('SELECT estado_moderacion, activo FROM cartas_media'
+          + ' WHERE id=$1::uuid', [e9pend.id]);
+        check('E13 retirada = estado retirada + activo=false (cero DELETE)',
+          e13m && e13m.estado_moderacion === 'retirada' && e13m.activo === false);
+      }
+
       var mkUsr = await q('SELECT id::text AS id FROM usuarios'
         + ' ORDER BY creado_en ASC NULLS LAST LIMIT 3');
       var mkProd = await q1("SELECT id FROM cartas_catalogo WHERE familia='producto'"
@@ -674,7 +839,8 @@ async function main() {
       && pre.usuarios_cartas === post.usuarios_cartas
       && pre.cartas_catalogo === post.cartas_catalogo
       && pre.xp_ledger === post.xp_ledger
-      && pre.niveles === post.niveles,
+      && pre.niveles === post.niveles
+      && pre.cartas_media === post.cartas_media,
       resumen(pre, post));
   }
 

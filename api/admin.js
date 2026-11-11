@@ -772,6 +772,34 @@ function motivoNoFusionableCarta(f) {
   return m.join(', ');
 }
 
+// -- MEDIA UGC: cola de moderacion (spec 6.2) ------------------------------
+// La maquina de estados y los limites viven en lib/cartas-config.js: el
+// handler que modera y el smoke prueban la MISMA tabla (Regla de No-Duplicidad).
+// Aqui solo queda la validacion del vinculo carta -> obra.
+
+// Valida el vinculo carta -> obra (spec 6.2): la obra EXISTE, esta 'aprobada'
+// y activa, y si la carta es UGC su emisor_id ES el autor_id de la obra. La
+// regla no se puede expresar con un CHECK entre tablas (lo declara 067:109-112):
+// vive aqui y responde 409 tipado. Devuelve {ok:true} o {ok:false,status,...}.
+async function validarMediaCarta(sql, mediaId, emisorTipo, emisorId) {
+  var filas = await sql(
+    'SELECT id, autor_id, estado_moderacion, activo FROM cartas_media'
+    + ' WHERE id=$1::uuid LIMIT 1',
+    [mediaId]
+  );
+  if (!filas.length)
+    return { ok:false, status:404, error:'MEDIA_NO_ENCONTRADA' };
+  var m = filas[0];
+  if (m.estado_moderacion !== 'aprobada' || m.activo !== true)
+    return { ok:false, status:409, error:'MEDIA_NO_APROBADA',
+      detalle:'la obra debe estar aprobada y activa para vincularse' };
+  if (emisorTipo === 'ugc'
+      && String(m.autor_id || '') !== String(emisorId || ''))
+    return { ok:false, status:409, error:'MEDIA_AUTOR_INCOHERENTE',
+      detalle:'emisor_id debe ser el autor_id de la obra' };
+  return { ok:true, media:m };
+}
+
 // == ORIGEN / LEJANIA (ADR-058, migracion 038) ============================
 // Umbrales de las alertas anti-gaming del panel "Salud de la Red". Fijos y
 // documentados: NO se leen de gamificacion_config (esa tabla parametriza la
@@ -1499,13 +1527,117 @@ module.exports = async function handler(req, res) {
         var filasCa = await sql(
           'SELECT id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en, '
           + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, '
-          + 'familia, subtipo, edicion, supply_max, emitidas, precio_xp, '
+          + 'familia, subtipo, edicion, supply_max, emitidas, precio_xp, media_id, '
           + '(imagen_url IS NOT NULL AND btrim(imagen_url) <> \'\') AS tiene_diseno, '
           + '(activo AND imagen_url IS NOT NULL AND btrim(imagen_url) <> \'\') AS jugable '
           + 'FROM cartas_catalogo '
           + 'ORDER BY activo DESC, set_slug ASC, nivel_gate ASC NULLS FIRST, id ASC'
         );
         return res.status(200).json({ ok:true, data: filasCa, total: filasCa.length });
+      }
+
+      // --- Cola de moderacion de MEDIA UGC (spec 6.2) -------------------
+      // GET ?recurso=cartas&tipo=cartas_media_lista&estado=pendiente&limite=50
+      // Default 'pendiente' (la cola real); idx_cartas_media_cola
+      // (estado_moderacion, creado_en) cubre el filtro y el ORDER BY.
+      // autor_id NO tiene FK (067:35-38): LEFT JOIN y COALESCE, la obra de un
+      // autor desaparecido se sigue leyendo.
+      if (tipoCa === 'cartas_media_lista') {
+        if (req.method !== 'GET') return res.status(405).end();
+        var estMed = String(req.query.estado || 'pendiente').trim().toLowerCase();
+        if (['pendiente', 'aprobada', 'rechazada', 'retirada'].indexOf(estMed) < 0)
+          return res.status(400).json({ ok:false, error:'ESTADO_INVALIDO',
+            detalle:'estado debe ser pendiente, aprobada, rechazada o retirada' });
+        var limMed = parseInt(req.query.limite, 10);
+        if (!isFinite(limMed) || limMed <= 0) limMed = 50;
+        if (limMed > 200) limMed = 200;
+        var medFilas = await sql(
+          'SELECT m.id, m.autor_id, COALESCE(u.nombre, \'\') AS autor_nombre,'
+          + ' COALESCE(u.email, \'\') AS autor_email, m.tipo, m.titulo,'
+          + ' m.media_url, m.thumb_url, m.texto, m.duracion_seg,'
+          + ' m.estado_moderacion, m.motivo, m.licencia, m.licencia_aceptada_en,'
+          + ' m.moderado_por, m.moderado_en, m.activo, m.creado_en,'
+          + ' (SELECT COUNT(*)::int FROM cartas_catalogo c'
+          + '   WHERE c.media_id = m.id) AS cartas_n'
+          + ' FROM cartas_media m LEFT JOIN usuarios u ON u.id = m.autor_id'
+          + ' WHERE m.estado_moderacion=$1'
+          + ' ORDER BY m.activo DESC, m.creado_en DESC LIMIT $2::int',
+          [estMed, limMed]
+        );
+        return res.status(200).json({ ok:true, data: medFilas,
+          total: medFilas.length, estado: estMed });
+      }
+
+      // --- Moderar una obra (spec 6.2) ----------------------------------
+      // POST {id, estado:'aprobada'|'rechazada'|'retirada', motivo?}
+      // Maquina de estados (regla de handler):
+      //   pendiente -> aprobada | rechazada
+      //   aprobada  -> retirada
+      //   rechazada -> pendiente (se reabre; no hay reenvio de la fila)
+      // Rechazo exige motivo (chk_cartas_media_rechazo). Aprobacion sin
+      // licencia la frena chk_cartas_media_licencia (23514) y se traduce a 400
+      // LICENCIA_REQUERIDA, nunca 500. Al reabrir se limpian moderado_por y
+      // moderado_en (chk_cartas_media_pendiente: el estado no puede mentir).
+      // moderado_por: el panel admin se autentica con ADMIN_SECRET (secreto
+      // compartido, sin uuid de usuario: admin.js:3200), asi que no se inventa
+      // una identidad. Se acepta opcional en el body y por omision queda NULL.
+      if (tipoCa === 'cartas_media_moderar') {
+        if (req.method !== 'POST') return res.status(405).end();
+        var idMed = normalizarUuidCarta(body.id);
+        if (idMed === undefined || idMed === null)
+          return res.status(400).json({ ok:false, error:'ID_INVALIDO',
+            detalle:'id debe ser el uuid de la obra' });
+        var estNuevo = String(body.estado || '').trim().toLowerCase();
+        if (['pendiente', 'aprobada', 'rechazada', 'retirada'].indexOf(estNuevo) < 0)
+          return res.status(400).json({ ok:false, error:'ESTADO_INVALIDO',
+            detalle:'estado debe ser pendiente (reabrir), aprobada, rechazada o retirada' });
+        var motMed = String(body.motivo == null ? '' : body.motivo).trim() || null;
+        if (estNuevo === 'rechazada' && !motMed)
+          return res.status(400).json({ ok:false, error:'MOTIVO_REQUERIDO' });
+        var modPor = normalizarUuidCarta(body.moderado_por);
+        if (modPor === undefined)
+          return res.status(400).json({ ok:false, error:'MODERADO_POR_INVALIDO',
+            detalle:'moderado_por debe ser un uuid valido o null' });
+        if (estNuevo === 'pendiente') modPor = null;
+        var actMed = await sql(
+          'SELECT estado_moderacion, licencia FROM cartas_media'
+          + ' WHERE id=$1::uuid LIMIT 1',
+          [idMed]
+        );
+        if (!actMed.length)
+          return res.status(404).json({ ok:false, error:'MEDIA_NO_ENCONTRADA' });
+        var estViejo = String(actMed[0].estado_moderacion || '');
+        if (!CartasConfig.transicionMediaValida(estViejo, estNuevo))
+          return res.status(409).json({ ok:false, error:'TRANSICION_INVALIDA',
+            detalle: estViejo + ' -> ' + estNuevo });
+        if (estNuevo === 'aprobada' && !String(actMed[0].licencia || '').trim())
+          return res.status(400).json({ ok:false, error:'LICENCIA_REQUERIDA',
+            detalle:'la obra no declara licencia: no se puede aprobar' });
+        var updMed;
+        try {
+          updMed = await sql(
+            'UPDATE cartas_media SET estado_moderacion=($2::text)::varchar(12),'
+            + ' motivo=CASE WHEN $2::text=\'rechazada\' THEN $3 ELSE motivo END,'
+            + ' moderado_por=$4::uuid,'
+            + ' moderado_en=CASE WHEN $2::text=\'pendiente\' THEN NULL ELSE NOW() END,'
+            + ' activo=CASE WHEN $2::text=\'retirada\' THEN false ELSE activo END'
+            + ' WHERE id=$1::uuid'
+            + ' RETURNING id, autor_id, estado_moderacion, motivo, moderado_por,'
+            + ' moderado_en, activo, creado_en',
+            [idMed, estNuevo, motMed, modPor]
+          );
+        } catch (eMod) {
+          var msgMod = String((eMod && eMod.message) || '');
+          if (eMod && eMod.code === '23514'
+              && msgMod.indexOf('chk_cartas_media_licencia') !== -1)
+            return res.status(400).json({ ok:false, error:'LICENCIA_REQUERIDA' });
+          if (eMod && eMod.code === '23514'
+              && msgMod.indexOf('chk_cartas_media_rechazo') !== -1)
+            return res.status(400).json({ ok:false, error:'MOTIVO_REQUERIDO' });
+          throw eMod;
+        }
+        return res.status(200).json({ ok:true, data: updMed[0],
+          mensaje: 'Obra ' + estNuevo });
       }
 
       // --- Crear: id unico (slug ASCII), set y rareza validos -----------
@@ -1598,20 +1730,33 @@ module.exports = async function handler(req, res) {
         });
         if (cohCa)
           return res.status(400).json({ ok:false, error: cohCa.error, detalle: cohCa.detalle });
+        // Media UGC (spec 6.2): OPCIONAL. Si viene, la obra debe existir,
+        // estar aprobada y activa, y con emisor_tipo=ugc pertenecer al emisor.
+        var medCa = normalizarUuidCarta(body.media_id);
+        if (medCa === undefined)
+          return res.status(400).json({ ok:false, error:'MEDIA_ID_INVALIDO',
+            detalle:'media_id debe ser un uuid valido o null' });
+        if (medCa) {
+          var valMedCa = await validarMediaCarta(sql, medCa, emiTipoCa, emiCa);
+          if (!valMedCa.ok)
+            return res.status(valMedCa.status).json({
+              ok:false, error: valMedCa.error, detalle: valMedCa.detalle
+            });
+        }
         var existCa = await sql('SELECT 1 FROM cartas_catalogo WHERE id=$1 LIMIT 1',[idCa]);
         if (existCa.length)
           return res.status(409).json({ ok:false, error:'Ya existe una carta con ese id' });
         var insCa = await sql(
           'INSERT INTO cartas_catalogo (id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, '
           + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, '
-          + 'familia, subtipo, edicion, supply_max, precio_xp) '
-          + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17,$18,$19,$20) '
+          + 'familia, subtipo, edicion, supply_max, precio_xp, media_id) '
+          + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17,$18,$19,$20,$21::uuid) '
           + 'RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en, '
           + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, '
-          + 'familia, subtipo, edicion, supply_max, emitidas, precio_xp',
+          + 'familia, subtipo, edicion, supply_max, emitidas, precio_xp, media_id',
           [idCa, nomCa, setCa, rarCa, nivCa, evCa, imgCa, actCa,
            emiTipoCa, emiCa, marCa, descCa, JSON.stringify(statsCa), qrCa, fusCa,
-           famCa, subCa, ediCa, supCa, preCa]
+           famCa, subCa, ediCa, supCa, preCa, medCa]
         );
         var respCa = { ok:true, data: insCa[0], mensaje:'Carta creada' };
         if (!imgCa) {
@@ -1639,14 +1784,17 @@ module.exports = async function handler(req, res) {
         // lamina o emisor NO arrastra la validacion de familia.
         var tocaFamCa = ('familia' in body) || ('subtipo' in body) || ('edicion' in body)
           || ('supply_max' in body) || ('precio_xp' in body);
+        // Spec 6.2: vincular/desvincular la obra exige leer la fila actual
+        // (media_id vigente) y, al desvincular, comprobar el mercado.
+        var tocaMedCa = ('media_id' in body);
         // ADR-117 D3.2: tocar imagen_url exige leer activo para no dejar sin
         // lamina una carta ACTIVA (el invariante I1 se romperia por detras).
         var tocaImgCa = ('imagen_url' in body);
         var curCa = [];
-        if (tocaInvCa || tocaImgCa || tocaFamCa) {
+        if (tocaInvCa || tocaImgCa || tocaFamCa || tocaMedCa) {
           curCa = await sql(
             'SELECT nivel_gate, es_evento, es_canjeable_qr, emisor_tipo, emisor_id, marca_id, fusionable, activo, '
-            + 'familia, subtipo, edicion, supply_max, precio_xp, emitidas, stats_json '
+            + 'familia, subtipo, edicion, supply_max, precio_xp, emitidas, stats_json, media_id '
             + 'FROM cartas_catalogo WHERE id=$1 LIMIT 1',
             [body.id]
           );
@@ -1824,6 +1972,39 @@ module.exports = async function handler(req, res) {
           effFusCa = boolCarta(body.fusionable);
           setsCa.push('fusionable=$' + piCa++); paramsCa.push(effFusCa);
         }
+        // Media UGC (spec 6.2). Vincular exige obra APROBADA y, si la carta es
+        // UGC, que el emisor sea su autor. Desvincular (media_id=null) solo si
+        // la carta no esta LISTADA: una oferta abierta/parcial perderia la
+        // obra de un activo que ya tiene compradores potenciales.
+        if (tocaMedCa) {
+          var medE2 = normalizarUuidCarta(body.media_id);
+          if (medE2 === undefined)
+            return res.status(400).json({ ok:false, error:'MEDIA_ID_INVALIDO',
+              detalle:'media_id debe ser un uuid valido o null' });
+          if (medE2) {
+            var valMedE2 = await validarMediaCarta(sql, medE2, effTipoCa, effEmiCa);
+            if (!valMedE2.ok)
+              return res.status(valMedE2.status).json({
+                ok:false, error: valMedE2.error, detalle: valMedE2.detalle
+              });
+          } else if (curCa.length && curCa[0].media_id) {
+            var ofMed = [];
+            try {
+              ofMed = await sql(
+                'SELECT 1 FROM cartas_ofertas WHERE carta_id=$1'
+                + ' AND estado IN (\'abierta\',\'parcial\') LIMIT 1',
+                [body.id]
+              );
+            } catch (eOfMed) {
+              // Entorno sin la 041: no hay mercado, nada que proteger.
+              if (!esquemaAusente(eOfMed)) throw eOfMed;
+            }
+            if (ofMed.length)
+              return res.status(409).json({ ok:false, error:'MEDIA_CON_OFERTAS',
+                detalle:'La carta tiene ofertas abiertas o parciales: cancelalas antes de desvincular la obra' });
+          }
+          setsCa.push('media_id=$' + piCa++); paramsCa.push(medE2);
+        }
         // INVARIANTE DE FUSION (chk_cartas_catalogo_fusionable) sobre el
         // resultado. fusionable=true incompatible se RECHAZA con el motivo:
         // no se corrige en silencio a false, el operador pidio algo
@@ -1870,13 +2051,13 @@ module.exports = async function handler(req, res) {
               detalle:'La carta tiene ofertas abiertas o parciales: cancelalas antes de cambiar la familia' });
         }
         if (!setsCa.length)
-          return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, familia, subtipo, edicion, supply_max o precio_xp' });
+          return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, familia, subtipo, edicion, supply_max, precio_xp o media_id' });
         paramsCa.push(body.id);
         var updCa = await sql(
           'UPDATE cartas_catalogo SET ' + setsCa.join(', ') + ' WHERE id=$' + piCa
           + ' RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, '
           + 'emisor_tipo, emisor_id, marca_id, descripcion, stats_json, es_canjeable_qr, fusionable, '
-          + 'familia, subtipo, edicion, supply_max, emitidas, precio_xp',
+          + 'familia, subtipo, edicion, supply_max, emitidas, precio_xp, media_id',
           paramsCa
         );
         if (!updCa.length) return res.status(404).json({ ok:false, error:'Carta no encontrada' });
