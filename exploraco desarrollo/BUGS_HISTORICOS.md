@@ -2744,6 +2744,16 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 - **Mitigacion / fix propuesto:** anadir `c.activo = true` al `WHERE` del bloque (una condicion, sin endpoint nuevo: **8/8 funciones**, ADR-001/ADR-010), con **degradacion** si el esquema antiguo no tuviera la columna (**42703**, mismo criterio que el resto del fichero), y smoke que desactive una carta con oferta abierta y afirme **0 filas**. Dueno `@backend-dev` (**GATE**).
 - **Nota de alcance:** **no** es regresion de la tanda de ADR-120 -- la consulta no se toco ahi; se detecto al revisar el catalogo tras reactivar por dato. Queda **abierta** y **no bloqueante** para el deploy ya hecho.
 
+## BUG-156: `cartas_mias` confundia catalogo activo con posesion -- la carta ya comprada desaparecia del inventario de su dueno al retirarla del catalogo -- **CERRADO (2026-11-12, TSK-257 / ADR-121 Enmienda 13; backend en `2ddc89f`, UX en `939b5c4`)**
+
+- **Severidad:** ALTA en logica de propiedad, **impacto real NULO** en esta tanda (solo alcanzo a la pieza de prueba; ver "Impacto acotado"). Una carta pagada que se vuelve invisible es, por definicion, **borrado logico por la puerta de atras** (ADR-003).
+- **Sintoma:** al cerrar **D-34** (`db/migrations/080_cartas_apagar_prueba_d34.sql`, `car_artista_prueba` a **`activo=false`**), la carta **ya comprada** desaparecia del inventario de su dueno: `usuarios_cartas` conservaba la fila, `emitidas` seguia en 1 y el XP seguia cobrado, pero **la superficie no la pintaba**.
+- **Causa:** `cartas_mias` filtraba **`WHERE c.activo = true`** (`api/usuarios.js:1244`), es decir usaba el **estado de catalogo** como si fuera el **estado de posesion**. Son dos verdades distintas: `cartas_catalogo.activo` dice si se **vende**, `usuarios_cartas` dice si se **tiene**.
+- **Fix:** el filtro **incluye lo poseido aunque la carta este retirada** y anade **`retirada`**, **`activa_catalogo`** y **`poder_sin_copias`**; la UI pinta el badge **`Retirada`** y, desde **`?v=12`**, la ficha de una carta con `retirada:true` **no ofrece** "Subir nivel" ni "Acunar otra" (el backend habria respondido **404/409**). **Cero endpoint nuevo (8/8)** y **cero `DELETE`**.
+- **Evidencia medida (2026-11-12):** `car_artista_prueba` **retirada** con **`cantidad=1`** y visible en el inventario con **`retirada:true`** / **`activa_catalogo:false`**; `ct_comun_01` **activa** con **`cantidad=2`** y **`poder=5.3`** (2 copias a nivel 2, `poder_sin_copias` 5.0); catalogo publico **57**; **UI 213/213**; **`npm test` exit 0**.
+- **Impacto acotado:** **no afecto a usuarios reales**: el unico caso era la **pieza de prueba** de D-34 y su comprador (el operador). El defecto habria escalado a dano real en cuanto una carta legitima se retirara con copias vendidas.
+- **Nota de alcance:** es un **efecto lateral del cierre de D-34**, no del contrato de copias. La regla que queda escrita es **"se retira la venta, no la propiedad"** (ADR-121 Enmienda 12, punto 3), y este bug es la evidencia de por que se escribio.
+
 
 
 
