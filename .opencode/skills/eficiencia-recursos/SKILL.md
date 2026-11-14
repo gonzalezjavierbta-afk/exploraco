@@ -42,13 +42,14 @@ El costo de una sesión crece de forma aproximadamente cuadrática con sus turno
 *   El orquestador que supere **20-25 llamadas directas** (`read`/`grep`/`glob`) se DETIENE y delega a `@explore`.
 *   El reconocimiento masivo siempre va a `@explore`, con brief de salida acotado (que devuelva `archivo:línea`, no el contenido).
 
-## Coste por herencia (ADR-082): el precio vive en el modelo activo
+## Coste por herencia (ADR-082 + ADR-083 + ADR-115): el precio vive en el modelo activo
 
-*   El roster son **18 agentes** = **2 primarios** (`@plan`, `@build`) + **16 subagentes heredados** que no declaran `model:` y toman el del turno en que se invocan (`coste: heredado`). **Ningún agente lleva pin**: el precio lo pone el **modelo activo de cada turno**, que el operador cambia en el selector.
+*   El roster son **19 agentes** = **2 primarios** (`@plan`, `@build`) + **17 subagentes heredados** que no declaran `model:` y toman el del turno en que se invocan (`coste: heredado`). **Ningún agente lleva pin**: el precio lo pone el **modelo activo de cada turno**, que el operador cambia en el selector.
 *   Un `task` no cuesta dinero por sí mismo: cuesta lo que cuesta el modelo activo de ese turno. Medido: `$0.003331` por una tanda de 4 turnos / 43.360 tokens (~`$0.0008` por turno) con el modelo de pago, y `$0` con el FREE. No afirmes jamás un coste absoluto ni `$0.000000`.
 *   **La escalada tardía es el riesgo real**: cambiar de FREE a PAGO a mitad de sesión no es un error de configuración, es un multiplicador de precio por el contexto acumulado. Turno 2 (~20.000 tokens) ~`$0.001` por subagente; turno 25 (~700.000) ~`$0.05`: **~35x por el mismo trabajo**. Antes de cambiar de modelo con contexto grande, ejecuta `node scripts/ejecucion/verificar-capa-gratis.js --preflight`.
 *   Si un subagente falla, devuelve `partial`/`blocked` o no pasa la verificación, NO se re-despacha el mismo perfil: se cambia de estrategia (otro agente del dominio, un script o un brief mínimo) y se registra el incidente.
-*   Los dominios con gate de riesgo (`sql-security`, `data-migration`, `renderer-dev`, `architect`, `architect-review`) exigen confirmación explícita del usuario ANTES de ejecutarse.
+*   Los **9 dominios con gate** (`@sql-security`, `@data-migration`, `@backend-dev`, `@renderer-dev`, `@admin-dev`, `@seo-dev`, `@content-loader`, `@architect`, `@architect-review`) exigen confirmación explícita del usuario ANTES de ejecutarse, **también cuando la invocación viene del menú `@`**. Los **8 sin gate** (`@docs-keeper`, `@explore`, `@js-silo-dev`, `@frontend-tpl`, `@next-dev`, `@media-reader`, `@qa-auditor`, `@research-agent`) se delegan sin confirmación adicional. Reparto vigente: `AGENTS.md` §2 (9 con gate / 8 sin gate).
+*   Los identificadores de modelo que aparecen en la documentación son **datos medidos de allowlist** (`AGENTS.md` §2, `verificar-capa-gratis.js`), **no pines de agente**. Cualquier `model:` escrito en un agente es **ilustrativo e histórico**: los 19 agentes vigentes van sin `model:`.
 *   Nunca desdoblar dos agentes sobre el mismo archivo en paralelo (sesiones vacías = reloj puro).
 
 ## Watchdog de subagentes
@@ -119,7 +120,7 @@ La exploración del orquestador es el rubro más caro de una sesión: se midió 
 1. `grep` SIEMPRE con la ruta del archivo concreto, nunca la raíz del repo.
 2. Patrones ESPECÍFICOS. Prohibido alternar 5 términos en un solo patrón (devuelve 100 coincidencias truncadas y quema contexto).
 3. Si no se conoce el archivo, la primera llamada es `glob`, no `grep`.
-4. Reconocimiento amplio = subagente de exploración (modelo económico), no el orquestador.
+4. Reconocimiento amplio = subagente de exploración (hereda el modelo activo del turno, como los 17), no el orquestador.
 5. Antes de abrir un archivo grande, un `grep` que devuelva la línea exacta.
 
 ## Diagnóstico: "mi CSS no se aplica" (orden obligatorio)

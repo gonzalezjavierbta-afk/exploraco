@@ -1,11 +1,11 @@
 ---
 name: cascada-tier
-description: Guia operativa de la cascada de coste de ExploraCO tras ADR-083: el tier lo fija el MODELO ACTIVO de cada turno (selector), los 18 agentes van sin model: y con coste: heredado, y el invariante de coste es ATRIBUCION (reparto por message.data.modelID, detector de escalada tardia, --preflight). Allowlists medidas, lista ROTOS, gates 9+7 por rol y el bypass del menu @.
+description: Guia operativa de la cascada de coste de ExploraCO tras ADR-083 y ADR-115: el tier lo fija el MODELO ACTIVO de cada turno (selector), los 19 agentes van sin model: y con coste: heredado, y el invariante de coste es ATRIBUCION (reparto por message.data.modelID, detector de escalada tardia, --preflight). Allowlists medidas, lista ROTOS, reparto de gates 9 con gate / 8 sin gate y el bypass del menu @.
 ---
 
 # Cascada de Tier (ADR-082 + ADR-083)
 
-Como se decide el coste de una sesion en ExploraCO: **no preguntando, heredando**. El unico lugar del sistema donde vive el precio es el **modelo activo del turno**; los 18 agentes no tienen modelo propio.
+Como se decide el coste de una sesion en ExploraCO: **no preguntando, heredando**. El unico lugar del sistema donde vive el precio es el **modelo activo del turno**; los 19 agentes no tienen modelo propio.
 
 > **Fuente de la regla de tier: `AGENTS.md` secciones 0 y 2, y `DECISIONS.md` ADR-083.** Esta skill es la guia operativa (allowlists, ROTOS, gates, herencia, comandos de verificacion), no la fuente normativa. Donde esta skill y `AGENTS.md` discrepen, **`AGENTS.md` manda**.
 
@@ -14,18 +14,18 @@ Como se decide el coste de una sesion en ExploraCO: **no preguntando, heredando*
 **El precio es una decision del turno; el comportamiento es una decision del agente. Son ortogonales.**
 
 ```
-selector de modelos (por turno)  ->  modelo activo  ->  18 agentes sin pin heredan ese modelo
+selector de modelos (por turno)  ->  modelo activo  ->  19 agentes sin pin heredan ese modelo
                                         |
                         +---------------+---------------+
                         |                               |
-              FREE (opencode/space-bunny-free)   PAGO (deepseek-v4.1-flash, glm-5.3-flash)
+     FREE (default de sesion, seccion 4)      PAGO (allowlist PAGO, seccion 4)
                         |                               |
                  coste $0                        coste por turno x contexto
 ```
 
-- El **tier lo fija el modelo activo de cada turno**, cambiable en el selector de la sesion. **La seleccion explicita de modelo PISA el pin del agente**: PROBADO en carga real (`-m opencode-go/deepseek-v4.1-flash` sobre un agente pineado a FREE -> el header registro deepseek). Es la palanca de pago, y ya existia en el producto antes de que la gobernanza la reconociera.
-- Los **18 agentes NO declaran `model:`**. Declaran `coste: heredado` en el frontmatter: es el pin sustituido, la capa legible y auditable.
-- Los **2 primarios** (`plan`, `build`) son **roles sin precio**: se distinguen por permiso de escritura (`plan` conserva `edit: deny`, ADR-078), no por tier. `free-plan` y `free-build` **ya no existen** (borrados; roster **20 -> 18**).
+- El **tier lo fija el modelo activo de cada turno**, cambiable en el selector de la sesion. El precedente medido (ejemplo **historico e ilustrativo**, anterior a ADR-083) es que la seleccion explicita de modelo pisaba el pin de un agente (`-m opencode-go/deepseek-v4.1-flash` sobre un agente entonces pineado a FREE -> el header registro deepseek). Es la palanca de pago, y ya existia en el producto. **Hoy ningun agente lleva pin**, asi que no hay nada que pisar: el `-m`/selector solo cambia el modelo activo.
+- Los **19 agentes NO declaran `model:`**. Declaran `coste: heredado` en el frontmatter: es el pin sustituido, la capa legible y auditable.
+- Los **2 primarios** (`plan`, `build`) son **roles sin precio**: se distinguen por permiso de escritura (`plan` conserva `edit: deny`, ADR-078), no por tier. `free-plan` y `free-build` **ya no existen** (borrados; roster **20 -> 18** en ADR-083, **18 -> 19** en ADR-115 al entrar `@next-dev`).
 - **Una sesion puede empezar FREE y terminar PAGO.** Eso es **capacidad declarada**, no violacion: el sistema la mide y la atribuye en vez de prohibitla.
 - **No existe ruta hibrida** ni pares gemelo por dominio (ADR-076). No existe "el subagente de pago": un subagente es tan FREE o tan PAGO como el modelo activo del turno que lo lanza.
 
@@ -40,7 +40,7 @@ La herencia esta **medida en este repositorio** (T2.5, 2026-10-04), no solo cita
 | 1 | `sonda-pago-p` | `deepseek-v4.1-flash` | $0.001788 | (raiz, pin de pago) |
 | 2 | `sonda-hereda` | **`deepseek-v4.1-flash`** | $0.0016035 | = padre |
 
-El `model` global de `opencode.json` es `opencode/space-bunny-free` (FREE) y el hijo **no cayo al global**: tomo el del padre. La herencia es **discriminante**. Evidencia completa: `scripts/ejecucion/sondas/sonda-modelos.md`.
+El `model` global de `opencode.json` **era** `opencode/space-bunny-free` (FREE) en la fecha de T2.5 y el hijo **no cayo al global**: tomo el del padre. La herencia es **discriminante**. Evidencia completa: `scripts/ejecucion/sondas/sonda-modelos.md`. **Default vigente hoy (T4, 2026-11-14): `opencode/minimax-m3.1-flash-free`**; `space-bunny-free` ya no esta en el catalogo. La conclusion de T2.5 (herencia discriminante) **no depende** del nombre del default.
 
 ## 3. La asimetria de momento (D4): el mismo cambio no cuesta lo mismo
 
@@ -57,11 +57,16 @@ El coste de un turno **escala con el contexto acumulado**, no con la tarea: `~50
 
 | model | veredicto | coste medido |
 |---|---|---|
-| `opencode/space-bunny-free` | OK (allowlist FREE; default de sesion) | $0.000000 |
+| `opencode/minimax-m3.1-flash-free` | OK (allowlist FREE y **default de sesion** hoy; no es pin de agente; medido en **T4 2026-11-14** como primario y como subagente) | $0 por catalogo |
+| `opencode/space-bunny-free` | **HISTORICO**: era el default hasta 2026-11-14; ya **no esta en el catalogo** (su variante `opencode-go/space-bunny-free` es la fila **FANTASMA** NO_CATALOGO) | $0.000000 (medido cuando existia) |
 | `opencode-go/deepseek-v4.1-flash` | OK (allowlist PAGO) | $0.000966 sonda minima / **$0.003331 carga real** de 4 turnos / 43.360 tokens |
 | `opencode-go/glm-5.3-flash` | OK (allowlist PAGO, plan B, **NO pineado**) | $0.000950 |
 | `opencode-go/qwen3.8-max` | OK pero **FUERA de allowlist** (17x) | $0.016108 |
 | `opencode/big-pickle` | **FALLA -> ROTOS** | $0 |
+
+**T4 (2026-11-14) - como se verifico el default nuevo:** `opencode run --model opencode/minimax-m3.1-flash-free` respondio **OK como primario** (header `> build · <modelo>`) y **OK invocado como subagente**; `opencode/flint-40b-free` respondio **OK en ambos roles**. Coste **$0 por catalogo** en los dos. **`flint-40b-free` queda como plan B documentado FUERA de allowlist** (no entra en el guard hasta medirse y declararse). Caveat para **T4-bis**: `opencode run` **no expone tokens ni sessionID por stdout**, asi que la atribucion de coste exige `--format json` o `--session <id>` + `reparto --sesion <id>`.
+
+Los IDs de esta tabla son **datos medidos de allowlist y ROTOS** (contrastables con `AGENTS.md` seccion 2 y con el guard): **ninguno es un `model:` de agente**. Cualquier pin que aparezca en un ejemplo es **ilustrativo e historico**; los 19 agentes vigentes van sin `model:`.
 
 Error literal medido de `opencode/big-pickle` como subagente:
 
@@ -84,7 +89,7 @@ Lo que lo sustituye:
 
 ### Riesgo conocido: una sesion puede abrir en PAGO sin aviso
 
-Con `default_agent: "build"` sin pin y `model`/`small_model` en la allowlist FREE, si el **selector recuerda `opencode-go/deepseek-v4.1-flash`**, la sesion abre en **PAGO sin ningun aviso**: `opencode.json` no le gana a un selector con memoria. No es un fallo del guard (el check (f) se cumple) sino un hueco de la premisa nueva. Se documenta en vez de ocultarse.
+Con `default_agent: "build"` sin pin y `model`/`small_model` en la allowlist FREE, si el **selector recuerda un modelo PAGO de la allowlist** (ejemplo ilustrativo: `opencode-go/deepseek-v4.1-flash`), la sesion abre en **PAGO sin ningun aviso**: `opencode.json` no le gana a un selector con memoria. No es un fallo del guard (el check (f) se cumple) sino un hueco de la premisa nueva. Se documenta en vez de ocultarse.
 
 **Mitigacion (10 s del operador):** preguntar el **modelo activo antes y despues de pulsar Tab**, o correr `--preflight`.
 
@@ -92,17 +97,18 @@ Con `default_agent: "build"` sin pin y `model`/`small_model` en la allowlist FRE
 
 **Pagar no compra saltar el freno.** El gate es por naturaleza del **dominio**, no por el precio del modelo (ADR-082 seccion 6). Con el tier desanclado del agente, un gate por tier seria literalmente imposible de escribir: por eso se piden **siempre**, en FREE y en PAGO.
 
-## 7. Tabla de dominios de riesgo (7 sin gate + 9 con gate = 16)
+## 7. Tabla de dominios de riesgo (8 sin gate + 9 con gate = 17)
 
-Fuente de verdad: `ADR-082` (DECISIONS.md) y `ADR-083`. El gate se pide por la **naturaleza del dominio**, no por el precio del modelo.
+Fuente de verdad: `AGENTS.md` seccion 2 (reparto vigente 9/8, ADR-115 sobre ADR-084), `ADR-083` y `ADR-082`. El gate se pide por la **naturaleza del dominio**, no por el precio del modelo.
 
-**SIN gate (7)** -- se puede delegar sin confirmacion adicional:
+**SIN gate (8)** -- se puede delegar sin confirmacion adicional:
 
 | Agente | Dominio |
 |---|---|
 | `@explore` | Exploracion masiva |
 | `@js-silo-dev` | JS/TS rutinario, `scripts/` |
 | `@frontend-tpl` | CSS de silo / templates |
+| `@next-dev` | Frontend Next/React/Tailwind/shadcn en rutas migradas (`next/`) |
 | `@media-reader` | Imagenes / audio / video / PDF |
 | `@qa-auditor` | Certificacion / Escudo GOLD |
 | `@docs-keeper` | Cierre documental |
@@ -127,12 +133,13 @@ Notas de procedencia que no hay que redescubrir:
 - `@content-loader` entra porque **escribe seeds**; Hostalterraza no lo lista. Asimetria deliberada.
 - `@research-agent` **sale** de la lista con gate: no escribe SQL, ni HTML, ni seeds, ni toca `api/*`. El riesgo lo produce el consumidor (`@content-loader`), que si esta con gate.
 - La restriccion "solo invocado manualmente por el usuario" de `@sql-security`, `@js-silo-dev` y `@frontend-tpl` es un control **adicional**, no un sustituto del gate.
+- `@next-dev` (ADR-115) va **sin gate**: solo trabaja en `next/` con SSG puro, no toca `api/*.js`, `admin.html`, `api/pagina-destino.js` ni metadatos SEO (eso es de `@seo-dev`), y no escribe seeds.
 
 ## 8. El BYPASS del proveedor: `permission.task` controla el RADIO, no el coste
 
-Los 2 primarios llevan un bloque `permission.task` con `"*": deny` primero y allow-list explicita de los 16 subagentes (ADR-082 punto 5). Lo que hace y lo que NO hace:
+Los 2 primarios llevan un bloque `permission.task` con `"*": deny` primero y allow-list explicita de los 17 subagentes (ADR-082 punto 5). Lo que hace y lo que NO hace:
 
-- **SI hace:** acota lo que el *primario* puede delegar. Un `task: allow` plano convierte un error de ruteo en riesgo de dominio, y el radio de impacto de un primario es 16 agentes.
+- **SI hace:** acota lo que el *primario* puede delegar. Un `task: allow` plano convierte un error de ruteo en riesgo de dominio, y el radio de impacto de un primario es 17 agentes.
 - **NO hace:** frenar el gasto, ni fijar el tier. No es una mitigacion de coste y no debe presentarse como tal.
 - **Bypass real:** el **operador puede invocar cualquier subagente por el menu `@`**, saltandose el primario y por tanto la allow-list. El radio se controla dentro del primario, no frente al operador.
 
@@ -151,8 +158,8 @@ node scripts/ejecucion/verificar-capa-gratis.js
 Salida esperada:
 
 ```
-Agentes: 18 | primarios: 2 | subagentes heredados: 16
-RESULTADO: OK. Cascada vigente (ADR-082).
+Agentes: 19 | primarios: 2 | subagentes heredados: 17
+RESULTADO: OK. Cascada vigente (ADR-083 D1/D2 + ADR-115 sobre ADR-084).
 ```
 
 **Reparto real por tier de una sesion** (atribucion D2 i):
@@ -187,4 +194,4 @@ Para cada fila de `opencode.db` con `parent_id` no vacio, el modelo del **hijo d
 
 ## 11. Relativas
 
-`AGENTS.md` secciones 0 a 2 (gobernanza vigente) - `ADR-083` (tier por modelo activo, atribucion, D4/D5) - `ADR-082` (cascada, herencia T2.5, allowlists, ROTOS, gates 9+7; **derogado solo en su premisa**) - `ADR-076` (roster unico, sin pares gemelo) - `ADR-078` (permisos) - `ADR-074` (allowlist FREE y ROTOS sobreviven) - `ADR-067` (rechazo del override de modelo en runtime como practica: el `-m` explicito del selector es la via correcta) - `scripts/ejecucion/sondas/sonda-modelos.md` (T1 y T2.5) - skill `eficiencia-recursos` (coste por turno).
+`AGENTS.md` secciones 0 a 2 (gobernanza vigente) - `ADR-083` (tier por modelo activo, atribucion, D4/D5) - `ADR-115` (roster 19 = 2 + 17, `@next-dev` sin gate, reparto 9/8) - `ADR-084` (argumento documental unico) - `ADR-082` (cascada, herencia T2.5, allowlists, ROTOS; gates por rol; **derogado solo en su premisa y en su reparto de gates**) - `ADR-076` (roster unico, sin pares gemelo) - `ADR-078` (permisos) - `ADR-074` (allowlist FREE y ROTOS sobreviven) - `ADR-067` (rechazo del override de modelo en runtime como practica: el `-m` explicito del selector es la via correcta) - `scripts/ejecucion/sondas/sonda-modelos.md` (T1 y T2.5) - skill `eficiencia-recursos` (coste por turno).

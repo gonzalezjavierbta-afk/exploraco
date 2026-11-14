@@ -231,3 +231,41 @@ siendo la medicion valida de lo que pasa al delegar a un modelo sin permiso de s
 
 No se toco `opencode.json`, ni el roster, ni `DECISIONS.md`, ni `AGENTS.md` por este anexo.
 Cero modelos de pago: toda la evidencia de este anexo es $0.000000.
+
+## T4 - 2026-11-14: el default FREE cambia (`minimax-m3.1-flash-free`) y su plan B (`flint-40b-free`)
+
+**Motivo:** `opencode/space-bunny-free` **salio del catalogo**. El default de `opencode.json` pasa a
+`opencode/minimax-m3.1-flash-free` (mismo valor en `model` y `small_model`). **No se toco ningun
+agente:** los 19 siguen sin `model:`, con `coste: heredado`.
+
+### Candidatos
+
+| model | primario | subagente | coste | allowlist |
+|---|---|---|---|---|
+| `opencode/minimax-m3.1-flash-free` | OK (header `> build · minimax-m3.1-flash-free`) | OK | $0 por catalogo | SI (allowlist FREE del guard) |
+| `opencode/flint-40b-free` | OK | OK | $0 por catalogo | **NO**: plan B documentado, fuera de allowlist |
+
+### Metodo
+
+`opencode run --model <provider/model> ...` y lectura del header de la sesion (`> build · <modelo>`)
+para confirmar que el modelo activo es el pedido, **en invocacion directa (primario)** y **en una
+delegacion (subagente)**.
+
+### Caveat que bloquea la atribucion (abre T4-bis)
+
+`opencode run` **no imprime tokens ni sessionID por stdout**. Sin esos dos datos no hay
+`reparto --sesion <id>` posible, asi que el coste de estas dos filas es **de catalogo ($0)**, no
+medido por token. **T4-bis** debe repetir la sonda con `--format json` o con `--session <id>` y cerrar
+con `node scripts/ejecucion/verificar-capa-gratis.js reparto --sesion <id>`.
+
+### Plan B
+
+`opencode/flint-40b-free` responde en **ambos roles**, pero **no esta en las allowlists medidas**.
+Para usarlo como sustituto hay que medirlo con el metodo de arriba y declararlo; hasta entonces el
+guard lo trata como fuera de allowlist.
+
+### Constancia
+
+No se toco `opencode.json`, ni el roster, ni `DECISIONS.md` por este anexo. Cero modelos de pago.
+**Este T4 (2026-11-14) NO sustituye** el anexo T4 de 2026-10-13: aquel mide herencia, entrada
+fantasma y la trampa de nombres, y sigue vigente; este solo actualiza **que modelo FREE es el default**.

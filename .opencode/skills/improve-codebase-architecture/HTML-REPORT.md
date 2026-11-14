@@ -1,3 +1,5 @@
+> **OBSOLETO:** el esqueleto HTML vive ahora en `SKILL.md` (seccion del scaffold, ~linea 57); se conserva por trazabilidad (ADR-003). **No actualizar este fichero** ni usarlo como fuente: si discrepa de `SKILL.md`, manda `SKILL.md`.
+
 # HTML Report Format
 
 The architectural review is rendered as a single self-contained HTML file in the OS temp directory. Tailwind and Mermaid both come from CDNs. Mermaid handles graph-shaped diagrams reliably; hand-built divs and inline SVG handle the more editorial visuals (mass diagrams, cross-sections). Mix the two — don't lean on Mermaid for everything, it'll start to look generic.

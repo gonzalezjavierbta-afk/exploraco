@@ -91,7 +91,7 @@ function esSintetica(dest) {
   }
 });
 
-var FREE_M = 'space-bunny-free', FREE_P = 'opencode';
+var FREE_M = 'minimax-m3.1-flash-free', FREE_P = 'opencode';
 var PAGO_M = 'deepseek-v4.1-flash', PAGO_P = 'opencode-go';
 var SIN_ADMITIR_M = 'exo-free', SIN_ADMITIR_P = 'opencode';
 var BIG_PICKLE_M = 'big-pickle', BIG_PICKLE_P = 'opencode';
@@ -337,15 +337,15 @@ var ids = ['opencode/space-bunny-free', 'opencode-go/longcat-2.5-preview-free',
 var firmaOk = ids.every(function (m) { return guard.tierDe(m) === guard.tierDe(m, 'sesion'); });
 check('(k) tierDe(m) con UN argumento == tierDe(m, sesion) y coincidencia exacta de ids',
   firmaOk &&
-  guard.tierDe('opencode/space-bunny-free') === 'FREE' &&
+  guard.tierDe(FREE_P + '/' + FREE_M) === 'FREE' &&
   guard.tierDe('opencode/space-bunny') !== 'FREE' &&
   guard.tierDe('space-bunny-free') !== 'FREE' &&
   guard.tierDe('opencode-go/space-bunny-free') === 'ROTO_CATALOGO' &&
   guard.tierDe('opencode/exo-free') === 'FUERA_ADMITIDO_A_CONSCIENCIA' &&
   guard.tierDe('opencode/nemotron-3.5-lightning-free') === 'NO_MEDIDO' &&
   guard.esTrampaDeNombre('opencode-go/space-bunny') === true &&
-  guard.esTrampaDeNombre('opencode/space-bunny-free') === false,
-  'variante=' + guard.tierDe('opencode/space-bunny') + ' gratis=' + guard.tierDe('opencode/space-bunny-free'));
+  guard.esTrampaDeNombre(FREE_P + '/' + FREE_M) === false,
+  'variante=' + guard.tierDe('opencode/space-bunny') + ' gratis=' + guard.tierDe(FREE_P + '/' + FREE_M));
 
 // (l) control positivo: un hijo con modelo propio sigue dando CASCADA ROTA (exit 1).
 var l = correr(['verificar-herencia', '--sesion', 'qa-pin-roto', '--db', DB_GRANDE]);

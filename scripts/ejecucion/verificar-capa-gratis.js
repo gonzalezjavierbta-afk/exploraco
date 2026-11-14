@@ -74,9 +74,10 @@ try { SQLITE = require('node:sqlite'); } catch (e) { SQLITE = null; }
 
 // --- Allowlists medidas (sondas reales; ver scripts/ejecucion/sondas/) --------
 
-// FREE medido: $0.000000 registrado en opencode.db.
+// FREE: default fijado por sonda T4 (2026-11-14): primario responde OK con el
+// harness mostrando el modelo aplicado, subagente OK y coste $0 en el catalogo.
 const FREE = [
-  'opencode/space-bunny-free',
+  'opencode/minimax-m3.1-flash-free',
 ];
 
 // Supervivientes de ADR-074 (dentro del FREE verificado alli). NO se usan como
@@ -92,10 +93,10 @@ const FREE_SUPERVIVIENTES = [
 ];
 
 // ADR-096 B2: FREE ESTRICTA = la unica combinacion segura para una sesion
-// completa, porque es la unica con $0.000000 MEDIDO en LOS DOS roles (3
-// subsesiones + control de la sonda T1). Hoy es un solo identificador.
+// completa. Sonda T4 (2026-11-14): primario OK y subagente OK con
+// opencode/minimax-m3.1-flash-free ($0 en el catalogo). Un solo identificador.
 const FREE_ESTRICTA = [
-  'opencode/space-bunny-free',
+  'opencode/minimax-m3.1-flash-free',
 ];
 
 // PAGO medido. Marcadas como pagadas, no como gratuitas: usarlas es una decision
@@ -195,11 +196,12 @@ const UMBRAL_PREFLIGHT_TOKENS = 100000; // ~$0.0077 por turno a deepseek
 const UMBRAL_ESCALADA_TARDIA_TOKENS = UMBRAL_PREFLIGHT_TOKENS;
 
 // --- TRAMPA DE NOMBRES (medida; no re-sondear) --------------------------------
-// Dos modelos de familia "space-bunny" con precios opuestos. El nombre NO dice
-// si el turno cuesta $0: lo dice el PROVEEDOR.
-//   opencode/space-bunny-free -> FREE verificado ($0.000000 en opencode.db).
+// El nombre NO dice si el turno cuesta $0: lo dice el PROVEEDOR. Medido: la
+// familia "space-bunny" tenia un id FREE ($0.000000 en opencode.db) y otro PAGO:
 //   opencode-go/space-bunny   -> PAGO. Medido: $0.15 por Mtokens de entrada y
 //                                $0.60 por Mtokens de salida.
+// Ese id FREE de la familia ya no es el default (sonda T4, 2026-11-14): el
+// default vigente es FREE[0]. El aviso de nombre sigue aplicando a la familia.
 const MODELO_FREE = FREE[0];
 const MODELO_PARADOJO = 'opencode-go/space-bunny';
 const PRECIO_USD_POR_MTOK_ENTRADA_PARADOJO = 0.15;
@@ -492,8 +494,8 @@ function verificar(root, rol) {
   });
 
   // (f) ADR-096 B2, endurecido: el default de sesion debe ser FREE ESTRICTA, es
-  // decir EXACTAMENTE los ids con $0 medido en primario Y subagente (hoy:
-  // opencode/space-bunny-free). Un modelo de FREE_SUPERVIVIENTES (permitido en la
+  // decir EXACTAMENTE los ids con $0 medido en primario Y subagente (hoy un solo
+  // id: FREE_ESTRICTA[0]). Un modelo de FREE_SUPERVIVIENTES (permitido en la
   // allowlist) NO vale como default: se marca como AVISO, no como falla.
   // Criterio: permitido en allowlist != permitido en el check (f).
   if (cfg) {

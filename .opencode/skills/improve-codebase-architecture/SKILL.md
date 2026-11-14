@@ -1,71 +1,101 @@
 ---
 name: improve-codebase-architecture
-description: Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.
-disable-model-invocation: true
+description: Audita la arquitectura de ExploraCO buscando oportunidades de profundizacion (modulos profundos, no mas capas) y entrega un informe HTML temporal fuera del repo; la candidata elegida se afina con la skill grill-me (Definition of Done). Usar al plantear un refactor estructural o al notar friccion al navegar el codigo.
 ---
 
-# Improve Codebase Architecture
+# Improve Codebase Architecture (ExploraCO)
 
-Surface architectural friction and propose **deepening opportunities** — refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.
+Superficie de friccion arquitectonica -> **oportunidades de profundizacion**: refactors que convierten modulos superficiales en modulos profundos. El fin es testabilidad y navegabilidad por IA, no "mas capas".
 
-This command is _informed_ by the project's domain model and built on a shared design vocabulary:
+## Vocabulario (usarlo exacto)
 
-- Run the `/codebase-design` skill for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion — don't drift into "component," "service," "API," or "boundary."
-- The domain language in `CONTEXT.md` gives names to good seams; ADRs in `docs/adr/` record decisions this command should not re-litigate.
+**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**. No derivar a "componente", "servicio", "API" ni "boundary".
 
-## Process
+Principios:
 
-### 1. Explore
+- **Deletion test**: si borro esto, la complejidad se concentra o solo se mueve? "Se concentra" es la senal buena.
+- **La interface es la superficie de test**: si para probar algo hay que renderizar media pagina, la interface esta en el sitio equivocado.
+- **Un adapter = seam hipotetico; dos = seam real.**
 
-**Scope before you scan — YAGNI.** Deepening a module pays off by making future changes to it easier, so put extra weight on the parts of the codebase that have recently changed. Decide *where* to look before you look:
+## Fuentes de verdad
 
-- If the user named a direction — a module, a subsystem, a pain point — take it, and skip the inference below.
-- Otherwise, walk back a good stretch of the commit history (`git log --oneline`) to find the codebase's hot spots — the files and areas that keep coming up — and let those paths pull your attention first. If the changes are scattered with no clear hot spot, widen the net.
+- Dominio y alcance: `exploraco desarrollo/PROJECT.md` y `exploraco desarrollo/BLUEPRINT.md`.
+- Decisiones: `exploraco desarrollo/DECISIONS.md`. Para ubicar el ultimo ADR: `Select-String -Pattern "^## ADR-0"` y leer **solo su seccion** (Read con `offset`/`limit` <= 60 lineas, ADR-084 D5). Prohibido leer completos los ficheros > 150 KB.
+- Baseline = archivo real (ADR-006): nada se declara "hecho" ni "pendiente" por lo que digan TASKS.md o NEXT.md.
+- Los ADR **no se re-litigan**: si una candidata choca con uno, se marca y se ofrece reabrirlo como ADR nuevo.
 
-Read the project's domain glossary (`CONTEXT.md`) and any ADRs in the area you're touching first.
+## Proceso
 
-Then spawn a sub-agent to walk the codebase. Don't follow rigid heuristics — explore organically and note where you experience friction:
+### 1. Explorar (scope antes del scan, YAGNI)
 
-- Where does understanding one concept require bouncing between many small modules?
-- Where are modules **shallow** — interface nearly as complex as the implementation?
-- Where have pure functions been extracted just for testability, but the real bugs hide in how they're called (no **locality**)?
-- Where do tightly-coupled modules leak across their seams?
-- Which parts of the codebase are untested, or hard to test through their current interface?
+- Si el operador ya nombro una direccion (modulo, subsistema, dolor concreto), se toma y se salta la inferencia.
+- Si no: `git log --oneline -30` para hallar los hot spots. Prohibido `git diff` sin `--stat` sobre ficheros > 150 KB.
+- Delegar el barrido a `@explore` (read-only, `edit: deny`) con un brief que diga el **resultado esperado**, nunca el metodo; techo 15 turnos por subagente.
 
-Apply the **deletion test** to anything you suspect is shallow: would deleting it concentrate complexity, or just move it? A "yes, concentrates" is the signal you want.
+Senales de friccion propias de este repo:
 
-### 2. Present candidates as an HTML report
+- **Silos CSS (ADR-004)**: reglas de una categoria fuera de su selector padre, o dos silos que repiten el mismo bloque. Un `tpl-*` es el module; el selector padre es la interface.
+- **Vanilla puro (ADR-001)**: cualquier profundizacion que asuma bundler, transpilador o Node en runtime cliente **no es implementable**. Descartarla.
+- **Cero Borrado Logico (ADR-003)**: si la unica forma de testear el module es renderizar HTML con IDs que no se pueden eliminar, el seam esta mal puesto.
+- **Presupuesto serverless (8/8 funciones)**: un module que "merece su propio endpoint" no se puede crear; se extiende uno existente por query params.
+- **Serverless ASCII-safe (ADR-002)**: cero backticks y cero bytes > 127 en `api/*.js`; una propuesta que los introduzca rompe el deploy.
+- Entender un concepto obliga a saltar entre muchos modules pequenos (loader, seed, motor de render): candidata a profundizar.
+- Donde los bugs reales viven en **como se llama** a una funcion pura extraida solo para testear (falta de locality).
 
-Write a self-contained HTML file to the OS temp directory so nothing lands in the repo. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<tmpdir>/architecture-review-<timestamp>.html` so each run gets a fresh file. Open it for the user — `xdg-open <path>` on Linux, `open <path>` on macOS, `start <path>` on Windows — and tell them the absolute path.
+Aplicar el **deletion test** a todo lo que parezca superficial antes de proponerlo.
 
-The report uses **Tailwind via CDN** for layout and styling, and **Mermaid via CDN** for diagrams where a graph/flow/sequence reliably communicates the structure. Mix Mermaid with hand-crafted CSS/SVG visuals — use Mermaid when relationships are graph-shaped (call graphs, dependencies, sequences), and hand-built divs/SVG when you want something more editorial (mass diagrams, cross-sections, collapse animations). Each candidate gets a **before/after visualisation**. Be visual.
+### 2. Informe HTML (artefacto temporal, fuera del repo)
 
-For each candidate, render a card with:
+Escribir en el directorio temporal del sistema (`%TEMP%`, fallback `$TMPDIR`/`/tmp`):
+`<tmp>/architecture-review-<timestamp>.html`. Abrirlo con `start <ruta>` (Windows) / `open` / `xdg-open` y dar la **ruta absoluta**. Nada se escribe dentro del repo.
 
-- **Files** — which files/modules are involved
-- **Problem** — why the current architecture is causing friction
-- **Solution** — plain English description of what would change
-- **Benefits** — explained in terms of locality and leverage, and how tests would improve
-- **Before / After diagram** — side-by-side, custom-drawn, illustrating the shallowness and the deepening
-- **Recommendation strength** — one of `Strong`, `Worth exploring`, `Speculative`, rendered as a badge
+El informe es un artefacto temporal y **no es codigo de producto**: ADR-001 y ADR-002 no le aplican, asi que puede usar Tailwind y Mermaid por CDN.
 
-End the report with a **Top recommendation** section: which candidate you'd tackle first and why.
+Esqueleto minimo autocontenido:
 
-**Use CONTEXT.md vocabulary for the domain, and the `/codebase-design` vocabulary for the architecture.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
+```html
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Architecture review</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true });
+</script>
+<style>
+  .badge{display:inline-block;padding:.15rem .55rem;border-radius:999px;font-size:.75rem;font-weight:700}
+  .strong{background:#dcfce7;color:#166534}.worth{background:#fef9c3;color:#854d0e}.spec{background:#e5e7eb;color:#374151}
+  .card{border:1px solid #e5e7eb;border-radius:.75rem;padding:1.25rem;margin:1.5rem 0}
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+  .warn{border-left:4px solid #f59e0b;background:#fffbeb;padding:.6rem .8rem}
+</style></head><body class="max-w-5xl mx-auto p-6 text-slate-800">
+<h1 class="text-2xl font-bold">Oportunidades de profundizacion</h1>
+<!-- una <section class="card"> por candidata: Files / Problem / Solution /
+     Benefits (locality + leverage + como mejora el test) / Before-After / badge -->
+<!-- Mermaid cuando la relacion sea de grafo; divs/SVG cuando sea editorial -->
+<section class="card"><h2>Top recommendation</h2><p>Cual atacar primero y por que.</p></section>
+</body></html>
+```
 
-**ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007 — but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
+Cada candidata es un `<section class="card">` con: **Files** (modules implicados), **Problem** (por que la arquitectura actual genera friccion), **Solution** (que cambia, en lenguaje llano), **Benefits** (locality, leverage, como mejora el test), **Before / After** visual lado a lado y **badge** `Strong`, `Worth exploring` o `Speculative`. Cerrar con **Top recommendation**.
 
-See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
+**Conflicto con ADR**: si la candidata contradice un ADR, incluirla solo si la friccion es real y marcarla con un `<div class="warn">` del tipo "contradice ADR-00XX - merece reabrirse porque...". No listar refactors teoricos que un ADR prohibe.
 
-Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
+No proponer interfaces todavia. Preguntar: **"Cual de estas exploramos?"**
 
-### 3. Grilling loop
+### 3. Afinar la elegida con grill-me (Definition of Done)
 
-Once the user picks a candidate, run the `/grilling` skill to walk the decision tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
+Invocar la skill `grill-me` sobre la candidata elegida: objetivo, criterios de aceptacion medibles, territorio, comandos de verificacion, hecho + cadencia, gates y fuera de alcance. **Sin el sello "LISTO PARA IMPLEMENTAR" no se implementa.**
 
-Side effects happen inline as decisions crystallize — run the `/domain-modeling` skill to keep the domain model current as you go:
+Efectos colaterales, ya gobernados en este repo:
 
-- **Naming a deepened module after a concept not in `CONTEXT.md`?** Add the term to `CONTEXT.md`. Create the file lazily if it doesn't exist.
-- **Sharpening a fuzzy term during the conversation?** Update `CONTEXT.md` right there.
-- **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing — skip ephemeral reasons ("not worth it right now") and self-evident ones.
-- **Want to explore alternative interfaces for the deepened module?** Run the `/codebase-design` skill and use its design-it-twice parallel sub-agent pattern.
+- **Termino de dominio nuevo o afinado**: no se escribe inline. Se entrega en el pase documental de cierre a `@docs-keeper` (`PROJECT.md` / `BLUEPRINT.md`). El argumento de cada decision vive **una sola vez** en `DECISIONS.md` (ADR-084 D1).
+- **Rechazo con razon de peso** (la que un explorador futuro necesitaria para no re-proponer lo mismo): ofrecer ADR via `@architect`, con la pregunta "lo registro como ADR para que la proxima revision no lo re-sugiera?". Saltar razones efimeras.
+- **Interfaces alternativas** (design-it-twice): lanzar 2 subagentes en paralelo con el mismo brief y sesgo distinto (minimizar superficie publica / maximizar locality) y comparar; el ganador se justifica con el deletion test.
+- **Gates**: `@architect` y `@architect-review` exigen confirmacion explicita del operador. El **Escudo GOLD** se corre antes de desplegar `api/*.js`, `admin.html`, `index.html` o el motor de render.
+
+## Limites duros
+
+- La auditoria es **read-only**: el unico artefacto escrito es el HTML temporal. Nada de seeds, migraciones ni ediciones de docs dentro de la auditoria.
+- No crear endpoints (presupuesto 8/8), no crear directorios de skills o agentes, no tocar `AGENTS.md`.
+- Si el hallazgo exige mas de 3 ficheros criticos o un gate sin confirmacion, se entrega como **bloque** y decide el operador.

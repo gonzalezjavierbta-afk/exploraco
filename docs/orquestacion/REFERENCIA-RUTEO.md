@@ -1,3 +1,5 @@
+> **OBSOLETO (pre-ADR-083):** este documento cita `free-build` y `opencode/space-bunny-free` como vigentes; ambos ya no existen. La fuente vigente es `AGENTS.md` seccion 0 / seccion 2 (default de sesion `opencode/minimax-m3.1-flash-free`). Se conserva por trazabilidad (ADR-003).
+
 # REFERENCIA DE RUTEO (ExploraCO)
 
 Documento de apoyo a la orquestacion de agentes. Complementa el `AGENTS.md` de
