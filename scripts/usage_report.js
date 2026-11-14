@@ -19,7 +19,8 @@
  *   - NUNCA se leen, listan ni exportan las tablas:
  *       account, control_account, credential
  *     (contienen access_token, refresh_token, JWT). Este script solo consulta
- *     las tablas: session, message, part, project.
+ *     las tablas: session/session_v2, message/session_message, part, project
+ *     (el par v1/v2 se elige solo segun exista session_v2; ver detectarEsquema).
  *   - Con --with-content TODO texto pasa por redact() ANTES de truncar:
  *     enmascara tokens (sk-, sk-proj-, sk_live_/rk_live_/pk_live_, xoxb-,
  *     xapp-, ghp_, gho_, glpat-, npm_, AKIA, AIza), Bearer y Authorization,
@@ -136,6 +137,46 @@ function chunk(arr, size) {
 function all(db, sql, params) {
   var stmt = db.prepare(sql);
   return stmt.all.apply(stmt, params || []);
+}
+
+/* --------------------------- esquema de la base ------------------------------
+   OpenCode 2.3.0 dejo de escribir las tablas v1 (session / message) y escribe
+   session_v2 + session_message. La deteccion es por sqlite_master: si existe
+   session_v2 se usa v2; si no, v1 (una DB historica se sigue leyendo igual).
+   v1: session / message.
+   v2: session_v2 / session_message WHERE type='assistant' (una respuesta del
+   asistente = una llamada al modelo; el resto de los tipos de session_message
+   son eventos de ciclo de vida, no turnos). Las filas v2 son incrementales y
+   sumables, por eso se agregan con SUM/COUNT sobre el rango pedido. */
+var ESQUEMA = {
+  v: 1, session: 'session', message: 'message', msgWhere: '', etiqueta: 'esquema v1'
+};
+
+function detectarEsquema(db) {
+  var v2 = false;
+  try {
+    v2 = all(db,
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session_v2'",
+      []).length > 0;
+  } catch (e) { v2 = false; }
+  if (v2) {
+    return {
+      v: 2, session: 'session_v2', message: 'session_message',
+      msgWhere: "type = 'assistant'", etiqueta: 'esquema v2'
+    };
+  }
+  return { v: 1, session: 'session', message: 'message', msgWhere: '', etiqueta: 'esquema v1' };
+}
+
+/* Turnos por sesion. v1: COUNT(message). v2: COUNT(session_message) con
+   type='assistant'. Control medido (2026-11-14, sesion ses_e24ca7dd6ffe...):
+   10 filas assistant y la suma de sus tokens/coste coincide con los agregados
+   de session_v2 (36.074 in / 2.497 out / 198.016 cache_read), o sea 1 fila
+   assistant = 1 turno persistido. Contar TODOS los tipos de session_message
+   seria lo que infla el numero (idle, system, synthetic, agent-switched...). */
+function turnsBySession(db, ids) {
+  return countsBySession(db, ESQUEMA.message, ids,
+    ESQUEMA.msgWhere ? ' AND ' + ESQUEMA.msgWhere : '');
 }
 
 function truncate(s, max) {
@@ -306,7 +347,7 @@ function loadSessions(db, opts) {
   }
   var sql = 'SELECT id,parent_id,project_id,title,agent,model,cost,' +
     'tokens_input,tokens_output,tokens_reasoning,tokens_cache_read,tokens_cache_write,' +
-    'time_created,time_updated FROM session';
+    'time_created,time_updated FROM ' + ESQUEMA.session;
   if (w.length) sql += ' WHERE ' + w.join(' AND ');
 
   /* Cap de sesiones (no aplica con --root: ese alcance es explicito).
@@ -324,7 +365,7 @@ function loadSessions(db, opts) {
 
   var rootInfo = null;
   if (opts.root) {
-    var map = all(db, 'SELECT id,parent_id FROM session', []);
+    var map = all(db, 'SELECT id,parent_id FROM ' + ESQUEMA.session, []);
     rootInfo = descendants(map, opts.root);
     var set = {};
     rootInfo.ids.forEach(function (id) { set[id] = true; });
@@ -414,7 +455,9 @@ function evaluarDesfase(db, ids, umbralMs) {
   var batches = chunk(ids, 400);
   for (var b = 0; b < batches.length; b++) {
     var ph = batches[b].map(function () { return '?'; }).join(',');
-    var r = all(db, 'SELECT MAX(time_created) AS mx FROM message WHERE session_id IN (' + ph + ')', batches[b])[0];
+    var r = all(db, 'SELECT MAX(time_created) AS mx FROM ' + ESQUEMA.message +
+      ' WHERE session_id IN (' + ph + ')' +
+      (ESQUEMA.msgWhere ? ' AND ' + ESQUEMA.msgWhere : ''), batches[b])[0];
     if (r && num(r.mx) > maxMsg) maxMsg = num(r.mx);
   }
   out.sesiones = ids.length;
@@ -598,7 +641,7 @@ function renderGrid(cols, rows) {
 
 function renderTotals(t) {
   var L = [];
-  L.push('TOTALES GLOBALES (' + t.sessions + ' sesiones)');
+  L.push('TOTALES GLOBALES (' + t.sessions + ' sesiones, ' + ESQUEMA.etiqueta + ')');
   L.push('  tokens_input        : ' + fmtInt(t.tokens_input) + '  (' + t.pct.input + '%)');
   L.push('  tokens_output       : ' + fmtInt(t.tokens_output) + '  (' + t.pct.output + '%)');
   L.push('  tokens_reasoning    : ' + fmtInt(t.tokens_reasoning) + '  (' + t.pct.reasoning + '%)');
@@ -633,7 +676,11 @@ function summaryCols() {
 function renderSummary(list, totals, opts) {
   var rows = list.slice().sort(function (a, b) { return b.time_created - a.time_created; });
   var shown = (opts.top > 0) ? rows.slice(0, opts.top) : rows;
-  var out = renderGrid(summaryCols(), shown);
+  /* Etiqueta de fuente: con OpenCode 2.3.0 las tablas v1 estan congeladas y los
+     datos vivos estan en v2. Decirlo evita leer un reporte vacio como "stale". */
+  var out = 'FUENTE: opencode.db en solo lectura - ' + ESQUEMA.etiqueta + ' (' +
+    (ESQUEMA.v === 2 ? 'session_v2 + session_message' : 'session + message') + ')\n' +
+    renderGrid(summaryCols(), shown);
   out += '\n\n' + renderTotals(totals);
   if (rows.length > shown.length) {
     out += '\n(mostrando ' + shown.length + ' de ' + rows.length + ' sesiones; usa --top N para ampliar)';
@@ -841,6 +888,7 @@ function makeJson(opts, dbPath, totals, list, byAg, detailEntries) {
     schema_version: 1,
     generated_at: new Date().toISOString(),
     db_path: dbPath,
+    db_schema: ESQUEMA.etiqueta,
     scope: opts.implicitToday
       ? 'Dia local actual (' + new Date(opts.effSince).toISOString() + ' -> ahora). ' +
         'Pasa --since/--until/--project/--agent/--root para acotar; --since 0 = todo el historico.'
@@ -944,10 +992,16 @@ function resolveDbPath(opts) {
     : path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db');
 }
 
+/* Turnos del periodo, con SEMANTICA DE SESION: se toma el conjunto de sesiones
+   del rango desde la tabla de sesiones (v1 session / v2 session_v2) y se suman
+   sus turnos persistidos. NO se cuenta el total de filas de session_message:
+   esa tabla incluye eventos de ciclo de vida (idle, system, synthetic,
+   agent-switched, compaction) y contarlos infla el numero por sesion. En v2 el
+   turno es la fila type='assistant' (ver turnsBySession). */
 function countTurns(db, opts) {
   var loaded = loadSessions(db, opts);
   var ids = loaded.rows.map(function (r) { return r.id; });
-  var turnsMap = countsBySession(db, 'message', ids, '');
+  var turnsMap = turnsBySession(db, ids);
   var total = 0;
   ids.forEach(function (id) { total += turnsMap[id] || 0; });
   return { turns: total, sessions: ids.length, capped: loaded.capped };
@@ -1002,10 +1056,10 @@ function renderOverhead(fx, period) {
   }
   L.push('');
   if (period && period.ok) {
-    L.push('PERIODO: ' + period.label);
+    L.push('PERIODO: ' + period.label + ' [' + ESQUEMA.etiqueta + ']');
     L.push('  sesiones en el periodo          : ' + fmtInt(period.sessions) +
       (period.capped ? ' (recortado por --max-sessions)' : ''));
-    L.push('  turnos (message) en el periodo  : ' + fmtInt(period.turns));
+    L.push('  turnos (' + ESQUEMA.message + ') en el periodo  : ' + fmtInt(period.turns));
     L.push('  overhead fijo por turno         : ' + fmtInt(fx.perTurn.tokens) +
       ' tokens (' + fmtInt(fx.perTurn.bytes) + ' bytes)');
     L.push('  OVERHEAD TOTAL DEL PERIODO      : ' + fmtInt(period.turns) + ' turnos x ' +
@@ -1051,6 +1105,7 @@ function runOverhead(opts) {
       var db = null;
       try {
         db = new SQLITE.DatabaseSync(dbPath, { readOnly: true });
+        ESQUEMA = detectarEsquema(db);
         var t = countTurns(db, opts);
         period.ok = true;
         period.turns = t.turns;
@@ -1182,7 +1237,8 @@ function helpText() {
   L.push('SEGURIDAD:');
   L.push('  La DB se abre en SOLO LECTURA. NUNCA se leen ni exportan las tablas');
   L.push('  account, control_account ni credential (contienen access_token,');
-  L.push('  refresh_token, JWT). Solo se consultan session, message, part, project.');
+  L.push('  refresh_token, JWT). Solo se consultan session/session_v2,');
+  L.push('  message/session_message, part y project.');
   L.push('  Con --with-content todo texto pasa por redact() antes de truncar.');
   L.push('');
   L.push('EJEMPLOS:');
@@ -1255,6 +1311,7 @@ function main() {
   }
 
   try {
+    ESQUEMA = detectarEsquema(db);
     /* A1: sin filtro explicito el alcance es "hoy". Si HOY no hay ninguna
        sesion, la tabla sale vacia con total 0, que se lee como "no se uso nada"
        cuando en realidad no hay datos de hoyTodavia: opencode.db se escribe al
@@ -1263,12 +1320,13 @@ function main() {
        presentar un 0 como si fuera una medicion. */
     var loaded = loadSessions(db, opts);
     if (opts.implicitToday && !loaded.rows.length && opts.mode !== 'overhead') {
-      var ultimo = all(db, 'SELECT MAX(time_created) AS mx FROM session', [])[0];
+      var ultimo = all(db, 'SELECT MAX(time_created) AS mx FROM ' + ESQUEMA.session, [])[0];
       var mx = ultimo ? num(ultimo.mx) : 0;
       if (mx > 0) {
         var d = new Date(mx);
         var inicioDia = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-        var r = all(db, 'SELECT COUNT(*) AS n FROM session WHERE time_created >= ? AND time_created < ?',
+        var r = all(db, 'SELECT COUNT(*) AS n FROM ' + ESQUEMA.session +
+          ' WHERE time_created >= ? AND time_created < ?',
           [inicioDia, inicioDia + 86400000])[0];
         opts.effSince = inicioDia;
         opts.effUntil = inicioDia + 86400000;
@@ -1291,7 +1349,7 @@ function main() {
     }
 
     var ids = loaded.rows.map(function (r) { return r.id; });
-    var turnsMap = countsBySession(db, 'message', ids, '');
+    var turnsMap = turnsBySession(db, ids);
     var list = buildMetrics(loaded.rows, turnsMap, null);
 
     /* Conteo dirigido: part.data es lo caro, solo se lee para las sesiones

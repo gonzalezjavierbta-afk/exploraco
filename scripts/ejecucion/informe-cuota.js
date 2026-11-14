@@ -96,6 +96,48 @@ function query(sql) {
 }
 
 // ---------------------------------------------------------------------------
+// Esquema de la base: OpenCode 2.3.0 dejo de escribir las tablas v1
+// (session / message) y escribe session_v2 + session_message. Se detecta por
+// sqlite_master: si existe session_v2 se usa v2; si no, v1 (DB historica).
+// En v2 el turno persistido es la fila type='assistant' de session_message
+// (una respuesta del asistente = una llamada al modelo); el resto de los tipos
+// (idle, system, synthetic, agent-switched, compaction) son eventos, no turnos,
+// y sumarlos infla el conteo por sesion.
+// ---------------------------------------------------------------------------
+function detectarEsquema() {
+  var v2 = false;
+  try {
+    v2 = query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session_v2'").length > 0;
+  } catch (e) { v2 = false; }
+  if (v2) {
+    return {
+      v: 2, session: 'session_v2', message: 'session_message',
+      msgWhere: "type = 'assistant'", msgWhereM: "m.type = 'assistant'",
+      etiqueta: 'v2 - session_v2 + session_message'
+    };
+  }
+  return {
+    v: 1, session: 'session', message: 'message',
+    msgWhere: '', msgWhereM: '',
+    etiqueta: 'v1 - session + message'
+  };
+}
+
+var ESQUEMA = detectarEsquema();
+
+// v2 guarda el modelo como objeto en message.data.model ({id, providerID}); v1
+// lo ponia plano en data.modelID / data.providerID. Se normaliza a la forma v1
+// para que el resto del script no cambie.
+function normalizeMsg(d) {
+  if (!d || typeof d !== 'object') return d;
+  if (d.model && typeof d.model === 'object') {
+    if (!d.modelID && d.model.id) d.modelID = d.model.id;
+    if (!d.providerID && d.model.providerID) d.providerID = d.model.providerID;
+  }
+  return d;
+}
+
+// ---------------------------------------------------------------------------
 // Modo diagnostico: --schema
 // Lista las tablas y columnas reales de la base y muestrea las claves de
 // nivel superior presentes en message.data, para saber con certeza donde
@@ -112,7 +154,9 @@ function runSchemaInspection() {
   });
 
   try {
-    var sample = query('SELECT data FROM message ORDER BY time_created DESC LIMIT 300');
+    var sample = query('SELECT data FROM ' + ESQUEMA.message +
+      (ESQUEMA.msgWhere ? ' WHERE ' + ESQUEMA.msgWhere : '') +
+      ' ORDER BY time_created DESC LIMIT 300');
     var keySet = {};
     var nestedTokenKeys = {};
     sample.forEach(function (r) {
@@ -127,7 +171,7 @@ function runSchemaInspection() {
         }
       });
     });
-    console.log('\n=== Claves de nivel superior en message.data (muestra de ' + sample.length + ' filas) ===');
+    console.log('\n=== Claves de nivel superior en ' + ESQUEMA.message + '.data (muestra de ' + sample.length + ' filas) ===');
     Object.keys(keySet).sort(function (a, b) { return keySet[b] - keySet[a]; }).forEach(function (k) {
       console.log('  ' + k + ': presente en ' + keySet[k] + ' filas');
     });
@@ -264,7 +308,7 @@ function buildReport(w) {
   var rows = query.apply(null,
     ["SELECT id, title, directory, model, agent, cost, tokens_input, tokens_output, " +
     "tokens_reasoning, tokens_cache_read, tokens_cache_write, time_created, time_updated " +
-    "FROM session WHERE directory LIKE ? AND time_updated >= ? AND time_updated < ?" + sc.sql +
+    "FROM " + ESQUEMA.session + " WHERE directory LIKE ? AND time_updated >= ? AND time_updated < ?" + sc.sql +
     " ORDER BY cost DESC",
     '%' + DIR_FILTER + '%', w.from, w.to].concat(sc.params)
   );
@@ -308,9 +352,10 @@ function buildReport(w) {
   // consumo con su contexto.
   var mc = inClause(allowed, 'm.session_id');
   var msgs = query.apply(null,
-    ["SELECT m.data, s.title as session_title, s.id as session_id FROM message m " +
-    "JOIN session s ON s.id = m.session_id " +
-    "WHERE s.directory LIKE ? AND m.time_created >= ? AND m.time_created < ?" + mc.sql,
+    ["SELECT m.data, s.title as session_title, s.id as session_id FROM " + ESQUEMA.message + " m " +
+    "JOIN " + ESQUEMA.session + " s ON s.id = m.session_id " +
+    "WHERE s.directory LIKE ? AND m.time_created >= ? AND m.time_created < ?" + mc.sql +
+    (ESQUEMA.msgWhereM ? " AND " + ESQUEMA.msgWhereM : ""),
     '%' + DIR_FILTER + '%', w.from, w.to].concat(mc.params)
   );
 
@@ -321,6 +366,7 @@ function buildReport(w) {
   msgs.forEach(function (r) {
     var d;
     try { d = JSON.parse(r.data); } catch (e) { return; }
+    d = normalizeMsg(d);
     var agent = d.agent || '(principal)';
     var model = d.modelID || '(n/a)';
     var prov = d.providerID;
@@ -353,7 +399,7 @@ function buildReport(w) {
   md += '# Informe de consumo de cuota - ExploraCO\n\n';
   md += '- Generado: ' + fmtDate(now) + '\n';
   md += '- Ventana: ' + w.label + ' (desde ' + fmtDate(w.from) + ' hasta ' + fmtDate(w.to) + ')\n';
-  md += '- Origen: ' + DB_PATH + ' (tablas session y message)\n';
+  md += '- Origen: ' + DB_PATH + ' (esquema ' + ESQUEMA.etiqueta + ')\n';
   md += '- Proyecto (filtro dir): *' + DIR_FILTER + '*\n';
   md += '- Sesiones en ventana: ' + rows.length + ' | Mensajes con costo: ' + msgs.length + '\n';
   if (MAX_SESSIONS) md += '- Limite --max-sessions: ' + MAX_SESSIONS + ' sesiones mas recientes\n';
@@ -471,7 +517,7 @@ function parseMaxSessionsArg() {
 function recentSessionIds() {
   if (!MAX_SESSIONS) return null;
   return query(
-    "SELECT id FROM session WHERE directory LIKE ? ORDER BY time_updated DESC LIMIT ?",
+    "SELECT id FROM " + ESQUEMA.session + " WHERE directory LIKE ? ORDER BY time_updated DESC LIMIT ?",
     '%' + DIR_FILTER + '%', MAX_SESSIONS
   ).map(function (r) { return r.id; });
 }
@@ -502,13 +548,13 @@ function resolveTaskMark() {
   var raw = argValue('--task=');
   if (raw === null || raw === '') {
     var cand = query(
-      "SELECT id, time_created FROM session WHERE directory LIKE ? AND time_archived IS NULL " +
+      "SELECT id, time_created FROM " + ESQUEMA.session + " WHERE directory LIKE ? AND time_archived IS NULL " +
       "ORDER BY time_updated DESC LIMIT 1",
       '%' + DIR_FILTER + '%'
     );
     if (!cand.length) {
       cand = query(
-        "SELECT id, time_created FROM session WHERE directory LIKE ? ORDER BY time_updated DESC LIMIT 1",
+        "SELECT id, time_created FROM " + ESQUEMA.session + " WHERE directory LIKE ? ORDER BY time_updated DESC LIMIT 1",
         '%' + DIR_FILTER + '%'
       );
     }
@@ -526,7 +572,7 @@ function resolveTaskMark() {
     return { sessionId: null, from: t, kind: 'timestamp', label: raw + ' (timestamp)' };
   }
   var s = query(
-    "SELECT id, time_created FROM session WHERE directory LIKE ? AND id LIKE ? ORDER BY time_updated DESC LIMIT 1",
+    "SELECT id, time_created FROM " + ESQUEMA.session + " WHERE directory LIKE ? AND id LIKE ? ORDER BY time_updated DESC LIMIT 1",
     '%' + DIR_FILTER + '%', raw + '%'
   );
   if (s.length) {
@@ -544,9 +590,10 @@ function runTask() {
 
   var allowed = recentSessionIds();
   var mc = inClause(allowed, 'm.session_id');
-  var sql = "SELECT m.data, m.session_id, s.title as session_title FROM message m " +
-    "JOIN session s ON s.id = m.session_id " +
-    "WHERE s.directory LIKE ? AND m.time_created >= ?";
+  var sql = "SELECT m.data, m.session_id, s.title as session_title FROM " + ESQUEMA.message + " m " +
+    "JOIN " + ESQUEMA.session + " s ON s.id = m.session_id " +
+    "WHERE s.directory LIKE ? AND m.time_created >= ?" +
+    (ESQUEMA.msgWhereM ? " AND " + ESQUEMA.msgWhereM : "");
   var params = ['%' + DIR_FILTER + '%', mark.from];
   if (mark.sessionId) { sql += " AND m.session_id = ?"; params.push(mark.sessionId); }
   sql += mc.sql;
@@ -559,8 +606,9 @@ function runTask() {
      desfasado por encima del umbral (15 min): el snapshot puede no ser el
      vigente. No es un fallo: es decir que el numero es viejo. */
   var UMBRAL_DESFASE_MS = 15 * 60 * 1000;
-  var sqlDesfase = "SELECT MAX(m.time_created) AS mx FROM message m " +
-    "JOIN session s ON s.id = m.session_id WHERE s.directory LIKE ?" +
+  var sqlDesfase = "SELECT MAX(m.time_created) AS mx FROM " + ESQUEMA.message + " m " +
+    "JOIN " + ESQUEMA.session + " s ON s.id = m.session_id WHERE s.directory LIKE ?" +
+    (ESQUEMA.msgWhereM ? " AND " + ESQUEMA.msgWhereM : "") +
     (mark.sessionId ? " AND m.session_id = ?" : "");
   var parsDesfase = ['%' + DIR_FILTER + '%'].concat(mark.sessionId ? [mark.sessionId] : []);
   var ultimaFila = query.apply(null, [sqlDesfase].concat(parsDesfase))[0];
@@ -582,6 +630,7 @@ function runTask() {
   msgs.forEach(function (r) {
     var d;
     try { d = JSON.parse(r.data); } catch (e) { return; }
+    d = normalizeMsg(d);
     var t = d.tokens || {};
     var hasRea = Object.prototype.hasOwnProperty.call(t, 'reasoning');
     var cache = t.cache || {};
@@ -615,7 +664,7 @@ function runTask() {
   md += '- Generado: ' + fmtDate(now) + '\n';
   md += '- Marca: ' + mark.label + '\n';
   md += '- Ventana: desde ' + fmtDate(mark.from) + ' hasta ' + fmtDate(now) + '\n';
-  md += '- Origen: ' + DB_PATH + ' (tablas session y message)\n';
+  md += '- Origen: ' + DB_PATH + ' (esquema ' + ESQUEMA.etiqueta + ')\n';
   if (desfasado) {
     md += '- MEDICION DESFASADA: ultima fila persistida ' + new Date(mx).toISOString() +
       ', ' + Math.round((now - mx) / 60000) + ' min de retraso (umbral 15 min): el turno en curso puede no estar dentro.\n';
