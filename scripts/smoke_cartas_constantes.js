@@ -304,9 +304,9 @@ assert(bloqueEdit.indexOf('if (preFinE2 !== effPreCa)') !== -1
 // Este bloque fija los cuatro hechos para que no se puedan deshacer sin gate.
 var famsCarta = libCfg.FAMILIAS_CARTA;
 assert(Object.prototype.toString.call(famsCarta) === '[object Array]'
-  && famsCarta.length === 8
+  && famsCarta.length === 9
   && famsCarta.filter(function (f) { return f === 'naturaleza'; }).length === 1,
-  'FAMILIAS_CARTA declara 8 familias y naturaleza aparece UNA sola vez',
+  'FAMILIAS_CARTA declara 9 familias y naturaleza aparece UNA sola vez',
   'valor real: ' + JSON.stringify(famsCarta));
 assert(famsCarta.indexOf('naturaleza') === famsCarta.indexOf('lugar') + 1,
   'FAMILIAS_CARTA ordena naturaleza junto a lugar (capa de juego)',
@@ -316,8 +316,8 @@ var subsNat = libCfg.subtiposDeFamilia('naturaleza');
 assert(JSON.stringify(subsNat) === JSON.stringify(['flora', 'fauna']),
   'subtiposDeFamilia(naturaleza) = [flora, fauna] (hongo descartado)',
   'valor real: ' + JSON.stringify(subsNat));
-assert(Object.keys(libCfg.SUBTIPOS_CARTA).length === 8,
-  'SUBTIPOS_CARTA cubre las 8 familias (una rama por familia, sin huerfanas)',
+assert(Object.keys(libCfg.SUBTIPOS_CARTA).length === 9,
+  'SUBTIPOS_CARTA cubre las 9 familias (una rama por familia, sin huerfanas)',
   'claves: ' + Object.keys(libCfg.SUBTIPOS_CARTA).join(', '));
 
 assert(Object.prototype.hasOwnProperty.call(mults, 'naturaleza')
@@ -330,6 +330,69 @@ assert(libCfg.CARTA_FAMILIAS_SIN_PRECIO_XP.indexOf('naturaleza') < 0
   'naturaleza NO cae en CARTA_FAMILIAS_SIN_PRECIO_XP y acuna 150 / 2500',
   'sin_precio=' + libCfg.CARTA_FAMILIAS_SIN_PRECIO_XP.join(',')
     + ' comun=' + libCfg.precioAcunacion('naturaleza', 'comun'));
+
+// --- (h-bis) FAMILIA MEJORA (ADR-122; migracion 081) ------------------------
+// 'mejora' es la NOVENA familia y absorbe "ampliar contenido": capacidad
+// permanente, precio FIJO por copia y subtipos DERIVADOS de MEJORA_REF_ORIGEN
+// (solo los comprables). 'destacar_evento' se conserva en el mapa con
+// soporte=false pero NO es subtipo: "proximamente" no se vende (D10). Estos
+// asserts fijan los hechos que no se pueden deshacer sin gate.
+var REF_MEJORA = libCfg.MEJORA_REF_ORIGEN;
+assert(!!REF_MEJORA
+  && Object.prototype.toString.call(REF_MEJORA) === '[object Object]',
+  'lib exporta MEJORA_REF_ORIGEN como mapa de datos',
+  'valor real: ' + JSON.stringify(REF_MEJORA));
+
+var subsMejora = libCfg.subtiposDeFamilia('mejora');
+assert(JSON.stringify(subsMejora)
+  === JSON.stringify(['foto_galeria', 'album_slot', 'portada_destino']),
+  'subtiposDeFamilia(mejora) = [foto_galeria, album_slot, portada_destino]',
+  'valor real: ' + JSON.stringify(subsMejora));
+
+assert(libCfg.precioAcunacion('mejora', 'raro') === 400,
+  'precioAcunacion(mejora, raro) = 400 (precio fijo, mult 1,0)',
+  'valor real: ' + libCfg.precioAcunacion('mejora', 'raro'));
+assert(mults.mejora === 1.0,
+  'CARTA_MULT_FAMILIA declara mejora = 1,0 (sin la clave el precio seria null)',
+  'valor real: ' + mults.mejora);
+assert(sinPrecioCarta.indexOf('mejora') < 0,
+  'mejora NO cae en CARTA_FAMILIAS_SIN_PRECIO_XP (exige precio_xp > 0)',
+  'sin_precio=' + sinPrecioCarta.join(','));
+
+assert(!!REF_MEJORA && !!REF_MEJORA.destacar_evento
+  && REF_MEJORA.destacar_evento.soporte === false,
+  'MEJORA_REF_ORIGEN.destacar_evento.soporte = false (reservado, no comprable)',
+  'valor real: ' + JSON.stringify(REF_MEJORA && REF_MEJORA.destacar_evento));
+
+// D3: el mapeo es DATO PURO, ni un byte de SQL en lib/. El fragmento
+// " AND tipo_medio = 'general'" lo CONSTRUYE api/interacciones.js a partir del
+// dato tipo_medio_requerido: si el SQL viviera aqui, las 8 funciones cargarian
+// una consulta desde un modulo de datos.
+var refTexto = JSON.stringify(REF_MEJORA || {});
+assert(refTexto.indexOf(' AND ') < 0 && refTexto.indexOf('tipo_medio =') < 0,
+  'MEJORA_REF_ORIGEN no contiene SQL (tipo_medio_requerido es un dato)',
+  'fragmento SQL detectado en el mapa');
+assert(!!REF_MEJORA && !!REF_MEJORA.portada_destino
+  && REF_MEJORA.portada_destino.tipo_medio_requerido === 'general',
+  'portada_destino declara tipo_medio_requerido = general',
+  'valor real: ' + JSON.stringify(REF_MEJORA && REF_MEJORA.portada_destino));
+
+// Los 3 comprables enganchan a la tabla/columna REAL verificada (ADR-122 D3).
+var REFS_MEJORA_OK = {
+  foto_galeria: 'usuario_fotos.id',
+  album_slot: 'albumes.id',
+  portada_destino: 'spot_duenos.destino_id'
+};
+assert(Object.keys(REFS_MEJORA_OK).every(function (k) {
+  var o = REF_MEJORA && REF_MEJORA[k];
+  return !!o && o.soporte === true
+    && (o.tabla + '.' + o.columna) === REFS_MEJORA_OK[k];
+}), 'MEJORA_REF_ORIGEN engancha a usuario_fotos.id / albumes.id / spot_duenos.destino_id',
+  'valor real: ' + JSON.stringify(REF_MEJORA && {
+    foto_galeria: REF_MEJORA.foto_galeria.tabla + '.' + REF_MEJORA.foto_galeria.columna,
+    album_slot: REF_MEJORA.album_slot.tabla + '.' + REF_MEJORA.album_slot.columna,
+    portada_destino: REF_MEJORA.portada_destino.tabla + '.' + REF_MEJORA.portada_destino.columna
+  }));
 
 // Segunda autoridad retirada: admin.html ya no replica las listas. Pinta los
 // selects con el bloque config de cartas_lista (armado en api/admin.js desde

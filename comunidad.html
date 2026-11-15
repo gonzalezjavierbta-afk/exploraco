@@ -4811,13 +4811,15 @@ function cmFichaWire(box) {
      lectura con JWT      -> cmGet(url) para GET (contrato {ok,data,raw}) y
                              postComAPIJWT(body) para POST (JSON crudo, con
                              reintento de 401 SESION_REQUERIDA)
-     relectura de inventario -> no existe en comunidad: tras comprar se relee
-                             con pfSlotsCargar() y NO se llama a
-                             cargarCartasComm(), porque un slot no altera el
-                             mercado de cartas
+     relectura tras exito     -> pfSlotsCargar() relee saldo, slots y el picker, y
+                             cargarCartasComm() refresca "Mis cartas" del mercado
+                             (consumir una carta de mejora SI altera el
+                             inventario); en fallo solo se relee el picker
    fmtXp, esc y sesion YA existen en comunidad con el mismo nombre: se reusan,
    no se redefinen. Endpoints existentes, sin backend nuevo:
-   GET tipo=slot_catalogo|slot_mios|slot_refs|bonus_referido, POST slot_comprar.
+   GET tipo=slot_catalogo|slot_mios|slot_refs|bonus_referido. slot_comprar, el POST
+   de compra de slots con XP, responde hoy 410: se retiro en ADR-122 y cada slot
+   nace de una carta de la familia mejora, que el picker de abajo consume.
    ASCII-safe (ADR-002). --------------------------------------------------- */
 var PF_SLOT_CLAVE = /^[a-z0-9_]+$/;
 var pfSlotsCat = null;
@@ -4948,14 +4950,14 @@ function pfSlotsEtiqueta(r) {
   var t = (r && r.etiqueta) ? String(r.etiqueta) : 'Sin nombre';
   return (r && r.ciudad) ? t + ' - ' + String(r.ciudad) : t;
 }
-/* Estado de compra de UN sumidero. Fuente unica de verdad: lo pinta la fila y
-   lo consulta el handler ANTES de tocar la red, de modo que la guarda y lo que
-   se ve son el mismo calculo y no pueden discrepar.
+/* Estado de UN sumidero. Fuente unica de verdad: lo pinta la fila y lo consulta
+   el boton ANTES de llevar al picker, de modo que la guarda y lo que se ve son
+   el mismo calculo y no pueden discrepar. Desde ADR-122 el estado NO mira XP:
+   la compra con curva se retiro y lo que decide es el tope del sumidero y la
+   disponibilidad del enganche (ref_contrato y sus candidatos).
    Regla dura: aqui NO se enumera ningun sumidero, ni su clave, ni el nombre del
-   campo de enganche. Todo se lee de lo que manda el motor (puede_comprar,
-   ref_contrato.comprable, ref_contrato.motivo_soporte, topes, disponible_xp),
-   luego un sumidero puede volverse comprable sin tocar una linea de aqui, que es
-   justo lo que esta pasando con el enganche a destinos. */
+   campo de enganche. Todo se lee de lo que manda el motor (ref_contrato,
+   topes, disponible_xp), luego un sumidero puede cambiar sin tocar esta funcion. */
 function pfSlotsEstado(a) {
   var st = { boton: '', motivo: '', tecnico: '', listo: false, ref: null,
     etiqueta: '', prox: null, saldo: null, topeH: false, topeA: false,
@@ -4976,23 +4978,24 @@ function pfSlotsEstado(a) {
   st.ka = ka;
   st.sMax = sMax;
   st.sMaxA = sMaxA;
-  /* Sin sesion no hay k, ni topes, ni precio: solo se ofrece entrar. */
-  if (k === null || ka === null || st.prox === null) {
+  /* Sin sesion no hay k ni topes: solo se ofrece entrar. costo_proximo ya no
+     interviene: la compra con XP se retiro (ADR-122) y aqui no se pinta precio. */
+  if (k === null || ka === null) {
     st.boton = 'Inicia sesion';
-    st.motivo = 'Entra con tu cuenta para ver cuanto costaria ampliar este sumidero.';
+    st.motivo = 'Entra con tu cuenta para ver cuantos slots tienes y cuales puedes ampliar.';
     return st;
   }
   st.topeH = sMax !== null && k >= sMax;
   st.topeA = sMaxA !== null && ka >= sMaxA;
-  st.alcanza = st.saldo.valor === null || st.saldo.valor >= st.prox;
-  /* Sin soporte el motor RECHAZA la compra. Eso no es un error de la pagina ni
-     un fallo de red: es un sumidero todavia no comprable, y se muestra como tal.
-     El tecnico (motivo_soporte) queda como detalle, nunca como el mensaje. */
+  /* Sin soporte el motor RECHAZA el uso de cualquier carta sobre este sumidero.
+     Eso no es un error de la pagina ni un fallo de red: es un sumidero que
+     todavia no se puede ampliar, y se muestra como tal. El tecnico
+     (motivo_soporte) queda como detalle, nunca como el mensaje. */
   if (!rc || rc.comprable !== true) {
-    st.boton = 'No comprable todavia';
+    st.boton = 'No disponible todavia';
     st.motivo = 'Este sumidero todavia no se puede ampliar: falta saber a que se '
-      + 'engancha y el servidor no puede comprobarlo, asi que cobrar por el crearia '
-      + 'una fila que no apunta a nada.';
+      + 'engancha y el servidor no puede comprobarlo, asi que crear un slot sin '
+      + 'destino no tendria sentido.';
     st.tecnico = (rc && rc.motivo_soporte) ? String(rc.motivo_soporte) : '';
     return st;
   }
@@ -5006,15 +5009,10 @@ function pfSlotsEstado(a) {
     st.motivo = 'Llegaste al tope de slots activos. Suelta uno para seguir.';
     return st;
   }
-  if (!st.alcanza) {
-    st.boton = 'XP insuficiente';
-    st.motivo = 'Te faltan ' + fmtXp(st.prox - st.saldo.valor) + ' XP para este slot.';
-    return st;
-  }
   /* El enganche, en los tres estados que se distinguen a ojo. La etiqueta la
      pone el motor, asi que el motivo dice el nombre real de lo que falta en vez
      de un "no disponible" que no ayuda a nadie. En los tres casos el boton queda
-     deshabilitado: un boton que va a fallar al cobrar es peor que no tenerlo. */
+     deshabilitado: un boton que va a fallar al usar la carta es peor que no tenerlo. */
   var etq = st.etiqueta ? st.etiqueta.toLowerCase() : 'el recurso';
   st.candidatos = pfSlotsCandidatos(a);
   st.elegido = pfSlotsElegido(a);
@@ -5025,8 +5023,8 @@ function pfSlotsEstado(a) {
   }
   if (pfSlotsRefsEstado === 'fallo') {
     st.boton = 'No se pudo leer ' + etq;
-    st.motivo = 'No se pudo comprobar que ' + etq + ' tienes, asi que la compra queda cerrada '
-      + 'mientras tanto: sin saber a que se engancha, cobrar seria vender algo que no se puede entregar.';
+    st.motivo = 'No se pudo comprobar que ' + etq + ' tienes, asi que la ampliacion queda '
+      + 'cerrada mientras tanto: sin saber a que se engancha el slot, no se puede usar la carta.';
     st.tecnico = pfSlotsRefsError;
     return st;
   }
@@ -5036,11 +5034,10 @@ function pfSlotsEstado(a) {
       + 'Cuando tengas una, vuelve a esta pestana y aparecera aqui para elegirla.';
     return st;
   }
-  st.boton = 'Comprar por ' + fmtXp(st.prox) + ' XP';
-  /* puede_comprar del motor manda sobre cualquier derivacion local: si el
-     servidor dice que no, aqui no se pinta un boton vivo. */
-  st.listo = a.puede_comprar !== false;
-  if (!st.listo) st.motivo = 'El motor todavia no habilita esta compra.';
+  /* ADR-122: el boton ya no compra con XP: lleva al picker de cartas de mejora.
+     No se pinta precio en XP en ningun caso (ni costo_proximo ni costo_siguiente). */
+  st.boton = 'Ver cartas de mejora';
+  st.listo = true;
   return st;
 }
 function pfSlotsEsqueleto(clave) {
@@ -5051,21 +5048,21 @@ function pfSlotsEsqueleto(clave) {
       + '<span class="sl-top" id="' + pfSlotsId(clave, 'top-a') + '"></span>'
     + '</div>'
     + '<div class="sl-precio">'
-      + '<div class="sl-precio-lbl">Lo que pagas ahora</div>'
+      + '<div class="sl-precio-lbl">Como se consigue este slot</div>'
       + '<div class="sl-precio-v" id="' + pfSlotsId(clave, 'px') + '"></div>'
       + '<div class="sl-precio-base" id="' + pfSlotsId(clave, 'base') + '"></div>'
       + '<div class="sl-siguiente" id="' + pfSlotsId(clave, 'sig') + '"></div>'
     + '</div>'
     + '<div class="sl-bars">'
-      + '<div class="sl-bar base"><span>Inicial</span><i id="' + pfSlotsId(clave, 'bar-b') + '"></i></div>'
-      + '<div class="sl-bar prox"><span>Ahora</span><i id="' + pfSlotsId(clave, 'bar-p') + '"></i></div>'
+      + '<div class="sl-bar base"><span>Historicos</span><i id="' + pfSlotsId(clave, 'bar-b') + '"></i></div>'
+      + '<div class="sl-bar prox"><span>Activos</span><i id="' + pfSlotsId(clave, 'bar-p') + '"></i></div>'
     + '</div>'
     + '<div class="sl-crece" id="' + pfSlotsId(clave, 'crece') + '"></div>'
     + '<div class="sl-hielo" id="' + pfSlotsId(clave, 'hielo') + '"></div>'
     + '<div class="sl-ref" id="' + pfSlotsId(clave, 'ref') + '"></div>'
     + '<div class="sl-mios" id="' + pfSlotsId(clave, 'mios') + '"></div>'
     + '<div class="sl-cta">'
-      + '<button type="button" class="sl-btn" id="' + pfSlotsId(clave, 'btn') + '" data-clave="' + esc(clave) + '">Comprar</button>'
+      + '<button type="button" class="sl-btn" id="' + pfSlotsId(clave, 'btn') + '" data-clave="' + esc(clave) + '">Ver cartas de mejora</button>'
       + '<span class="sl-motivo" id="' + pfSlotsId(clave, 'motivo') + '"></span>'
     + '</div>'
     + '</div>';
@@ -5073,9 +5070,7 @@ function pfSlotsEsqueleto(clave) {
 function pfSlotsFila(a) {
   var clave = a.clave;
   var st = pfSlotsEstado(a);
-  var base = st.base;
   var k = st.k;
-  var prox = st.prox;
 
   pfSlotsTxt(pfSlotsId(clave, 'n'), a.etiqueta || clave);
 
@@ -5095,58 +5090,37 @@ function pfSlotsFila(a) {
   var topeH = st.topeH;
   var topeA = st.topeA;
 
-  pfSlotsTxt(pfSlotsId(clave, 'px'), prox === null ? 'Inicia sesion' : fmtXp(prox) + ' XP');
+  /* ADR-122 F2.1: aqui NO se pinta ningun precio en XP. costo_proximo y
+     costo_siguiente son historia de la curva retirada: se consumen como dato,
+     nunca como precio. Se pintan topes usados/max y como se consigue el slot. */
+  pfSlotsTxt(pfSlotsId(clave, 'px'), 'Con una carta de mejora del mercado');
 
   var baseEl = document.getElementById(pfSlotsId(clave, 'base'));
-  if (baseEl) {
-    baseEl.innerHTML = base === null ? ''
-      : 'Precio inicial <s>' + fmtXp(base) + ' XP</s>'
-        + (k !== null && k > 0 ? ' (ya no es el que pagas)' : ' (este es el que pagas)');
-  }
-
-  /* El k+1, DEBAJO del precio actual y en pequeno (jerarquia: 25px gold el
-     actual, ~12px apagado el siguiente). Los tres casos se distinguen:
-       - undefined -> el catalogo no trae el campo: no se inventa nada.
-       - null      -> el motor dice que k+1 supera slot_max: NO hay proximo, y
-                      se dice con palabras. Nunca 0, NaN ni un "--" ambiguo.
-       - numero    -> el precio real del slot k+1, tal cual lo manda. */
+  if (baseEl) baseEl.innerHTML = '';
   var sigEl = document.getElementById(pfSlotsId(clave, 'sig'));
-  if (sigEl) {
-    if (a.costo_siguiente === undefined) sigEl.textContent = '';
-    else {
-      var sig = pfSlotsNum(a.costo_siguiente);
-      sigEl.textContent = sig === null ? 'No hay proximo slot en este sumidero.'
-        : 'El siguiente costara ' + fmtXp(sig) + ' XP.';
-    }
-  }
+  if (sigEl) sigEl.innerHTML = '';
 
-  var max = Math.max(base || 0, prox || 0) || 1;
-  pfSlotsBar(clave, 'bar-b', base || 0, max);
-  pfSlotsBar(clave, 'bar-p', prox || 0, max);
+  /* Las dos barras miden TOPES, no precio: historicos y activos. */
+  pfSlotsBar(clave, 'bar-b', st.k || 0, st.sMax === null ? 1 : st.sMax);
+  pfSlotsBar(clave, 'bar-p', st.ka || 0, st.sMaxA === null ? 1 : st.sMaxA);
 
-  /* La explicacion del crecimiento va ANTES del boton: el usuario tiene que ver
-     por que paga mas que el precio inicial antes de confirmar. Los numeros son
-     del motor; aqui solo se hace el porcentaje de comparacion. */
+  /* La explicacion del origen del slot va ANTES del boton. Sin numeros de la
+     curva: se retiro, y publicar su tramo como precio seria vender algo que ya
+     no se cobra. */
   var creEl = document.getElementById(pfSlotsId(clave, 'crece'));
   if (creEl) {
-    creEl.innerHTML = '';
     if (k === null) {
-      creEl.textContent = 'Entra con sesion para ver cuanto costaria tu proximo slot.';
-    } else if (base !== null && prox !== null && base > 0 && prox > base) {
-      var subida = Math.round(((prox - base) / base) * 100);
-      creEl.innerHTML = 'Este slot <b>ya no cuesta el precio inicial</b>: +' + subida
-        + '% porque tu historial en este sumidero va en <b>k = ' + k + '</b>.';
-    } else if (k > 0) {
-      creEl.innerHTML = 'Historial en este sumidero: <b>k = ' + k + '</b>.';
+      creEl.textContent = 'Entra con sesion para ver tus topes en este sumidero.';
     } else {
-      creEl.innerHTML = 'Primer slot en este sumidero (<b>k = 0</b>): pagas el precio inicial.';
+      creEl.innerHTML = 'La compra de slots con XP <b>se retiro</b>. Cada slot nace de una '
+        + '<b>carta de mejora</b> del mercado que se usa aqui. Usar la carta no cobra XP.';
     }
   }
 
   var hEl = document.getElementById(pfSlotsId(clave, 'hielo'));
   if (hEl) {
-    hEl.innerHTML = 'Lo que pagues aqui queda <b>congelado</b> en su fila y no sube despues. '
-      + 'Si sueltas el slot y lo recompras, pagas lo que toque en ese momento, no el precio inicial.';
+    hEl.innerHTML = 'El freno ya no es el precio sino el <b>tope</b>: si llegas al maximo de '
+      + 'historicos o de activos, no se crea otro slot aunque tengas cartas.';
   }
 
 /* El enganche: ref_contrato.etiqueta es lo que el usuario tiene que LEER, asi
@@ -5236,15 +5210,16 @@ function pfSlotsPintar() {
     return;
   }
   if (!document.getElementById('pf-slots-grid')) {
-    var curva = cat.curva || {};
     box.innerHTML = '<div class="sl-curva">'
       + '<div class="sl-saldo"><span class="sl-saldo-k">Disponible</span>'
       + '<span class="sl-saldo-v" id="pf-slots-saldo">lo confirma el motor</span>'
       + '<span class="sl-saldo-av" id="pf-slots-aviso"></span></div>'
-      + (curva.formula ? '<div>Crecimiento del precio: <code>' + esc(curva.formula) + '</code></div>' : '')
-      + (curva.k ? '<div>k = ' + esc(curva.k) + '</div>' : '')
-      + (curva.congelado ? '<div>' + esc(curva.congelado) + '</div>' : '')
-      + '</div><div class="sl-grid" id="pf-slots-grid"></div>';
+      + '<div>Ampliar tu contenido ya no se compra con XP: cada slot nace de una '
+      + '<b>carta de mejora</b> del mercado. Abajo eliges la carta y el recurso que '
+      + 'amplias.</div>'
+      + '</div>'
+      + '<div id="pf-slots-uso"></div>'
+      + '<div class="sl-grid" id="pf-slots-grid"></div>';
     document.getElementById('pf-slots-grid').addEventListener('click', function (ev) {
       var b = ev.target && ev.target.closest ? ev.target.closest('.sl-btn') : null;
       if (b) pfSlotsComprar(b.getAttribute('data-clave'));
@@ -5271,7 +5246,7 @@ function pfSlotsPintar() {
        compra). Sin numero no se pinta nada: xp_total NO baja al comprar, asi que
        usarlo aqui seria un saldo congelado que miente. */
     saldoEl.textContent = saldo.valor === null
-      ? 'el motor lo confirma al cobrar'
+      ? 'el motor lo confirma'
       : fmtXp(saldo.valor) + ' XP';
   }
   var avEl = document.getElementById('pf-slots-aviso');
@@ -5284,6 +5259,9 @@ function pfSlotsPintar() {
       document.getElementById('pf-slots-grid').insertAdjacentHTML('beforeend', pfSlotsEsqueleto(a.clave));
     pfSlotsFila(a);
   });
+  /* El picker de cartas de mejora (ADR-122 F2.4) se repinta con el mismo estado
+     que el catalogo: un solo camino para la verdad. */
+  pfSlotsPicker();
 }
 function pfSlotsCargarMios(uid, clave) {
   return cmGet('/api/interacciones?tipo=slot_mios&usuario_id='
@@ -5345,7 +5323,7 @@ function pfSlotsCargar(uid) {
       if (!claves.length) return null;
       return Promise.all(claves.map(function (c) { return pfSlotsCargarMios(uid, c); }));
     });
-  return Promise.all([catP, pfSlotsCargarRefs()])
+  return Promise.all([catP, pfSlotsCargarRefs(), pfSlotsCargarMejoras(uid)])
     .then(function () { pfSlotsPintar(); })
     .catch(function () {});
 }
@@ -5378,51 +5356,362 @@ function pfSlotsRef(clave) {
   return pfSlotsRefs[clave] || null;
 }
 function pfSlotsComprar(clave) {
-  /* CORTE ANTES DE LA RED. No es una mejora de estilo: un boton que parece
-     apagado pero sigue llamando al servidor es un fallo, porque alguien paga por
-     un slot que el motor va a rechazar o, peor, que no sabe a que engancharse.
-     Se recalcula el estado con la MISMA funcion que pinta la tarjeta, de modo que
-     guarda y pantalla no pueden discrepar, y se sale sin fetch. Se avisa con el
-     motivo real para que el usuario sepa por que no pasa nada. */
-  var fila = null;
+  /* ADR-122 F2.1: la compra de slots con XP se retiro y su POST responde 410.
+     El boton de la tarjeta ya no compra: lleva al picker de cartas de mejora con
+     el subtipo de este sumidero preseleccionado. Cero red: no se llama a un
+     endpoint retirado. */
+  pfSlotsUsoFoco = String(clave || '');
+  pfSlotsPicker();
+  var box = document.getElementById('pf-slots-uso');
+  if (box && box.scrollIntoView) {
+    try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    catch (e) { box.scrollIntoView(); }
+  }
+  cmSlotToast('Comprar slots con XP ya no esta disponible: cada slot nace de una '
+    + 'carta de mejora del mercado y se usa aqui.', '#fcd34d');
+  return null;
+}
+
+/* ---- ADR-122 F2.4: picker que USA una carta de la familia mejora ----------
+   Compra y uso son dos pasos (D7): la carta se compra o se acuna en el mercado
+   y aqui se consume para crear el slot. La clave NO se manda: el servidor la
+   deriva de cartas_catalogo.subtipo, y el ref_id se elige al usar. `origen` es
+   una declaracion explicita del usuario (D5), no un valor adivinado.
+   El precio que se pinta es el de CATALOGO, como referencia: usar la carta no
+   cobra XP. costo_proximo no se pinta nunca. ASCII-safe (ADR-002). */
+var pfSlotsMejoras = null;
+var pfSlotsMejorasEstado = 'cargando';
+var pfSlotsMejorasError = '';
+var pfSlotsUso = { carta: '', variante: '', ref: {}, origen: 'acunada' };
+var pfSlotsUsoFoco = '';
+var pfSlotsUsoOcupado = false;
+
+/* Inventario de cartas de la familia mejora. Se lee del helper existente
+   misCartas (usuario-session.js) y NO de una rama nueva: cero endpoints.
+   null = no leido; [] = leido y sin cartas: son cosas distintas. */
+function pfSlotsCargarMejoras(uid) {
+  pfSlotsMejorasEstado = 'cargando';
+  var fnMis = cmHelper('misCartas');
+  if (!fnMis) {
+    pfSlotsMejoras = null;
+    pfSlotsMejorasEstado = 'fallo';
+    pfSlotsMejorasError = 'NO_HELPER';
+    return Promise.resolve(null);
+  }
+  return Promise.resolve(fnMis(uid)).then(function (res) {
+    if (!res || res.ok !== true) {
+      pfSlotsMejoras = null;
+      pfSlotsMejorasEstado = 'fallo';
+      pfSlotsMejorasError = (res && (res.error || res.mensaje)) ? String(res.error || res.mensaje) : '';
+      return null;
+    }
+    var cartas = (res.data && res.data.cartas) || (res.raw && res.raw.cartas) || [];
+    var out = [];
+    for (var i = 0; i < cartas.length; i++) {
+      var c = cartas[i];
+      if (!c || String(c.familia || '') !== 'mejora') continue;
+      var vs = [];
+      var variantes = Array.isArray(c.variantes) ? c.variantes : [];
+      for (var j = 0; j < variantes.length; j++) {
+        var v = variantes[j] || {};
+        var cant = parseInt(v.cantidad, 10) || 0;
+        if (v.activa !== true || cant < 1) continue;
+        vs.push({ variante: String(v.variante || 'base'), cantidad: cant });
+      }
+      if (!vs.length) continue;
+      out.push({
+        id: String(c.id || ''),
+        nombre: String(c.nombre || 'Carta de mejora'),
+        subtipo: String(c.subtipo || ''),
+        precio: pfSlotsNum(c.precio_xp),
+        variantes: vs
+      });
+    }
+    pfSlotsMejoras = out;
+    pfSlotsMejorasEstado = 'listo';
+    pfSlotsMejorasError = '';
+    return null;
+  }).catch(function () {
+    pfSlotsMejoras = null;
+    pfSlotsMejorasEstado = 'fallo';
+    pfSlotsMejorasError = '';
+    return null;
+  });
+}
+function pfSlotsCatFila(clave) {
   var lista = (pfSlotsCat && Array.isArray(pfSlotsCat.data)) ? pfSlotsCat.data : [];
   for (var i = 0; i < lista.length; i++) {
-    if (lista[i] && lista[i].clave === clave) { fila = lista[i]; break; }
+    if (lista[i] && String(lista[i].clave) === String(clave)) return lista[i];
   }
-  var st = pfSlotsEstado(fila);
-  if (!st.listo) {
-    cmSlotToast(st.motivo || 'Esta compra no esta disponible todavia.', '#fcd34d');
+  return null;
+}
+function pfSlotsUsoCarta(id) {
+  var arr = Array.isArray(pfSlotsMejoras) ? pfSlotsMejoras : [];
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].id === String(id)) return arr[i];
+  }
+  return null;
+}
+function pfSlotsUsoCartaSel() {
+  var c = pfSlotsUsoCarta(pfSlotsUso.carta);
+  if (c) return c;
+  return (Array.isArray(pfSlotsMejoras) && pfSlotsMejoras.length) ? pfSlotsMejoras[0] : null;
+}
+function pfSlotsUsoVarSel(c) {
+  if (!c) return 'base';
+  var vs = Array.isArray(c.variantes) ? c.variantes : [];
+  for (var i = 0; i < vs.length; i++) {
+    if (vs[i].variante === pfSlotsUso.variante) return vs[i].variante;
+  }
+  return vs.length ? vs[0].variante : 'base';
+}
+/* Candidatos de slot_refs para el subtipo de la carta, menos los que ya tienen
+   un slot activo: la MISMA lectura que usa la tarjeta (slot_refs), sin tocar su
+   logica. El campo de enganche lo publica el motor (ref_id), no se escribe aqui. */
+function pfSlotsUsoCands(clave) {
+  var arr = (pfSlotsRefsRaw && Array.isArray(pfSlotsRefsRaw[clave])) ? pfSlotsRefsRaw[clave] : [];
+  var usados = pfSlotsUsados(clave, 'ref_id');
+  var out = [];
+  for (var i = 0; i < arr.length; i++) {
+    var r = arr[i] || {};
+    var v = String(r.ref_id || '');
+    if (!v || usados[v] === true) continue;
+    out.push(r);
+  }
+  return out;
+}
+function pfSlotsUsoRefSel(clave, cands) {
+  var lista = Array.isArray(cands) ? cands : [];
+  var v = String(pfSlotsUso.ref[clave] || '');
+  for (var i = 0; i < lista.length; i++) {
+    if (String(lista[i].ref_id || '') === v) return v;
+  }
+  return lista.length ? String(lista[0].ref_id || '') : '';
+}
+function pfSlotsUsoSel(campo, valor) {
+  var v = (valor === undefined || valor === null) ? '' : String(valor);
+  if (campo === 'carta') { pfSlotsUso.carta = v; pfSlotsUso.variante = ''; }
+  else if (campo === 'variante') { pfSlotsUso.variante = v; }
+  else if (campo === 'origen') {
+    pfSlotsUso.origen = (v === 'mercado' || v === 'intercambio') ? v : 'acunada';
+  } else if (campo === 'ref') {
+    var c = pfSlotsUsoCartaSel();
+    if (c) pfSlotsUso.ref[c.subtipo] = v;
+  }
+  pfSlotsPicker();
+}
+/* Codigos del handler: mensajes legibles y ningun codigo crudo en pantalla. */
+function pfSlotsUsoError(codigo, res) {
+  var c = String(codigo || '');
+  if (c === 'SIN_CARTA') return 'No te queda ninguna copia de esa carta de mejora.';
+  if (c === 'SLOT_TOPE_ACTIVOS') return 'Llegaste al tope de slots activos de ese tipo. Suelta uno para seguir.';
+  if (c === 'SLOT_TOPE_HISTORICO') return 'Llegaste al tope historico de slots de ese tipo: no admite mas.';
+  if (c === 'SINK_ACCION_INACTIVA') return 'Ese tipo de slot no esta disponible ahora mismo.';
+  if (c === 'REF_NO_ENCONTRADA') return 'El recurso elegido no existe o no pertenece a tu cuenta.';
+  if (c === 'ORIGEN_NO_SOSTENIDO') return 'Esa carta no consta como acunada por ti: declara de donde salio (mercado o intercambio).';
+  if (c === 'PARAMETROS_INVALIDOS') return 'Faltan datos para usar la carta. Elige otra vez la carta y el recurso.';
+  if (c === 'CARTA_NO_ENCONTRADA') return 'Esa carta ya no esta disponible en el catalogo.';
+  if (c === 'MEJORA_CLAVE_DESCONOCIDA') return 'Ese tipo de mejora no existe.';
+  if (c === 'SINK_REFSIN_SOPORTE') return 'Ese tipo de slot todavia no admite ampliaciones.';
+  if (c === 'SIN_SESION') return 'Tu sesion caduco. Vuelve a entrar.';
+  if (c === 'MEJORA_NO_ESCRITA') return 'No se pudo crear el slot. Intentalo otra vez en un momento.';
+  var txt = (res && res.error) ? String(res.error) : '';
+  if (txt && !/^[A-Z0-9_]+$/.test(txt)) return txt;
+  return 'No se pudo usar la carta.';
+}
+/* Enlace al catalogo del mercado: el host es #catalogo-panel y su boton de
+   apertura lo atiende cartas-ui.js (idempotente: abrir dos veces no lo cierra). */
+function pfSlotsIrCatalogo() {
+  var panel = document.getElementById('catalogo-panel');
+  if (panel && panel.scrollIntoView) {
+    try { panel.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    catch (e) { panel.scrollIntoView(); }
+  }
+  var abrir = document.getElementById('catalogo-abrir');
+  if (abrir) {
+    try { abrir.click(); } catch (e2) {}
+  }
+  return false;
+}
+function pfSlotsPicker() {
+  var box = document.getElementById('pf-slots-uso');
+  if (!box) return;
+  var ir = '<div><button type="button" class="sl-btn" onclick="pfSlotsIrCatalogo()">'
+    + 'Ir al mercado de cartas</button></div>';
+  var aviso = '<div class="sl-crece">Un slot ya no se compra con XP: se crea al '
+    + '<b>usar una carta de mejora</b>. Compra la carta en el catalogo del mercado, '
+    + 'acunala y elige aqui la copia y el recurso que amplias. Usarla no cobra XP.</div>';
+  if (pfSlotsMejorasEstado === 'cargando') {
+    box.innerHTML = aviso + '<div class="sl-motivo">Revisando tus cartas de mejora...</div>';
+    return;
+  }
+  if (pfSlotsMejorasEstado === 'fallo') {
+    box.innerHTML = aviso + '<div class="sl-motivo">No se pudo leer tu inventario de '
+      + 'cartas de mejora, asi que aqui no se puede usar ninguna todavia.</div>' + ir;
+    return;
+  }
+  var arr = Array.isArray(pfSlotsMejoras) ? pfSlotsMejoras : [];
+  /* Foco desde el boton de una tarjeta: se preselecciona una carta de ese
+     subtipo si existe. Si no existe, se dice; no se inventa. */
+  if (pfSlotsUsoFoco) {
+    var hayFoco = false;
+    for (var f = 0; f < arr.length; f++) {
+      if (arr[f].subtipo === pfSlotsUsoFoco) { hayFoco = true; break; }
+    }
+    if (hayFoco && !pfSlotsUsoCarta(pfSlotsUso.carta)) {
+      for (var g = 0; g < arr.length; g++) {
+        if (arr[g].subtipo === pfSlotsUsoFoco) { pfSlotsUso.carta = arr[g].id; break; }
+      }
+    }
+  }
+  if (!arr.length) {
+    box.innerHTML = aviso + '<div class="sl-motivo">Aun no tienes cartas de mejora. '
+      + 'Se compran en el catalogo del mercado y cada copia crea un slot.</div>' + ir;
+    return;
+  }
+  var c = pfSlotsUsoCartaSel();
+  if (!c) {
+    box.innerHTML = aviso + '<div class="sl-motivo">No hay ninguna carta elegida.</div>' + ir;
+    return;
+  }
+  var variante = pfSlotsUsoVarSel(c);
+  var cands = pfSlotsUsoCands(c.subtipo);
+  var refSel = pfSlotsUsoRefSel(c.subtipo, cands);
+  var fila = pfSlotsCatFila(c.subtipo);
+  var cab = '<div class="sl-mios-l">Usar una carta de mejora</div>';
+  var opsC = '';
+  for (var i = 0; i < arr.length; i++) {
+    var cc = arr[i];
+    var cant = 0;
+    for (var j = 0; j < cc.variantes.length; j++) cant += cc.variantes[j].cantidad;
+    opsC += '<option value="' + esc(cc.id) + '"' + (cc.id === c.id ? ' selected' : '') + '>'
+      + esc(cc.nombre) + ' (' + esc(cc.subtipo) + ', ' + cant + (cant === 1 ? ' copia)' : ' copias)')
+      + '</option>';
+  }
+  var opsV = '';
+  for (var m = 0; m < c.variantes.length; m++) {
+    var cv = c.variantes[m];
+    opsV += '<option value="' + esc(cv.variante) + '"' + (cv.variante === variante ? ' selected' : '') + '>'
+      + esc(cv.variante) + ' (' + cv.cantidad + ')</option>';
+  }
+  var opsR = '';
+  for (var q = 0; q < cands.length; q++) {
+    var rv = String(cands[q].ref_id || '');
+    opsR += '<option value="' + esc(rv) + '"' + (rv === refSel ? ' selected' : '') + '>'
+      + esc(pfSlotsEtiqueta(cands[q])) + '</option>';
+  }
+  var origenes = [['acunada', 'La acune yo en el mercado'],
+    ['mercado', 'La compre a otro jugador'],
+    ['intercambio', 'Me la dieron en un intercambio']];
+  var opsO = '';
+  for (var z = 0; z < origenes.length; z++) {
+    opsO += '<option value="' + origenes[z][0] + '"'
+      + (pfSlotsUso.origen === origenes[z][0] ? ' selected' : '') + '>'
+      + origenes[z][1] + '</option>';
+  }
+  var info = '';
+  if (c.precio !== null) info += 'Precio de catalogo (referencia): ' + fmtXp(c.precio) + ' XP. ';
+  info += 'Usar la carta no cobra XP.';
+  if (fila) {
+    var kH = pfSlotsNum(fila.k_historico);
+    var kA = pfSlotsNum(fila.k_activos);
+    var sMax = pfSlotsNum(fila.slot_max);
+    var sMaxA = pfSlotsNum(fila.slot_max_activos);
+    info += ' Topes de ' + esc(String(fila.etiqueta || c.subtipo)) + ': '
+      + (kH === null ? '?' : kH) + ' de ' + (sMax === null ? 'sin tope' : sMax) + ' historicos y '
+      + (kA === null ? '?' : kA) + ' de ' + (sMaxA === null ? 'sin tope' : sMaxA) + ' activos.';
+  }
+  var motivo = '';
+  var bloqueado = false;
+  if (pfSlotsRefsEstado === 'cargando') {
+    motivo = 'Revisando cuales de tus recursos puedes ampliar. Un momento.';
+    bloqueado = true;
+  } else if (pfSlotsRefsEstado === 'fallo') {
+    motivo = 'No se pudo revisar cuales de tus recursos puedes ampliar, asi que usar la carta queda cerrado mientras tanto.';
+    bloqueado = true;
+  } else if (!cands.length) {
+    motivo = 'No tienes ningun recurso libre para engancharle este tipo de slot.';
+    bloqueado = true;
+  }
+  box.innerHTML = aviso + cab
+    + '<label class="sl-pick-lbl" for="pf-slots-uso-carta">Tu carta de mejora</label>'
+    + '<select class="sl-sel" id="pf-slots-uso-carta" onchange="pfSlotsUsoSel(\'carta\', this.value)">'
+    + opsC + '</select>'
+    + '<label class="sl-pick-lbl" for="pf-slots-uso-var">Variante de la carta</label>'
+    + '<select class="sl-sel" id="pf-slots-uso-var" onchange="pfSlotsUsoSel(\'variante\', this.value)">'
+    + opsV + '</select>'
+    + '<label class="sl-pick-lbl" for="pf-slots-uso-ref">Recurso que se va a ampliar</label>'
+    + '<select class="sl-sel" id="pf-slots-uso-ref" onchange="pfSlotsUsoSel(\'ref\', this.value)"'
+    + (bloqueado ? ' disabled' : '') + '>'
+    + (opsR || '<option value="">Sin recursos disponibles</option>') + '</select>'
+    + '<label class="sl-pick-lbl" for="pf-slots-uso-origen">De donde salio la carta</label>'
+    + '<select class="sl-sel" id="pf-slots-uso-origen" onchange="pfSlotsUsoSel(\'origen\', this.value)">'
+    + opsO + '</select>'
+    + '<div class="sl-crece" id="pf-slots-uso-info">' + info + '</div>'
+    + '<div class="sl-cta">'
+      + '<button type="button" class="sl-btn" id="pf-slots-uso-btn" onclick="pfSlotsUsar()"'
+      + (bloqueado ? ' disabled' : '') + '>Usar carta</button>'
+      + '<span class="sl-motivo" id="pf-slots-uso-motivo">' + esc(motivo) + '</span>'
+    + '</div>'
+    + ir;
+}
+function pfSlotsUsar() {
+  if (pfSlotsUsoOcupado) return null;
+  var btn = document.getElementById('pf-slots-uso-btn');
+  var motivoEl = document.getElementById('pf-slots-uso-motivo');
+  var c = pfSlotsUsoCartaSel();
+  if (!c) { cmSlotToast('No tienes ninguna carta de mejora.', '#fcd34d'); return null; }
+  var cands = pfSlotsUsoCands(c.subtipo);
+  var ref = pfSlotsUsoRefSel(c.subtipo, cands);
+  if (!ref) {
+    cmSlotToast('No hay ningun recurso libre para engancharle este slot.', '#fcd34d');
     return null;
   }
-  var btn = document.getElementById(pfSlotsId(clave, 'btn'));
-  var previo = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Comprando...'; }
-  return postComAPIJWT({ tipo: 'slot_comprar', clave: clave, ref_id: pfSlotsRef(clave) })
-  .then(function (res) {
+  var variante = pfSlotsUsoVarSel(c);
+  var origen = (pfSlotsUso.origen === 'mercado' || pfSlotsUso.origen === 'intercambio')
+    ? pfSlotsUso.origen : 'acunada';
+  pfSlotsUsoOcupado = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Usando...'; }
+  if (motivoEl) motivoEl.textContent = '';
+  return postComAPIJWT({
+    tipo: 'carta_mejora_usar',
+    carta_id: c.id,
+    variante: variante,
+    ref_id: ref,
+    origen: origen
+  }).then(function (res) {
     res = res || {};
+    pfSlotsUsoOcupado = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Usar carta'; }
     var u = sesion();
     if (res.ok === true) {
-      var pagado = pfSlotsNum(res.costo_pagado);
-      pfSlotsSaldoTras = pfSlotsNum(res.disponible_restante);
-      cmSlotToast('Slot comprado. Precio congelado: '
-        + (pagado === null ? 'confirmado' : fmtXp(pagado) + ' XP'));
-    } else {
-      cmSlotToast(pfSlotsMotivo(res.error || '', res), '#ef4444');
-      if (btn) { btn.disabled = false; btn.textContent = previo; }
+      var precio = pfSlotsNum(res.precio_catalogo);
+      var idx = (res.slot_index === undefined || res.slot_index === null) ? '' : ' ' + String(res.slot_index);
+      cmSlotToast('Carta usada: slot' + idx + ' creado.'
+        + (precio === null ? '' : ' Precio de catalogo (referencia): ' + fmtXp(precio) + ' XP, sin cargo.'),
+        '#22C55E');
+      /* Refresco sin recargar: inventario (misCartas) y slots en una pasada. */
+      if (u && u.id) pfSlotsCargar(u.id);
+      if (typeof cargarCartasComm === 'function') cargarCartasComm();
+      return res;
     }
-    /* Tras comprar se relee TODO, y el orden importa: primero los slots ya
-       comprados (que es lo que deja de ser elegible el recurso que se acaba de
-       comprar) y despues la lista de recursos, en la misma pasada. Si ese
-       recurso era el ultimo, la tarjeta cae sola al estado "aun no tienes" y el
-       boton queda deshabilitado: no queda un boton vivo apuntando a algo que ya
-       se gasto.
-       la relectura de inventario del perfil NO existe en comunidad y por eso no
-       se referencia; cargarCartasComm() tampoco se llama, porque un slot no
-       altera el mercado de cartas. pfSlotsCargar ya relee saldo, k y slots. */
-    if (u && u.id) pfSlotsCargar(u.id);
+    var msg = pfSlotsUsoError(res.error || res.code || '', res);
+    if (motivoEl) motivoEl.textContent = msg;
+    cmSlotToast(msg, '#ef4444');
+    /* Un fallo puede dejar el selector apuntando a una copia que ya no esta: se
+       relee el inventario para que la pantalla no mienta, y se repone el motivo
+       porque el picker se repinta entero. */
+    if (u && u.id) pfSlotsCargarMejoras(u.id).then(function () {
+      pfSlotsPicker();
+      var m2 = document.getElementById('pf-slots-uso-motivo');
+      if (m2) m2.textContent = msg;
+    });
+    return res;
   }).catch(function () {
+    pfSlotsUsoOcupado = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Usar carta'; }
     cmSlotToast('Error de conexion', '#ef4444');
-    if (btn) { btn.disabled = false; btn.textContent = previo; }
+    return null;
   });
 }
 

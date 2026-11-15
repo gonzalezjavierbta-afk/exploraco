@@ -13993,3 +13993,278 @@ La matriz completa es la seccion 8 de `docs/superpowers/specs/2026-11-11-cartas-
 ---
 
 **Estado que tenia la Enmienda 10 (foto historica; su superficie la corrige la Enmienda 11 de arriba y se conserva por ADR-003):** **PULIDO DEL CATALOGO OPERATIVO -- 65 CARTAS / 8 FAMILIAS / 58 ACUNABLES (2 de PRUEBA)** (2026-11-11), con **066-079 aplicadas** y **ninguna migracion nueva**. **Cerradas en esta enmienda: D-26, D-28 y D-29.** **Cerradas antes: D-14 parcial (las 8 familias tienen cartas), D-21, D-22, D-24, D-25 y D-31.** **Deudas abiertas: D-34** (**datos de prueba en produccion; la compra NO se ha ejercitado: `usuarios_cartas` 0, `usuarios_cartas_nivel` 0, `emitidas` 0, `xp_ledger` 0 en `carta_compra`/`carta_nivel`/`carta_expedicion`/`compartir`**), **D-27** (`total`/`restantes` publicos), **D-30** (`usuarios_cartas` vacia -> **`posee=true` no medido**), **D-33** (gobernanza de migraciones), **D-32 residual** (**0 ALTO, 2 MEDIO** de feature dormida, `030` sin aplicar), **D-23** (arte), **D-20** (md5 070), **D-12/D-19** y **D-13**; y el **`estado_iucn` fuera por decision del operador** hasta que haya token. Punteros: **`TASKS.md` TSK-257**, **`NEXT.md`** (apertura), **`PROJECT.md`** (sistema de cartas) y la spec **11.8 / 11.12**.
+
+---
+
+## ADR-122: La familia **`mejora`** absorbe el modulo "ampliar contenido" como **categoria del mercado de cartas**: **3 subtipos comprables 1:1 con las claves de sumidero** (el cuarto, `destacar_evento`, queda **reservado fuera del CHECK y del alta**), **precio fijo por copia** (curva progresiva retirada del camino de compra), **consumo en paso explicito** `carta_mejora_usar` con `ref_id` elegido al usar, y **`sink_slots` se conserva** como tabla destino del efecto y **autoridad unica de los topes**, mientras `slot_comprar` se retira con **410 gobernado** [**acota** ADR-086 (la curva y `slot_comprar` como camino de compra dejan de ser la via) y ADR-121 (multiplicador y subtipos de la familia nueva); **no deroga** ADR-003 (nada se retira con consumidor vivo), ni ADR-018 (`xp_total` no se toca), ni ADR-002 (ASCII-safe), ni ADR-084 D1 (el argumento vive una vez, aqui), ni el presupuesto **8/8** de ADR-082]
+
+**ID:** ADR-122
+**Fecha:** 2026-11-14 (**v3**, corrige las 4 residuales de la 2a ronda de `@architect-review` — 3 ALTA, 1 BAJA, todas introducidas por la v2 — y aplica las 3 decisiones ratificadas del mismo dia: **F2.4 dentro de R2**, **083 hace el flip** (082 siembra `activo=false`) y **`origen_verificado` por formula de servidor**)
+**Autor:** `@architect`. **Gate de riesgo CONFIRMADO por el operador** (2026-11-14): **R1** toca **esquema** (`@sql-security` + `@data-migration`, gate **SI**) y `lib/` (`@backend-dev`, gate **SI**); **R2** toca `api/interacciones.js` (`@backend-dev`, gate **SI**), `admin.html` (`@admin-dev`, gate **SI**) y `cartas-ui.js`/`comunidad.html` (`@js-silo-dev`, sin gate). **Este ADR no implementa nada:** fija el contrato.
+**Estado:** **ACEPTADA (v3; revisada por `@architect-review` en 2 rondas -- v2 y v3 -- y aceptada por el orquestador el 2026-11-14) / R1 APLICADO EN NEON / 083 PREPARADA SIN APLICAR / R2 EN ARBOL DE TRABAJO, SIN COMMIT NI DEPLOY.** Cero endpoint nuevo (**8/8** agotado). **Ratificacion del operador: `CARTA_MULT_FAMILIA.mejora = 1.0`** (ver el cierre de la deuda al final de esta seccion).
+**Estado de implementacion medido (2026-11-14, `@qa-auditor`; baseline = archivo real, ADR-006):** **081 APLICADA** (CHECK de familia a **9** valores + rama `mejora` con `foto_galeria|album_slot|portada_destino`; `destacar_evento` **fuera** del CHECK y del alta) y **082 APLICADA** (3 cartas `cme_*`: raro/400, epico/1000, epico/1000, todas `activo=false`). `schema_migrations` max = **82**; catalogo **68** cartas; `mejora` = **3** filas, `activo=true` = **0**. **083 PREPARADA y validada en dry-run, NO aplicada** (`db/migrations/083_cartas_mejora_activar.sql`; sin fila 83 en el ledger). **R2 en arbol de trabajo:** `api/interacciones.js` (F1.1+F1.2 handler `carta_mejora_usar`, F2.2 campo `compra_retirada`, F1.3 **410** `SLOT_COMPRAR_RETIRADO` con su SQL conservado), `lib/cartas-config.js` (9 familias, `MEJORA_REF_ORIGEN`, `SUBTIPOS_CARTA.mejora` derivado, `mejora: 1.0`), `cartas-ui.js`, `comunidad.html` (aviso + picker `slot_refs` + POST `carta_mejora_usar`), `scripts/verificar-mejora.js` (**7/7**) y `scripts/smoke_cartas_constantes.js` (**8 -> 9**, **111 PASS**). **QA:** `node --check` **8/8**, ASCII **0** bytes anadidos, divs `comunidad.html` **511/511** (HEAD **503/503**), `admin.html` **1408/1408**, `index.html` **375/375**; `npm run test` **EXIT 0 / 0 FAIL** (38 scripts). Git: HEAD **`2069075`**, **sin commit ni deploy**.
+**Numeracion (ADR-006, verificado contra el archivo real el 2026-11-14):** el mayor encabezado del fichero era **ADR-121** (`:13553`); **122** es el consecutivo libre. Tres migraciones, **ninguna colisiona** (ultima en disco: `080_cartas_apagar_prueba_d34.sql`, verificado con `Get-ChildItem db/migrations`): **081** (CHECKs), **082** (seed `activo=false`), **083** (flip a `activo=true` en R2). Los numeros se **re-verifican** antes de escribir cada una.
+
+### Problema
+
+"Ampliar contenido" existe hoy como **modulo suelto** dentro de `#cpanel-mercado` (`comunidad.html:4820-5504`, bloque `pf-slots`), con su propia moneda (XP), su propia curva de precio (`SINK_ALPHA`/`SINK_GAMMA`, `api/interacciones.js:2797-2798`) y su propio camino de compra (`slot_comprar`, `:21494`). Las cartas, en cambio, se compran/acunan por `carta_acunar` (`:17701`), tienen familia y subtipo (`lib/cartas-config.js:60-72`) y un patron de consumo ya probado (`carta_evento_usar`, `:16851-16898`). Consecuencias medidas:
+
+1. **Dos caminos de compra para el mismo recurso** (XP -> slot). Dos autoridades de precio, dos ledgers, dos UIs. Es exactamente el defecto que ADR-121 D5 cerro para el precio de acunacion ("una copia literal en SQL deriva en silencio").
+2. **La curva castiga al usuario fiel**: `foto_galeria` arranca en 320 y en `k=25` cobra `320 * (1+0.2*25)^2 = 11.520` XP. 10 slots de `foto_galeria` cuestan **~12.610 XP**; 10 copias de una carta rara a precio fijo cuestan **3.200**.
+3. **Un slot no es una carta**, luego no aparece en el mercado, no se colecciona, no se regala y no se puede nombrar en un ticket.
+4. La taxonomia actual (**8 valores**) no tiene una familia de **servicio**, asi que no puede expresar "esto que compro sirve para ampliar X".
+
+### Opciones evaluadas
+
+- **A. Reusar `consumible`.** **Descartada por dos motivos independientes:** (i) `consumible` es un **SKU** (`consumibles.clave`/`precio_xp`), y el CHECK de `066:243-253` obliga `precio_xp IS NULL` en `producto`/`consumible` (`lib/cartas-config.js:84`): una `mejora` necesita `precio_xp > 0` y no tiene SKU. (ii) Semantica: `consumible` da bonos temporales (ADR-120); una `mejora` da una **capacidad permanente**. Meter ambas en la misma familia cierra la puerta a cualquier predicado futuro por familia.
+- **B. Reusar `producto`.** **Descartada:** mismo CHECK, y `producto` es fisico/digital con envio, no una capacidad.
+- **C. Familia nueva `mejora` con 3 subtipos comprables 1:1 con las claves de sumidero (y `destacar_evento` reservado fuera del CHECK).** **Elegida.**
+- **D. Conservar el modulo de sumideros y anadir las cartas como via paralela.** **Descartada:** dos caminos vivos = dos autoridades de precio y dos sitios donde arreglar el proximo bug. El operador cerro "reemplazar, no convivir".
+- **E. Mover el mapa carta->slot a `api/interacciones.js` (reusar `SINK_REF_ORIGEN` tal cual).** **Descartada como fuente:** el mapa pasa a tener **tres** lectores (el handler nuevo, el seed y la UI de `slot_catalogo`), y el propio archivo `lib/cartas-config.js:10-14` ya se declara fuente unica de taxonomia ("una sola fuente, dos lectores"). Un literal en `api/` y otro en `lib/` es el drift que este ADR existe para impedir.
+
+### Decision
+
+**D1. Familia `mejora`.** Se anade como **noveno** valor de `FAMILIAS_CARTA` (`lib/cartas-config.js:60-61`), capa **economia**. `CARTA_FAMILIAS_SIN_PRECIO_XP` **NO** la incluye (necesita `precio_xp > 0`); `CARTA_MULT_FAMILIA` **SI** la incluye (si falta, `precioAcunacion()` devuelve `null` y la carta nace **no acunable en silencio**, trampa ya documentada en `:99-100`). No se toca `FAMILIAS_CARTA` de ningun otro consumidor: `admin.html` pinta sus selects desde el bloque `config` de `cartas_lista`, luego hereda el valor sin cambios (patron `:55-59`).
+
+**D2. Subtipos = claves de sumidero, sin traduccion, y SOLO los comprables.** Lista **cerrada de 3**, ASCII, estable, identica a `sink_acciones.clave`:
+
+| `subtipo` | clave de sumidero | `soporte` | en `SUBTIPOS_CARTA.mejora` | en el CHECK de 081 | en el seed |
+|---|---|---|---|---|---|
+| `foto_galeria` | `foto_galeria` | `true` | si | si | **si** |
+| `album_slot` | `album_slot` | `true` | si | si | **si** |
+| `portada_destino` | `portada_destino` | `true` | si | si | **si** |
+| `destacar_evento` | `destacar_evento` | `false` | **NO** | **NO** | **NO** (D10) |
+
+`SUBTIPOS_CARTA.mejora` se **deriva SOLO de los comprables** — `Object.keys(MEJORA_REF_ORIGEN).filter(function (k) { return MEJORA_REF_ORIGEN[k].soporte === true; })` — y **no se escribe a mano**: derivar impide el drift sin lanzar en `require` (un `throw` en `lib/` tumbaria las 8 funciones de golpe) y hace **imposible** que los subtipos y el CHECK de 081 se desalineen. `destacar_evento` **se conserva en `MEJORA_REF_ORIGEN`** (con `soporte:false` y `motivo_soporte`) para que `ref_contrato` siga explicando por que no es comprable, pero **no es subtipo**: un valor que no puede existir en la base no debe ser un valor valido del alta admin ni del CHECK.
+
+**D3. Fuente unica del mapeo: `lib/cartas-config.js`, que es DATO PURO (cero SQL).** El objeto `SINK_REF_ORIGEN` (`api/interacciones.js:2835-2866`) se **renombra y se mueve** a `lib/cartas-config.js` como **`MEJORA_REF_ORIGEN`**, con estos campos, **todos dato**: `tabla`, `columna`, `tipo_medio_requerido` (**sustituye a `filtro_tipo`**: hoy `:2856` guarda el fragmento `" AND tipo_medio = 'general'"`, que es SQL y no puede vivir en un modulo que cargan las 8 funciones), `soporte`, `requiere_pertenencia`, `etiqueta`, `motivo_soporte`. En `api/interacciones.js` queda **una sola linea de enlace**, sin literal:
+
+```
+var SINK_REF_ORIGEN = CartasConfig.MEJORA_REF_ORIGEN;
+var SINK_CLAVES = Object.keys(SINK_REF_ORIGEN);
+```
+
+`sinkRefCte(clave, idxRef)` (**firma nueva**, `:2945`) sigue en `api/` y es la que **construye** el SQL: valida `tabla`/`columna` contra un **par literal local** (allow-list `usuario_fotos.id`, `albumes.id`, `spot_duenos.destino_id`) y traduce `tipo_medio_requerido` a ` AND tipo_medio = 'general'`; un valor fuera de esa allow-list **no se interpola** (degrada a `soporte=false`, fail-closed). Asi `lib/` no contiene **ni un byte de SQL** y `api/` sigue siendo el unico archivo que interpola nombres de tabla/columna (`:2957`: "la columna sale de la allow-list de CODIGO, nunca del navegador"). **Una autoridad de datos (`lib/`), una autoridad de SQL (`api/`).**
+
+Parametros exactos (contrato, no prosa): `$1` = `usuario_id` (**invariante del endpoint**, `:2961`); `$<idxRef>` = `ref_id`. `slot_comprar` llama `sinkRefCte(clave, 5)` (**paridad byte a byte con hoy**: su lista es `[uid, clave, SINK_ALPHA, SINK_GAMMA, ref_id]`, `:21623`, luego ref es `$5`); `carta_mejora_usar` llama `sinkRefCte(subtipo, 4)` con `[uid, carta_id, variante, ref_id, origen]`. Construir el indice como `'$' + idxRef` elimina el `$5::uuid` cableado (`:2961`) que hoy impediria reusar la funcion con 4 parametros de ref.
+
+**D4. Precio: fijo por copia, `CARTA_MULT_FAMILIA.mejora = 1.0`.** Base de ADR-121 sin cambios (`150/400/1000/2500`). Rareza del seed = **banda del coste historico** del sumidero (320-560 -> `raro`; 640-800 -> `epico`):
+
+| carta | rareza | `precio_xp` | coste historico `k=0` / `k=1` | desvio vs `k=1` |
+|---|---|---|---|---|
+| `foto_galeria` | raro | **400** | 320 / 460.80 | **-13.2%** |
+| `album_slot` | epico | **1000** | 640 / 921.60 | **+8.5%** |
+| `portada_destino` | epico | **1000** | 800 / 1.152 | **-13.2%** |
+
+El precio fijo **congela la curva en su tramo bajo (`k=1`)** y elimina el tramo exponencial. Consecuencia declarada: el primer slot sube (+25% en `foto_galeria`) y el uso intensivo baja ~3.9x (10 slots: **12.610 -> 3.200** XP). **El freno deja de ser el precio y pasa a ser el tope** (D6). El multiplicador **no** es la palanca para reconstruir la curva: **1.0** mantiene la equivalencia historica observada (base 320-800 contra base `raro`/`epico` 400/1.000) y deja un solo numero ratificable; si el balance pide mas quemado, la palanca es el `precio_xp` de la fila o el tope, y eso es otra decision.
+
+**D5. `sink_slots` se conserva como tabla destino del efecto.** Se sigue escribiendo **la misma tabla, con las mismas columnas**, y se sigue leyendo con el mismo SQL en `slot_catalogo` (`:12029`), `slot_mios` (`:12130`) y `slot_refs` (`:12200`). Motivos: (i) conserva el **motor de topes** y los indices (`046`, `idx_sink_slots_usuario` / `_hist`); (ii) conserva **el recibo** de las filas ya compradas (`costo_pagado`, `alpha_aplicado`, `gamma_aplicado`, `slot_index`) — reescribirlas seria falsificar historia (espiritu de ADR-003); (iii) los lectores existentes siguen funcionando **sin cambiar su SQL** (F2.2 solo anade un campo de respuesta). Lo unico que cambia es **quien inserta**: pasa de `slot_comprar` a `carta_mejora_usar`.
+
+- **`costo_pagado` = `precio_catalogo`, PRECIO DE REFERENCIA (no importe pagado).** Se escribe el `precio_xp` de la fila de catalogo **en el momento del uso**, y el recibo **no afirma que se haya pagado**: la copia pudo entrar por mercado o intercambio, y `usuarios_cartas` **no tiene columna de procedencia** (deuda **D-39**). El nombre de la columna es historia (`046:157`) y **no se renombra** (cero churn de esquema): se redefine su lectura aqui. En la **respuesta** el campo se llama `precio_catalogo`, nunca `costo_pagado`.
+- **`origen`** viaja en `xp_ledger.contexto` y en la respuesta, con enum cerrado `acunada|mercado|intercambio`. `acunada` **se verifica** en el mismo statement (existe asiento `carta_compra` de ese usuario con esa carta y variante); si el cliente lo declara y no hay asiento -> **409 `ORIGEN_NO_SOSTENIDO`**. `mercado`/`intercambio` se aceptan como **declaracion del cliente**. **Cero columna nueva.** El flag de la respuesta es **`origen_verificado = (COALESCE($5,'acunada') = 'acunada')`** — formula de servidor, **no** `origen_sostenido AND origen='acunada'`: `origen_sostenido` es `true` por construccion en toda respuesta 200 (si fuera `false`, `inv` no corre), luego usarlo como flag haria que el campo dijera siempre `true` y perderia su unico valor informativo.
+- **`alpha_aplicado`/`gamma_aplicado` = `0`/`0`** (columnas `NOT NULL`, sin default nuevo): marcan **"sin curva aplicada"** y hacen **cohortable** la era nueva (`WHERE alpha_aplicado = 0`). Dejar `0.20`/`2.00` afirmaria una formula que no se aplico.
+- **`slot_index`** = `COUNT(*)` historico de `(usuario, clave)` en el momento del insert. **Deja de fijar precio**; sigue siendo ordinal. La tabla **si tiene** UNIQUE (`uq_sink_slot (usuario_id, clave_accion, ref_id, creado_en)`, `046:163`), pero incluye `creado_en` con `DEFAULT now()`, luego **dos usos nunca colisionan**: el unico valor repetible bajo concurrencia es `slot_index`, que **no** lleva UNIQUE. Aceptable porque ya no tiene funcion economica (D-38).
+- **`sink_acciones`** no se desactiva: es la **autoridad de los topes** y de la etiqueta. Su `costo_base_xp` queda como **dato historico**.
+
+**D6. Topes: los de `sink_acciones`, sin moverlos a la carta.** `slot_max` / `slot_max_activos` (`046`, semilla `40/25`, `20/12`, `15/10`, `5/3`) siguen siendo la unica autoridad, y se evaluan **dentro del mismo statement** del efecto (fail-closed, sin lectura previa: el patron `refok` de ADR-055). Un tope en la carta crearia **dos autoridades** y permitiria que una carta saltase el tope historico. El tope es **por `(usuario, clave)`**, no global.
+
+**D7. Consumo en paso explicito: `carta_mejora_usar`.** `carta_acunar` **no cambia una linea**: ya considera comprable cualquier carta con `precio_xp > 0` y familia fuera de `CARTA_FAMILIAS_SIN_PRECIO_XP` (`:17725-17726`), luego comprar una `mejora` con XP **ya funciona hoy** en cuanto exista la fila. El consumo es un `tipo` **nuevo del mismo endpoint** `api/interacciones.js` (8/8 intacto):
+
+- **La `clave` NUNCA se lee del body.** Se deriva server-side de `cartas_catalogo.subtipo` con `familia='mejora'`. Asi un cliente **no puede** emparejar la carta `album_slot` con un `ref_id` de `portada_destino`. Es la diferencia de seguridad clave frente a `slot_comprar`, que recibe `clave` del navegador (`:21498`).
+- **`ref_id` se elige al usar** y se valida por pertenencia con **la misma funcion** `sinkRefCte(subtipo, 4)` (`idxRef` como parametro, ver D3), que sigue aplicando el `tipo_medio_requerido='general'` de `portada_destino`: **cero SQL nuevo** para el enganche y cero reimplementacion de la validacion.
+- **Cero cargo de XP en el uso:** el XP se cobro **una vez**, al acunar. `carta_mejora_usar` **no toca `xp_total` ni `xp_gastado_sinks`** (ADR-018 intacto).
+- **Cero `DELETE` fisico:** `cantidad - 1` y `activo = false` al llegar a 0, con el mismo `CASE` de `carta_evento_usar` (`:16864-16867`, incluidos `en_museo`/`orden_museo`).
+
+**D8. Ledger: accion nueva `carta_mejora`, sin reutilizar.** `xp_ledger.accion` es `text NOT NULL` **sin CHECK de dominio** (`031:228`), luego un literal nuevo es legal y no cuesta migracion. Se escribe `xp_base = 0`, `xp_final = 0`, `es_exento = true`, `contexto = {carta_id, variante, clave, ref_id, origen, precio_catalogo, slot_id, slot_index}` — misma forma que `carta_evento` (`:16887-16892`). Colapsarla en `carta_evento` haria que el ledger **mintiera** (un evento no es una mejora) y mataria cualquier conteo por accion. **El cobro sigue siendo `carta_compra`**, que ya escribe `carta_acunar` (`:17772`): no se toca. Ademas, `BONO_EXCLUIDAS.carta_mejora = true` (`api/interacciones.js:5873-5893`, junto a `carta_evento`): un consumo con 0 XP jamas puede recibir bono.
+
+**D8-bis. Segundo camino de escritura del ledger, declarado y acotado.** El asiento se inserta con `INSERT` crudo **dentro del mismo CTE** (`carta_acunar` ya lo hace, `:17770-17777`) y **no** con `registrarXpLedger()` (`:2009`). Motivo: el helper es una **consulta aparte**, y usarlo aqui abriria la ventana "carta consumida / asiento no escrito" — exactamente la desincronizacion que el CTE unico evita. Es **legal por construccion**: `xp_base=0`, `xp_final=0`, `es_exento=true`, luego el asiento **no pasa por el motor de bonos ni por ningun cap**, que es lo unico que el helper aporta. Queda declarado como **unico** segundo camino: todo asiento con XP sigue yendo por `registrarXpLedger`.
+
+**D9. Retirada gobernada de `slot_comprar` y de las tarjetas `pf-slots`, en UN SOLO release.** Ver tabla de fases. **Nada se borra**: `slot_comprar` **no se elimina del router**, pasa a **410 Gone** tipado con alternativa; `#pf-slots` **no retira el ID** (ADR-003 D5 / contrato v107), solo cambia lo que hacen sus botones. **La UI nueva (F2.1 aviso + F2.4 picker) y el 410 (F1.3) entran en el MISMO deploy** (decision ratificada del operador): no existe ventana con `comunidad.html:5400` vivo contra un endpoint vivo, ni un release con handler y sin llamador.
+
+**D10. `destacar_evento` NO entra al seed, NI al CHECK de 081, NI al alta admin; se conserva solo como entrada de mapeo.** Argumento: hoy `slot_comprar` lo rechaza **antes de tocar la base** (`SINK_REFSIN_SOPORTE`, `:21535`) justamente para no cobrar por una fila huerfana. Una carta en catalogo **no puede expresar "comprable pero inutilizable"**: el CHECK `066:243-253` obliga `precio_xp > 0`, luego `carta_acunar` la venderia y `carta_mejora_usar` la rechazaria -> **XP cobrada y nada entregado**, el agujero que se cierra por la puerta de atras. **"Proximamente" no se vende, y un subtipo que el CHECK prohibe no puede aparecer en un select del admin.** Se conserva la entrada en `MEJORA_REF_ORIGEN` (con `soporte:false` y `motivo_soporte`) para que `ref_contrato` lo siga explicando y para que el dia que exista tabla de eventos el alta sea **un CHECK ampliado + un INSERT**, no un rediseno.
+
+### Contrato de `carta_mejora_usar` (F1, escrito: no implementado)
+
+`POST api/interacciones.js` con `{ tipo: 'carta_mejora_usar', carta_id, variante?, ref_id, origen? }`, `origen` en `acunada|mercado|intercambio` (default `acunada`; ver D5). **Sin body anidado, sin query param, sin endpoint.** Parametros del statement, en orden: `$1` uid, `$2` carta_id, `$3` variante, `$4` ref_id, `$5` origen.
+
+**Pre-flight (sin tocar la base, 5 guardas):**
+
+| # | Validacion | HTTP | `error` |
+|---|---|---|---|
+| 1 | sesion firmada (ADR-025) | 401 | `SIN_SESION` |
+| 2 | `carta_id` presente | 400 | `CARTA_ID_REQUERIDO` |
+| 3 | `variante` en `CARTA_VARIANTES` (default `base`) | 400 | `VARIANTE_INVALIDA` |
+| 4 | `ref_id` presente | 400 | `REF_ID_REQUERIDO` + `ref_contrato` |
+| 5 | `ref_id` con forma UUID (`MERCADO_UUID_RE`) | 400 | `REF_ID_INVALIDO` + `ref_contrato` |
+| 6 | `origen` en el enum | 400 | `ORIGEN_INVALIDO` |
+
+**Causas dentro del statement: la respuesta trae el campo, el handler mapea, no adivina.** El `SELECT` final devuelve `carta_n`, `carta_subtipo`, `refok_soporte`, `refok_existe_mio`, `acc_n`, `acc_activa`, `tope_act_ok`, `tope_hist_ok`, `inv_n`, `ins_n`, `origen_sostenido`, `origen_verificado`; el mapeo es **una sola rama en este orden** (sin releer la base). `tope_act_ok`/`tope_hist_ok` valen **`false`** cuando el tope esta superado —no `NULL`—: el unico `NULL` posible es con `acc_n=0`, y esa rama ya cae en `SINK_ACCION_INACTIVA`:
+
+| Causa (campo) | HTTP | `error` |
+|---|---|---|
+| `carta_n = 0` (incluye carta inactiva o de otra familia) | 404 | `CARTA_NO_ENCONTRADA` |
+| `carta_subtipo` ausente de `MEJORA_REF_ORIGEN` | 400 | `MEJORA_CLAVE_DESCONOCIDA` |
+| `refok_soporte = false` | 409 | `SINK_REFSIN_SOPORTE` + `motivo_soporte` |
+| `refok_existe_mio = false` | 404 | `REF_NO_ENCONTRADA` |
+| `acc_n = 0` o `acc_activa = false` | 409 | **`SINK_ACCION_INACTIVA`** (nuevo) |
+| `tope_act_ok = false` | 409 | `SLOT_TOPE_ACTIVOS` |
+| `tope_hist_ok = false` | 409 | `SLOT_TOPE_HISTORICO` |
+| `origen = 'acunada'` y `origen_sostenido = false` | 409 | `ORIGEN_NO_SOSTENIDO` |
+| `inv_n = 0` con las anteriores ok | 409 | `SIN_CARTA` |
+| `ins_n = 0` con todo lo anterior ok | 500 | `MEJORA_NO_ESCRITA` (no deberia ocurrir; se registra con el contexto) |
+
+**`SINK_ACCION_INACTIVA` es necesario, no cosmetico:** sin el, una accion dada de baja en `sink_acciones` era **indistinguible** de un tope (los dos daban `ins_n=0` y el cliente leia "tope" cuando el problema era otro). Ademas, con el gate anterior (tope dentro del `WHERE` de `ok`) un tope superado dejaba `tope_act_ok` en **`NULL`** y la rama caia en `SIN_CARTA` — un 409 que culpaba al inventario de un limite de slots. Ahora el gate vive en `acc` y el reporte tambien: **el codigo que se devuelve es el de la causa real**. Un tope **nunca** consume la carta: `inv` va gateado por `ok`, `ins` por `inv` y `led` por `ins`. Los codigos 4-5, `SINK_REFSIN_SOPORTE`, `REF_NO_ENCONTRADA`, `SIN_CARTA` y los dos de tope son **los mismos que ya devuelve `slot_comprar`** (`:21511-21543`): la UI no aprende un segundo vocabulario. `REF_SIN_PERMISO` **no existe y no se inventa**: `sinkRefCte` mete existencia y pertenencia en el mismo predicado (`existe_mio`, `:2960-2965`), luego la respuesta honesta es `REF_NO_ENCONTRADA`.
+
+Escritura **en un solo statement**, con el gate de cada paso en el paso anterior (patron `:2954-2960` + ADR-055), en este orden:
+
+```
+-- $1 uid | $2 carta_id | $3 variante | $4 ref_id | $5 origen
+WITH card AS (SELECT id, subtipo, precio_xp FROM cartas_catalogo
+              WHERE id=$2 AND activo=true AND familia='mejora' LIMIT 1),
+     cnt  AS (SELECT COUNT(*)::int k, COUNT(*) FILTER (WHERE activo)::int k_act
+              FROM sink_slots WHERE usuario_id=$1::uuid
+               AND clave_accion=(SELECT subtipo FROM card)),
+     acc  AS (SELECT a.slot_max, a.slot_max_activos, a.activo,
+               (cnt.k_act < a.slot_max_activos) AS tope_act_ok,
+               (cnt.k     < a.slot_max)         AS tope_hist_ok
+              FROM sink_acciones a, card c, cnt
+              WHERE a.clave=c.subtipo),   -- GATE y REPORTE en la MISMA rama
+     ref/refok  -- sinkRefCte(subtipo, 4): ref_id = $4, $1 = uid
+     ok   AS (SELECT refok.ok FROM refok, acc
+              WHERE refok.ok AND acc.activo
+                AND acc.tope_act_ok AND acc.tope_hist_ok),
+     org  AS (SELECT (COALESCE($5,'acunada') <> 'acunada'
+               OR EXISTS (SELECT 1 FROM xp_ledger l
+                          WHERE l.usuario_id=$1::uuid AND l.accion='carta_compra'
+                            AND l.contexto->>'carta_id'=$2::text
+                            AND l.contexto->>'variante'=$3)) AS origen_sostenido),
+     inv  AS (UPDATE usuarios_cartas SET cantidad=cantidad-1,
+               activo=CASE WHEN cantidad-1<=0 THEN false ELSE activo END,
+               en_museo=CASE WHEN cantidad-1<=0 THEN false ELSE en_museo END,
+               orden_museo=CASE WHEN cantidad-1<=0 THEN NULL ELSE orden_museo END
+              WHERE usuario_id=$1::uuid AND carta_id=$2 AND variante=$3
+                AND activo=true AND cantidad>=1
+                AND EXISTS (SELECT 1 FROM ok)
+                AND (SELECT origen_sostenido FROM org)
+              RETURNING cantidad, activo),
+     ins  AS (INSERT INTO sink_slots (usuario_id, clave_accion, ref_id,
+               costo_pagado, alpha_aplicado, gamma_aplicado, slot_index, activo)
+              SELECT $1::uuid, (SELECT subtipo FROM card), $4,
+                     (SELECT precio_xp FROM card), 0, 0, (SELECT k FROM cnt), true
+              WHERE EXISTS (SELECT 1 FROM inv) RETURNING id, slot_index),
+     led  AS (INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final,
+               es_exento, contexto)
+              SELECT $1::uuid, 'carta_mejora', 0, 0, true,
+                jsonb_build_object('carta_id',$2,'variante',$3,
+                  'clave',(SELECT subtipo FROM card),'ref_id',$4,
+                  'origen',COALESCE($5,'acunada'),
+                  'precio_catalogo',(SELECT precio_xp FROM card),
+                  'slot_id',(SELECT id FROM ins),
+                  'slot_index',(SELECT slot_index FROM ins))
+              WHERE EXISTS (SELECT 1 FROM ins) RETURNING id)
+SELECT (SELECT COUNT(*)::int FROM card) carta_n,
+       (SELECT subtipo FROM card) carta_subtipo,
+       (SELECT COALESCE(soporte,false) FROM ref) refok_soporte,
+       (SELECT COALESCE(existe_mio,false) FROM ref) refok_existe_mio,
+       (SELECT COUNT(*)::int FROM acc) acc_n,
+       (SELECT activo FROM acc) acc_activa,
+       (SELECT tope_act_ok FROM acc) tope_act_ok,
+       (SELECT tope_hist_ok FROM acc) tope_hist_ok,
+       (SELECT origen_sostenido FROM org) origen_sostenido,
+       ((COALESCE($5,'acunada') = 'acunada')) AS origen_verificado,
+       (SELECT COUNT(*)::int FROM inv) inv_n,
+       (SELECT COUNT(*)::int FROM ins) ins_n,
+       (SELECT cantidad FROM inv) cantidad, (SELECT activo FROM inv) carta_activa,
+       (SELECT id FROM ins) slot_id, (SELECT slot_index FROM ins) slot_index,
+       (SELECT k FROM cnt) k_previo, (SELECT k_act FROM cnt) k_act_previo,
+       (SELECT slot_max FROM acc) slot_max,
+       (SELECT slot_max_activos FROM acc) slot_max_activos
+```
+
+Nota de orden: `acc` concentra **gate y reporte** —sus dos booleanos `tope_act_ok`/`tope_hist_ok` se calculan siempre que exista fila en `sink_acciones`— y `ok` solo los consume, luego **un tope superado produce `ok` vacio pero `tope_* = false` legible**, nunca `NULL` (el `NULL` solo aparece si `acc_n=0`, y esa rama ya tiene su propio codigo). `org` es un `SELECT` puro (no escribe) y su resultado se exige **dentro de `inv`**, luego un origen no sostenido **no descuenta inventario ni escribe slot**. `led` va gateado por `ins` y `ins` por `inv`: si falla cualquier paso anterior, **no hay asiento**.
+
+Respuesta **200**:
+
+```
+{ ok: true, mejora: "<clave>", carta_id, cantidad_restante, carta_activa,
+  slot_id, slot_index, ref_id,
+  precio_catalogo,                    // referencia, NO importe pagado
+  origen: "acunada|mercado|intercambio",
+  origen_verificado: (COALESCE($5,'acunada') = 'acunada'),  // formula de servidor, no origen_sostenido
+  topes: { historico: slot_max, activos: slot_max_activos,
+           historicos_usados: k_previo+1, activos_usados: k_act_previo+1 } }
+```
+
+**Idempotencia (declarada, no resuelta con nonce):** el uso **no** es idempotente por diseno; un doble submit consume **dos copias** y crea **dos filas**, es decir produce **dos slots reales**. No hay cobro fantasma: el XP se pago en la acunacion y cada copia vale exactamente un slot, luego el invariante "cada copia consumida = una fila insertada" se mantiene. El unico cota es el tope (D6). Se documenta porque es la diferencia con `carta_acunar`, donde un doble submit **si** podia cobrar de mas.
+
+### Fases y orden seguro (ADR-003)
+
+**Dos releases, no tres.** **R1** = solo esquema y constantes (invisible al usuario: **082 siembra las cartas con `activo=false`**, ver F0.2, luego `carta_acunar` no las ve). **R2** = handler nuevo + UI completa (**aviso en `pf-slots`, picker de `slot_refs` y POST de uso**) + 410 **en el mismo merge y el mismo deploy**, y **083 al final** del release: la retirada del comportamiento y su reemplazo aterrizan juntos, sin ventana con `comunidad.html:5400` vivo y sin ventana con la carta comprable pero inutilizable.
+
+| Release | Fase | Duenno | Gate | Contenido | Se conserva |
+|---|---|---|---|---|---|
+| **R1** | **F0.1** | `@sql-security` | SI | **081**: `DROP`/`ADD` de `chk_cartas_catalogo_familia` (9 valores, + `mejora`) y `chk_cartas_catalogo_subtipo` (**8 ramas intactas**, incluida la de `naturaleza` de **076**, **+** `(familia='mejora' AND subtipo IN ('foto_galeria','album_slot','portada_destino'))`). **`destacar_evento` NO entra** (D10) | filas, `precio_xp`, topes |
+| **R1** | **F0.2** | `@data-migration` | SI | **082**: seed de **3** cartas (`raro`/`epico`/`epico`), `precio_xp` = `precioAcunacion('mejora', rareza)`, `edicion='abierta'`, `supply_max=NULL`, `es_evento=false`, **`activo=false`** (el DEFAULT de `040:107` es `true`: omitirlo las publicaria en R1 y `carta_acunar` (`:17738`) las venderia antes de existir el consumo), lamina (`imagen_url`) cuando exista: hoy hay **0 cartas con diseno** y el arte se resuelve por otra via (`071:81`), luego **no es requisito** de este contrato ni se valida en el handler | catalogo actual |
+| **R1** | **F0.3** | `@backend-dev` | SI | `lib/cartas-config.js` (**modulo compartido por las 8 funciones**, por eso no va a `@js-silo-dev`): `mejora` en `FAMILIAS_CARTA`, `MEJORA_REF_ORIGEN` (con `tipo_medio_requerido`, sin SQL), `SUBTIPOS_CARTA.mejora` derivado **solo de `soporte:true`**, `mejora: 1.0` en `CARTA_MULT_FAMILIA`, exports. **Y `scripts/smoke_cartas_constantes.js`: `:307` 8 -> 9 familias y `:319` 8 -> 9 ramas de subtipo, + asserts de `mejora`** | exportaciones existentes |
+| **R2** | **F1.1** | `@backend-dev` | SI | `SINK_REF_ORIGEN = CartasConfig.MEJORA_REF_ORIGEN`, `SINK_CLAVES` derivado, `sinkRefCte(clave, idxRef)` con allow-list local de `tabla`/`columna` (D3) | `sinkRefContrato`, SQL de `slot_comprar` |
+| **R2** | **F1.2** | `@backend-dev` | SI | handler `carta_mejora_usar` (D7/D8) | `carta_acunar`, `carta_evento_usar` |
+| **R2** | **F2.3** | `@admin-dev` | SI | `cartas-ui.js`: `mejora` en el mapa de `:340` **y en `CATALOGO_FAMILIAS` (`:1368`)**, con sus consumidores `:1405`, `:1639`, `:1846` y el export `:2658` | resto del catalogo |
+| **R2** | **F2.1** | `@js-silo-dev` | no | `comunidad.html:5400`: el POST de compra se sustituye por el aviso + enlace al mercado; `#pf-slots` y sus data-attributes **intactos**. **El aviso NO pinta ningun precio en XP**: solo topes usados/max y el enlace (ver "Que NO cambia") | CSS del silo `.pf-slots` (ADR-004) |
+| **R2** | **F2.4** | `@js-silo-dev` | no | **El LLAMADOR del handler nuevo:** en `#pf-slots`, picker construido con `slot_refs` (`GET tipo=slot_refs`, `:12200`) que elige la carta `mejora` del inventario y el `ref_id` destino, y envia `POST { tipo:'carta_mejora_usar', carta_id, variante, ref_id, origen }`; `origen` explicito (`acunada` por defecto, `mercado`/`intercambio` si el usuario lo declara, D5). Muestra **`precio_catalogo`** de la carta y **no** `costo_proximo`. Sin F2.4, R2 publicaria un handler **sin llamador** | `slot_refs` tal cual (solo se consume) |
+| **R2** | **F2.2** | `@backend-dev` | SI | `slot_catalogo` anade `compra_retirada: true` por sumidero (un **campo**; no un endpoint) para que ninguna UI pinte un precio impagable | `costo_proximo`/`costo_siguiente` (lectura historica) |
+| **R2** | **F1.3** | `@backend-dev` | SI | `slot_comprar` -> **410** `SLOT_COMPRAR_RETIRADO` + `alternativa:'carta_mejora_usar'`, **en el mismo deploy que F2.1/F2.4**; la rama **se queda** en el router y su SQL **se conserva** hasta F3 (revertir el 410 debe ser cambiar una constante, no reescribir el handler) | validacion, `ref_contrato`, cuerpo SQL |
+| **R2** | **F0.4** | `@data-migration` | SI | **083**: flip `activo=true` de las 3 cartas del seed, **idempotente** (`WHERE familia='mejora' AND activo=false AND id IN (...)`, re-ejecutar = 0 filas), con su fila en `schema_migrations`. **Se aplica al FINAL de R2, con el deploy ya verificado**: primero el handler y la UI, despues el catalogo. Invertir el orden abre una ventana de "comprable pero no usable" | filas y `precio_xp` de 082 |
+| **F3** | **F3** | `@js-silo-dev` | no | limpieza **solo con 0 referencias vivas** y la ventana de rollback de R2 cerrada: JS muerto de `pf-slots` y, si nadie lee ya la curva, `sinkPrecioCte`/`sinkCosto` | `#pf-slots`, `slot_mios`, `slot_refs`, `slot_comprar_tipo` |
+
+**Guardas ADR-003 (obligatorias en el PR de R2):** `Select-String -Pattern "slot_comprar" comunidad.html cartas-ui.js admin.html scripts/` -> **antes de R2: 2 hits en `comunidad.html`**, `:4820` (comentario que declara el contrato del endpoint) y `:5400` (el POST de `pf-slots`); **despues de R2: 1 hit** (`:4820`, el comentario se conserva como documentacion del contrato retirado) **+ la rama 410 + `slot_comprar_tipo`** (`:12344`, declaracion del contrato que el 410 usa). **Los 2 consumidores de UI se sustituyen en R2 (F2.1 y F2.4) y el contrato se conserva.** ADR-003 exige **0 consumidores vivos antes de retirar el comportamiento**, no antes de cambiar codigo: por eso el 410 viaja con la UI nueva y **no es un 404** (un cliente con HTML cacheado debe recibir una explicacion y una alternativa, no un error opaco). **Id retirado: ninguno.** `#pf-slots`, `.pf-slots`, `#pf-bono` siguen siendo contrato de UI aunque queden inertes.
+
+### Justificacion
+
+- **Una sola autoridad por hecho** (ADR-121 D5, ADR-084 D1): *taxonomia y mapeo* en `lib/cartas-config.js`; *interpolacion SQL* en `api/`. Si el mapa viviera en `api/`, el seed y el admin tendrian que copiarlo, y la copia derivaria en silencio (la trampa ya documentada en `:99-100` para `naturaleza`).
+- **`lib/` es puro y no contiene SQL:** `lib/cartas-config.js` lo cargan las **8** funciones serverless; un fragmento `" AND tipo_medio = 'general'"` ahi seria SQL en un modulo de datos, y el dia que otro consumidor lo interpole sin el contexto adecuado se convierte en una inyeccion silenciosa. Se modela como dato (`tipo_medio_requerido`) y el `AND` lo construye `api/`, contra una allow-list **literal** de `tabla`/`columna`: si alguien edita `lib/` y pone `tabla:'usuarios'`, la allow-list **no lo deja pasar**.
+- **`idxRef` como parametro y no `$5` cableado:** la funcion se reusa desde dos sitios con distinta aridad de parametros. Cablear el indice obligaria a duplicar el constructor de SQL (dos autoridades otra vez) o a renumerar el statement viejo; parametrizarlo deja **una** implementacion y paridad byte a byte con el camino historico.
+- **La respuesta trae la causa, no una precedencia adivinada:** `ins_n=0` es el mismo sintoma para accion de baja, tope de activos, tope historico y falta de copia. Publicar `acc_n`/`acc_activa`/`tope_*`/`refok_*`/`inv_n` convierte el diagnostico en un mapeo de campos y **elimina el codigo inventado** (`REF_SIN_PERMISO` no existia) y el falso "tope" cuando el problema estaba en `sink_acciones`. **El gate y el reporte tienen que vivir en la MISMA rama:** filtrar los topes dentro del `WHERE` de `ok` dejaba `tope_act_ok` en `NULL` y mandaba al usuario a `SIN_CARTA` ("no tienes la carta") cuando el limite era de slots — un error que miente y que ninguna prueba de camino feliz detecta.
+- **R1 no puede ser visible:** el DEFAULT de `cartas_catalogo.activo` es `true` (`040:107`) y `carta_acunar` solo mira `activo` (`:17738`). Un seed que omita la columna **publica**. Por eso 082 nace `activo=false` y el flip es una migracion propia (083) al final de R2: la invisibilidad es un **valor escrito**, no una consecuencia del orden de deploy.
+- **`subtipo` = clave, sin tabla de traduccion:** el nombre de la clave ya es contrato externo (lo devuelve `slot_catalogo`, lo consume `slot_refs`, esta en `sink_acciones.clave`). Traducir (`foto_extra` -> `foto_galeria`) crearia un punto de drift a cambio de nada.
+- **Comprar y usar en dos pasos:** el paso de uso es lo que permite la carta **generica** (el `ref_id` se elige al final) y lo que hace que el recurso sea **comerciable, coleccionable y contable** antes de gastarse. Tambien separa "gaste XP" (cobro, una vez) de "consumi la carta" (cambio de estado, sin XP): dos hechos distintos, dos asientos distintos.
+- **`sink_slots` sobrevive y las filas viejas no se reescriben:** un `costo_pagado` es un recibo. Reescribirlo para "normalizar" la era seria borrado logico de facto. **Pero el recibo nuevo no miente:** al no existir columna de procedencia, el importe se declara **referencia de catalogo** y el `origen` viaja con su flag de verificacion.
+- **`alpha/gamma = 0` en la era nueva:** deja la columna como marcador de epoca y evita afirmar una formula no aplicada.
+- **`destacar_evento` fuera del seed:** "no comprable" ya esta escrito en el codigo y la UI lo explica; una carta "proximamente" con `precio_xp > 0` es una promesa cobrada.
+- **Multiplicador 1.0:** reproduce la equivalencia historica (320-800 contra 400-1.000) y deja la curva fuera de la economia en vez de esconderla en un factor.
+
+### Impacto
+
+- **Esquema:** **081 + 082 + 083**, tres migraciones, **cero `DELETE`**, cero `DROP TABLE`, cero `DROP COLUMN`. Los `DROP CONSTRAINT` de 081 son de **CHECK** (re-creados en la misma transaccion), no de dato. **Cero cambio a `sink_slots`, `sink_acciones`, `usuarios_cartas`, `xp_ledger`, y cero cambio al DEFAULT de `cartas_catalogo.activo`** (`040:107`): la publicacion se controla con el valor de la fila, no con el default de la columna.
+- **Backend:** **1 handler nuevo** en `api/interacciones.js` (`carta_mejora_usar`), 1 linea de enlace `SINK_*` -> `CartasConfig`, `sinkRefCte` con `idxRef` + allow-list local, `slot_comprar` a 410, 1 campo en `slot_catalogo`, `BONO_EXCLUIDAS.carta_mejora`. **Cero endpoint nuevo (8/8).** `carta_acunar` **sin cambios**.
+- **Constantes:** `lib/cartas-config.js` crece con `MEJORA_REF_ORIGEN` (dato puro, `tipo_medio_requerido`), `FAMILIAS_CARTA` 8->9, `SUBTIPOS_CARTA.mejora` derivado de los comprables, `CARTA_MULT_FAMILIA.mejora`. `precioAcunacion()` y `factorCopias()` **sin cambios**.
+- **Smoke de constantes (obligatorio, o R1 rompe el repo):** `scripts/smoke_cartas_constantes.js:307` (`famsCarta.length === 8`) y `:319` (`Object.keys(SUBTIPOS_CARTA).length === 8`) **fallan** en cuanto F0.3 entre. F0.3 los sube a **9** familias y **9** ramas, y anade assert de que `subtiposDeFamilia('mejora')` devuelve **exactamente** `['foto_galeria','album_slot','portada_destino']` y de que `precioAcunacion('mejora', 'raro') === 400`. `:124` (8 funciones serverless) **no se toca**.
+- **Render:** `cartas-ui.js` necesita `mejora` en **dos** sitios: el mapa de familias (`:340`) y **`CATALOGO_FAMILIAS` (`:1368`)**, con sus tres consumidores (`:1405` filtro de familia, `:1639` lista de filtros, `:1846` validacion del valor de filtro) y el export (`:2658`). Sin `:1368` la carta existe en el catalogo pero **no se puede filtrar ni mostrar** por familia. El resto de la ficha (stats, poder, copias) no aplica: **`mejora` no tiene vector** y `poder = 0`, luego `factorCopias` es inerte (declarado; no se "arregla").
+- **Cliente:** `comunidad.html` deja de comprar slots y pasa a **avisar + usar** (picker `slot_refs` -> `carta_mejora_usar`); `admin.html` **sin cambios de codigo** (hereda la familia del bloque `config`).
+- **Publicacion:** las cartas **no existen para el usuario en R1** (`activo=false`, 082) y se abren en **R2 con 083**, despues del deploy verificado. `carta_acunar` no cambia: respeta `activo=true` (`:17738`).
+- **Presupuesto:** 8/8 intacto. El costo es **una rama mas** en el `switch` de `tipo2`.
+
+### Verificacion (contrato; se ejecuta en F0/F1, no en este ADR)
+
+1. **Sintaxis y ASCII (Escudo GOLD):** `node --check api/interacciones.js`, `node --check lib/cartas-config.js`; `Select-String -Pattern '[^\x00-\x7F]' api/interacciones.js lib/cartas-config.js` con **0** hits en las lineas nuevas.
+2. **Paridad del mapeo (script nuevo, `$0`, `scripts/verificar-mejora.js`):** falla con exit != 0 si (i) `SUBTIPOS_CARTA.mejora` != las claves de `MEJORA_REF_ORIGEN` con `soporte === true`; (ii) alguna clave de `SINK_CLAVES` no esta en `MEJORA_REF_ORIGEN`; (iii) `CARTA_MULT_FAMILIA.mejora` no existe; (iv) `CARTA_FAMILIAS_SIN_PRECIO_XP` contiene `mejora`; (v) el `precio_xp` del seed != `precioAcunacion('mejora', rareza)`; (vi) `destacar_evento` aparece en `SUBTIPOS_CARTA.mejora` o en el CHECK de 081.
+3. **Guarda ADR-003:** el grep de `slot_comprar` devuelve **2 hits en `comunidad.html`** (`:4820`, `:5400`) + la rama 410 + `slot_comprar_tipo`; `#pf-slots` sigue existiendo en HTML y CSS.
+4. **Esquema:** `SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE conname IN ('chk_cartas_catalogo_familia','chk_cartas_catalogo_subtipo')` -> 9 familias y **3** subtipos de `mejora` (sin `destacar_evento`); tras **081/082**: 3 filas `mejora` con `activo=false`; tras **083**: 3 con `activo=true`; re-ejecutar 081/082/083 = **0 cambios de dato**; **1 fila** en `schema_migrations` por migracion. `grep` de `activo` en el SQL aplicado: el DEFAULT no se toca.
+5. **Smoke de constantes:** `node scripts/smoke_cartas_constantes.js` -> exit **0** con 9 familias, 9 ramas y el assert de `subtiposDeFamilia('mejora')` (es el unico gate que detecta el `length === 8` cableado).
+6. **Smoke del motor:** acunar 1 `foto_galeria` (400 XP, `xp_gastado_sinks +400`, `carta_compra`), usar con un `ref_id` propio (`cantidad 1->0`, `activo=false`, fila en `sink_slots` con `alpha_aplicado=0` y `costo_pagado=400`, `carta_mejora` en `xp_ledger` con `origen`), repetir con `cantidad=0` -> **409 `SIN_CARTA`** y **sin** fila nueva; usar con `ref_id` ajeno -> **404 `REF_NO_ENCONTRADA`** y **sin** descuento; con `sink_acciones.activo=false` -> **409 `SINK_ACCION_INACTIVA`** (no `SLOT_TOPE_*`); **llenar hasta `slot_max_activos` -> 409 `SLOT_TOPE_ACTIVOS` y NO `SIN_CARTA`** (regresion exacta de ALTA-1); declarar `origen='acunada'` con una copia de mercado -> **409 `ORIGEN_NO_SOSTENIDO`**; `slot_comprar` -> **410**.
+7. **Cero regresion:** `xp_total` sin cambio en todo el flujo (ADR-018); `slot_mios`/`slot_refs` devuelven las filas nuevas sin tocar su SQL; el predicado de compra de `carta_acunar` intacto (misma carta, mismo `precio_xp`).
+
+### Que NO cambia (radio acotado)
+
+`xp_total` y la semantica `xp_gastado_sinks` (ADR-018) · `carta_acunar` y su CTE · `carta_evento_usar`, `carta_intercambiar`, `carta_fusionar`, `carta_publicar`, mercado P2P, `consumibles`, set Ancestral y bonos de ADR-120 · esquema de `sink_slots`/`sink_acciones` y sus 4 topes · SQL de `slot_catalogo`/`slot_mios`/`slot_refs` (solo **campo** nuevo) · **`SINK_ALPHA`/`SINK_GAMMA`/`sinkCosto`/`sinkPrecioCte` como lectura historica**: `slot_catalogo` sigue calculando y publicando `costo_proximo`/`costo_siguiente` (`:12106`, `:12120`) y **`#pf-slots` deja de pintarlo como precio** — el aviso muestra **topes usados/max y ningun numero de XP**, y el unico precio que ve el usuario es el **`precio_xp` de la carta** en el mercado. **Dos numeros nunca compiten:** la curva queda como referencia de lo que costo la era vieja, la carta como oferta vigente · `cromos_*` · los 8 endpoints y el contrato v107 · CSS de `.pf-slots` (ADR-004).
+
+### Deudas declaradas (no bloquean este ADR)
+
+- **D-35:** `mejora` puede ir al museo (no hay predicado de familia en el handler de museo). Inofensivo (consume un hueco cosmetico); se cierra con el mismo predicado de **D-15** (`carta_publicar`).
+- **D-36:** `carta_publicar` no filtra `familia` (D-15 de ADR-121): una `mejora` podria listarse en el mercado P2P. No crea arbitraje (el XP se transfiere), pero el predicado debe decidirlo **junto** con `producto`/`consumible`.
+- **D-37:** el `CASE` de "cantidad-1 + activo=false + en_museo/orden_museo" tiene **3** copias (`carta_evento_usar`, `carta_intercambiar`, futuro `carta_mejora_usar`). Se extrae a helper **solo** si aparece un cuarto consumidor (no refactorizar en la misma tanda que el contrato nuevo).
+- **D-38:** `slot_index` puede repetirse bajo concurrencia. **No es que falte UNIQUE:** `uq_sink_slot (usuario_id, clave_accion, ref_id, creado_en)` existe (`046:163`) e incluye `creado_en` (`DEFAULT now()`), luego **dos usos nunca colisionan**; el unico valor repetible es el ordinal `slot_index`, que no lleva restriccion propia. Cosmetico desde D4; se declara aqui para que nadie lo lea como bug nuevo.
+- **D-39:** `usuarios_cartas` **no guarda procedencia** (acunada / mercado / intercambio). Por eso `precio_catalogo` es **referencia** y no importe, y por eso `origen` solo se **verifica** cuando el cliente declara `acunada` (asiento `carta_compra`); `mercado`/`intercambio` quedan como declaracion con `origen_verificado:false`. Cerrarlo exige una columna de procedencia en `usuarios_cartas` — fuera del radio de este ADR.
+- **Ratificacion CERRADA (2026-11-14, operador) -- ya no es un pendiente:** `CARTA_MULT_FAMILIA.mejora = 1.0`, ratificado sin reabrir diseno. Cambiarlo **no** altera ninguna estructura: el seed recalcula `precio_xp` con `precioAcunacion()`. No queda ningun numero de esta ADR sujeto a ratificacion.
+
+---
+

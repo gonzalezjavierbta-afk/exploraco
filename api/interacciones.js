@@ -2798,72 +2798,23 @@ var SINK_ALPHA = 0.20;
 var SINK_GAMMA = 2.00;
 var SINK_DIAS_RAMPA = 30;
 
-// Las 4 claves validas. allow-list explicita en codigo: la compra NUNCA
-// interpola la clave del cliente en el nombre de tabla ni en un fragmento de
-// SQL; viaja solo como parametro $2 contra la FK de sink_acciones. La lista es
-// una segunda barrera, no la primera.
-var SINK_CLAVES = ['foto_galeria', 'destacar_evento', 'album_slot', 'portada_destino'];
+// FUENTE UNICA DEL MAPEO (ADR-122 D3). El mapa clave -> origen del efecto vive
+// en lib/cartas-config.js como DATO PURO (cero SQL: el filtro de medio viaja
+// como el dato 'general', nunca como fragmento de consulta, porque ese modulo
+// lo cargan las 8 funciones serverless). Aqui queda UNA sola linea de enlace,
+// sin literal: un mapa copiado en api/ derivaria en silencio del que leen el
+// seed y el admin. SINK_CLAVES se DERIVA de sus claves y sigue siendo la
+// allow-list de ENTRADA de la compra (la clave del cliente se valida contra
+// ella antes de tocar la base, y viaja solo como parametro contra la FK de
+// sink_acciones); el segundo cerrojo es la allow-list de pares tabla/columna
+// de sinkRefCte, que es la UNICA que interpola nombres.
+var SINK_REF_ORIGEN = CartasConfig.MEJORA_REF_ORIGEN;
+var SINK_CLAVES = Object.keys(SINK_REF_ORIGEN);
 
-// FAIL-CLOSED: a que se engancha cada sumidero. Los 4 se enganchan a algo
-// (foto -> foto, evento -> evento, album -> album, portada -> destino) y
-// ninguno es un slot "suelto": por eso ref_id es OBLIGATORIO. Allow-list en
-// CODIGO: el nombre de tabla sale de aqui, nunca del navegador. La clave ya
-// esta contra SINK_CLAVES antes de llegar aqui, y aun asi el fragmento SQL se
-// construye con concatenacion de literales, no con el valor del cliente.
-//
-// Los cuatro campos salen de lo MEDIDO en Neon (information_schema), no de
-// suposiciones:
-//   usuario_fotos: 1 fila. Columnas id, usuario_id, url, activo.
-//   albumes: 11 filas. Columnas id, usuario_id, activo.
-//   spot_duenos: 4 filas (MEDIDO 2026-10-05). Columnas destino_id, usuario_id,
-//     votos, calculado_en, activo, tipo_medio. PK COMPUESTA (destino_id,
-//     tipo_medio): NO tiene columna id, luego la columna de enganche se
-//     declara por sumidero en el campo columna. Es la tabla duena-destino de la
-//     plataforma: destinos (218 filas) es catalogo (slug, telefono, web,
-//     booking) y por diseno NO tiene dueno.
-//   eventos: NO existe ninguna tabla: ningun nombre hace match a %event% ni a
-//     %agenda% en information_schema.tables de public. Lo unico con esa
-//     forma semantica es cartas_catalogo.es_evento (un booleano), que NO se
-//     cablea aqui: es anotacion de futuro, no un enganche.
-// soporte=false significa que el servidor NO PUEDE validar el enganche, luego
-// RECHAZA la compra en vez de crear una fila huerfana por la que alguien paga
-// 320-800 XP. Preferible no comprable todavia a cobrar por nada.
-// NOTA DE ALCANCE (portada_destino): spot_duenos tiene 4 filas, las 4 con
-// activo=true, pero de UN SOLO usuario (1 usuario_id distinto). El sumidero
-// esta desbloqueado y correcto, pero solo 1 usuario del universo puede
-// comprarlo hoy. No es un defecto del codigo: es el tamano del dato.
-var SINK_REF_ORIGEN = {
-  foto_galeria: {
-    tabla: 'usuario_fotos', columna: 'id',
-    soporte: true, requiere_pertenencia: true,
-    etiqueta: 'Una foto de tu galeria'
-  },
-  album_slot: {
-    tabla: 'albumes', columna: 'id',
-    soporte: true, requiere_pertenencia: true,
-    etiqueta: 'Un album tuyo'
-  },
-  portada_destino: {
-    // El enganche es el PAR (destino_id, usuario_id) con activo=true. Un
-    // destino del catalogo que el usuario no posee falla por existe_mio, que
-    // va en el MISMO WHERE del debit (refok): no hay lectura previa.
-    // filtro_tipo: la PK es COMPUESTA (destino_id, tipo_medio) con 6 medios
-    // permitidos (general, foto, video, audio, escrito, texto). Sin este
-    // filtro pertenecer CUALQUIER medio de un destino compra la PORTADA de
-    // ese destino, que es el extremo 'general'. Va en el MISMO EXISTS, no en
-    // una segunda consulta: separar la comprobacion abre una carrera.
-    tabla: 'spot_duenos', columna: 'destino_id',
-    filtro_tipo: " AND tipo_medio = 'general'",
-    soporte: true, requiere_pertenencia: true,
-    etiqueta: 'Uno de tus destinos'
-  },
-  destacar_evento: {
-    tabla: null, columna: null, soporte: false, requiere_pertenencia: true,
-    etiqueta: 'Un evento',
-    motivo_soporte: 'No existe tabla de eventos en el esquema: no se puede'
-      + ' probar que un evento exista ni a quien pertenezca'
-  }
-};
+// ADR-122 D9 / F1.3: retirada GOBERNADA de slot_comprar. La rama sigue en el
+// router con TODO su SQL debajo, pero inalcanzable mientras esto sea true:
+// revertir la retirada es cambiar ESTA linea, no reescribir el handler.
+var SLOT_COMPRA_RETIRADA = true;
 
 // Lo que la UI necesita saber para construir el picker de cada sumidero. Va en
 // la respuesta de TODOS los rechazos y en el catalogo, para que el cliente no
@@ -2933,6 +2884,38 @@ function sinkCosto(costoBase, k) {
   return red2(numXp(costoBase) * Math.pow(1 + SINK_ALPHA * k, SINK_GAMMA));
 }
 
+// AUTORIDAD UNICA DE SQL (ADR-122 D3). lib/cartas-config.js es la autoridad de
+// DATOS (tabla, columna, tipo_medio_requerido); este archivo es la autoridad de
+// SQL y solo interpola un par tabla/columna si esta en esta allow-list LITERAL.
+// Si lib/ trae un par fuera de la lista (p.ej. tabla:'usuarios') el nombre NO se
+// interpola: la rama degrada a soporte=false y el handler responde fail-closed,
+// porque la columna y la tabla son nombres de SQL, no datos del navegador.
+//
+// Los pares salen de lo MEDIDO en Neon (information_schema), no de supuestos:
+//   usuario_fotos: 1 fila. Columnas id, usuario_id, url, activo.
+//   albumes: 11 filas. Columnas id, usuario_id, activo.
+//   spot_duenos: 4 filas (MEDIDO 2026-10-05). Columnas destino_id, usuario_id,
+//     votos, calculado_en, activo, tipo_medio. PK COMPUESTA (destino_id,
+//     tipo_medio): NO tiene columna id, luego la columna de enganche se
+//     declara por sumidero en el mapa. Es la tabla duena-destino de la
+//     plataforma: destinos (218 filas) es catalogo (slug, telefono, web,
+//     booking) y por diseno NO tiene dueno.
+//   eventos: NO existe ninguna tabla: ningun nombre hace match a %event% ni a
+//     %agenda% en information_schema.tables de public. 'destacar_evento' vive
+//     en el mapa con soporte=false y aqui no se interpola nada.
+// soporte=false significa que el servidor NO PUEDE validar el enganche, luego
+// RECHAZA la compra en vez de crear una fila huerfana por la que alguien paga
+// XP. Preferible no comprable todavia a cobrar por nada.
+// NOTA DE ALCANCE (portada_destino): spot_duenos tiene 4 filas, las 4 con
+// activo=true, pero de UN SOLO usuario (1 usuario_id distinto). El sumidero
+// esta desbloqueado y correcto, pero solo 1 usuario del universo puede
+// comprarlo hoy. No es un defecto del codigo: es el tamano del dato.
+var SINK_REF_ALLOWLIST = {
+  usuario_fotos: { id: true },
+  albumes: { id: true },
+  spot_duenos: { destino_id: true }
+};
+
 // La validacion del enganche, DENTRO de la misma sentencia atomica (ADR-055).
 // No es una lectura previa: es la CTE refok, y el UPDATE de usuarios hace
 // CROSS JOIN contra ella, luego un ref que no valia no produce debit ni INSERT
@@ -2940,11 +2923,40 @@ function sinkCosto(costoBase, k) {
 // despues. Sin esto habia una ventana entre "comprobar" y "cobrar": es la razon
 // de que el orphan de TSK-184 no reaparezca.
 //
-// $5 llega como $5::uuid. Si fuera NULL el cast da NULL, la comparacion nunca
-// es cierta y existe_mio queda false: el filtro tambien es fail-closed.
-function sinkRefCte(clave) {
+// idxRef es el INDICE del parametro del ref en el statement que la llama y es
+// OBLIGATORIO: slot_comprar lo manda como $5 (su lista es [uid, clave, alpha,
+// gamma, ref_id]) y carta_mejora_usar como $4 ([uid, carta_id, variante,
+// ref_id, origen]). Cablear $5 obligaba a duplicar el constructor de SQL o a
+// renumerar el statement viejo, que son dos autoridades otra vez. Se construye
+// como '$' + idxRef y con cast ::uuid: si el parametro fuera NULL el cast da
+// NULL, la comparacion nunca es cierta y existe_mio queda false (fail-closed).
+// Un idxRef que no sea entero positivo degrada la rama: es un error de codigo,
+// no un dato, y fail-closed es el unico comportamiento aceptable.
+function sinkRefCte(clave, idxRef) {
   var o = SINK_REF_ORIGEN[clave];
-  if (!o || !o.soporte) {
+  var nRef = Number(idxRef);
+  var valido = !!(o && o.soporte && o.tabla && o.columna
+    && SINK_REF_ALLOWLIST[o.tabla]
+    && SINK_REF_ALLOWLIST[o.tabla][o.columna] === true
+    && nRef === Math.floor(nRef) && nRef > 0);
+  // tipo_medio_requerido es DATO ('general'), no el fragmento SQL: el AND se
+  // construye AQUI, contra el unico valor que esta funcion sabe traducir. La PK
+  // de spot_duenos es COMPUESTA (destino_id, tipo_medio) con 6 medios
+  // permitidos; sin el filtro, pertenecer CUALQUIER medio de un destino compra
+  // la PORTADA de ese destino, que es el extremo 'general'. Va en el MISMO
+  // EXISTS, no en una segunda consulta: separar la comprobacion abre una
+  // carrera. Un valor distinto de 'general' es dato nuevo que api/ no sabe
+  // traducir: degrada, no se interpola.
+  var filtro = '';
+  if (valido && o.tipo_medio_requerido !== undefined
+      && o.tipo_medio_requerido !== null) {
+    if (o.tipo_medio_requerido === 'general') {
+      filtro = " AND tipo_medio = 'general'";
+    } else {
+      valido = false;
+    }
+  }
+  if (!valido) {
     return ', ref AS ('
       + ' SELECT false AS soporte, false AS existe_mio'
       + '), refok AS ('
@@ -2953,13 +2965,15 @@ function sinkRefCte(clave) {
   }
   // exists por id Y por dueno. Se consulta la columna de enganche + usuario_id +
   // activo = true: una foto, un album o un destino dado de baja (activo=false)
-  // no se puede destacar. La columna sale de la allow-list de CODIGO de
-  // SINK_REF_ORIGEN, nunca del navegador: es un nombre de columna, igual que
-  // la tabla, y se concatena como LITERAL.
+  // no se puede destacar. La columna sale de la allow-list de CODIGO de arriba,
+  // nunca del navegador: es un nombre de columna, igual que la tabla, y se
+  // concatena como LITERAL.
+  var pRef = '$' + nRef;
   return ', ref AS ('
     + ' SELECT true AS soporte, EXISTS (SELECT 1 FROM ' + o.tabla
-    + '  WHERE ' + o.columna + ' = $5::uuid AND usuario_id = $1::uuid AND activo = true'
-    + (o.filtro_tipo || '') + ')'
+    + '  WHERE ' + o.columna + ' = ' + pRef + '::uuid'
+    + ' AND usuario_id = $1::uuid AND activo = true'
+    + filtro + ')'
     + '  AS existe_mio'
     + '), refok AS ('
     + ' SELECT soporte AND existe_mio AS ok, soporte, existe_mio FROM ref'
@@ -5876,6 +5890,9 @@ var BONO_EXCLUIDAS = {
   bono_faccion_era1: true, bono_consumible_24h: true,
   dm_nuevo: true, tithe_parche: true, pandilla_reto: true,
   carta_evento: true, carta_fusion: true, carta_venta_debito: true,
+  // ADR-122 D8: consumir una mejora (carta_mejora) es un CAMBIO DE ESTADO con
+  // xp_base=0 y xp_final=0: no es un ingreso y jamas puede recibir bono.
+  carta_mejora: true,
   // Fase 2 (spec 3.4 / 4.8): la acunacion y la subida de nivel son COBROS.
   // Un cargo nunca puede recibir el bono % de consumibles (ADR-120).
   carta_compra: true, carta_nivel: true,
@@ -12095,7 +12112,13 @@ module.exports = async function handler(req, res) {
               // slot y si el servidor puede validarlo. Sin este campo la UI
               // no tenia con que construir el selector y mandaba ref_id null,
               // que es la fila huerfana de TSK-184.
-              ref_contrato: sinkRefContrato(a.clave)
+              ref_contrato: sinkRefContrato(a.clave),
+              // ADR-122 D9 / F2.2: camino de compra RETIRADO (slot_comprar
+              // responde 410). Es un CAMPO de esta respuesta, no un endpoint ni
+              // un tipo nuevo: ninguna UI debe pintar un precio impagable.
+              // costo_proximo/costo_siguiente y puede_comprar se conservan como
+              // LECTURA HISTORICA del motor de la curva.
+              compra_retirada: true
             };
             if (usuarioId) {
               var k = Number(a.k_historico) || 0;
@@ -12222,10 +12245,12 @@ module.exports = async function handler(req, res) {
       //  4. RLS: al estar desactivado, no se desactiva ni se saltea nada; el
       //     filtrado es el del punto 1.
       //
-      // El ref_id devuelto es EXACTAMENTE el que acepta slot_comprar, porque
-      // ambos salen de SINK_REF_ORIGEN: tabla y columna de enganche. Para
-      // portada_destino la columna es destino_id, que slot_comprar castea a
-      // $5::uuid (ver sinkRefCte): lo que se devuelve es el UUID, NO el slug.
+      // El ref_id devuelto es EXACTAMENTE el que aceptan slot_comprar y
+      // carta_mejora_usar, porque todos salen del mismo mapa
+      // (CartasConfig.MEJORA_REF_ORIGEN): tabla y columna de enganche. Para
+      // portada_destino la columna es destino_id, que sinkRefCte castea al
+      // parametro del ref (idxRef=5 en slot_comprar, idxRef=4 en
+      // carta_mejora_usar): lo que se devuelve es el UUID, NO el slug.
       if (tipo === 'slot_refs') {
         var srwSes = usuarioDeSesion(req);
         if (!srwSes.ok) return responderSesion(res, srwSes.razon);
@@ -12341,7 +12366,11 @@ module.exports = async function handler(req, res) {
           ref_contrato: {
             campo: 'ref_id',
             tipo: 'uuid',
-            slot_comprar_tipo: 'slot_comprar'
+            // ADR-122 D9: el campo se conserva porque sigue describiendo el
+            // ref_id, pero el tipo que anuncia queda RETIRADO por el 410; el
+            // consumidor nuevo es carta_mejora_usar.
+            slot_comprar_tipo: 'slot_comprar',
+            compra_retirada: true
           }
         });
       }
@@ -16894,6 +16923,347 @@ module.exports = async function handler(req, res) {
           ok: true, evento_habilitado: true, carta_id: cevCarta,
           cantidad_restante: Number(cevR.cantidad),
           carta_activa: cevR.activa === true
+        });
+      }
+
+      // ADR-122 D7/D8 (F1.2): CONSUMIR una carta de familia 'mejora' para
+      // ejecutar el efecto de sumidero (foto_galeria, album_slot,
+      // portada_destino). La clave NUNCA se lee del body: se deriva de
+      // cartas_catalogo.subtipo, luego un cliente no puede emparejar la carta
+      // 'album_slot' con un ref_id de otro sumidero (diferencia de seguridad
+      // frente a slot_comprar, que recibe clave del navegador). CERO cargo de
+      // XP: el XP se cobro al acunar (carta_compra) y aqui solo se cambia
+      // estado, luego xp_total y xp_gastado_sinks NO se tocan (ADR-018).
+      //
+      // UN SOLO statement, con el gate de cada paso en el paso anterior
+      // (ADR-055). 'acc' concentra gate Y reporte en la misma rama: un tope
+      // superado deja tope_* = false (nunca NULL; el NULL solo aparece si
+      // acc_n = 0 y esa rama tiene su propio codigo), luego el codigo que se
+      // devuelve es el de la causa REAL y no una precedencia adivinada.
+      // 'inv' va gateado por 'ok' y 'org'; 'ins' por 'inv'; 'led' por 'ins':
+      // un tope jamas consume la carta y un fallo jamas escribe asiento.
+      if (tipo2 === 'carta_mejora_usar') {
+        var cmuSes = usuarioDeSesion(req);
+        if (!cmuSes.ok) return responderSesion(res, cmuSes.razon);
+        var cmuUid = cmuSes.usuario_id;
+        var cmuCarta = String(body.carta_id || '').trim();
+        if (!cmuCarta)
+          return res.status(400).json({
+            ok: false, code: 'CARTA_ID_REQUERIDO',
+            error: 'CARTA_ID_REQUERIDO', detalle: 'carta_id requerido'
+          });
+        var cmuVar = String(body.variante || CARTA_VARIANTE_DEFECTO)
+          .trim().toLowerCase();
+        if (!cmuVar) cmuVar = CARTA_VARIANTE_DEFECTO;
+        if (CARTA_VARIANTES.indexOf(cmuVar) === -1)
+          return res.status(400).json({
+            ok: false, code: 'VARIANTE_INVALIDA',
+            error: 'VARIANTE_INVALIDA',
+            detalle: 'variante debe ser una de: ' + CARTA_VARIANTES.join(', ')
+          });
+        // FAIL-CLOSED: el ref_id es obligatorio y se exige forma UUID antes de
+        // tocar la base. La existencia y la pertenencia se deciden DENTRO del
+        // statement (refok), no aqui.
+        var cmuRef = body.ref_id === undefined || body.ref_id === null
+          ? '' : String(body.ref_id).trim().slice(0, 200);
+        if (cmuRef === '')
+          return res.status(400).json({
+            ok: false, code: 'REF_ID_REQUERIDO',
+            error: 'REF_ID_REQUERIDO',
+            detalle: 'ref_id requerido: falta elegir a que se engancha la mejora',
+            ref_contrato: {
+              campo: 'ref_id', tipo: 'uuid', requiere_pertenencia: true
+            }
+          });
+        if (!MERCADO_UUID_RE.test(cmuRef))
+          return res.status(400).json({
+            ok: false, code: 'REF_ID_INVALIDO',
+            error: 'REF_ID_INVALIDO',
+            detalle: 'ref_id invalido: se espera un UUID del recurso',
+            ref_contrato: {
+              campo: 'ref_id', tipo: 'uuid', requiere_pertenencia: true
+            }
+          });
+        // 'acunada' es la unica declaracion VERIFICABLE (asiento carta_compra
+        // del mismo usuario, carta y variante). mercado/intercambio se aceptan
+        // como declaracion: usuarios_cartas no guarda procedencia (D-39).
+        var cmuOrigen = String(body.origen || 'acunada').trim().toLowerCase();
+        if (['acunada', 'mercado', 'intercambio'].indexOf(cmuOrigen) === -1)
+          return res.status(400).json({
+            ok: false, code: 'ORIGEN_INVALIDO',
+            error: 'ORIGEN_INVALIDO',
+            detalle: 'origen debe ser acunada, mercado o intercambio'
+          });
+
+        // Lectura de la carta SOLO para conocer el subtipo: sinkRefCte valida
+        // tabla/columna al CONSTRUIR el SQL y la clave es dato de la base, no
+        // del navegador. El statement REPITE la validacion (CTE 'card') y de
+        // ahi salen carta_n/carta_subtipo, luego un cambio entre esta lectura y
+        // la sentencia no cobra nada: el gate real sigue dentro del statement.
+        var cmuCat;
+        try {
+          cmuCat = await sql(
+            'SELECT id, subtipo FROM cartas_catalogo'
+            + ' WHERE id = $1 AND activo = true AND familia = \'mejora\' LIMIT 1',
+            [cmuCarta]
+          );
+        } catch (eCmuCat) {
+          if (!esEsquemaFaltante(eCmuCat)) throw eCmuCat;
+          return responderCartasAusente(res, eCmuCat, 'carta_mejora_usar');
+        }
+        var cmuFila = cmuCat && cmuCat[0] ? cmuCat[0] : null;
+        if (!cmuFila)
+          return res.status(404).json({
+            ok: false, code: 'CARTA_NO_ENCONTRADA',
+            error: 'CARTA_NO_ENCONTRADA',
+            detalle: 'la carta no existe, no esta activa o no es de familia mejora'
+          });
+        var cmuClave = String(cmuFila.subtipo || '').trim();
+        if (!SINK_REF_ORIGEN[cmuClave])
+          return res.status(400).json({
+            ok: false, code: 'MEJORA_CLAVE_DESCONOCIDA',
+            error: 'MEJORA_CLAVE_DESCONOCIDA',
+            detalle: 'el subtipo de la carta no esta en MEJORA_REF_ORIGEN',
+            clave: cmuClave
+          });
+
+        var cmuSql = 'WITH card AS ('
+          + ' SELECT id, subtipo, precio_xp FROM cartas_catalogo'
+          + ' WHERE id = $2 AND activo = true AND familia = \'mejora\' LIMIT 1'
+          + '), cnt AS ('
+          + ' SELECT COUNT(*)::int AS k,'
+          + '  COUNT(*) FILTER (WHERE activo)::int AS k_act'
+          + ' FROM sink_slots WHERE usuario_id = $1::uuid'
+          + '  AND clave_accion = (SELECT subtipo FROM card)'
+          + '), acc AS ('
+          // GATE Y REPORTE en la MISMA rama: los dos booleanos se calculan
+          // siempre que exista fila en sink_acciones. Con el tope dentro del
+          // WHERE de 'ok', un tope superado dejaba tope_* en NULL y la rama
+          // caia en SIN_CARTA, culpando al inventario de un limite de slots.
+          + ' SELECT a.slot_max, a.slot_max_activos, a.activo,'
+          + '  (cnt.k_act < a.slot_max_activos) AS tope_act_ok,'
+          + '  (cnt.k < a.slot_max) AS tope_hist_ok'
+          + ' FROM sink_acciones a, card c, cnt WHERE a.clave = c.subtipo'
+          + ')'
+          // idxRef = 4: la lista de parametros es [uid, carta_id, variante,
+          // ref_id, origen], luego el ref es $4. Cero SQL nuevo para el
+          // enganche: la misma funcion que usa slot_comprar.
+          + sinkRefCte(cmuClave, 4)
+          + ', ok AS ('
+          + ' SELECT refok.ok FROM refok, acc'
+          + ' WHERE refok.ok AND acc.activo'
+          + '  AND acc.tope_act_ok AND acc.tope_hist_ok'
+          + '), org AS ('
+          // SELECT puro (no escribe). Su resultado se exige DENTRO de 'inv',
+          // luego un origen no sostenido no descuenta inventario ni escribe
+          // slot. $2 es text (cartas_catalogo.id es text) y carta_acunar
+          // escribe el contexto con la misma forma, luego el match es exacto.
+          + ' SELECT (COALESCE($5, \'acunada\') <> \'acunada\' OR EXISTS ('
+          + '  SELECT 1 FROM xp_ledger l WHERE l.usuario_id = $1::uuid'
+          + '   AND l.accion = \'carta_compra\''
+          + '   AND l.contexto->>\'carta_id\' = $2::text'
+          + '   AND l.contexto->>\'variante\' = $3)) AS origen_sostenido'
+          + '), inv AS ('
+          // CERO DELETE fisico: cantidad-1 y activo=false al llegar a 0, con el
+          // mismo CASE de carta_evento_usar (incluye en_museo/orden_museo).
+          + ' UPDATE usuarios_cartas SET cantidad = cantidad - 1,'
+          + '  activo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE activo END,'
+          + '  en_museo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE en_museo END,'
+          + '  orden_museo = CASE WHEN cantidad - 1 <= 0 THEN NULL ELSE orden_museo END'
+          + ' WHERE usuario_id = $1::uuid AND carta_id = $2 AND variante = $3'
+          + '  AND activo = true AND cantidad >= 1'
+          + '  AND EXISTS (SELECT 1 FROM ok)'
+          + '  AND (SELECT origen_sostenido FROM org)'
+          + ' RETURNING cantidad, activo'
+          + '), ins AS ('
+          // costo_pagado = precio_xp es PRECIO DE REFERENCIA, no importe
+          // pagado: la copia pudo entrar por mercado o intercambio y no hay
+          // columna de procedencia (D-39). alpha/gamma = 0 declaran "sin curva
+          // aplicada" y dejan cohortable la era nueva.
+          + ' INSERT INTO sink_slots (usuario_id, clave_accion, ref_id,'
+          + '  costo_pagado, alpha_aplicado, gamma_aplicado, slot_index, activo)'
+          + ' SELECT $1::uuid, (SELECT subtipo FROM card), $4,'
+          + '  (SELECT precio_xp FROM card), 0, 0, (SELECT k FROM cnt), true'
+          + ' WHERE EXISTS (SELECT 1 FROM inv)'
+          + ' RETURNING id, slot_index'
+          + '), led AS ('
+          // INSERT crudo DENTRO del mismo CTE (D8-bis): registrarXpLedger() es
+          // una consulta APARTE y abriria la ventana "carta consumida /
+          // asiento no escrito". Es legal por construccion (xp_base=0,
+          // xp_final=0, es_exento=true), luego no pasa por bonos ni por caps.
+          + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final,'
+          + '  es_exento, contexto)'
+          + ' SELECT $1::uuid, \'carta_mejora\', 0, 0, true,'
+          + '  jsonb_build_object(\'carta_id\', $2, \'variante\', $3,'
+          + '   \'clave\', (SELECT subtipo FROM card), \'ref_id\', $4,'
+          + '   \'origen\', COALESCE($5, \'acunada\'),'
+          + '   \'precio_catalogo\', (SELECT precio_xp FROM card),'
+          + '   \'slot_id\', (SELECT id FROM ins),'
+          + '   \'slot_index\', (SELECT slot_index FROM ins))'
+          + ' WHERE EXISTS (SELECT 1 FROM ins)'
+          + ' RETURNING id'
+          + ')'
+          // La respuesta trae TODOS los campos de causa: el handler mapea, no
+          // adivina. origen_verificado es formula de servidor (declaro
+          // 'acunada'), no origen_sostenido: en toda respuesta 200 este ultimo
+          // es true por construccion y como flag no informaria de nada.
+          + ' SELECT (SELECT COUNT(*)::int FROM card) AS carta_n,'
+          + '  (SELECT subtipo FROM card) AS carta_subtipo,'
+          + '  (SELECT COALESCE(soporte, false) FROM ref) AS refok_soporte,'
+          + '  (SELECT COALESCE(existe_mio, false) FROM ref) AS refok_existe_mio,'
+          + '  (SELECT COUNT(*)::int FROM acc) AS acc_n,'
+          + '  (SELECT activo FROM acc) AS acc_activa,'
+          + '  (SELECT tope_act_ok FROM acc) AS tope_act_ok,'
+          + '  (SELECT tope_hist_ok FROM acc) AS tope_hist_ok,'
+          + '  (SELECT origen_sostenido FROM org) AS origen_sostenido,'
+          + '  (COALESCE($5, \'acunada\') = \'acunada\') AS origen_verificado,'
+          + '  (SELECT COUNT(*)::int FROM inv) AS inv_n,'
+          + '  (SELECT COUNT(*)::int FROM ins) AS ins_n,'
+          + '  (SELECT cantidad FROM inv) AS cantidad,'
+          + '  (SELECT activo FROM inv) AS carta_activa,'
+          + '  (SELECT id FROM ins) AS slot_id,'
+          + '  (SELECT slot_index FROM ins) AS slot_index,'
+          + '  (SELECT k FROM cnt) AS k_previo,'
+          + '  (SELECT k_act FROM cnt) AS k_act_previo,'
+          + '  (SELECT slot_max FROM acc) AS slot_max,'
+          + '  (SELECT slot_max_activos FROM acc) AS slot_max_activos,'
+          + '  (SELECT precio_xp FROM card) AS precio_catalogo';
+        var cmuRes;
+        try {
+          cmuRes = await sql(cmuSql,
+            [cmuUid, cmuCarta, cmuVar, cmuRef, cmuOrigen]);
+        } catch (eCmu) {
+          if (!esEsquemaFaltante(eCmu)) throw eCmu;
+          return responderCartasAusente(res, eCmu, 'carta_mejora_usar');
+        }
+        var cmuR = cmuRes && cmuRes[0] ? cmuRes[0] : {};
+        // Mapeo causa -> codigo, en el orden del contrato y SIN releer la base.
+        // Un tope NUNCA consume la carta, luego 'inv_n = 0' con los topes en
+        // verde solo puede significar "no quedan copias".
+        if (Number(cmuR.carta_n) !== 1)
+          return res.status(404).json({
+            ok: false, code: 'CARTA_NO_ENCONTRADA',
+            error: 'CARTA_NO_ENCONTRADA',
+            detalle: 'la carta no existe, no esta activa o no es de familia mejora'
+          });
+        var cmuSub = String(cmuR.carta_subtipo || '').trim();
+        if (!SINK_REF_ORIGEN[cmuSub])
+          return res.status(400).json({
+            ok: false, code: 'MEJORA_CLAVE_DESCONOCIDA',
+            error: 'MEJORA_CLAVE_DESCONOCIDA',
+            detalle: 'el subtipo de la carta no esta en MEJORA_REF_ORIGEN',
+            clave: cmuSub
+          });
+        if (cmuR.refok_soporte === false)
+          return res.status(409).json({
+            ok: false, code: 'SINK_REFSIN_SOPORTE',
+            error: 'SINK_REFSIN_SOPORTE',
+            detalle: 'Esta mejora todavia no es comprable: falta a que se'
+              + ' engancha y el servidor no puede validarlo',
+            clave: cmuSub,
+            motivo_soporte: (SINK_REF_ORIGEN[cmuSub] || {}).motivo_soporte || null,
+            ref_contrato: sinkRefContrato(cmuSub)
+          });
+        if (cmuR.refok_existe_mio === false)
+          return res.status(404).json({
+            ok: false, code: 'REF_NO_ENCONTRADA',
+            error: 'REF_NO_ENCONTRADA',
+            // Mismo texto para "no existe" y "es de otro": distinguirlos seria
+            // un oraculo de enumeracion. La respuesta honesta es "no la
+            // encuentro": REF_SIN_PERMISO no existe y no se inventa.
+            detalle: 'El recurso indicado no existe o no pertenece a tu cuenta',
+            clave: cmuSub,
+            ref_id: cmuRef,
+            ref_contrato: sinkRefContrato(cmuSub)
+          });
+        if (Number(cmuR.acc_n) === 0 || cmuR.acc_activa === false)
+          return res.status(409).json({
+            ok: false, code: 'SINK_ACCION_INACTIVA',
+            error: 'SINK_ACCION_INACTIVA',
+            detalle: 'Esta mejora esta dada de baja en sink_acciones: no es un'
+              + ' tope y no consume la carta',
+            clave: cmuSub
+          });
+        if (cmuR.tope_act_ok === false)
+          return res.status(409).json({
+            ok: false, code: 'SLOT_TOPE_ACTIVOS',
+            error: 'SLOT_TOPE_ACTIVOS',
+            detalle: 'Alcanzaste el maximo de slots ACTIVOS de esta mejora: da'
+              + ' de baja uno para liberar capacidad (la carta NO se consumio)',
+            clave: cmuSub,
+            topes_bloqueados: ['TOPE_ACTIVOS'],
+            slot_max: cmuR.slot_max === null ? null : Number(cmuR.slot_max),
+            slot_max_activos: cmuR.slot_max_activos === null
+              ? null : Number(cmuR.slot_max_activos),
+            k_previo: Number(cmuR.k_previo) || 0,
+            k_act_previo: Number(cmuR.k_act_previo) || 0
+          });
+        if (cmuR.tope_hist_ok === false)
+          return res.status(409).json({
+            ok: false, code: 'SLOT_TOPE_HISTORICO',
+            error: 'SLOT_TOPE_HISTORICO',
+            detalle: 'Alcanzaste el maximo HISTORICO de esta mejora: el tope no'
+              + ' se recupera al dar de baja (la carta NO se consumio)',
+            clave: cmuSub,
+            topes_bloqueados: ['TOPE_HISTORICO'],
+            slot_max: cmuR.slot_max === null ? null : Number(cmuR.slot_max),
+            slot_max_activos: cmuR.slot_max_activos === null
+              ? null : Number(cmuR.slot_max_activos),
+            k_previo: Number(cmuR.k_previo) || 0,
+            k_act_previo: Number(cmuR.k_act_previo) || 0
+          });
+        if (cmuOrigen === 'acunada' && cmuR.origen_sostenido === false)
+          return res.status(409).json({
+            ok: false, code: 'ORIGEN_NO_SOSTENIDO',
+            error: 'ORIGEN_NO_SOSTENIDO',
+            detalle: 'Declaraste origen acunada pero no hay asiento carta_compra'
+              + ' de esta carta y variante: declara mercado o intercambio',
+            clave: cmuSub,
+            carta_id: cmuCarta,
+            variante: cmuVar,
+            origen: cmuOrigen
+          });
+        if (Number(cmuR.inv_n) === 0)
+          return res.status(409).json({
+            ok: false, code: 'SIN_CARTA',
+            error: 'SIN_CARTA',
+            detalle: 'No tienes copias activas de esta carta',
+            clave: cmuSub,
+            carta_id: cmuCarta,
+            variante: cmuVar
+          });
+        if (Number(cmuR.ins_n) === 0)
+          return res.status(500).json({
+            ok: false, code: 'MEJORA_NO_ESCRITA',
+            error: 'MEJORA_NO_ESCRITA',
+            detalle: 'El inventario se desconto pero el slot no se escribio:'
+              + ' revisar el contexto de este rechazo en los logs',
+            clave: cmuSub,
+            carta_id: cmuCarta,
+            ref_id: cmuRef,
+            inv_n: Number(cmuR.inv_n) || 0
+          });
+        return res.status(200).json({
+          ok: true,
+          mejora: cmuSub,
+          carta_id: cmuCarta,
+          cantidad_restante: Number(cmuR.cantidad),
+          carta_activa: cmuR.carta_activa === true,
+          slot_id: cmuR.slot_id,
+          slot_index: Number(cmuR.slot_index),
+          ref_id: cmuRef,
+          // Referencia de catalogo, NO importe pagado (D5 / D-39): el campo se
+          // llama precio_catalogo y nunca costo_pagado.
+          precio_catalogo: red2(numXp(cmuR.precio_catalogo)),
+          origen: cmuOrigen,
+          origen_verificado: cmuR.origen_verificado === true,
+          topes: {
+            historico: cmuR.slot_max === null ? null : Number(cmuR.slot_max),
+            activos: cmuR.slot_max_activos === null
+              ? null : Number(cmuR.slot_max_activos),
+            historicos_usados: (Number(cmuR.k_previo) || 0) + 1,
+            activos_usados: (Number(cmuR.k_act_previo) || 0) + 1
+          }
         });
       }
 
@@ -21492,6 +21862,19 @@ module.exports = async function handler(req, res) {
       // ADR-018 INVARIANTE: se debita xp_gastado_sinks, NUNCA xp_total. El
       // nivel es MONOTONO y el disponible es NO CRECIENTE.
       if (tipo2 === 'slot_comprar') {
+        // ADR-122 D9 / F1.3: retirada GOBERNADA. El 410 va ANTES de leer el
+        // body y de cualquier consulta: un cliente con HTML cacheado recibe
+        // una explicacion y una alternativa, no un 404 opaco. La rama SE QUEDA
+        // en el router y todo su SQL se conserva debajo (ADR-003: nada se
+        // retira mientras tenga consumidor vivo). Revertir es poner la
+        // constante en false, no reescribir el handler.
+        if (SLOT_COMPRA_RETIRADA)
+          return res.status(410).json({
+            ok: false,
+            error: 'SLOT_COMPRAR_RETIRADO',
+            alternativa: 'carta_mejora_usar',
+            code: 'SLOT_COMPRAR_RETIRADO'
+          });
         var slSes = usuarioDeSesion(req);
         if (!slSes.ok) return responderSesion(res, slSes.razon);
         var slUid = slSes.usuario_id;
@@ -21546,7 +21929,10 @@ module.exports = async function handler(req, res) {
         var slParams;
         try {
           slSql = sinkPrecioCte()
-            + sinkRefCte(slClave)
+            // idxRef = 5: la lista de abajo es [uid, clave, alpha, gamma,
+            // ref_id], luego el ref es $5. Paridad byte a byte con el SQL
+            // historico (el cast y el EXISTS no cambian).
+            + sinkRefCte(slClave, 5)
             + ', debit AS ('
             // B1: se debita xp_gastado_sinks, NUNCA xp_total. El nivel NO se
             // mueve. La fila de usuarios que se toca es la MISMA de antes:

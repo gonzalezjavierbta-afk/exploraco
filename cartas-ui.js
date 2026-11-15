@@ -337,7 +337,10 @@
     marca: { label: 'Marca', capa: 'juego' },
     producto: { label: 'Producto', capa: 'economia' },
     consumible: { label: 'Consumible', capa: 'economia' },
-    cosmetica: { label: 'Cosmetica', capa: 'estatus' }
+    cosmetica: { label: 'Cosmetica', capa: 'estatus' },
+    /* Capacidad permanente, no bien fungible (ADR-122 D1): capa economia y
+       sin vector de stats ni poder. Ver familiaSinVector(). */
+    mejora: { label: 'Mejora', capa: 'economia' }
   };
   var CAPAS = { juego: 'Juego', economia: 'Economia', estatus: 'Estatus' };
 
@@ -357,6 +360,13 @@
     var k = fichaTexto(carta && carta.familia).toLowerCase();
     if (!k || !Object.prototype.hasOwnProperty.call(FAMILIAS, k)) return '';
     return k;
+  }
+
+  /* 'mejora' (ADR-122) describe una CAPACIDAD: no tiene vector de stats ni
+     poder (poder = 0). Se OCULTAN ambos bloques en vez de pintar "estetico
+     sin poder", que describiria una cosmetica. No se inventan ejes. */
+  function familiaSinVector(carta) {
+    return familiaDe(carta) === 'mejora';
   }
 
   /* Vector normalizado del contrato (spec 3.3). null cuando la carta NO trae
@@ -405,7 +415,7 @@
     var sub = fichaTexto(carta.subtipo).toLowerCase();
     if (sub) partes += '<span class="c-meta-sub">' + esc(sub) + '</span>';
     var poder = safeNum(carta.poder, null);
-    if (poder !== null) {
+    if (poder !== null && !familiaSinVector(carta)) {
       partes += '<span class="c-meta-poder" title="Poder de la carta">'
         + poderHtml(poder) + '</span>';
     }
@@ -419,7 +429,7 @@
 
   /* Poder y nivel destacados dentro de la ficha. Solo si el servidor los mando. */
   function fichaPoderNivel(carta) {
-    var poder = safeNum(carta.poder, null);
+    var poder = familiaSinVector(carta) ? null : safeNum(carta.poder, null);
     var nivel = safeNum(carta.nivel, null);
     var conNivel = nivel !== null && nivel >= 1;
     if (poder === null && !conNivel) return '';
@@ -556,7 +566,7 @@
 
   /* Bloque completo de detalle. Devuelve '' si no hay NADA nuevo que decir. */
   function fichaDetalle(carta) {
-    var vec = vectorStats(carta);
+    var vec = familiaSinVector(carta) ? null : vectorStats(carta);
     var ejeHtml = (vec && (vec.suma > 0 || vec.cosm > 0)) ? fichaEjes(vec) : '';
     var lineas = [];
     var tirada = fichaTirada(carta);
@@ -621,14 +631,16 @@
   /* --- Acunacion con XP (spec 4.8, handler YA existente) -------------- */
   /* Familias comerciables: espejo de CARTA_FAMILIAS_SIN_PRECIO_XP
      (lib/cartas-config.js). El catalogo economico (producto/consumible)
-     no se acuna: el backend lo rechaza con CARTA_NO_COMPRABLE. */
+     no se acuna: el backend lo rechaza con CARTA_NO_COMPRABLE.
+     'mejora' SI se acuna: nace con precio_xp > 0 (ADR-122 D1/D4). */
   var FAMILIAS_ACUNABLES = {
     lugar: 1,
     naturaleza: 1,
     personaje: 1,
     artista: 1,
     marca: 1,
-    cosmetica: 1
+    cosmetica: 1,
+    mejora: 1
   };
 
   /* Precio de acunacion, o null si la carta no es acunable. */
@@ -1365,7 +1377,8 @@
      ahi no se monta y no se pide nada. perfil.html no trae host.
      ================================================================== */
   var CATALOGO_LIMIT = 24;
-  var CATALOGO_FAMILIAS = ['lugar', 'naturaleza', 'personaje', 'marca', 'artista', 'cosmetica'];
+  var CATALOGO_FAMILIAS = ['lugar', 'naturaleza', 'personaje', 'marca', 'artista',
+    'mejora', 'cosmetica'];
   var CATALOGO_RAREZAS = ['comun', 'raro', 'epico', 'dorado'];
   var CATALOGO_FILTROS_KEY = 'exploraco.catalogo.filtros';
 
@@ -1595,7 +1608,7 @@
     var nombre = fichaTexto(carta.nombre) || id || 'Carta';
     var estado = catalogoEstadoCarta(carta);
     var precio = safeNum(carta.precio_xp, null);
-    var poder = safeNum(carta.poder, null);
+    var poder = familiaSinVector(carta) ? null : safeNum(carta.poder, null);
     var img = fichaTexto(carta.imagen_url);
     var html = '<article class="c-cat-card" data-c-cat-id="' + catalogoAttr(id)
       + '" data-c-cat-estado="' + estado + '" tabindex="0" aria-haspopup="dialog">';
