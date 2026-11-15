@@ -22,7 +22,7 @@ Skill puente para el **Aislamiento Atómico** de ExploraCO (ADR-004, Regla de Or
 1. **Diagnóstico del DOM real:** `grep` los IDs y clases que la categoría usa realmente en el HTML y en el motor de render (`api/pagina-destino.js`). NUNCA usar el BLUEPRINT como mapa: el ARCHIVO REAL manda (ADR-006).
 2. **Tokens + paleta:** definir tokens CSS con prefijo del silo (`--{categoria}-*`); contraste WCAG AA ≥ 4.5:1 en texto.
 3. **Reset scoped + puente cromático:** bloque raíz `.tpl-{template_id}` con su acento propio; **prohibido `@import` y escritura en `:root` global**.
-4. **Activación atómica:** `display:flex/block !important` (encendidos) y `display:none !important` (apagados); los IDs del DOM nunca se borran (Cero Borrado Lógico, ADR-003).
+4. **Activación atómica:** `display:flex/block !important` (encendidos) y `display:none !important` (apagados); los IDs del DOM se conservan mientras tengan consumidor vivo (Borrado Gobernado, ADR-003 D5).
 5. **Grid + secciones en orden DOM:** la grilla sigue el orden real del DOM renderizado, no el del documento de diseño.
 6. **Breakpoints + reduced-motion:** 640/767/992/1279 y `prefers-reduced-motion` para transiciones.
 7. **Escudo GOLD:** CSS válido, ASCII-safety (0 bytes > 127), cero selectores fantasma, Cero Borrado, accesibilidad, smoke de render y cero colateral.

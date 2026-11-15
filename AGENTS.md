@@ -102,7 +102,7 @@ El gate es por naturaleza del **dominio**, no por el precio del modelo. **Pagar 
 
 1. **Vanilla JS puro (ADR-001):** prohibido Node.js en runtime cliente, React o build tools.
 2. **ASCII-safe (ADR-002):** cero bytes > 127, escapes `\uXXXX` simples, cero backticks en serverless. Los `.md` de gobernanza sí admiten tildes.
-3. **Cero Borrado Lógico (ADR-003):** nunca eliminar IDs del DOM aunque el módulo esté oculto (`display: none`).
+3. **Borrado Gobernado (ADR-003 D5, `DECISIONS.md:128`)**: ningún ID se retira mientras tenga consumidor vivo (HTML, JS, smoke, scripts, orquestador). Un ID oculto o inerte se conserva; la retirada exige 0 referencias vivas y el grep del PR. Los IDs del contrato v107 (`#db-lineup`, `#meta-fecha`) son contrato externo: retirada prohibida.
 4. **Aislamiento Atómico (ADR-004):** todo CSS nuevo de una categoría vive bajo un selector padre único con Reset de Silo. Nada suelto en `:root`.
 5. **Silent Fallback (ADR-008):** todo `<img>` dinámico lleva `onerror` con fallback.
 6. **Baseline = archivo real (ADR-006):** nunca dar por "pendiente" o "completo" algo citado en TASKS.md/NEXT.md sin verificar el archivo.

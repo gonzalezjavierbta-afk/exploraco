@@ -70,6 +70,7 @@
 var fs = require('fs');
 var path = require('path');
 var crypto = require('crypto');
+var guardBorrado = require('./verificar-borrado-gobernado');
 
 var RAIZ = path.join(__dirname, '..');
 var DIR_MIG = path.join(RAIZ, 'db', 'migrations');
@@ -124,6 +125,11 @@ function uso(destino) {
   t.push('Dentro de db/migrations/: contrato de ledger (a)-(e), obligatorio y sin');
   t.push('forma de saltarselo. Fuera de ahi: se ejecuta como siempre, sin registrar,');
   t.push('y avisa por pantalla de que se sale del registro.');
+  t.push('');
+  t.push('BORRADO GOBERNADO (ADR-003 Enmienda 1): todo DELETE FROM tiene que ser');
+  t.push('una excepcion nominada en scripts/verificar-borrado-gobernado.js o llevar');
+  t.push('el marcador -- BORRADO GOBERNADO: <motivo>. El marcador solo vale en');
+  t.push('db/migrations/NNN_*.sql o db/cleanups/NNN_*.sql. Se valida antes de escribir.');
   var txt = t.join('\n');
   if (destino === 'log') { console.log(txt); } else { console.error(txt); }
 }
@@ -151,7 +157,40 @@ async function main() {
   SUM.numero = num;
 
   // Lectura y troceado: identico al de siempre, y no toca la red.
-  var texto = quitarComentarios(fs.readFileSync(rutaAbs, 'utf8'));
+  var crudo = fs.readFileSync(rutaAbs, 'utf8');
+
+  // BORRADO GOBERNADO (ADR-003 Enmienda 1): validacion PREVIA y fail-closed.
+  // No depende de --dry-run ni del tier: un DELETE fisico sin marcador ni
+  // excepcion no se aplica ni se valida, se rechaza. Va antes de cualquier
+  // conexion y antes de escribir el ledger, asi que un rechazo no deja fila.
+  var bg = revisarBorradoGobernado(crudo, normalizar(path.relative(RAIZ, rutaAbs)));
+  SUM.borrado_gobernado = bg.rechazos.length === 0 ? 'ok' : 'rechazado';
+  if (bg.rechazos.length > 0) {
+    err('RECHAZO - BORRADO GOBERNADO (ADR-003 Enmienda 1): ' + bg.rechazos.length +
+        ' DELETE FROM no admitido en ' + normalizar(path.relative(RAIZ, rutaAbs)) + '.');
+    bg.rechazos.forEach(function (r) {
+      err('  ' + base + ':' + r.linea + ' [' + r.motivo + '] ' + r.texto.slice(0, 110));
+    });
+    err('  Un DELETE fisico solo pasa si cumple las dos:');
+    err('   (a) el fichero es una migracion o un cleanup numerado de 3 digitos');
+    err('       (db/migrations/NNN_*.sql o db/cleanups/NNN_*.sql), y');
+    err('   (b) es una excepcion nominada de');
+    err('       scripts/verificar-borrado-gobernado.js o lleva en su bloque el');
+    err('       marcador -- BORRADO GOBERNADO: <motivo>');
+    err('  Un .sql fuera de esas dos rutas corre SIN ledger, asi que el marcador');
+    err('  no vale ahi: muevelo a cleanups/ con nombre numerado o hazlo migracion.');
+    err('  Sin eso no hay borrado gobernado, y ADR-003 manda conservar la fila');
+    err('  (soft-delete con activo=false) en vez de borrarla.');
+    err('  No se ha abierto conexion ni se ha ejecutado ninguna sentencia.');
+    SUM.errores = bg.rechazos.map(function (r) {
+      return 'BORRADO GOBERNADO: DELETE rechazado en ' +
+        normalizar(FLAGS.ruta) + ':' + r.linea + ' (' + r.motivo + ')';
+    });
+    codigoSalida(1);
+    return;
+  }
+
+  var texto = quitarComentarios(crudo);
   var sentencias = dividirSentencias(texto);
   SUM.sentencias = sentencias.length;
 
@@ -629,6 +668,52 @@ function urlValida(raw) {
   return s;
 }
 
+// ---------------------------------------------------------------------------
+// Borrado gobernado (ADR-003 Enmienda 1)
+// ---------------------------------------------------------------------------
+
+// Espejo EXACTO de scripts/verificar-borrado-gobernado.js: la lista de
+// excepciones, el marcador y el ALCANCE del marcador se importan de alli para
+// no tener dos fuentes de verdad. Rechaza lo mismo que rechazaria el guard, y
+// lo hace antes de abrir conexion, antes de la puerta del predecesor y antes
+// de escribir el ledger.
+//
+// Alcance: un marcador solo vale en db/migrations/NNN_*.sql o
+// db/cleanups/NNN_*.sql, que son las rutas donde este runner es la via normal.
+// Un .sql suelto bajo db/ corre sin ledger, asi que ahi el marcador NO se
+// acepta: se rechaza aunque lo lleve. Fail-closed.
+function revisarBorradoGobernado(crudo, archivoRel) {
+  var codigo = guardBorrado.quitarComentariosSQL(crudo);
+  var sents = guardBorrado.sentenciasDelete(codigo);
+  var gobernada = guardBorrado.rutaGobernada(archivoRel);
+  var rechazos = [];
+  var excepciones = 0;
+  sents.forEach(function (s) {
+    if (guardBorrado.esExcepcionDb(archivoRel, s.linea) !== null) { excepciones++; return; }
+    if (!gobernada) {
+      rechazos.push({
+        linea: s.linea,
+        texto: s.texto,
+        motivo: 'fuera de alcance: ' + archivoRel + ' no esta en db/migrations/ ni ' +
+          'db/cleanups/ con nombre NNN_*.sql, asi que corre sin ledger y el marcador no vale'
+      });
+      return;
+    }
+    if (guardBorrado.tieneMarcaEnBloque(crudo, s.linea, s.lineaFin)) return;
+    rechazos.push({
+      linea: s.linea,
+      texto: s.texto,
+      motivo: 'sin marcador ni excepcion'
+    });
+  });
+  return {
+    sentencias: sents.length,
+    excepciones: excepciones,
+    gobernada: gobernada,
+    rechazos: rechazos
+  };
+}
+
 // Quita lineas de comentario puro (empiezan por --) y lineas vacias.
 // No toca comentarios al final de una linea con SQL (no hay en las migraciones).
 function quitarComentarios(texto) {
@@ -813,6 +898,7 @@ function nuevoResumen() {
     numero: null,
     sentencias: 0,
     ledger_disponible: null,
+    borrado_gobernado: null,
     checksum_disco: null,
     fila_previa: null,
     predecesores: null,
