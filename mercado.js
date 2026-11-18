@@ -588,6 +588,9 @@
         '#cpanel-mercado .mk-cat-c{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 12px}',
         '#cpanel-mercado .mk-cat-n{font-size:12px;font-weight:700;color:#fff}',
         '#cpanel-mercado .mk-cat-meta{font-size:10px;color:rgba(255,255,255,.45);margin-top:3px;line-height:1.5}',
+        '#cpanel-mercado .mk-cat-px{font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:900;letter-spacing:.6px;color:var(--gold);margin-top:6px}',
+        '#cpanel-mercado .mk-cat-px em{font-style:normal;font-family:Outfit,sans-serif;font-size:9px;font-weight:400;letter-spacing:0;color:rgba(255,255,255,.4);margin-left:5px;text-transform:uppercase}',
+        '#cpanel-mercado .mk-cat-px.na{font-family:Outfit,sans-serif;font-size:10px;font-weight:400;letter-spacing:0;color:rgba(255,255,255,.4)}',
         '#cpanel-mercado .mk-cat-d{font-size:10px;color:rgba(255,255,255,.35);margin-top:4px;line-height:1.5}',
         '#cpanel-mercado .mk-cat-t{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;border-radius:999px;padding:2px 8px;margin-top:6px}',
         '#cpanel-mercado .mk-cat-t.tienes{background:rgba(34,197,94,.14);border:1px solid rgba(34,197,94,.45);color:#22C55E}',
@@ -1084,6 +1087,18 @@
     return '<span class="mk-cat-t set" title="Acceso permanente al set ' + esc(set) + '">'
       + esc(txt) + '</span>';
   }
+  /* Precio que PAGA el comprador en el catalogo: SIEMPRE la columna precio_xp
+   * de la fila, que es la que cobra comprar_consumible. precio_xp_base es el
+   * COSTE DE PRODUCCION de los productos: se usa en el formulario de producir
+   * (opcionesProducibles) y como referencia del P2P que calcula el servidor,
+   * nunca como precio de venta. Sin precio_xp no se inventa cifra (ADR-008). */
+  function precioVentaHtml(c) {
+    var o = c || {};
+    if (o.precio_xp === null || o.precio_xp === undefined) {
+      return '<div class="mk-cat-px na">Sin precio en XP</div>';
+    }
+    return '<div class="mk-cat-px">' + esc(fmt(o.precio_xp)) + ' XP<em>precio de venta</em></div>';
+  }
   function catalogoHtml() {
     var todo = _catalogo || [];
     /* Un solo guard por render: sin CartasArte la salida es EXACTAMENTE la de
@@ -1139,8 +1154,6 @@
       var clave = String(c.clave || '');
       var cant = invCant(clave);
       var precio = (c.precio_xp != null) ? fmt(c.precio_xp) + ' XP' : '-';
-      var extra = (c.precio_xp_base != null && c.precio_xp_base !== c.precio_xp)
-        ? (' \u00b7 base ' + fmt(c.precio_xp_base) + ' XP') : '';
       var desc = descCorta(c.descripcion);
       var tags = (cant > 0)
         ? '<span class="mk-cat-t tienes">Lo tienes: x' + cant + '</span>'
@@ -1189,13 +1202,14 @@
         idxFicha = _fichaCat.length;
         _fichaCat.push({ carta: fichaCatCarta(c), opciones: fichaCatOpciones(c, btn) });
       }
-      /* Con lamina, nombre/clave/precio/descripcion van HORNEADOS en el PNG:
-       * el HTML solo pinta lo dinamico (tienes/falta/bloqueo/gates + boton).
+      /* La lamina trae nombre, tipo, texto y bono HORNEADOS en el PNG, pero NO
+       * el precio: el precio de venta lo pinta SIEMPRE el HTML con la columna
+       * precio_xp (precioVentaHtml), arriba o abajo de la lamina.
        * Sin lamina (placeholder o modulo ausente) se mantiene la ficha entera. */
       var ficha = '';
       if (!(ar && ar.hay)) {
         ficha = '<div class="mk-cat-n">' + esc(c.nombre || clave) + '</div>'
-          + '<div class="mk-cat-meta">' + esc(clave) + ' \u00b7 ' + esc(precio) + extra
+          + '<div class="mk-cat-meta">' + esc(clave) + ' \u00b7 ' + esc(precio)
           + (c.categoria ? (' \u00b7 ' + esc(c.categoria)) : '') + '</div>'
           + (desc ? '<div class="mk-cat-d">' + esc(desc) + '</div>' : '');
       }
@@ -1206,6 +1220,7 @@
         + '>'
         + (ar ? ar.slot : '')
         + ficha
+        + ((ar && ar.hay) ? precioVentaHtml(c) : '')
         + tags
         + '<div class="mk-cat-act">' + btn + '</div>'
         + '</div>';

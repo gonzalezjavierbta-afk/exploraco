@@ -8160,12 +8160,20 @@ module.exports = async function handler(req, res) {
           );
           // D3.7: elegibles = premio_semanal + stock. marca_id en un producto
           // premio_semanal identifica al PATROCINADOR, no restringe.
+          // El valor de VENTA de un consumible es consumibles.precio_xp. La
+          // vista consumibles_precio deriva precio_xp_efectivo de
+          // precio_xp_base y devuelve 0.00 cuando la base es 0 (17 filas
+          // medidas el 2026-11-18). GREATEST pone el suelo en precio_xp: el
+          // premio nunca se valora por debajo del precio que se cobra, sin
+          // tocar la base (que sigue siendo coste de produccion en
+          // mercado_producir).
           mpProds = await sql(
-            'SELECT c.clave, v.precio_xp_efectivo, v.stock_disponible,'
+            'SELECT c.clave, GREATEST(v.precio_xp_efectivo, c.precio_xp) AS precio_xp_efectivo,'
+            + ' v.stock_disponible,'
             + ' COALESCE(c.precio_cop,0) AS precio_cop'
             + ' FROM consumibles_precio v JOIN consumibles c ON c.id = v.id'
             + ' WHERE c.premio_semanal = true AND v.stock_disponible >= 1'
-            + ' ORDER BY v.precio_xp_efectivo DESC, c.clave ASC'
+            + ' ORDER BY GREATEST(v.precio_xp_efectivo, c.precio_xp) DESC, c.clave ASC'
           );
         } catch (eMpRank) {
           if (!esEsquemaFaltante(eMpRank)) throw eMpRank;
@@ -11342,8 +11350,11 @@ module.exports = async function handler(req, res) {
         // Catalogo para resolver clave -> nombre publico + era_exclusiva.
         // Degradacion en dos niveles: sin 035 cae al SELECT sin era pero
         // conserva los nombres publicos (nunca regresa a la clave cruda).
+        // precio_xp se suma al nivel 1 (columna base de consumibles, no de una
+        // migracion posterior): el cliente necesita el precio pagado para el
+        // punto de equilibrio del bono sin pedir el catalogo publico (ADR-110).
         var invCatalogo = await sql(
-          'SELECT clave, nombre, descripcion, era_exclusiva, faccion_requerida FROM consumibles WHERE activo=true',
+          'SELECT clave, nombre, descripcion, era_exclusiva, faccion_requerida, precio_xp FROM consumibles WHERE activo=true',
           []
         ).catch(function(){ return null; });
         if (!invCatalogo) {
@@ -11364,11 +11375,17 @@ module.exports = async function handler(req, res) {
         var invEras = {};
         var invDescs = {};
         var invFacs = {};
+        var invPrecios = {};
         invCatalogo.forEach(function(c) {
           invNombres[c.clave] = c.nombre;
           invEras[c.clave] = c.era_exclusiva || null;
           invDescs[c.clave] = c.descripcion || null;
           invFacs[c.clave] = c.faccion_requerida || null;
+          // Si el catalogo vino de un nivel degradado (sin precio_xp en el
+          // SELECT) el mapa queda vacio y el item sale con precio_xp null:
+          // el cliente calla la cifra (ADR-008) en vez de inventar un 0.
+          invPrecios[c.clave] = (c.precio_xp === undefined || c.precio_xp === null)
+            ? null : red2(numXp(c.precio_xp));
         });
         var inventarioCons = {};
         Object.keys(invCrudo).forEach(function(clave) {
@@ -11378,6 +11395,11 @@ module.exports = async function handler(req, res) {
             era_exclusiva: invEras[clave] || null,
             descripcion: invDescs[clave] || null,
             faccion_requerida: invFacs[clave] || null,
+            // ADITIVOS (ADR-110): clave propia + precio de compra del catalogo,
+            // para que el perfil calcule el equilibrio del bono sin pedir
+            // ?tipo=consumibles. Nada previo se renombra ni se quita.
+            clave: clave,
+            precio_xp: (invPrecios[clave] === undefined ? null : invPrecios[clave]),
           };
         });
         // Stock por clave de consumibles (migracion 057, solo LECTURA: la
@@ -19420,7 +19442,7 @@ module.exports = async function handler(req, res) {
           ceRes = await sql(
             'WITH c AS ('
             + ' SELECT c.id AS consumible_id, c.clave,'
-            + ' COALESCE(v.precio_xp_efectivo, c.precio_xp, 0) AS precio'
+            + ' GREATEST(COALESCE(v.precio_xp_efectivo, 0), COALESCE(c.precio_xp, 0)) AS precio'
             + ' FROM consumibles c'
             + ' LEFT JOIN consumibles_precio v ON v.id = c.id'
             + ' WHERE c.clave = $3 AND c.marca_id = $4::uuid LIMIT 1'
@@ -19671,12 +19693,16 @@ module.exports = async function handler(req, res) {
           );
           // D3.7: elegibles = premio_semanal + stock. marca_id en un producto
           // premio_semanal identifica al PATROCINADOR, no restringe.
+          // Mismo suelo que marca_premios: el valor del premio no puede quedar
+          // por debajo del precio de venta (precio_xp) cuando la vista
+          // consumibles_precio devuelve 0.00 por precio_xp_base = 0.
           moProds = await sql(
-            'SELECT c.clave, v.precio_xp_efectivo, v.stock_disponible,'
+            'SELECT c.clave, GREATEST(v.precio_xp_efectivo, c.precio_xp) AS precio_xp_efectivo,'
+            + ' v.stock_disponible,'
             + ' COALESCE(c.precio_cop, 0) AS precio_cop'
             + ' FROM consumibles_precio v JOIN consumibles c ON c.id = v.id'
             + ' WHERE c.premio_semanal = true AND v.stock_disponible >= 1'
-            + ' ORDER BY v.precio_xp_efectivo DESC, c.clave ASC'
+            + ' ORDER BY GREATEST(v.precio_xp_efectivo, c.precio_xp) DESC, c.clave ASC'
           );
         } catch (eMo) {
           if (!esEsquemaFaltante(eMo)) throw eMo;

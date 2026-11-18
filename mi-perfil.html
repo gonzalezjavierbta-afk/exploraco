@@ -2940,7 +2940,7 @@ function cargarInventario(uid) {
    capacidades->'consumible_efectos' (una entrada por clave, cooldown de 24 h
    por carta) y la compra ya no tiene tope de stock: el objeto antiguo
    'consumible_efecto' se conserva SOLO como lectura de compatibilidad. */
-var PF_FAC_ESTADO = { cat: null, stock: {}, efecto: null, efectos: [], mapa: false, reloj: null };
+var PF_FAC_ESTADO = { cat: null, stock: {}, precios: {}, efecto: null, efectos: [], mapa: false, reloj: null };
 /* Codigo -> texto legible. El motor manda la forma larga
    ('FACCION_INSUFICIENTE') y el contrato corto la forma corta ('faccion'):
    las dos caen al mismo texto via pfFacMotivoClave, de modo que un cambio de
@@ -3220,56 +3220,37 @@ function pfFacRentabilidadBono(item) {
     + '</div>';
 }
 /* ---- Precio por clave: lo que necesita el EQUILIBRIO -------------------
-   El equilibrio se mide contra el PRECIO de la carta y ese dato NO viaja en el
-   objeto de efecto (?tipo=inventario). El catalogo publico (?tipo=consumibles)
-   es la unica fuente; se pide UNA vez y solo cuando hay un bono vigente que lo
-   necesita. Sin precio no hay fila (ADR-008) y NUNCA se sustituye por la cifra
-   del tope, que mide otra cosa. */
-var PF_FAC_PRECIOS = null;        /* mapa clave -> precio_xp; null = no pedido */
-var PF_FAC_PRECIOS_EST = 'idle';  /* idle | pidiendo | listo | fallo */
+   El equilibrio se mide contra el PRECIO pagado por la carta. Ese dato ya
+   viaja en el PROPIO item del inventario (data.consumibles de la lectura que
+   el bloque hace de todas formas: precio_xp y clave son aditivos sobre el
+   stock que ya se leia), asi que NO se pide ningun catalogo aparte: cero
+   peticiones nuevas. Se indexa por la clave del item Y por la del mapa,
+   porque el item puede no traer aun el campo clave (motor anterior) y el
+   emparejamiento no debe depender de que llegue hoy. Sin precio no hay fila
+   (ADR-008) y NUNCA se sustituye por la cifra del tope, que mide otra cosa. */
+function pfFacPreciosDe(inv) {
+  var out = {};
+  var raw = (inv && inv.consumibles && typeof inv.consumibles === 'object'
+    && !Array.isArray(inv.consumibles)) ? inv.consumibles : null;
+  if (!raw) return out;
+  Object.keys(raw).forEach(function(k){
+    var it = raw[k];
+    if (!it || typeof it !== 'object') return;
+    var p = Number(it.precio_xp);
+    if (!isFinite(p) || p <= 0) return;
+    if (k) out[String(k)] = p;
+    var prop = String(it.clave || '');
+    if (prop) out[prop] = p;
+  });
+  return out;
+}
 function pfFacPrecioDe(clave) {
   var k = String(clave || '');
   if (!k) return null;
-  var it = pfFacItem(k);
-  if (it) {
-    var p = Number(it.precio_xp);
-    if (isFinite(p) && p > 0) return p;
-  }
-  if (PF_FAC_PRECIOS && Object.prototype.hasOwnProperty.call(PF_FAC_PRECIOS, k)) {
-    var q = Number(PF_FAC_PRECIOS[k]);
-    if (isFinite(q) && q > 0) return q;
-  }
-  return null;
-}
-function pfFacAsegurarPrecios() {
-  if (PF_FAC_PRECIOS_EST === 'pidiendo' || PF_FAC_PRECIOS_EST === 'listo') return;
-  var lista = PF_FAC_ESTADO.efectos || [];
-  var falta = false;
-  for (var i = 0; i < lista.length; i++) {
-    var ef = lista[i] || {};
-    if (Number(ef.bono_pct) > 0 && pfFacPrecioDe(ef.clave) === null) falta = true;
-  }
-  if (!falta) return;
-  PF_FAC_PRECIOS_EST = 'pidiendo';
-  fetch('/api/interacciones?tipo=consumibles')
-    .then(function (r) { return r.json(); })
-    .then(function (res) {
-      var raw = (res && res.data) || [];
-      var map = {}, it, k;
-      if (Array.isArray(raw)) {
-        for (var j = 0; j < raw.length; j++) {
-          it = raw[j] || {};
-          if (it.clave) map[String(it.clave)] = it.precio_xp;
-        }
-      } else if (raw && typeof raw === 'object') {
-        var ks = Object.keys(raw);
-        for (k = 0; k < ks.length; k++) map[ks[k]] = (raw[ks[k]] || {}).precio_xp;
-      }
-      PF_FAC_PRECIOS = map;
-      PF_FAC_PRECIOS_EST = 'listo';
-      pfFacPintar();
-    })
-    .catch(function () { PF_FAC_PRECIOS_EST = 'fallo'; });
+  var map = PF_FAC_ESTADO.precios || {};
+  if (!Object.prototype.hasOwnProperty.call(map, k)) return null;
+  var p = Number(map[k]);
+  return (isFinite(p) && p > 0) ? p : null;
 }
 /* EQUILIBRIO del bono VIGENTE: XP BASE que falta para que el bono cubra el
    PRECIO pagado (no el tope). EXIGE dos datos: pct > 0 y bono_acumulado_xp
@@ -3519,11 +3500,12 @@ function pfFacCargar(uid) {
         || inv.efectos);
       PF_FAC_ESTADO.efectos = pfFacEfectosDe(inv);
       PF_FAC_ESTADO.efecto = PF_FAC_ESTADO.efectos.length ? PF_FAC_ESTADO.efectos[0] : null;
+      /* El precio de cada carta llega con el propio inventario: se guarda
+         antes de pintar, asi el equilibrio no necesita segunda lectura. Si el
+         motor aun no publica precio_xp, el mapa queda vacio y la fila de
+         equilibrio no sale (ADR-008). */
+      PF_FAC_ESTADO.precios = pfFacPreciosDe(inv);
       pfFacPintar();
-      /* El equilibrio necesita el precio de la carta, que no viaja en el
-       * inventario: se pide una sola vez, y solo si hay un bono vigente que lo
-       * use. Al llegar repinta; si falla, la fila no aparece (ADR-008). */
-      pfFacAsegurarPrecios();
     })
     .catch(function() {
       el.innerHTML = '<div class="fac-err">No se pudo cargar tu efecto de faccion.</div>';
