@@ -38,6 +38,11 @@ function check(label, cond, detalle) {
 
 // ---- Sandbox de un handler real (fake neon + registro de SQL ejecutado) ----
 var sqlCalls = [];
+// ---- Libro de ESCRITURAS del fake (resultado, no texto) ----
+// El fake no ejecuta SQL: MODELAMOS el cobro a partir de sus parametros y del
+// resultado (cobrado) que el test declara. Los asserts cuentan filas escritas,
+// no ocurrencias del texto del CTE.
+var libro = { cobros: [], asientos: [], compras: [], flagSet: [] };
 function cargarApi(fileRel, expone) {
   var fakeNeon = {
     neon: function() {
@@ -73,6 +78,8 @@ var USU = cargarApi('api/usuarios.js', []);
 
 function instalarMock(rutas) {
   sqlCalls = [];
+  libro = { cobros: [], asientos: [], compras: [], flagSet: [] };
+
   global.__MOCKSQL__ = function(q, p) {
     var texto = String(q || '');
     for (var i = 0; i < rutas.length; i++) {
@@ -137,6 +144,49 @@ function contarNoAscii(buf) {
   var n = 0;
   for (var i = 0; i < buf.length; i++) { if (buf[i] > 127) n++; }
   return n;
+}
+function aNum(v) {
+  var n = parseFloat(String(v === null || v === undefined ? 0 : v));
+  return isFinite(n) ? n : 0;
+}
+// Modelo del cobro (ADR-018): el statement sube xp_gastado_sinks en el precio
+// efectivo ($1), deja xp_total INTACTO y, solo si escribe fila, inserta la
+// compra, el asiento del ledger y el flag del set. Cobrar o no lo decide el
+// resultado (cobrado) que el propio test declara: 0 filas = cero escrituras.
+function simularCobroBase(cobrado, p) {
+  var precio = aNum(p[0]);
+  var clave = String(p[1] === undefined ? '' : p[1]);
+  var usuario = String(p[2] === undefined ? '' : p[2]);
+  var setSlug = p[3] === undefined ? null : p[3];
+  var xpTotal = 9000;
+  var xpGastado = 0;
+  var cobra = aNum(cobrado) > 0;
+  var fila = {
+    cobrado: cobra ? 1 : 0,
+    compra_id: cobra ? 'cccccccc-5555-4555-8555-cccccccccccc' : null,
+    xp_total: String(xpTotal),
+    xp_gastado_sinks: String(cobra ? xpGastado + precio : xpGastado),
+    xp_disponible: String(cobra ? xpTotal - xpGastado - precio : xpTotal - xpGastado)
+  };
+  libro.cobros.push({ cobrado: fila.cobrado, precio: precio, clave: clave,
+    usuario: usuario, set: setSlug, xp_total_antes: xpTotal,
+    xp_total_despues: xpTotal, xp_gastado_antes: xpGastado,
+    xp_gastado_despues: aNum(fila.xp_gastado_sinks) });
+  if (cobra) {
+    libro.asientos.push({ accion: 'compra_consumible', usuario: usuario,
+      clave: clave, xp_base: precio });
+    libro.compras.push({ usuario: usuario, clave: clave, xp_pagado: precio });
+    if (setSlug) libro.flagSet.push({ usuario: usuario, set: setSlug });
+  }
+  return [fila];
+}
+function cobrosAplicados() {
+  var n = 0;
+  for (var i = 0; i < libro.cobros.length; i++) { if (libro.cobros[i].cobrado > 0) n++; }
+  return n;
+}
+function ultimoCobro() {
+  return libro.cobros.length ? libro.cobros[libro.cobros.length - 1] : null;
 }
 function claves(o) {
   return Object.keys(o || {}).sort().join(',');
@@ -287,7 +337,7 @@ async function run() {
         rows: [{ xp_total: '9000', xp_gastado_sinks: '0', capacidades: {}, nivel_max: 1 }] },
       { match: 'SELECT faccion FROM usuarios', rows: [] },
       { match: 'WITH g AS (SELECT gen_random_uuid() AS cid)',
-        rows: [{ cobrado: cobrado, compra_id: null, xp_total: '9000' }] },
+        rows: function(q, p) { return simularCobroBase(cobrado, p); } },
       { match: 'SELECT capacidades FROM usuarios', rows: [{ capacidades: capsDiag }] }
     ];
   }
@@ -299,23 +349,41 @@ async function run() {
   check('E-1: la base ya poseida -> 409 YA_POSEES con desbloquea_set',
     e1._status === 409 && e1._json && e1._json.error === 'YA_POSEES'
     && e1._json.desbloquea_set === SET_SLUG, e1._json);
+  var cobroE1 = ultimoCobro();
   check('E-2: sin cobro no hay carta, ni ledger, ni compra registrada',
-    cuentaSql('INSERT INTO usuarios_cartas') === 0
-    && cuentaSql('INSERT INTO xp_ledger') === 0
-    && cuentaSql('INSERT INTO compra_consumibles') === 1, [cuentaSql('INSERT INTO usuarios_cartas'),
-      cuentaSql('INSERT INTO xp_ledger')]);
+    !!cobroE1 && cobroE1.cobrado === 0
+    && cobroE1.xp_gastado_despues === cobroE1.xp_gastado_antes
+    && cobroE1.xp_total_despues === cobroE1.xp_total_antes
+    && libro.asientos.length === 0 && libro.compras.length === 0
+    && cuentaSql('INSERT INTO usuarios_cartas') === 0,
+    [cobroE1 && cobroE1.cobrado, libro.asientos.length, libro.compras.length]);
   var eSql = (llamadaSql('WITH g AS (SELECT gen_random_uuid() AS cid)') || { q: '', p: [] }).q;
   var ePh = (eSql || '').replace(/\s+/g, ' ');
   check('E-3: la carrera de la recompra va en el WHERE del cobro ($4 = set)',
     ePh.indexOf("NOT (COALESCE(u.capacidades->'sets_acceso','{}'::jsonb) ? $4::text)") !== -1,
     ePh.slice(-300));
-  check('E-4: el flag del set y el cobro son la MISMA sentencia (no hay pre-chequeo TOCTOU)',
-    ePh.indexOf("jsonb_build_object('sets_acceso'") !== -1
-    && ePh.indexOf('xp_total = u.xp_total - $1') !== -1, ePh.slice(0, 300));
+  check('E-4: el flag del set y el cobro son la MISMA sentencia (sin pre-chequeo TOCTOU)',
+    cuentaSql('WITH g AS (SELECT gen_random_uuid() AS cid)') === 1
+    && libro.cobros.length === 1 && libro.cobros[0].set === SET_SLUG
+    && libro.flagSet.length === 0 && libro.asientos.length === 0
+    && cuentaSql('UPDATE usuarios SET capacidades = ') === 0,
+    [cuentaSql('WITH g AS (SELECT gen_random_uuid() AS cid)'),
+      libro.cobros.length, libro.flagSet.length]);
   instalarMock(mockCompraBase(1, { sets_acceso: yaPosee }));
   var e5 = await post({ tipo: 'comprar_consumible', usuario_id: UID, clave: 'ancestral_base' });
   check('E-5: control positivo: si el cobro escribe, la respuesta NO es YA_POSEES',
-    e5._status === 200 && !!(e5._json && e5._json.acceso_set === SET_SLUG), e5._json);
+    e5._status === 200 && !!(e5._json && e5._json.acceso_set === SET_SLUG)
+    && librosE5Validos(), e5._json);
+  // El mismo statement que cobra escribe el flag del set (una sola sentencia
+  // atomica): eso es lo que hace imposible el TOCTOU, medido en filas.
+  function librosE5Validos() {
+    var c = ultimoCobro();
+    return cobrosAplicados() === 1 && !!c
+      && Math.abs((c.xp_gastado_despues - c.xp_gastado_antes) - c.precio) < 1e-9
+      && c.xp_total_despues === c.xp_total_antes
+      && libro.flagSet.length === 1 && libro.flagSet[0].set === SET_SLUG
+      && libro.asientos.length === 1 && libro.compras.length === 1;
+  }
 
   console.log('');
   console.log('== F misiones filtradas por acceso al set');

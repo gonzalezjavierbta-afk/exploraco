@@ -74,7 +74,10 @@
 //   (2) xp_ledger: registrarXpLedger en TODOS los puntos de escritura de
 //       xp_total (incluidos los exentos: misiones/logros/pandilla reto/
 //       admin_xp; restas de compras y DM con xp_final negativo) y
-//       actualizacion monotona de usuarios.nivel_max.
+//       actualizacion monotona de usuarios.nivel_max. Excepcion: los COBROS
+//       que usan sumidero (comprar_consumible, carta_acunar, ...) escriben el
+//       asiento en el MISMO statement (CTE led): xp_base = precio, xp_final = 0,
+//       es_exento = true y xp_total intacto (ADR-018).
 //   (3) Bases/acciones: visita_bono_rural 25, resena_larga 30,
 //       foto_viajero 20, ao_checkin 20, ao_proponer +30 (cap 3/dia),
 //       plan_crear +20 (cap 3/dia), plan_unirse +6 (cap 5/dia),
@@ -15516,12 +15519,17 @@ module.exports = async function handler(req, res) {
         // Placeholders: $1 precio, $2 clave, $3 usuario, $4 desbloquea_set
         // (o null), $5 desde ISO (o null), $6 consumible_id uuid. Ninguno
         // cambia de sitio: $1/$2/$3 conservan su orden historico.
+        // ADR-018: xp_total es REPUTACION y NO baja al comprar. El cargo sube
+        // xp_gastado_sinks (mismo mecanismo que faccion/casa/clase y
+        // carta_acunar): la vara de gasto es xp_total - xp_gastado_sinks, y el
+        // nivel derivado de xp_total se conserva. El asiento del ledger cuelga
+        // de cobro (patron H26): sin cobro no hay fila.
         var ccDesde = new Date().toISOString();
         var ccUpd = await sql(
           'WITH g AS (SELECT gen_random_uuid() AS cid)'
           + ', cobro AS ('
           + '    UPDATE usuarios u SET'
-          + '      xp_total = u.xp_total - $1,'
+          + '      xp_gastado_sinks = COALESCE(u.xp_gastado_sinks, 0) + $1,'
           + "      capacidades = COALESCE(u.capacidades,'{}'::jsonb)"
           + "        || jsonb_build_object('consumibles',"
           + "             COALESCE(u.capacidades->'consumibles','{}'::jsonb)"
@@ -15541,15 +15549,35 @@ module.exports = async function handler(req, res) {
           + '       AND GREATEST(u.xp_total - COALESCE(u.xp_gastado_sinks, 0), 0) >= $1'
           + '       AND ($4::text IS NULL'
           + "            OR NOT (COALESCE(u.capacidades->'sets_acceso','{}'::jsonb) ? $4::text))"
-          + '     RETURNING u.xp_total, u.capacidades, g.cid'
+          + '     RETURNING u.xp_total, u.xp_gastado_sinks, u.capacidades, g.cid'
           + '), ins AS ('
           + '    INSERT INTO compra_consumibles (id, usuario_id, consumible_id, xp_pagado)'
           + '    SELECT cobro.cid, $3, $6::uuid, $1 FROM cobro'
           + '    RETURNING id'
+          + '), led AS ('
+          // R8: columnas EXPLICITAS (patron canonico del fichero, no DEFAULTs).
+          // es_exento = true explicito: un cargo no EMITE XP, lo MUEVE; sin
+          // esto heredaria false y se contaria como XP ganado en el agregado
+          // canonico de emision (SUM(xp_final) WHERE es_exento=false).
+          // mult_origen = 1.0 explicito: es NOT NULL.
+          + '    INSERT INTO xp_ledger'
+          + '     (usuario_id, accion, xp_base, mult_nivel, mult_stack,'
+          + '      mult_final, cap_aplicado, bonos_planos, xp_final, es_exento,'
+          + '      mult_origen, origen_tier, contexto, creado_en)'
+          + "    SELECT $3, 'compra_consumible', $1, 1.0, 1.0, 1.0,"
+          + "           'ninguno', 0, 0, true, 1.0, NULL,"
+          + "           jsonb_build_object('consumible', $2::text,"
+          + "                              'consumible_id', $6::uuid,"
+          + "                              'compra_id', c.cid),"
+          + '           NOW()'
+          + '    FROM cobro c'
+          + '    RETURNING id'
           + ')'
           + ' SELECT (SELECT count(*) FROM cobro)::int            AS cobrado,'
           + '        (SELECT cid::text FROM cobro LIMIT 1)        AS compra_id,'
-          + '        (SELECT xp_total FROM cobro LIMIT 1)         AS xp_total',
+          + '        (SELECT xp_total FROM cobro LIMIT 1)         AS xp_total,'
+          + '        (SELECT GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0)'
+          + '           FROM cobro LIMIT 1)                       AS xp_disponible',
           [ccPrecio, ccClave, usuarioId2, ccSetSlug, ccDesde, ccCons[0].id]
         ).catch(function(eCcUpd){
           console.warn('[interacciones] comprar_consumible UPDATE no ejecutado: '
@@ -15606,20 +15634,20 @@ module.exports = async function handler(req, res) {
         }
         var ccXpNuevo = numXp(ccUpd[0].xp_total);
         var ccNivelNuevo = calcularNivelLocal(ccXpNuevo).nivel;
-        // ADR-053 (v25): las COMPRAS restan XP -> fila EXENTA con xp_final
-        // negativo (misma via que la apertura de DM: resta auditada).
-        await registrarXpLedger(sql, {
-          usuario_id: usuarioId2, accion: 'compra_consumible', xp_base: ccPrecio,
-          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
-          bonos_planos: 0, xp_final: red2(-ccPrecio), es_exento: true,
-          nivel: ccNivelNuevo, contexto: { consumible: ccClave, consumible_id: ccCons[0].id }
-        });
+        // El asiento de xp_ledger lo escribe el CTE led (xp_base = precio
+        // efectivo, xp_final = 0, es_exento = true): un cargo no acredita XP y
+        // la accion ya esta en BONO_EXCLUIDAS, asi que nunca recibe el bono %.
+        // xp_total no cambia; el gasto se lee en xp_gastado_sinks.
+        var ccDispNuevo = Math.max(numXp(ccUpd[0].xp_disponible), 0);
         return res.status(200).json({
           ok: true,
           precio_base: ccPrecioBase,
           precio_final: ccPrecio,
           descuento_pct: ccDescPct,
           xp_total_nuevo: red2(ccXpNuevo),
+          // Campo ADITIVO (ADR-018): disponible = xp_total - xp_gastado_sinks.
+          // xp_total_nuevo sigue siendo la reputacion almacenada y no baja.
+          xp_disponible_nuevo: red2(ccDispNuevo),
           nivel_anterior: ccNivelAnt,
           nivel_nuevo: ccNivelNuevo,
           bajo_nivel: ccNivelNuevo < ccNivelAnt,

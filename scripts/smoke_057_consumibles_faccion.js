@@ -70,6 +70,11 @@ function info(msg) { console.log('INFO - ' + msg); }
 
 // ---- Sandbox del api real (fake neon + registro de SQL ejecutado) ----
 var sqlCalls = [];
+// ---- Libro de ESCRITURAS del fake (resultado, no texto) ----
+// El fake no ejecuta SQL: MODELAMOS el cobro a partir de los parametros del
+// statement y de la fila de usuario del fixture. Asi el assert mira lo que la
+// base habria escrito (filas afectadas) y no como esta escrito el SQL.
+var libro = { cobros: [], asientos: [], compras: [] };
 function cargarApi(fileRel, expone) {
   var fakeNeon = {
     neon: function() {
@@ -108,6 +113,8 @@ var apiSrc = fs.readFileSync(path.join(ROOT, API_REL), 'utf8');
 // ---- rutas: [{ match, rows, thr }] evaluadas en orden sobre el TEXTO del SQL ----
 function instalarMock(rutas) {
   sqlCalls = [];
+  libro = { cobros: [], asientos: [], compras: [] };
+
   global.__MOCKSQL__ = function(q, p) {
     var texto = String(q || '');
     for (var i = 0; i < rutas.length; i++) {
@@ -124,6 +131,74 @@ function instalarMock(rutas) {
     }
     return Promise.resolve([]);
   };
+}
+
+// ---- Modelo del cobro (ADR-018) ----
+// El cobro real es UNA sentencia: sube xp_gastado_sinks en el precio efectivo
+// ($1), deja xp_total INTACTO y, solo si escribe fila, inserta la compra y el
+// asiento del ledger. El fake reproduce ese resultado y lo registra en libro:
+// los asserts cuentan escrituras, no ocurrencias de texto SQL.
+function aNum(v) {
+  var n = parseFloat(String(v === null || v === undefined ? 0 : v));
+  return isFinite(n) ? n : 0;
+}
+function simularCobro(cfg, p) {
+  cfg = cfg || {};
+  var precio = aNum(p[0]);
+  var usr = cfg.usr || { xp_total: '1000', xp_gastado_sinks: '0', capacidades: {} };
+  var xpTotal = aNum(usr.xp_total);
+  var xpGastado = aNum(usr.xp_gastado_sinks);
+  var disp = Math.max(xpTotal - xpGastado, 0);
+  var caps = usr.capacidades || {};
+  var setSlug = p[3] === undefined ? null : p[3];
+  var yaPosee = !!(setSlug && caps.sets_acceso && caps.sets_acceso[setSlug]);
+  var cobra = cfg.cobrado === undefined
+    ? (xpTotal >= precio && disp >= precio && !yaPosee)
+    : (aNum(cfg.cobrado) > 0);
+  var clave = String(p[1] === undefined ? '' : p[1]);
+  var usuario = String(p[2] === undefined ? '' : p[2]);
+  var fila = {
+    cobrado: cobra ? 1 : 0,
+    compra_id: cobra ? 'cccccccc-3333-4333-8333-cccccccccccc' : null,
+    xp_total: String(xpTotal),
+    xp_gastado_sinks: String(cobra ? xpGastado + precio : xpGastado),
+    xp_disponible: String(cobra ? disp - precio : disp)
+  };
+  libro.cobros.push({
+    cobrado: fila.cobrado, precio: precio, clave: clave, usuario: usuario,
+    set: setSlug, xp_total_antes: xpTotal, xp_total_despues: xpTotal,
+    xp_gastado_antes: xpGastado, xp_gastado_despues: aNum(fila.xp_gastado_sinks)
+  });
+  if (cobra) {
+    libro.asientos.push({ accion: 'compra_consumible', usuario: usuario,
+      clave: clave, xp_base: precio, xp_final: 0, es_exento: true });
+    libro.compras.push({ usuario: usuario, clave: clave, xp_pagado: precio });
+  }
+  return [fila];
+}
+function cobrosAplicados() {
+  var n = 0;
+  for (var i = 0; i < libro.cobros.length; i++) { if (libro.cobros[i].cobrado > 0) n++; }
+  return n;
+}
+function ultimoCobro() {
+  return libro.cobros.length ? libro.cobros[libro.cobros.length - 1] : null;
+}
+// Un cobro CORRECTO: sube xp_gastado_sinks exactamente el precio efectivo y
+// xp_total no se mueve.
+function cobroCorrecto() {
+  var c = ultimoCobro();
+  return !!c && c.cobrado > 0 && c.precio > 0
+    && Math.abs((c.xp_gastado_despues - c.xp_gastado_antes) - c.precio) < 1e-9
+    && c.xp_total_despues === c.xp_total_antes;
+}
+// Un cobro que NO procede: 0 filas, sinks sin cambio, 0 asientos y 0 compras.
+function cobroNoAplica() {
+  var c = ultimoCobro();
+  return !!c && c.cobrado === 0
+    && c.xp_gastado_despues === c.xp_gastado_antes
+    && c.xp_total_despues === c.xp_total_antes
+    && libro.asientos.length === 0 && libro.compras.length === 0;
 }
 
 // ---- res fake minimo ----
@@ -452,11 +527,13 @@ async function run() {
         rows: cfg.fac === undefined ? [] : [{ faccion: cfg.fac }] },
       { match: 'consumible_id=$2', rows: [{ n: cfg.limN || 0 }] },
       { match: 'FROM compra_consumibles WHERE usuario_id', rows: [{ n: cfg.globN || 0 }] },
-      // ADR-120 (spec 2.2): el cobro es UNA sola sentencia con CTE y su
-      // resultado trae la columna cobrado (0 filas = no se cobro).
+      // ADR-120 (spec 2.2) + ADR-018: el cobro es UNA sola sentencia con CTE.
+      // El fake no compara el texto: EJECUTA el resultado. cobrado = 1 solo si
+      // el XP alcanza y el set no esta poseido; entonces sube xp_gastado_sinks
+      // en el precio efectivo ($1), deja xp_total intacto y escribe la compra y
+      // el asiento del ledger.
       { match: 'WITH g AS (SELECT gen_random_uuid() AS cid)',
-        rows: [{ cobrado: cfg.cobrado === undefined ? 1 : cfg.cobrado,
-          compra_id: 'cccccccc-3333-4333-8333-cccccccccccc', xp_total: '980' }] }
+        rows: function(q, p) { return simularCobro(cfg, p); } }
     ];
   }
 
@@ -473,9 +550,10 @@ async function run() {
   check('T3-2: el 403 de faccion llega ANTES del gate de era (era Mito no se evalua)',
     !!(t3a._json && t3a._json.error === 'FACCION_INSUFICIENTE'
       && t3a._json.era_requerida === undefined), t3a._json);
-  check('T3-3: faccion se evalua antes del cobro (0 UPDATE de xp, 0 ledger de compra)',
-    cuentaSql('xp_total = u.xp_total - $1') === 0
-    && cuentaSql('INSERT INTO compra_consumibles') === 0);
+  check('T3-3: faccion se evalua antes del cobro (0 filas de cobro, 0 asientos, 0 compras)',
+    cobrosAplicados() === 0 && libro.cobros.length === 0
+    && libro.asientos.length === 0 && libro.compras.length === 0,
+    [libro.cobros.length, libro.asientos.length, libro.compras.length]);
 
   instalarMock(mockCompra({ item: itemTriple, fac: 'exploradores' }));
   var t3b = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: FIXTURE_CLAVE });
@@ -484,9 +562,10 @@ async function run() {
   check('T3-5: el 403 de nivel llega ANTES del gate de era',
     !!(t3b._json && t3b._json.error === 'NIVEL_INSUFICIENTE'
       && t3b._json.era_requerida === undefined), t3b._json);
-  check('T3-6: nivel se evalua antes del cobro (0 UPDATE de xp, 0 ledger de compra)',
-    cuentaSql('xp_total = u.xp_total - $1') === 0
-    && cuentaSql('INSERT INTO compra_consumibles') === 0);
+  check('T3-6: nivel se evalua antes del cobro (0 filas de cobro, 0 asientos, 0 compras)',
+    cobrosAplicados() === 0 && libro.cobros.length === 0
+    && libro.asientos.length === 0 && libro.compras.length === 0,
+    [libro.cobros.length, libro.asientos.length, libro.compras.length]);
   check('T3-7: el 403 de nivel devuelve nivel_requerido y un nivel_actual por debajo',
     !!(t3b._json && t3b._json.nivel_requerido === 30
       && typeof t3b._json.nivel_actual === 'number'
@@ -541,9 +620,10 @@ async function run() {
   var t4a = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO, clave: 'consumible_catalejo_explorador' });
   check('T4-1: faccion con limite_diario 1 y 1 compra en 24 h -> 200 (tope por clave retirado)',
     t4a._status === 200, t4a._json || t4a._status);
-  check('T4-2: esa compra se cobra igual (1 UPDATE de xp y 1 asiento de ledger)',
-    cuentaSql('xp_total = u.xp_total - $1') === 1
-    && cuentaSql('INSERT INTO compra_consumibles') === 1);
+  check('T4-2: esa compra se cobra igual (sinks +precio, xp_total intacto, 1 compra y 1 asiento)',
+    cobrosAplicados() === 1 && cobroCorrecto()
+    && libro.compras.length === 1 && libro.asientos.length === 1,
+    [cobrosAplicados(), libro.compras.length, libro.asientos.length, ultimoCobro()]);
   check('T4-3: la compra ya no consulta el tope por clave ni el contador global',
     cuentaSql('consumible_id=$2') === 0
     && cuentaSql('FROM compra_consumibles') === 0);
@@ -589,8 +669,8 @@ async function run() {
     apiSrc.indexOf('ccStockTope') === -1 && apiSrc.indexOf("'STOCK_LLENO'") === -1,
     [apiSrc.indexOf('ccStockTope'), apiSrc.indexOf("'STOCK_LLENO'")]);
   check('T5-3 (ADR-120): no hay pre-chequeo de stock: con stock 30 la compra SI se cobra',
-    cuentaSql('xp_total = u.xp_total - $1') === 1,
-    cuentaSql('xp_total = u.xp_total - $1'));
+    cobrosAplicados() === 1 && cobroCorrecto() && libro.asientos.length === 1,
+    [cobrosAplicados(), libro.asientos.length, ultimoCobro()]);
 
   instalarMock(mockCompra({
     item: { categoria: 'faccion', faccion_requerida: null, limite_diario: 1 },
@@ -1066,18 +1146,22 @@ async function run() {
     && srcCobro.indexOf('WITH g AS (SELECT gen_random_uuid() AS cid)') !== -1,
     srcCobro.length);
 
-  function ejecutarCobro(clave, setSlug) {
+  function ejecutarCobro(clave, setSlug, precio) {
     var capturado = null;
     var llamadas = 0;
+    var importe = precio === undefined ? 20 : precio;
     var sqlFake = function(q, p) {
       llamadas++;
       capturado = { q: String(q), p: p || [] };
-      return Promise.resolve([{ cobrado: 1, compra_id: 'cccccccc-3333-4333-8333-cccccccccccc', xp_total: 980 }]);
+      // Resultado del cobro (ADR-018): xp_total INTACTO, sinks + importe.
+      return Promise.resolve([{ cobrado: 1,
+        compra_id: 'cccccccc-3333-4333-8333-cccccccccccc', xp_total: 1000,
+        xp_gastado_sinks: importe, xp_disponible: 1000 - importe }]);
     };
     var ctx = vm.createContext({
       sql: sqlFake, Promise: Promise, parseInt: parseInt, String: String,
       console: { warn: function() {}, log: function() {} },
-      ccPrecio: 20, ccClave: clave, usuarioId2: 'U1', ccSetSlug: setSlug,
+      ccPrecio: importe, ccClave: clave, usuarioId2: 'U1', ccSetSlug: setSlug,
       ccDesde: '2026-11-10T00:00:00.000Z', ccCons: [{ id: 'cccccccc-4444-4444-8444-cccccccccccc' }]
     });
     var fuente = '(async function(){' + srcCobro
@@ -1124,8 +1208,15 @@ async function run() {
   var phClaves = Object.keys(phSet).sort().join(',');
   check('T14-7: paridad exacta placeholders/parametros = 6 y sin renumerar ($1..$6)',
     phClaves === '$1,$2,$3,$4,$5,$6' && facCobro.sql.p.length === 6, [phClaves, ph.length]);
-  check('T14-8: $1 es el precio restado y $2/$3 el merge y el WHERE del usuario',
-    facSql.indexOf('xp_total = u.xp_total - $1') !== -1
+  // El importe cobrado es un RESULTADO del statement: se ejecuta dos veces con
+  // precios distintos (20 y 37) y el importe que viaja en $1 los sigue. Asi el
+  // assert no depende de como este escrita la asignacion del cobro.
+  var cobroP37 = await ejecutarCobro('ancestral_base', 'ancestral_esencia', 37);
+  check('T14-8: $1 es el importe cobrado (diferencial 20->37, xp_total intacto) y $2/$3 clave y usuario',
+    !!cobroP37.sql && facCobro.sql.p[0] === 20 && cobroP37.sql.p[0] === 37
+    && facCobro.sql.p[1] === 'ancestral_base' && facCobro.sql.p[2] === 'U1'
+    && facSql.indexOf('xp_gastado_sinks = COALESCE(u.xp_gastado_sinks, 0) + $1') !== -1
+    && facSql.indexOf('xp_total = u.xp_total -') === -1
     && facSql.indexOf('jsonb_build_object($2::text,') !== -1
     && facSql.indexOf('WHERE u.id = $3') !== -1, facSql.slice(0, 260));
   var srcCero = extraerEntre(apiSrc, '// 0 filas = no se cobro', 'var ccCompraId');
@@ -1197,9 +1288,10 @@ async function run() {
   check('T15-5: POST comprar_consumible SIN sesion -> 401 SESION_REQUERIDA',
     t15post._status === 401 && !!t15post._json
     && t15post._json.error === 'SESION_REQUERIDA', t15post._json);
-  check('T15-6: sin sesion no hay cobro ni ledger (0 escrituras)',
-    cuentaSql('xp_total = u.xp_total - $1') === 0
-    && cuentaSql('INSERT INTO compra_consumibles') === 0);
+  check('T15-6: sin sesion no hay cobro ni ledger (0 sentencias de cobro, 0 escrituras)',
+    libro.cobros.length === 0 && cobrosAplicados() === 0
+    && libro.asientos.length === 0 && libro.compras.length === 0,
+    [libro.cobros.length, libro.asientos.length, libro.compras.length]);
 
   instalarMock(mockCompraFase1('artistas'));
   var t15falso = await post({ tipo: 'comprar_consumible', usuario_id: UID_AJENO,
@@ -1220,10 +1312,13 @@ async function run() {
     clave: CLAVES_FASE1[0] });
   check('T15-9: POST con body usuario_id AJENO -> 200 (el body se ignora)',
     t15ajenoPost._status === 200, t15ajenoPost._json || t15ajenoPost._status);
-  var cobroAjeno = llamadaSql('xp_total = u.xp_total - $1');
+  var cobroAjeno = llamadaSql('WITH g AS (SELECT gen_random_uuid() AS cid)');
   check('T15-10: el cobro se aplica al sub del token ($3 = UID_SESION) y nunca al ajeno',
     !!cobroAjeno && String(cobroAjeno.p[2]) === UID_SESION
-    && String(cobroAjeno.p[2]) !== UID_AJENO, cobroAjeno && cobroAjeno.p);
+    && String(cobroAjeno.p[2]) !== UID_AJENO
+    && libro.cobros.length === 1 && libro.cobros[0].usuario === UID_SESION
+    && libro.asientos.length === 1 && libro.asientos[0].usuario === UID_SESION,
+    [cobroAjeno && cobroAjeno.p, libro.asientos]);
 
   instalarMock(mockCompraFase1('artistas'));
   var t15propioPost = await post({ tipo: 'comprar_consumible', usuario_id: UID_SESION,

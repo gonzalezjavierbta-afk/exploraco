@@ -3193,6 +3193,119 @@ function pfFacRentabilidad(item) {
     + (neto < 0 ? '\u2212 ' : '+ ') + pfFacNum(Math.abs(neto)) + ' XP neto</span>'
     + '</div>';
 }
+/* Rentabilidad de una carta con BONO % (064): aqui bono_xp_fijo viene a 0, que
+   es el motivo de que el bloque de arriba no salga nunca en estas 4 cartas. Se
+   calcula con el dato que si viaja: con un +pct%, cada XP base rinde pct/100,
+   asi que equilibrio = precio / (pct/100), techo = tope / (pct/100) y neto
+   maximo = tope - precio. El equilibrio va hacia ARRIBA: prometerlo antes de
+   alcanzarlo es peor que pedir un XP de mas. Sin precio, pct o tope no se pinta
+   nada (ADR-008): la tarjeta queda como estaba. */
+function pfFacRentabilidadBono(item) {
+  if (!item) return '';
+  var pct = Number(item.bono_pct);
+  var tope = Number(item.bono_tope_xp);
+  var precio = Number(item.precio_xp);
+  if (!isFinite(pct) || pct <= 0) return '';
+  if (!isFinite(tope) || tope <= 0) return '';
+  if (!isFinite(precio) || precio <= 0) return '';
+  var factor = pct / 100;
+  var equilibrio = Math.ceil(precio / factor);
+  var techo = Math.round(tope / factor);
+  var neto = Math.round(tope - precio);
+  return '<div class="fac-rent">'
+    + '<span class="fac-rent-op">Equilibrio ' + pfFacNum(equilibrio)
+    + ' XP base \u00b7 techo ' + pfFacNum(techo) + ' XP base</span>'
+    + '<span class="fac-neto' + (neto < 0 ? ' negativo' : '') + '">'
+    + (neto < 0 ? '\u2212 ' : '+ ') + pfFacNum(Math.abs(neto)) + ' XP neto</span>'
+    + '</div>';
+}
+/* ---- Precio por clave: lo que necesita el EQUILIBRIO -------------------
+   El equilibrio se mide contra el PRECIO de la carta y ese dato NO viaja en el
+   objeto de efecto (?tipo=inventario). El catalogo publico (?tipo=consumibles)
+   es la unica fuente; se pide UNA vez y solo cuando hay un bono vigente que lo
+   necesita. Sin precio no hay fila (ADR-008) y NUNCA se sustituye por la cifra
+   del tope, que mide otra cosa. */
+var PF_FAC_PRECIOS = null;        /* mapa clave -> precio_xp; null = no pedido */
+var PF_FAC_PRECIOS_EST = 'idle';  /* idle | pidiendo | listo | fallo */
+function pfFacPrecioDe(clave) {
+  var k = String(clave || '');
+  if (!k) return null;
+  var it = pfFacItem(k);
+  if (it) {
+    var p = Number(it.precio_xp);
+    if (isFinite(p) && p > 0) return p;
+  }
+  if (PF_FAC_PRECIOS && Object.prototype.hasOwnProperty.call(PF_FAC_PRECIOS, k)) {
+    var q = Number(PF_FAC_PRECIOS[k]);
+    if (isFinite(q) && q > 0) return q;
+  }
+  return null;
+}
+function pfFacAsegurarPrecios() {
+  if (PF_FAC_PRECIOS_EST === 'pidiendo' || PF_FAC_PRECIOS_EST === 'listo') return;
+  var lista = PF_FAC_ESTADO.efectos || [];
+  var falta = false;
+  for (var i = 0; i < lista.length; i++) {
+    var ef = lista[i] || {};
+    if (Number(ef.bono_pct) > 0 && pfFacPrecioDe(ef.clave) === null) falta = true;
+  }
+  if (!falta) return;
+  PF_FAC_PRECIOS_EST = 'pidiendo';
+  fetch('/api/interacciones?tipo=consumibles')
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      var raw = (res && res.data) || [];
+      var map = {}, it, k;
+      if (Array.isArray(raw)) {
+        for (var j = 0; j < raw.length; j++) {
+          it = raw[j] || {};
+          if (it.clave) map[String(it.clave)] = it.precio_xp;
+        }
+      } else if (raw && typeof raw === 'object') {
+        var ks = Object.keys(raw);
+        for (k = 0; k < ks.length; k++) map[ks[k]] = (raw[ks[k]] || {}).precio_xp;
+      }
+      PF_FAC_PRECIOS = map;
+      PF_FAC_PRECIOS_EST = 'listo';
+      pfFacPintar();
+    })
+    .catch(function () { PF_FAC_PRECIOS_EST = 'fallo'; });
+}
+/* EQUILIBRIO del bono VIGENTE: XP BASE que falta para que el bono cubra el
+   PRECIO pagado (no el tope). EXIGE dos datos: pct > 0 y bono_acumulado_xp
+   NUMERICO. Si el efecto es el objeto legacy y no trae el acumulado, la fila NO
+   se pinta: decir "faltan 640" a quien ya recupero 200 es peor que callar
+   (ADR-008). acum >= precio => se dice que ya esta recuperado, sin pedir XP
+   negativos ni cero. ceil: prometerlo antes de alcanzarlo es peor que pedir un
+   XP de mas. */
+function pfFacEquilibrioHtml(ef) {
+  if (!ef) return '';
+  var pct = Number(ef.bono_pct);
+  if (!isFinite(pct) || pct <= 0) return '';
+  var acumRaw = ef.bono_acumulado_xp;
+  if (acumRaw === undefined || acumRaw === null || acumRaw === '') return '';
+  var acum = Number(acumRaw);
+  if (!isFinite(acum) || acum < 0) return '';
+  var precio = pfFacPrecioDe(ef.clave);
+  if (precio === null) return '';
+  if (acum >= precio) {
+    return '. Precio ya recuperado por este bono (' + pfFacNum(precio) + ' XP)';
+  }
+  var falta = Math.ceil((precio - acum) * 100 / pct);
+  if (!(falta > 0)) return '';
+  return '. Faltan <b>' + pfFacNum(falta) + ' XP base</b> para el equilibrio'
+    + ' (precio ' + pfFacNum(precio) + ' XP)';
+}
+/* TOPE (otra cifra, otra palabra): XP base que falta para AGOTAR el tope con
+   el bono vigente = restante / (pct/100). Jamas se rotula 'equilibrio'. */
+function pfFacFaltanTope(ef) {
+  if (!ef) return 0;
+  var pct = Number(ef.bono_pct);
+  var rest = Number(ef.restante);
+  if (!isFinite(pct) || pct <= 0) return 0;
+  if (!isFinite(rest) || rest <= 0) return 0;
+  return Math.ceil(rest * 100 / pct);
+}
 /* Bono +% (064): '+15% XP durante 24 h - tope 400 XP'. Se compone SOLO con lo
    que trae el dato: bono_pct, bono_tope_xp y duracion_horas (o la ventana
    activo_desde..expira_en del mapa). Sin bono_pct no hay cifra y el llamador
@@ -3260,7 +3373,7 @@ function pfFacCardHtml(item) {
     + (bono ? '<div class="fac-bono">' + esc(bono) + '</div>' : '')
     + '<div class="fac-desc">' + esc(item.descripcion || '') + '</div>'
     + '<div class="fac-precio">' + pfFacNum(item.precio_xp) + ' XP</div>'
-    + pfFacRentabilidad(item)
+    + (pfFacRentabilidadBono(item) || pfFacRentabilidad(item))
     + (ops.length ? '<div class="fac-ops">Bono en: ' + esc(ops.join(', ')) + '</div>' : '')
     + (candado ? '<div class="fac-lock"><span aria-hidden="true">\uD83D\uDD12</span>'
         + '<span>' + esc(candado) + '</span></div>' : '')
@@ -3300,7 +3413,15 @@ function pfFacEfectoHtml() {
     }
     if (ef.restante !== undefined && ef.restante !== null) {
       partes += ' Restante del tope: <b>' + pfFacNum(ef.restante) + ' XP</b>';
+      /* Distancia al TOPE, no al equilibrio: se rotula por lo que es. */
+      var faltanTope = pfFacFaltanTope(ef);
+      if (faltanTope > 0) {
+        partes += '. Faltan <b>' + pfFacNum(faltanTope) + ' XP base</b> para agotar el tope';
+      }
     }
+    /* Equilibrio (XP base para cubrir el PRECIO): si no hay precio del
+       catalogo, no se pinta y no se sustituye por la cifra del tope. */
+    partes += pfFacEquilibrioHtml(ef);
     var idReloj = '';
     if (!relojPuesto) { idReloj = ' id="pf-fac-reloj"'; relojPuesto = true; }
     filas.push('<div class="fac-efecto">'
@@ -3399,6 +3520,10 @@ function pfFacCargar(uid) {
       PF_FAC_ESTADO.efectos = pfFacEfectosDe(inv);
       PF_FAC_ESTADO.efecto = PF_FAC_ESTADO.efectos.length ? PF_FAC_ESTADO.efectos[0] : null;
       pfFacPintar();
+      /* El equilibrio necesita el precio de la carta, que no viaja en el
+       * inventario: se pide una sola vez, y solo si hay un bono vigente que lo
+       * use. Al llegar repinta; si falla, la fila no aparece (ADR-008). */
+      pfFacAsegurarPrecios();
     })
     .catch(function() {
       el.innerHTML = '<div class="fac-err">No se pudo cargar tu efecto de faccion.</div>';

@@ -930,10 +930,14 @@
     var fac = String(c.faccion_requerida || '').trim();
     if (fac) nota += (nota ? ' - ' : '') + 'Faccion: ' + nombreFaccion(fac);
     /* ADR-120 (064): la ficha de CartasUI es el unico sitio con espacio para
-     * la mejora y para el acceso al set; se reutiliza, no hay componente
+     * la mejora, su VENTANA y el acceso al set; se reutiliza, no hay componente
      * nuevo. Sin dato no se anade nada. */
-    var bono = bonoTxt(c, true);
+    var bono = bonoTxt(c, false);
     if (bono) nota += (nota ? ' - ' : '') + bono;
+    /* Rentabilidad del bono %: la ficha es donde cabe entera (equilibrio,
+     * techo y neto). Sin precio, pct o tope no se anade nada (ADR-008). */
+    var rent = bonoRentTxt(c);
+    if (rent) nota += (nota ? ' - ' : '') + rent;
     var set = setDe(c);
     if (set) nota += (nota ? ' - ' : '') + (SET_TXT[set] || ('Set ' + setNombre(set)));
     if (nota) o.nota = nota;
@@ -942,16 +946,30 @@
   /* ---- Bono 24 h y acceso a set (ADR-120 / migracion 064) --------------
    * duracion_horas SI viaja en ?tipo=consumibles; bono_pct, bono_tope_xp,
    * desbloquea_set, otorga_carta y es_permanente dependen de que el SELECT del
-   * motor los exponga. Sin esos campos NO se inventa la cifra: la tarjeta
-   * declara la ventana solo si la descripcion del propio producto ya la dice y
-   * la ficha llevan el texto editorial completo. Nada de esto concede acceso:
-   * el candado (motivo_bloqueo) y la posesion (YA_POSEES) son del backend. */
+   * motor los exponga. Sin esos campos NO se inventa la cifra: si falta la
+   * columna de la ventana se lee la que declara el propio texto del producto.
+   * Nada de esto concede acceso: el candado (motivo_bloqueo) y la posesion
+   * (YA_POSEES) son del backend. */
+  /* Horas que el TEXTO del producto declara ('24 h'). 0 si no declara
+   * ninguna: sin dato no se pinta ventana (ADR-008). */
+  function bonoHorasDesc(c) {
+    var m = /(?:^|[^0-9])([0-9]{1,3})\s*h\b/i.exec(String((c && c.descripcion) || ''));
+    if (!m) return 0;
+    var h = parseInt(m[1], 10);
+    return (isFinite(h) && h > 0) ? h : 0;
+  }
+  /* Ventana del bono: la columna manda; el texto del producto es el respaldo. */
+  function bonoHorasDe(c) {
+    var horas = parseInt(c && c.duracion_horas, 10);
+    if (isFinite(horas) && horas > 0) return horas;
+    return bonoHorasDesc(c);
+  }
   function bonoTxt(c, sinHoras) {
     var pct = num(c && c.bono_pct);
     if (pct <= 0) return '';
     var t = '+' + fmt(pct) + '% XP';
-    var horas = parseInt(c && c.duracion_horas, 10);
-    if (!sinHoras && isFinite(horas) && horas > 0) t += ' durante ' + horas + ' h';
+    var horas = bonoHorasDe(c);
+    if (!sinHoras && horas > 0) t += ' durante ' + horas + ' h';
     var tope = num(c && c.bono_tope_xp);
     if (tope > 0) t += ' - tope ' + fmt(tope) + ' XP';
     return t;
@@ -962,15 +980,74 @@
       /* Sin bono_pct: se declara la VENTANA, y solo si la descripcion del
        * producto la declara. Asi las cartas de bono se leen como mejora 24 h
        * sin fabricar un porcentaje que el catalogo no mando. */
-      var horas = parseInt(c && c.duracion_horas, 10);
-      var desc = String((c && c.descripcion) || '').toLowerCase();
-      if (isFinite(horas) && horas > 0 && desc.indexOf(horas + ' h') !== -1) {
-        txt = 'Bono ' + horas + ' h';
-      }
+      var hd = bonoHorasDesc(c);
+      if (hd > 0) txt = 'Bono ' + hd + ' h';
     }
     if (!txt) return '';
     return '<span class="mk-cat-t bono" title="Bono de XP global por tiempo limitado">'
       + esc(txt) + '</span>';
+  }
+  /* ---- Corte de la descripcion de la TARJETA ---------------------------
+   * La ficha lleva el texto integro; la tarjeta solo tiene 110 caracteres. El
+   * corte va por PALABRA, asi que no puede partir una cifra (precio, %, tope o
+   * ventana de 24 h) ni dejar medio numero con la elipsis. La elipsis solo se
+   * anade cuando de verdad sobra texto. */
+  var DESC_MAX = 110;
+  function descCorta(txt) {
+    var s = String(txt || '');
+    if (s.length <= DESC_MAX) return s;
+    var partes = s.split(' ');
+    var acc = '';
+    for (var i = 0; i < partes.length; i++) {
+      var cand = acc ? (acc + ' ' + partes[i]) : partes[i];
+      if (cand.length > DESC_MAX) break;
+      acc = cand;
+    }
+    if (!acc) acc = s.slice(0, DESC_MAX).replace(/\s+$/, '');
+    /* Signos y conectores sueltos al final ('... durante 24' / '... de la'):
+     * se retiran para que el corte se lea entero. */
+    acc = acc.replace(/[\s,;:.\-\u2013\u2014]+$/, '');
+    acc = acc.replace(/\s+(de|del|la|el|los|las|un|una|y|o|con|en|para|por|que)$/i, '');
+    return acc + '\u2026';
+  }
+  /* ---- Rentabilidad del bono % (tarea de UI, 064) ----------------------
+   * Con un +pct%, cada XP base rinde pct/100, asi que:
+   *   equilibrio (lo util) = precio / (pct/100)  -> XP base para que el bono
+   *                          CUBRA el precio pagado. Redondeo hacia ARRIBA:
+   *                          prometer el equilibrio antes de alcanzarlo es peor
+   *                          que pedir un XP de mas.
+   *   techo                = tope / (pct/100)    -> XP base para agotar el tope.
+   *   neto maximo          = tope - precio       -> lo que deja al agotarlo.
+   * Sin precio, pct o tope no hay cifra (ADR-008). */
+  function bonoRentTxt(c) {
+    var pct = num(c && c.bono_pct);
+    var tope = num(c && c.bono_tope_xp);
+    var precio = num(c && c.precio_xp);
+    if (!(pct > 0) || !(tope > 0) || !(precio > 0)) return '';
+    var factor = pct / 100;
+    var equilibrio = Math.ceil(precio / factor);
+    var techo = Math.round(tope / factor);
+    var neto = Math.round(tope - precio);
+    return 'Equilibrio ' + fmt(equilibrio) + ' XP base - techo ' + fmt(techo)
+      + ' XP base (' + (neto < 0 ? '\u2212 ' : '+ ') + fmt(Math.abs(neto))
+      + ' XP neto)';
+  }
+  /* Chip CORTO de amortizacion para la tarjeta. Solo se ofrece cuando la
+   * tarjeta no lleva gates ni set: si compite con precio y candados se omite,
+   * porque la cifra entera vive en la ficha. Se dice en palabras del jugador
+   * (amortiza), no con una abreviatura que exija glosario. */
+  function rentChipHtml(c) {
+    var pct = num(c && c.bono_pct);
+    var tope = num(c && c.bono_tope_xp);
+    var precio = num(c && c.precio_xp);
+    if (!(pct > 0) || !(precio > 0)) return '';
+    var eq = Math.ceil(precio / (pct / 100));
+    if (tope > 0 && tope <= precio) {
+      return '<span class="mk-cat-t" title="El tope del bono no cubre el precio:'
+        + ' no se amortiza">No amortiza</span>';
+    }
+    return '<span class="mk-cat-t" title="XP base que necesitas ganar para que'
+      + ' el bono cubra el precio de la carta">Amortiza en ' + fmt(eq) + ' XP</span>';
   }
   /* El slug del set y la clave de la carta base son estables en el catalogo,
    * asi que el respaldo por clave es COPY (la columna aun no viaja), nunca un
@@ -1064,8 +1141,7 @@
       var precio = (c.precio_xp != null) ? fmt(c.precio_xp) + ' XP' : '-';
       var extra = (c.precio_xp_base != null && c.precio_xp_base !== c.precio_xp)
         ? (' \u00b7 base ' + fmt(c.precio_xp_base) + ' XP') : '';
-      var desc = String(c.descripcion || '');
-      if (desc.length > 110) desc = desc.slice(0, 110) + '\u2026';
+      var desc = descCorta(c.descripcion);
       var tags = (cant > 0)
         ? '<span class="mk-cat-t tienes">Lo tienes: x' + cant + '</span>'
         : '<span class="mk-cat-t falta">No lo tienes</span>';
@@ -1078,11 +1154,16 @@
         tags += '<span class="mk-cat-t bloq" title="' + esc(motivo) + '">'
           + esc(motivoTxt || 'Bloqueado') + '</span>';
       }
-      tags += gatesCatalogoHtml(c);
+      var gates = gatesCatalogoHtml(c);
+      tags += gates;
       /* ADR-120 (064): mejora 24 h de las cartas de bono y acceso al set de la
        * carta base. Sin dato en el catalogo los dos helpers devuelven '' y la
        * tarjeta queda EXACTAMENTE como antes (ADR-008). */
+      var haySet = !!setDe(c);
       tags += bonoChipHtml(c) + setChipHtml(c);
+      /* Chip de equilibrio: SOLO si la tarjeta no lleva gates ni set, para no
+       * competir con el precio ni con los candados. La ficha la lleva entera. */
+      if (!gates && !haySet) tags += rentChipHtml(c);
       var sinPrecio = (c.precio_xp === null || c.precio_xp === undefined);
       var comprable = !c.bloqueado && !sinPrecio;
       var titulo = c.bloqueado
@@ -1454,8 +1535,19 @@
         if (res && res.ok) {
           var desc = (num(res.descuento_pct) > 0)
             ? (' (-' + fmt(res.descuento_pct) + '%)') : '';
-          var resto = (res.xp_total_nuevo != null)
-            ? (' Te quedan ' + fmt(res.xp_total_nuevo) + ' XP.') : '';
+          /* El cobro NO baja xp_total (ADR-018: es reputacion); el saldo real es
+           * el campo aditivo xp_disponible_nuevo = xp_total - xp_gastado_sinks.
+           * Si no llega, NO se afirma saldo: se nombra la reputacion por lo que
+           * es (ADR-008), porque "te quedan N XP" con ella miente en cuanto se
+           * cobra un sumidero. */
+          var disp = (res.xp_disponible_nuevo != null)
+            ? num(res.xp_disponible_nuevo) : null;
+          var resto = '';
+          if (disp !== null) {
+            resto = ' Te quedan ' + fmt(disp) + ' XP.';
+          } else if (res.xp_total_nuevo != null) {
+            resto = ' Tu reputacion: ' + fmt(res.xp_total_nuevo) + ' XP.';
+          }
           toast('\u2705 Compra realizada: ' + fmt(res.precio_final) + ' XP' + desc + '.' + resto, '#16a34a');
           /* _catalogo = null: el GET vuelve a pedir los gates por usuario
            * (bloqueado/precio) ademas de mi datos e inventario. recargar()
