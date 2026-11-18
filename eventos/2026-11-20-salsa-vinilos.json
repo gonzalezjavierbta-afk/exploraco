@@ -1,0 +1,132 @@
+[
+  {
+    "slug": "salsa-y-descontrol-vol-2-2026",
+    "nombre": "Salsa y Descontrol Vol. 2",
+    "lead": "Una noche de pura salsa y viche sin parar en la casita, celebrando los 7 años del 21N.",
+    "descripcion": "Llega la segunda edición de Salsa y Descontrol a las instalaciones de Las Moscas, uniendo fuerzas con Ancestral Bebida para ofrecer una velada imperdible de salsa brava, vinilos y viche. Disfruta de una nómina de lujo en las consolas y el tradicional ritual de choris y choris veg a cargo de @monstruacion, acompañado de soberanía etílica y pola toda la noche.\n\nA partir de las 9:00 p.m. arranca el desorden en un ambiente de cofradía y cultura urbana en el corazón de Bogotá.",
+    "ciudad": "Bogotá",
+    "region": "Bogotá D.C.",
+    "barrio": "Chapinero / Marly",
+    "lat": 4.6392,
+    "lng": -74.0655,
+    "web": "",
+    "instagram": "@tallerdelasmoscas",
+    "precio_desde": "$12.000",
+    "horario": "9:00 p.m. - 3:00 a.m.",
+    "emoji": "💃",
+    "hero_bg": "linear-gradient(135deg,#7a0d1e 0%,#0B0A09 100%)",
+    "foto_hero": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2b/Salsa_dancing.jpg/960px-Salsa_dancing.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Cuál es el valor del aporte de entrada?",
+        "respuesta": "El aporte es de $12.000 por persona."
+      },
+      {
+        "pregunta": "¿Qué horario tiene el evento?",
+        "respuesta": "El evento inicia a las 9:00 p.m. y va hasta las 3:00 a.m."
+      },
+      {
+        "pregunta": "¿Dónde se realiza?",
+        "respuesta": "En la Cra 19A # 61E-11, Bogotá."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-11-20",
+      "fecha_fin": "2026-11-20",
+      "edicion": "Vol. 2",
+      "sede": "Cra 19A # 61E-11, Bogotá",
+      "organiza": "Las Moscas & Ancestral Bebida",
+      "lema": "A 7 años del 21N la revolución sigue siendo una fiesta",
+      "tipo_evento": "musica",
+      "lineup": [
+        { "nombre": "Órbita", "rol": "DJ Set", "genero": "Salsa / Vinilos" },
+        { "nombre": "JurasiX", "rol": "DJ Set", "genero": "Salsa" },
+        { "nombre": "José Campana", "rol": "DJ Set", "genero": "Salsa" },
+        { "nombre": "Bacatá", "rol": "DJ Set", "genero": "Salsa" },
+        { "nombre": "Ancestral", "rol": "Invitado especial", "genero": "Viche / Bebidas ancestrales" }
+      ],
+      "agenda": [
+        { "dia": "2026-11-20", "hora": "9:00 p.m.", "actividad": "Apertura de puertas y inicio de DJ sets" },
+        { "dia": "2026-11-20", "hora": "3:00 a.m.", "actividad": "Cierre del evento" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "General", "precio": "$12.000", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": [
+        "Buena actitud",
+        "Efectivo para el aporte y consumo"
+      ],
+      "prohibido": [
+        "Armas",
+        "Comportamientos violentos"
+      ]
+    }
+  },
+  {
+    "slug": "vinilos-inversos-c8yu",
+    "nombre": "Vinilos N Versos Vol. 2",
+    "lead": "Una sesión especial de alta fidelidad y selección en vinilo con los mejores exponentes de la escena local.",
+    "descripcion": "Llega la segunda entrega de Vinilos N Versos, una experiencia sonora imperdible centrada en el formato físico y el calor de los surcos de vinilo. Reunimos a una selecta nómina de selectores y artistas independientes para una noche de inmersión musical, cultura de coleccionista y buena compañía en el espacio de R10.\n\nDisfruta de una curaduría musical excepcional que cruza géneros y épocas en un formato acústico y visualmente auténtico.",
+    "ciudad": "Bogotá",
+    "region": "Bogotá D.C.",
+    "barrio": "La Candelaria / Centro",
+    "lat": 4.5981,
+    "lng": -74.0758,
+    "web": "https://hostalterraza.vercel.app/evento.html?slug=vinilos-inversos-c8yu",
+    "instagram": "@r10_bogota",
+    "precio_desde": "$15.000",
+    "horario": "8:00 p.m. - 3:00 a.m.",
+    "emoji": "💿",
+    "hero_bg": "linear-gradient(135deg,#c98b2e 0%,#0B0A09 100%)",
+    "foto_hero": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/40/DJ_Setup_Vinyl_Records.jpg/960px-DJ_Setup_Vinyl_Records.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Cuál es el valor de la entrada?",
+        "respuesta": "El aporte sugerido para la sesión es de $15.000."
+      },
+      {
+        "pregunta": "¿Dónde se realiza el evento?",
+        "respuesta": "En la sede cultural R10 (Calle 12B #5-07, Bogotá)."
+      },
+      {
+        "pregunta": "¿Qué tipo de música se programa?",
+        "respuesta": "Selección exclusiva en formato de vinilo abarcando diversos géneros de la cultura sonora independiente."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-11-20",
+      "fecha_fin": "2026-11-20",
+      "edicion": "Vol. 2",
+      "sede": "Calle 12B #5-07, Bogotá (R10)",
+      "organiza": "Charlie Jamm & R10",
+      "lema": "El sonido puro del vinilo en el corazón de la ciudad",
+      "tipo_evento": "musica",
+      "lineup": [
+        { "nombre": "Charlie Jamm", "rol": "Selector / DJ", "genero": "Vinilo" },
+        { "nombre": "Rente", "rol": "Selector / DJ", "genero": "Vinilo" },
+        { "nombre": "Urka", "rol": "Selector / DJ", "genero": "Vinilo" },
+        { "nombre": "Kümbra", "rol": "Selector / DJ", "genero": "Vinilo" },
+        { "nombre": "Jah Fellah", "rol": "Selector / DJ", "genero": "Vinilo" }
+      ],
+      "agenda": [
+        { "dia": "2026-11-20", "hora": "8:00 p.m.", "actividad": "Apertura de puertas y calentamiento en vinilo" },
+        { "dia": "2026-11-20", "hora": "3:00 a.m.", "actividad": "Cierre de la sesión" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "General", "precio": "$15.000", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": [
+        "Pasión por la música",
+        "Efectivo para ingresos y barra"
+      ],
+      "prohibido": [
+        "Armas",
+        "Mal comportamiento"
+      ]
+    }
+  }
+]
