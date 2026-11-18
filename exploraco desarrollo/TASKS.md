@@ -7327,5 +7327,24 @@ Ambos: fecha **2026-11-20**, `status=published`. **Ficheros de la tanda:** lote 
 
 **Enlaces (no argumentos; ADR-084 D1).** Vias de agenda ya documentadas en **TSK** de la tanda de eventos (seccion historica de este fichero) | **ADR-002** (ASCII-safe) | **ADR-006** (baseline = archivo real) | **ADR-003** (cero borrado de registros) | **ADR-084 D1** (el argumento vive una vez).
 
+**Cierre final del 2026-11-18 (segundo pase documental R2; solo `.md`, cero codigo nuevo en este pase).** Los **2 eventos siguen publicados** y el **defecto JSON-LD queda CORREGIDO y DESPLEGADO**, no solo registrado: lo que en esta misma seccion figuraba como "registrado, NO asignado, NO tocado" **ya no aplica** (se conserva como historial, ADR-003; la frase quedo superada por el commit `c5373da`).
+- **Commits de la tanda (push `d306031..5b745ac` a `main`):** `f5fa639` (feat: publicar los 2 eventos del 2026-11-20) -> `c5373da` (fix seo: JSON-LD Event con `startDate`, `endDate`, `eventStatus` y `location`; **47 inserciones, 0 borrados**, solo `api/pagina-destino.js`) -> `5b745ac` (docs: cierre de los 2 eventos y del defecto preexistente).
+- **Certificacion:** Escudo GOLD **7/7** y verificacion **en vivo post-deploy 7/7** en los 2 eventos (`startDate` **2026-11-20**, `eventStatus` `EventScheduled`, `location` con `PostalAddress`/`CO`, sin `endDate` cuando `fecha_fin == fecha_inicio`, 0 claves duplicadas); no-regresion en vivo: `/palomino.html` sigue `TouristAttraction` y `/la-fruteria-candelaria-bogota.html` sigue `FoodEstablishment` con `hasMenu` y `telephone`.
+- **Bug registrado:** **`BUGS_HISTORICOS.md` BUG-157** (severidad BAJA, CORREGIDO) -- ahi vive el argumento completo del defecto, su medicion y su deuda cosmetica. **No se repite aqui** (ADR-084 D1).
+- **Estado del pendiente de dato:** sigue **abierto y sin asignar a codigo** (coordenadas Marly/R10, `web` del evento de salsa, `fotos_galeria: []`); la **galeria** se abre como tarea propia en **TSK-260**. **Cierre no bloqueante.**
+
+
+## TSK-260 - Cargar `fotos_galeria` de los 2 eventos del 2026-11-20 (`salsa-y-descontrol-vol-2-2026`, `vinilos-inversos-c8yu`), hoy `[]` en ambos - 2026-11-18 - PENDIENTE (no abierto a ejecucion: depende de que el operador aporte material real)
+
+**Que falta exactamente (medido, ADR-006).** Los dos eventos publicados en **TSK-259** tienen `fotos_galeria` **vacia**: la galeria de la ficha se pinta con lo que haya y hoy solo existe `foto_hero` (HEAD **200** en las dos). No es un defecto del motor ni una regresion: es **falta de dato**.
+
+**Via obligatoria.** `@data-migration` (**GATE** de la seccion 2 de `AGENTS.md`) con un **lote aparte** y **UPDATE acotado por slug** sobre esas 2 filas. **Prohibido re-subir `eventos/eventos.json`** (**62 KB**): regeneraria la agenda completa por una edicion de galeria y el `upload-eventos.js --seed` es **DELETE+POST**, no un parche.
+
+**Precondicion de arranque (BLOQUEANTE).** El operador debe aportar las URLs reales (material propio o licencia verificable), con **HEAD 200** comprobado por `@research-agent` antes de tocar Neon. Sin material no se abre la tarea: **no se rellenan galerias con stock ni con las `foto_hero` repetidas**.
+
+**Criterio de cierre.** Las 2 filas con `fotos_galeria` de **>= 1** URL cada una, HTTP **200** verificado en las 2 paginas renderizadas, sin tocar `foto_hero` ni ningun otro campo, y `sitemap.xml` / agenda (**84** eventos) sin cambios.
+
+**Enlaces (no argumentos).** Contexto de la publicacion: **TSK-259** en este fichero | **BUG-157** (`BUGS_HISTORICOS.md`, JSON-LD ya corregido, no relacionado con la galeria) | **ADR-003** (cero borrado: la galeria se **anade**, no se reescribe la fila).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

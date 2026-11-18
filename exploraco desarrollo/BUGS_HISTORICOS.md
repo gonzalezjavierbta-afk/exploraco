@@ -2754,6 +2754,20 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 - **Impacto acotado:** **no afecto a usuarios reales**: el unico caso era la **pieza de prueba** de D-34 y su comprador (el operador). El defecto habria escalado a dano real en cuanto una carta legitima se retirara con copias vendidas.
 - **Nota de alcance:** es un **efecto lateral del cierre de D-34**, no del contrato de copias. La regla que queda escrita es **"se retira la venta, no la propiedad"** (ADR-121 Enmienda 12, punto 3), y este bug es la evidencia de por que se escribio.
 
+## BUG-157: el JSON-LD `Event` de `api/pagina-destino.js` no emitia `startDate`, `endDate`, `eventStatus` ni `location` -- `startDate` es propiedad REQUERIDA de schema.org/Event, asi que los 84 eventos publicados quedaban inelegibles para rich results -- **CORREGIDO (2026-11-18, TSK-259; fix en `c5373da`, cierre documental en `5b745ac`)**
+
+- **Severidad:** BAJA (SEO / elegibilidad de rich results), **impacto funcional NULO**: la pagina renderiza y el JSON-LD es JSON valido; lo que falta es el tipo de dato que los buscadores exigen para el rich result de evento.
+- **Sintoma:** el nodo `@type:"Event"` que emite el motor no llevaba `startDate`, `endDate`, `eventStatus` ni `location`. `startDate` es **propiedad requerida** de schema.org/Event, luego **ninguno de los 84 eventos** de la agenda era elegible para rich results de evento.
+- **Deteccion:** auditoria de render del **2026-11-18** sobre `/salsa-y-descontrol-vol-2-2026.html` y `/vinilos-inversos-c8yu.html`: el nodo era **`@type:"Event"` valido** pero `hasStartDate:false` en las dos fichas.
+- **Causa y alcance:** el bloque de la rama `evento` del else **no-blog** solo emitia el `@type`; nadie cruzo `tags.fecha_inicio`/`fecha_fin`/`sede` al JSON-LD. **Defecto PREEXISTENTE**: afecta a **toda la agenda**, no lo introduce el lote de eventos del 2026-11-20 (TSK-259), que es solo cuando se midio.
+- **Correccion:** commit **`c5373da`** ("fix(seo): JSON-LD Event con startDate, endDate, eventStatus y location"), **47 inserciones / 0 borrados** en un solo fichero (`api/pagina-destino.js`). Helpers `schemaTags` / `schemaFechaISO` en **`api/pagina-destino.js:292-312`** (tags JSONB a objeto plano; fecha **YYYY-MM-DD** validada contra calendario real, sin inventar hora -- `tags.horario` es texto libre) y bloque **`if (cat === 'evento')`** en **`api/pagina-destino.js:356-377`**.
+- **Degradacion condicional:** si `tags.fecha_inicio` no es una fecha **YYYY-MM-DD** valida **no se emite** `startDate` (ni `endDate`) y el JSON **sigue parseable**; `endDate` solo aparece si existe y **no repite** el inicio. No se inventa fecha en ningun caso.
+- **Certificacion Escudo GOLD 7/7:** `node --check` **exit 0**, **0** bytes > 127, **0** backticks en el fragmento serverless, **0** borrados.
+- **Verificacion en vivo post-deploy 7/7 en los 2 eventos:** `startDate` **2026-11-20**, `eventStatus` **`https://schema.org/EventScheduled`**, `location` con **`PostalAddress`** y **`addressCountry:"CO"`**, **sin** `endDate` cuando `fecha_fin == fecha_inicio` y **0** claves duplicadas en el nodo.
+- **No-regresion probada en vivo (mismo pase):** `/palomino.html` sigue emitiendo **`TouristAttraction`** y `/la-fruteria-candelaria-bogota.html` sigue **`FoodEstablishment`** con `hasMenu` y `telephone`; **ninguna** de las dos gano claves de evento. El `address` de nivel superior se dejo intacto a proposito, con un `address` anidado propio dentro de `location`.
+- **Deuda menor documentada (NO corregida; cosmetica, sin efecto en rich results):** (a) `eventStatus` se emite **fuera** del `if (iniEv)` (`:367`), luego sale aunque no haya `startDate` -- inofensivo pero incoherente, porque sin `startDate` el nodo tampoco es elegible; (b) `location.name` puede quedar **vacio** si `tags.sede` y `d.nombre` estan ambos vacios (`:376`, `sedeEv || (d.nombre || '')`).
+- **Nota de alcance:** el fix es de **render** y viajo con **gate de `@renderer-dev`** + Escudo GOLD; **cero endpoint nuevo** (`api/*.js` sigue **8/8**), cero migracion y cero cambio de contrato de datos: se **lee** lo que ya estaba en `tags`, no se escribe nada.
+
 
 
 
