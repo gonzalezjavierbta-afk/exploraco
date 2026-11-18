@@ -289,6 +289,28 @@ function menuSchemaLD(platos) {
   return { '@type':'Menu', 'hasMenuSection': secciones };
 }
 
+// tags como objeto plano para el JSON-LD: acepta el JSONB ya parseado
+// (objeto), un string JSON o null/vacio. Nunca devuelve array ni null, para
+// que el builder pueda leer campos sin guardas repetidas.
+function schemaTags(v) {
+  if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+  var p = safeJSON(v);
+  return (p && typeof p === 'object' && !Array.isArray(p)) ? p : {};
+}
+
+// Fecha ISO YYYY-MM-DD o cadena vacia. NO inventa hora (tags.horario es texto
+// libre) y NO reescribe el valor: solo valida forma y que el dia exista en el
+// calendario. Un valor raro degrada a '' y el llamador omite la clave.
+function schemaFechaISO(v) {
+  var s = String(v === null || v === undefined ? '' : v).trim();
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return '';
+  var y = parseInt(m[1], 10), mo = parseInt(m[2], 10), dy = parseInt(m[3], 10);
+  var dt = new Date(Date.UTC(y, mo - 1, dy));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== dy) return '';
+  return s;
+}
+
 // img (4o argumento, opcional): URL YA resuelta por la cascada del hero
 // (foto_hero -> foto -> primera curada valida -> Unsplash por categoria).
 // Con tags.sin_foto_hero esa cascada NO llega al Unsplash de categoria y el
@@ -328,6 +350,31 @@ function schemaLD(d, cat, autor, img) {
     if (d.rating && d.total_resenas>0) schema['aggregateRating'] = { '@type':'AggregateRating','ratingValue':parseFloat(d.rating).toFixed(1),'ratingCount':d.total_resenas,'bestRating':'5','worstRating':'1' };
     if (d.precio_desde) schema['priceRange'] = d.precio_desde;
     if (d.telefono) schema['telephone'] = d.telefono;
+    // schema.org/Event: startDate es REQUERIDA y este builder no la emitia,
+    // asi que los eventos quedaban inelegibles para rich results. Solo en la
+    // rama evento; el resto de categorias no toca estas claves.
+    if (cat === 'evento') {
+      var tagsEv = schemaTags(d.tags);
+      var iniEv = schemaFechaISO(tagsEv.fecha_inicio);
+      var finEv = schemaFechaISO(tagsEv.fecha_fin);
+      // Sin fecha_inicio valida no se emite startDate ni endDate: el JSON-LD
+      // sigue siendo valido (degradacion condicional, no se inventa fecha).
+      if (iniEv) {
+        schema['startDate'] = iniEv;
+        // endDate solo si existe y NO repite el inicio.
+        if (finEv && finEv !== iniEv) schema['endDate'] = finEv;
+      }
+      schema['eventStatus'] = 'https://schema.org/EventScheduled';
+      var sedeEv = String(tagsEv.sede === null || tagsEv.sede === undefined ? '' : tagsEv.sede).trim();
+      // address anidado propio: el address de nivel superior se queda igual
+      // (otra categoria de ficha y otro nodo), sin claves repetidas.
+      var dirEv = { '@type':'PostalAddress' };
+      if (sedeEv) dirEv['streetAddress'] = sedeEv;
+      if (d.ciudad) dirEv['addressLocality'] = d.ciudad;
+      if (d.region) dirEv['addressRegion'] = d.region;
+      dirEv['addressCountry'] = 'CO';
+      schema['location'] = { '@type':'Place', 'name': sedeEv || (d.nombre || ''), 'address': dirEv };
+    }
     // ADR-119: hasMenu solo en fichas de comida y solo con al menos un plato.
     // Sin platos no se crea la clave (nada de hasMenu vacio).
     if (cat === 'comida') {
